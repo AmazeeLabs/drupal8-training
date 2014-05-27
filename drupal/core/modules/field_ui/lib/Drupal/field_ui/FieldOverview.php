@@ -269,7 +269,10 @@ class FieldOverview extends OverviewBase {
     $form['fields'] = $table;
 
     $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array('#type' => 'submit', '#value' => $this->t('Save'));
+    $form['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#button_type' => 'primary',
+      '#value' => $this->t('Save'));
 
     return $form;
   }
@@ -421,7 +424,7 @@ class FieldOverview extends OverviewBase {
     if (!empty($form_values['_add_existing_field']['field_name'])) {
       $values = $form_values['_add_existing_field'];
       $field_name = $values['field_name'];
-      $field = field_info_field($this->entity_type, $field_name);
+      $field = FieldConfig::loadByName($this->entity_type, $field_name);
       if (!empty($field->locked)) {
         drupal_set_message($this->t('The field %label cannot be added because it is locked.', array('%label' => $values['label'])), 'error');
       }
@@ -489,7 +492,7 @@ class FieldOverview extends OverviewBase {
 
     // Collect candidate field instances: all instances of fields for this
     // entity type that are not already present in the current bundle.
-    $field_map = field_info_field_map();
+    $field_map = \Drupal::entityManager()->getFieldMap();
     $instance_ids = array();
     if (!empty($field_map[$this->entity_type])) {
       foreach ($field_map[$this->entity_type] as $field_name => $data) {
@@ -528,16 +531,17 @@ class FieldOverview extends OverviewBase {
    * Checks if a field machine name is taken.
    *
    * @param string $value
-   *   The machine name, not prefixed with 'field_'.
+   *   The machine name, not prefixed.
    *
    * @return bool
    *   Whether or not the field machine name is taken.
    */
   public function fieldNameExists($value) {
-    // Prefix with 'field_'.
-    $field_name = 'field_' . $value;
+    // Add the field prefix.
+    $field_name = \Drupal::config('field_ui.settings')->get('field_prefix') . $value;
 
-    return (bool) field_info_field($this->entity_type, $field_name);
+    $field_storage_definitions = \Drupal::entityManager()->getFieldStorageDefinitions($this->entity_type);
+    return isset($field_storage_definitions[$field_name]);
   }
 
 }

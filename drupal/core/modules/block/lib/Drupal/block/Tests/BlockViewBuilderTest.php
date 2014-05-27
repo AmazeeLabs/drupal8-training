@@ -11,6 +11,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\UrlCacheContext;
 use Drupal\simpletest\DrupalUnitTestBase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Tests the block view builder.
@@ -237,7 +238,7 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $cache_entry = $this->container->get('cache.render')->get($cid);
     $this->assertTrue($cache_entry, 'The block render element has been cached with the expected cache ID.');
     $expected_flattened_tags = array('content:1', 'block_view:1', 'block:test_block', 'theme:stark', 'block_plugin:test_cache');
-    $this->assertIdentical($cache_entry->tags, array_combine($expected_flattened_tags, $expected_flattened_tags)); //, 'The block render element has been cached with the expected cache tags.');
+    $this->assertIdentical($cache_entry->tags, $expected_flattened_tags); //, 'The block render element has been cached with the expected cache tags.');
     $this->container->get('cache.render')->delete($cid);
 
     // Advanced: cached block, but an alter hook adds an additional cache tag.
@@ -251,7 +252,7 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $cache_entry = $this->container->get('cache.render')->get($cid);
     $this->assertTrue($cache_entry, 'The block render element has been cached with the expected cache ID.');
     $expected_flattened_tags = array('content:1', 'block_view:1', 'block:test_block', 'theme:stark', 'block_plugin:test_cache', $alter_add_tag . ':1');
-    $this->assertIdentical($cache_entry->tags, array_combine($expected_flattened_tags, $expected_flattened_tags)); //, 'The block render element has been cached with the expected cache tags.');
+    $this->assertIdentical($cache_entry->tags, $expected_flattened_tags); //, 'The block render element has been cached with the expected cache tags.');
     $this->container->get('cache.render')->delete($cid);
 
     // Advanced: cached block, but an alter hook adds a #pre_render callback to
@@ -302,7 +303,9 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
 
     // Third: the same block configuration, but a different URL.
     $original_url_cache_context = $this->container->get('cache_context.url');
-    $temp_context = new UrlCacheContext(Request::create('/foo'));
+    $request_stack = new RequestStack();
+    $request_stack->push(Request::create('/foo'));
+    $temp_context = new UrlCacheContext($request_stack);
     $this->container->set('cache_context.url', $temp_context);
     $old_cid = $cid;
     $build = $this->getBlockRenderArray();

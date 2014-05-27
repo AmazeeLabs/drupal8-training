@@ -42,7 +42,6 @@ class ConfigImportRecreateTest extends DrupalUnitTestBase {
   public function setUp() {
     parent::setUp();
 
-    $this->installSchema('system', 'config_snapshot');
     $this->installSchema('node', 'node');
 
     $this->copyConfig($this->container->get('config.storage'), $this->container->get('config.storage.staging'));
@@ -50,7 +49,8 @@ class ConfigImportRecreateTest extends DrupalUnitTestBase {
     // Set up the ConfigImporter object for testing.
     $storage_comparer = new StorageComparer(
       $this->container->get('config.storage.staging'),
-      $this->container->get('config.storage')
+      $this->container->get('config.storage'),
+      $this->container->get('config.manager')
     );
     $this->configImporter = new ConfigImporter(
       $storage_comparer->createChangelist(),

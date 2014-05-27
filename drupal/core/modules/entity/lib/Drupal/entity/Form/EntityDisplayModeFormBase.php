@@ -7,7 +7,7 @@
 
 namespace Drupal\entity\Form;
 
-use Drupal\Core\Entity\EntityFormController;
+use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Provides the generic base class for entity display mode forms.
  */
-abstract class EntityDisplayModeFormBase extends EntityFormController {
+abstract class EntityDisplayModeFormBase extends EntityForm {
 
   /**
    * The entity query factory.
@@ -125,7 +125,7 @@ abstract class EntityDisplayModeFormBase extends EntityFormController {
   public function save(array $form, array &$form_state) {
     drupal_set_message(t('Saved the %label @entity-type.', array('%label' => $this->entity->label(), '@entity-type' => $this->entityType->getLowercaseLabel())));
     $this->entity->save();
-    entity_info_cache_clear();
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
     $form_state['redirect_route']['route_name'] = 'entity.' . $this->entity->getEntityTypeId() . '_list';
   }
 

@@ -1,6 +1,6 @@
 <?php
 
- /**
+/**
  * @file
  * API functions for installing modules and themes.
  */
@@ -8,10 +8,11 @@
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\OpCodeCache;
-use Drupal\Component\Utility\Settings;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Database\Database;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\Extension\ExtensionDiscovery;
+use Drupal\Core\Site\Settings;
 
 /**
  * Requirement severity -- Informational message only.
@@ -906,9 +907,9 @@ function install_goto($path) {
  */
 function drupal_current_script_url($query = array()) {
   $uri = $_SERVER['SCRIPT_NAME'];
-  $query = array_merge(drupal_get_query_parameters(), $query);
+  $query = array_merge(UrlHelper::filterQueryParameters(\Drupal::request()->query->all()), $query);
   if (!empty($query)) {
-    $uri .= '?' . drupal_http_build_query($query);
+    $uri .= '?' . UrlHelper::buildQuery($query);
   }
   return $uri;
 }
@@ -1076,6 +1077,7 @@ function install_profile_info($profile, $langcode = 'en') {
     // Set defaults for module info.
     $defaults = array(
       'dependencies' => array(),
+      'themes' => array('stark'),
       'description' => '',
       'version' => NULL,
       'hidden' => FALSE,

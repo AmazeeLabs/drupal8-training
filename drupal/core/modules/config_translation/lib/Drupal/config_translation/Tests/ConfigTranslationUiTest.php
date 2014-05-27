@@ -7,7 +7,7 @@
 
 namespace Drupal\config_translation\Tests;
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Config\FileStorage;
 use Drupal\Core\Language\Language;
@@ -652,25 +652,6 @@ class ConfigTranslationUiTest extends WebTestBase {
     $this->assertText(t('Name'));
     $this->assertNoText(t('Account cancellation confirmation'));
     $this->assertNoText(t('Password recovery'));
-  }
-
-  /**
-   * Tests that theme provided *.config_translation.yml files are found.
-   */
-  public function testThemeDiscovery() {
-    // Enable the test theme and rebuild routes.
-    $theme = 'config_translation_test_theme';
-    theme_enable(array($theme));
-    // Enabling a theme will cause the kernel terminate event to rebuild the
-    // router. Simulate that here.
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    $this->drupalLogin($this->admin_user);
-
-    $translation_base_url = 'admin/config/development/performance/translate';
-    $this->drupalGet($translation_base_url);
-    $this->assertResponse(200);
-    $this->assertLinkByHref("$translation_base_url/fr/add");
   }
 
   /**

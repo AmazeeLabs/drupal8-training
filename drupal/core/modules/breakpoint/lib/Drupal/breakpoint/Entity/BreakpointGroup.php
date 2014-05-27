@@ -7,6 +7,7 @@
 
 namespace Drupal\breakpoint\Entity;
 
+use Drupal\breakpoint\InvalidBreakpointNameException;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\breakpoint\BreakpointGroupInterface;
 use Drupal\breakpoint\InvalidBreakpointSourceException;
@@ -90,9 +91,16 @@ class BreakpointGroup extends ConfigEntityBase implements BreakpointGroupInterfa
   public $sourceType = Breakpoint::SOURCE_TYPE_USER_DEFINED;
 
   /**
-   * Overrides Drupal\config\ConfigEntityBase::__construct().
+   * {@inheritdoc}
+   *
+   * @throws \Drupal\breakpoint\InvalidBreakpointNameException
+   *   Exception thrown if $values['name'] is empty.
    */
   public function __construct(array $values, $entity_type = 'breakpoint_group') {
+    // Check required properties.
+    if (empty($values['name'])) {
+      throw new InvalidBreakpointNameException('Attempt to create an unnamed breakpoint group.');
+    }
     parent::__construct($values, $entity_type);
   }
 
@@ -149,7 +157,7 @@ class BreakpointGroup extends ConfigEntityBase implements BreakpointGroupInterfa
    */
   public function addBreakpointFromMediaQuery($name, $media_query) {
     // Use the existing breakpoint if it exists.
-    $breakpoint = entity_load('breakpoint', $this->sourceType . '.' . $this->name . '.' . $name);
+    $breakpoint = Breakpoint::load($this->sourceType . '.' . $this->name . '.' . $name);
     if (!$breakpoint) {
       // Build a new breakpoint.
       $breakpoint = entity_create('breakpoint', array(
@@ -183,7 +191,7 @@ class BreakpointGroup extends ConfigEntityBase implements BreakpointGroupInterfa
   public function getBreakpoints() {
     if (empty($this->breakpoints)) {
       foreach ($this->breakpoint_ids as $breakpoint_id) {
-        $breakpoint = breakpoint_load($breakpoint_id);
+        $breakpoint = Breakpoint::load($breakpoint_id);
         if ($breakpoint) {
           $this->breakpoints[$breakpoint_id] = $breakpoint;
         }

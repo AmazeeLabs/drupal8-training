@@ -19,7 +19,7 @@ use Symfony\Cmf\Component\Routing\RouteObjectInterface;
  *
  * The Drupal routing system defines how Drupal responds to URLs passed to the
  * browser. The menu system, which depends on the routing system, is used for
- * navigation. The Menu module allows menus to be created in the user interface
+ * navigation. The Menu UI module allows menus to be created in the user interface
  * as hierarchical lists of links.
  *
  * @section registering_paths Registering router paths
@@ -365,14 +365,6 @@ function theme_menu_local_action($variables) {
 }
 
 /**
- * Generates elements for the $arg array in the help hook.
- */
-function drupal_help_arg($arg = array()) {
-  // Note - the number of empty elements should be > MENU_MAX_PARTS.
-  return $arg + array('', '', '', '', '', '', '', '', '', '', '', '');
-}
-
-/**
  * Returns an array containing the names of system-defined (default) menus.
  */
 function menu_list_system_menus() {
@@ -471,13 +463,6 @@ function menu_navigation_links($menu_name, $level = 0) {
       if ($item['link']['in_active_trail']) {
         $class = ' active-trail';
         $l['attributes']['class'][] = 'active-trail';
-      }
-      // Normally, l() compares the href of every link with the current path and
-      // sets the active class accordingly. But local tasks do not appear in
-      // menu trees, so if the current path is a local task, and this link is
-      // its tab root, then we have to set the class manually.
-      if ($item['link']['href'] != current_path()) {
-        $l['attributes']['class'][] = 'active';
       }
       // Keyed with the unique mlid to generate classes in links.html.twig.
       $links['menu-' . $item['link']['mlid'] . $class] = $l;
@@ -823,6 +808,9 @@ function menu_link_rebuild_defaults() {
         $link['customized'] = $existing_item->customized;
         $link['updated'] = $existing_item->updated;
         $menu_link = $menu_link_storage->createFromDefaultLink($link);
+        // @todo Do not create a new entity in order to update it, see
+        //   https://drupal.org/node/2241865
+        $menu_link->setOriginalId($existing_item->mlid);
 
         // Convert the existing item to a typed object.
         /** @var \Drupal\menu_link\MenuLinkInterface $existing_item */

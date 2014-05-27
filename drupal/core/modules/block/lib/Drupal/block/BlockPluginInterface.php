@@ -20,8 +20,21 @@ use Drupal\Core\Session\AccountInterface;
  *   architecture and the relationships between the various objects, including
  *   brif references to the important components that are not coupled to the
  *   interface.
+ *
+ * @ingroup block_api
  */
 interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormInterface, PluginInspectionInterface, CacheableInterface {
+
+  /**
+   * Returns the user-facing block label.
+   *
+   * @todo Provide other specific label-related methods in
+   *   https://drupal.org/node/2025649.
+   *
+   * @return string
+   *   The block label.
+   */
+  public function label();
 
   /**
    * Indicates whether the block should be shown.

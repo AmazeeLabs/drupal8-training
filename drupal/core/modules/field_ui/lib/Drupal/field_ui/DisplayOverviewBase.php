@@ -57,7 +57,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
    *   The field type manager.
    * @param \Drupal\Component\Plugin\PluginManagerBase $plugin_manager
    *   The widget or formatter plugin manager.
-   * @param \Drupal\Core\Config\ConfigFactory $config_factory
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   The configuration factory.
    */
   public function __construct(EntityManagerInterface $entity_manager, FieldTypePluginManagerInterface $field_type_manager, PluginManagerBase $plugin_manager, ConfigFactoryInterface $config_factory) {
@@ -137,7 +137,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
     );
 
     if (empty($field_definitions) && empty($extra_fields) && $route_info = FieldUI::getOverviewRouteInfo($this->entity_type, $this->bundle)) {
-      drupal_set_message($this->t('There are no fields yet added. You can add new fields on the <a href="@link">Manage fields</a> page.', array('@link' => $this->url($route_info['route_name'], $route_info['route_parameters'], $route_info['options']))), 'warning');
+      drupal_set_message($this->t('There are no fields yet added. You can add new fields on the <a href="@link">Manage fields</a> page.', array('@link' => $route_info->toString())), 'warning');
       return $form;
     }
 
@@ -234,7 +234,11 @@ abstract class DisplayOverviewBase extends OverviewBase {
     );
 
     $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array('#type' => 'submit', '#value' => $this->t('Save'));
+    $form['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#button_type' => 'primary',
+      '#value' => $this->t('Save'),
+    );
 
     $form['#attached']['library'][] = 'field_ui/drupal.field_ui';
 
@@ -360,6 +364,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
               '#type' => 'actions',
               'save_settings' => $base_button + array(
                 '#type' => 'submit',
+                '#button_type' => 'primary',
                 '#name' => $field_name . '_plugin_settings_update',
                 '#value' => $this->t('Update'),
                 '#op' => 'update',
@@ -674,10 +679,14 @@ abstract class DisplayOverviewBase extends OverviewBase {
    * Returns the extra fields of the entity type and bundle used by this form.
    *
    * @return array
-   *   An array of extra field info, as provided by field_info_extra_fields().
+   *   An array of extra field info.
+   *
+   * @see \Drupal\Core\Entity\EntityManagerInterface::getExtraFields()
    */
   protected function getExtraFields() {
-    return field_info_extra_fields($this->entity_type, $this->bundle, ($this->displayContext == 'view' ? 'display' : $this->displayContext));
+    $context = $this->displayContext == 'view' ? 'display' : $this->displayContext;
+    $extra_fields = $this->entityManager->getExtraFields($this->entity_type, $this->bundle);
+    return isset($extra_fields[$context]) ? $extra_fields[$context] : array();
   }
 
   /**

@@ -7,16 +7,16 @@
 
 namespace Drupal\search\Form;
 
-use Drupal\Core\Entity\EntityFormController;
+use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\search\SearchPageRepositoryInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Provides a base form controller for search pages.
+ * Provides a base form for search pages.
  */
-abstract class SearchPageFormBase extends EntityFormController {
+abstract class SearchPageFormBase extends EntityForm {
 
   /**
    * The entity being used by this form.
@@ -179,17 +179,6 @@ abstract class SearchPageFormBase extends EntityFormController {
     $this->entity->save();
 
     $form_state['redirect_route']['route_name'] = 'search.settings';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function actions(array $form, array &$form_state) {
-    $actions = parent::actions($form, $form_state);
-    if ($this->entity->isDefaultSearch()) {
-      unset($actions['delete']);
-    }
-    return $actions;
   }
 
 }

@@ -68,6 +68,12 @@ interface CacheBackendInterface {
   /**
    * Stores data in the persistent cache.
    *
+   * Core cache implementations set the created time on cache item with
+   * microtime(TRUE) rather than REQUEST_TIME_FLOAT, because the created time
+   * of cache items should match when they are created, not when the request
+   * started. Apart from being more accurate, this increases the chance an
+   * item will legitimately be considered valid.
+   *
    * @param string $cid
    *   The cache ID of the data to store.
    * @param mixed $data
@@ -94,6 +100,26 @@ interface CacheBackendInterface {
    * @see \Drupal\Core\Cache\CacheBackendInterface::getMultiple()
    */
   public function set($cid, $data, $expire = Cache::PERMANENT, array $tags = array());
+
+  /**
+   * Store multiple items in the persistent cache.
+   *
+   * @param array $items
+   *   An array of cache items, keyed by cid. In the form:
+   *   @code
+   *   $items = array(
+   *     $cid => array(
+   *       // Required, will be automatically serialized if not a string.
+   *       'data' => $data,
+   *       // Optional, defaults to CacheBackendInterface::CACHE_PERMANENT.
+   *       'expire' => CacheBackendInterface::CACHE_PERMANENT,
+   *       // (optional) The cache tags for this item, see CacheBackendInterface::set().
+   *       'tags' => array(),
+   *     ),
+   *   );
+   *   @endcode
+   */
+  public function setMultiple(array $items);
 
   /**
    * Deletes an item from the cache.
@@ -237,15 +263,4 @@ interface CacheBackendInterface {
    * Remove a cache bin.
    */
   public function removeBin();
-
-  /**
-   * Checks if a cache bin is empty.
-   *
-   * A cache bin is considered empty if it does not contain any valid data for
-   * any cache ID.
-   *
-   * @return
-   *   TRUE if the cache bin specified is empty.
-   */
-  public function isEmpty();
 }

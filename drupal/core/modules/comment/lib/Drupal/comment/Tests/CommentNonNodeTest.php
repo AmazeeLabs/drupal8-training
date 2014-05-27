@@ -9,6 +9,7 @@ namespace Drupal\comment\Tests;
 
 use Drupal\comment\CommentInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
+use Drupal\field\Entity\FieldInstanceConfig;
 use Drupal\simpletest\WebTestBase;
 use Drupal\Core\Entity\EntityInterface;
 
@@ -41,6 +42,10 @@ class CommentNonNodeTest extends WebTestBase {
     entity_test_create_bundle('entity_test', 'Entity Test', 'entity_test');
     // Create comment field on entity_test bundle.
     $this->container->get('comment.manager')->addDefaultField('entity_test', 'entity_test');
+
+    // Verify that bundles are defined correctly.
+    $bundles = \Drupal::entityManager()->getBundleInfo('comment');
+    $this->assertEqual($bundles['entity_test__comment']['label'], 'Comment settings');
 
     // Create test user.
     $this->admin_user = $this->drupalCreateUser(array(
@@ -88,7 +93,7 @@ class CommentNonNodeTest extends WebTestBase {
     $edit = array();
     $edit['comment_body[0][value]'] = $comment;
 
-    $instance = $this->container->get('field.info')->getInstance('entity_test', 'entity_test', 'comment');
+    $instance = FieldInstanceConfig::loadByName('entity_test', 'entity_test', 'comment');
     $preview_mode = $instance->getSetting('preview');
     $subject_mode = $instance->getSetting('subject');
 

@@ -7,7 +7,7 @@
 
 namespace Drupal\block;
 
-use Drupal\Core\Plugin\PluginBase;
+use Drupal\Core\Plugin\ContextAwarePluginBase;
 use Drupal\block\BlockInterface;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Component\Utility\NestedArray;
@@ -22,8 +22,22 @@ use Drupal\Core\Session\AccountInterface;
  * This abstract class provides the generic block configuration form, default
  * block settings, and handling for general user-defined block visibility
  * settings.
+ *
+ * @ingroup block_api
  */
-abstract class BlockBase extends PluginBase implements BlockPluginInterface {
+abstract class BlockBase extends ContextAwarePluginBase implements BlockPluginInterface {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function label() {
+    if (!empty($this->configuration['label'])) {
+      return $this->configuration['label'];
+    }
+
+    $definition = $this->getPluginDefinition();
+    return $definition['admin_label'];
+  }
 
   /**
    * {@inheritdoc}
@@ -60,6 +74,7 @@ abstract class BlockBase extends PluginBase implements BlockPluginInterface {
    */
   protected function baseConfigurationDefaults() {
     return array(
+      'id' => $this->getPluginId(),
       'label' => '',
       'provider' => $this->pluginDefinition['provider'],
       'label_display' => BlockInterface::BLOCK_LABEL_VISIBLE,
@@ -82,6 +97,13 @@ abstract class BlockBase extends PluginBase implements BlockPluginInterface {
    */
   public function setConfigurationValue($key, $value) {
     $this->configuration[$key] = $value;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    return array();
   }
 
   /**
@@ -119,7 +141,7 @@ abstract class BlockBase extends PluginBase implements BlockPluginInterface {
       '#type' => 'textfield',
       '#title' => $this->t('Title'),
       '#maxlength' => 255,
-      '#default_value' => !empty($this->configuration['label']) ? $this->configuration['label'] : $definition['admin_label'],
+      '#default_value' => $this->label(),
       '#required' => TRUE,
     );
     $form['label_display'] = array(

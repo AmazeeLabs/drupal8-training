@@ -19,17 +19,20 @@ class EntityTestViewBuilder extends EntityViewBuilder {
   /**
    * {@inheritdoc}
    */
-  public function buildContent(array $entities, array $displays, $view_mode, $langcode = NULL) {
-    parent::buildContent($entities, $displays, $view_mode, $langcode);
+  public function buildComponents(array &$build, array $entities, array $displays, $view_mode, $langcode = NULL) {
+    parent::buildComponents($build, $entities, $displays, $view_mode, $langcode);
 
-    foreach ($entities as $entity) {
-      $entity->content['label'] = array(
+    foreach ($entities as $id => $entity) {
+      $build[$id]['label'] = array(
+        '#weight' => -100,
         '#markup' => check_plain($entity->label()),
       );
-      $entity->content['separator'] = array(
+      $build[$id]['separator'] = array(
+        '#weight' => -150,
         '#markup' => ' | ',
       );
-      $entity->content['view_mode'] = array(
+      $build[$id]['view_mode'] = array(
+        '#weight' => -200,
         '#markup' => check_plain($view_mode),
       );
     }

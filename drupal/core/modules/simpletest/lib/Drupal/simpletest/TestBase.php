@@ -9,7 +9,6 @@ namespace Drupal\simpletest;
 
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Database\Database;
-use Drupal\Component\Utility\Settings;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Config\StorageComparer;
@@ -20,6 +19,7 @@ use Drupal\Core\DrupalKernel;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Session\AccountProxy;
 use Drupal\Core\Session\AnonymousUserSession;
+use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Utility\Error;
 use Symfony\Component\HttpFoundation\Request;
@@ -958,7 +958,11 @@ abstract class TestBase {
     $connection_info = Database::getConnectionInfo('default');
     Database::renameConnection('default', 'simpletest_original_default');
     foreach ($connection_info as $target => $value) {
-      $connection_info[$target]['prefix'] = $value['prefix']['default'] . $this->databasePrefix;
+      // Replace the full table prefix definition to ensure that no table
+      // prefixes of the test runner leak into the test.
+      $connection_info[$target]['prefix'] = array(
+        'default' => $value['prefix']['default'] . $this->databasePrefix,
+      );
     }
     Database::addConnectionInfo('default', 'default', $connection_info['default']);
   }
@@ -966,7 +970,7 @@ abstract class TestBase {
   /**
    * Act on global state information before the environment is altered for a test.
    *
-   * Allows e.g. DrupalUnitTestBase to prime system/extension info from the
+   * Allows e.g. KernelTestBase to prime system/extension info from the
    * parent site (and inject it into the test environment so as to improve
    * performance).
    */
@@ -1048,14 +1052,17 @@ abstract class TestBase {
 
     $this->generatedTestFiles = FALSE;
 
+    // Ensure the configImporter is refreshed for each test.
+    $this->configImporter = NULL;
+
     // Unregister all custom stream wrappers of the parent site.
     // Availability of Drupal stream wrappers varies by test base class:
     // - UnitTestBase operates in a completely empty environment.
-    // - DrupalUnitTestBase supports and maintains stream wrappers in a custom
+    // - KernelTestBase supports and maintains stream wrappers in a custom
     //   way.
     // - WebTestBase re-initializes Drupal stream wrappers after installation.
     // The original stream wrappers are restored after the test run.
-    // @see TestBase::tearDown()
+    // @see TestBase::restoreEnvironment()
     $wrappers = file_get_stream_wrappers();
     foreach ($wrappers as $scheme => $info) {
       stream_wrapper_unregister($scheme);
@@ -1121,48 +1128,6 @@ abstract class TestBase {
   }
 
   /**
-   * Rebuild \Drupal::getContainer().
-   *
-   * Use this to build a new kernel and service container. For example, when the
-   * list of enabled modules is changed via the internal browser, in which case
-   * the test process still contains an old kernel and service container with an
-   * old module list.
-   *
-   * @see TestBase::prepareEnvironment()
-   * @see TestBase::restoreEnvironment()
-   *
-   * @todo Fix http://drupal.org/node/1708692 so that module enable/disable
-   *   changes are immediately reflected in \Drupal::getContainer(). Until then,
-   *   tests can invoke this workaround when requiring services from newly
-   *   enabled modules to be immediately available in the same request.
-   */
-  protected function rebuildContainer($environment = 'testing') {
-    // Preserve the request object after the container rebuild.
-    $request = \Drupal::request();
-    // When called from InstallerTestBase, the current container is the minimal
-    // container from TestBase::prepareEnvironment(), which does not contain a
-    // request stack.
-    if (\Drupal::getContainer()->initialized('request_stack')) {
-      $request_stack = \Drupal::service('request_stack');
-    }
-
-    $this->kernel = new DrupalKernel($environment, drupal_classloader(), FALSE);
-    $this->kernel->boot();
-    // DrupalKernel replaces the container in \Drupal::getContainer() with a
-    // different object, so we need to replace the instance on this test class.
-    $this->container = \Drupal::getContainer();
-    // The current user is set in TestBase::prepareEnvironment().
-    $this->container->set('request', $request);
-    if (isset($request_stack)) {
-      $this->container->set('request_stack', $request_stack);
-    }
-    else {
-      $this->container->get('request_stack')->push($request);
-    }
-    $this->container->get('current_user')->setAccount(\Drupal::currentUser());
-  }
-
-  /**
    * Performs cleanup tasks after each individual test method has been run.
    */
   protected function tearDown() {
@@ -1201,11 +1166,10 @@ abstract class TestBase {
     usleep(50000);
 
     // Remove all prefixed tables.
-    // @todo Connection prefix info is not normalized into an array.
     $original_connection_info = Database::getConnectionInfo('simpletest_original_default');
-    $original_prefix = is_array($original_connection_info['default']['prefix']) ? $original_connection_info['default']['prefix']['default'] : $original_connection_info['default']['prefix'];
+    $original_prefix = $original_connection_info['default']['prefix']['default'];
     $test_connection_info = Database::getConnectionInfo('default');
-    $test_prefix = is_array($test_connection_info['default']['prefix']) ? $test_connection_info['default']['prefix']['default'] : $test_connection_info['default']['prefix'];
+    $test_prefix = $test_connection_info['default']['prefix']['default'];
     if ($original_prefix != $test_prefix) {
       $tables = Database::getConnection()->schema()->findTables($test_prefix . '%');
       $prefix_length = strlen($test_prefix);
@@ -1226,10 +1190,6 @@ abstract class TestBase {
     // Restore original database connection.
     Database::removeConnection('default');
     Database::renameConnection('simpletest_original_default', 'default');
-    // @see TestBase::changeDatabasePrefix()
-    global $databases;
-    $connection_info = Database::getConnectionInfo('default');
-    $databases['default']['default'] = $connection_info['default'];
 
     // Reset all static variables.
     // All destructors of statically cached objects have been invoked above;
@@ -1260,6 +1220,9 @@ abstract class TestBase {
       drupal_valid_test_ua(FALSE);
     }
     conf_path(TRUE, TRUE);
+
+    // Restore stream wrappers of the test runner.
+    file_get_stream_wrappers();
 
     // Restore original shutdown callbacks.
     $callbacks = &drupal_register_shutdown_function();
@@ -1340,7 +1303,7 @@ abstract class TestBase {
    * @param $value
    *   The value of the setting.
    *
-   * @see \Drupal\Component\Utility\Settings::get()
+   * @see \Drupal\Core\Site\Settings::get()
    */
   protected function settingsSet($name, $value) {
     $settings = Settings::getAll();
@@ -1518,7 +1481,8 @@ abstract class TestBase {
       // Set up the ConfigImporter object for testing.
       $storage_comparer = new StorageComparer(
         $this->container->get('config.storage.staging'),
-        $this->container->get('config.storage')
+        $this->container->get('config.storage'),
+        $this->container->get('config.manager')
       );
       $this->configImporter = new ConfigImporter(
         $storage_comparer,

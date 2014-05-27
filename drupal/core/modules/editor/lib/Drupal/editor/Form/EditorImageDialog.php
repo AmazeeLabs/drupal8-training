@@ -7,6 +7,7 @@
 
 namespace Drupal\editor\Form;
 
+use Drupal\Component\Utility\Bytes;
 use Drupal\Core\Form\FormBase;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\Core\Ajax\AjaxResponse;
@@ -48,13 +49,14 @@ class EditorImageDialog extends FormBase {
     $editor = editor_load($filter_format->format);
 
     // Construct strings to use in the upload validators.
-    if (!empty($editor->image_upload['dimensions'])) {
-      $max_dimensions = $editor->image_upload['dimensions']['max_width'] . 'x' . $editor->image_upload['dimensions']['max_height'];
+    $image_upload = $editor->getImageUploadSettings();
+    if (!empty($image_upload['dimensions'])) {
+      $max_dimensions = $image_upload['dimensions']['max_width'] . 'x' . $image_upload['dimensions']['max_height'];
     }
     else {
       $max_dimensions = 0;
     }
-    $max_filesize = min(parse_size($editor->image_upload['max_size']), file_upload_max_size());
+    $max_filesize = min(Bytes::toInt($image_upload['max_size']), file_upload_max_size());
 
     $existing_file = isset($image_element['data-editor-file-uuid']) ? entity_load_by_uuid('file', $image_element['data-editor-file-uuid']) : NULL;
     $fid = $existing_file ? $existing_file->id() : NULL;
@@ -62,7 +64,7 @@ class EditorImageDialog extends FormBase {
     $form['fid'] = array(
       '#title' => $this->t('Image'),
       '#type' => 'managed_file',
-      '#upload_location' => $editor->image_upload['scheme'] . '://' .$editor->image_upload['directory'],
+      '#upload_location' => $image_upload['scheme'] . '://' . $image_upload['directory'],
       '#default_value' => $fid ? array($fid) : NULL,
       '#upload_validators' => array(
         'file_validate_extensions' => array('gif png jpg jpeg'),
@@ -82,7 +84,7 @@ class EditorImageDialog extends FormBase {
 
     // If the editor has image uploads enabled, show a managed_file form item,
     // otherwise show a (file URL) text form item.
-    if ($editor->image_upload['status']) {
+    if ($image_upload['status']) {
       $form['attributes']['src']['#access'] = FALSE;
       $form['attributes']['src']['#required'] = FALSE;
     }
@@ -132,7 +134,7 @@ class EditorImageDialog extends FormBase {
 
     // When Drupal core's filter_caption is being used, the text editor may
     // offer the ability to change the alignment.
-    if (isset($image_element['data_align'])) {
+    if (isset($image_element['data-align'])) {
       $form['align'] = array(
         '#title' => $this->t('Align'),
         '#type' => 'radios',
@@ -142,10 +144,10 @@ class EditorImageDialog extends FormBase {
           'center' => $this->t('Center'),
           'right' => $this->t('Right'),
         ),
-        '#default_value' => $image_element['data_align'] === '' ? 'none' : $image_element['data_align'],
+        '#default_value' => $image_element['data-align'] === '' ? 'none' : $image_element['data-align'],
         '#wrapper_attributes' => array('class' => array('container-inline')),
         '#attributes' => array('class' => array('container-inline')),
-        '#parents' => array('attributes', 'data_align'),
+        '#parents' => array('attributes', 'data-align'),
       );
     }
 
@@ -156,20 +158,8 @@ class EditorImageDialog extends FormBase {
         '#title' => $this->t('Caption'),
         '#type' => 'checkbox',
         '#default_value' => $image_element['hasCaption'] === 'true',
-        '#parents' => array('hasCaption'),
+        '#parents' => array('attributes', 'hasCaption'),
       );
-    }
-
-    $has_align_or_caption = isset($image_element['data_align']) || isset($image_element['hasCaption']);
-    if ($has_align_or_caption && isset($image_element['isInline']) && $image_element['isInline'] === 'true') {
-      $form['align']['#type'] = 'item';
-      $form['align']['#description'] = t('Inline images cannot be aligned.');
-      unset($form['align']['#default_value']);
-
-      $form['caption']['#type'] = 'item';
-      $form['caption']['#description'] = $this->t('Inline images cannot be captioned.');
-      $form['caption']['#wrapper_attributes'] = array('class' => array('container-inline'));
-      $form['caption']['#attributes'] = array('class' => array('container-inline'));
     }
 
     $form['actions'] = array(

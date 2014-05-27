@@ -43,8 +43,6 @@ class ConfigImporterTest extends DrupalUnitTestBase {
   function setUp() {
     parent::setUp();
 
-    $this->installSchema('system', 'config_snapshot');
-
     $this->installConfig(array('config_test'));
     // Installing config_test's default configuration pollutes the global
     // variable being used for recording hook invocations by this test already,
@@ -56,7 +54,8 @@ class ConfigImporterTest extends DrupalUnitTestBase {
     // Set up the ConfigImporter object for testing.
     $storage_comparer = new StorageComparer(
       $this->container->get('config.storage.staging'),
-      $this->container->get('config.storage')
+      $this->container->get('config.storage'),
+      $this->container->get('config.manager')
     );
     $this->configImporter = new ConfigImporter(
       $storage_comparer->createChangelist(),

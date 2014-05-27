@@ -11,7 +11,7 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests migration of variables for the Menu module.
+ * Tests migration of variables for the Menu UI module.
  */
 class MigrateMenuConfigsTest extends MigrateDrupalTestBase {
 
@@ -40,7 +40,7 @@ class MigrateMenuConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_menu_settings');
     $dumps = array(
-      drupal_get_path('module', 'migrate_drupal') . '/lib/Drupal/migrate_drupal/Tests/Dump/Drupal6MenuSettings.php',
+      $this->getDumpDirectory() . '/Drupal6MenuSettings.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -48,7 +48,7 @@ class MigrateMenuConfigsTest extends MigrateDrupalTestBase {
   }
 
   /**
-   * Tests migration of variables for the menu module.
+   * Tests migration of variables for the Menu UI module.
    */
   public function testMenuSettings() {
     $config = \Drupal::config('menu_ui.settings');

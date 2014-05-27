@@ -2,13 +2,14 @@ custom_block.type_list:
   path: '/admin/structure/block/custom-blocks/types'
   defaults:
     _entity_list: 'custom_block_type'
+    _title: 'Edit'
   requirements:
     _permission: 'administer blocks'
 
 custom_block.add_page:
   path: '/block/add'
   defaults:
-    _content: 'Drupal\custom_block\Controller\CustomBlockController::add'
+    _content: '\Drupal\custom_block\Controller\CustomBlockController::add'
     _title: 'Add custom block'
   options:
     _admin_route: TRUE
@@ -18,7 +19,7 @@ custom_block.add_page:
 custom_block.add_form:
   path: '/block/add/{custom_block_type}'
   defaults:
-    _content: 'Drupal\custom_block\Controller\CustomBlockController::addForm'
+    _content: '\Drupal\custom_block\Controller\CustomBlockController::addForm'
     _title_callback: 'Drupal\custom_block\Controller\CustomBlockController::getAddFormTitle'
   options:
     _admin_route: TRUE
@@ -48,6 +49,7 @@ custom_block.delete:
   path: '/block/{custom_block}/delete'
   defaults:
     _entity_form: 'custom_block.delete'
+    _title: 'Delete'
   options:
     _admin_route: TRUE
   requirements:
@@ -57,6 +59,7 @@ custom_block.type_add:
   path: '/admin/structure/block/custom-blocks/types/add'
   defaults:
     _entity_form: 'custom_block_type.add'
+    _title: 'Add'
   requirements:
     _permission: 'administer blocks'
 
@@ -64,6 +67,7 @@ custom_block.type_edit:
   path: '/admin/structure/block/custom-blocks/manage/{custom_block_type}'
   defaults:
     _entity_form: 'custom_block_type.edit'
+    _title: 'Edit'
   requirements:
     _entity_access: 'custom_block_type.update'
 

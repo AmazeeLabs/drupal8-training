@@ -17,9 +17,7 @@ classList:
 
 ckeditor:
   remote: https://github.com/ckeditor/ckeditor-dev
-  # @todo Stable release required for Drupal 8.0.
-  version: 4.2-dev
-  commit: 887d81ac1824008b690e439a1b29eb4f13b51212
+  version: 4.4.0
   js:
     assets/vendor/ckeditor/ckeditor.js: { preprocess: false }
 
@@ -289,12 +287,10 @@ jquery:
     assets/vendor/jquery/jquery.js: { weight: -20 }
 
 jquery.cookie:
-  # @todo jquery.cookie.js was never supposed to be distributed with jQuery UI.
-  # @see https://drupal.org/node/2161217
   remote: https://github.com/carhartl/jquery-cookie
-  version: v1.0
+  version: v1.4.0
   js:
-    assets/vendor/jquery.ui/external/jquery.cookie.js: {}
+    assets/vendor/jquery.cookie/jquery.cookie.js: {}
   dependencies:
     - core/jquery
 
@@ -312,12 +308,11 @@ jquery.farbtastic:
 
 jquery.form:
   remote: https://github.com/malsup/form
-  version: 3.39
+  version: 3.50
   js:
     assets/vendor/jquery-form/jquery.form.js: {}
   dependencies:
     - core/jquery
-    - core/jquery.cookie
 
 jquery.intrinsic:
   version: VERSION
@@ -331,9 +326,6 @@ jquery.joyride:
   version: v2.0.3
   js:
     assets/vendor/jquery-joyride/jquery.joyride-2.0.3.js: {}
-  css:
-    component:
-      assets/vendor/jquery-joyride/joyride-2.0.3.css: { media: screen }
   dependencies:
     - core/jquery
     - core/jquery.cookie

@@ -33,6 +33,12 @@ abstract class ViewTestBase extends WebTestBase {
   protected function setUp() {
     parent::setUp();
 
+    // Views' Page displays put menu links in the 'navigation' menu by default.
+    entity_create('menu', array(
+      'id' => 'navigation',
+      'label' => 'Navigation',
+    ))->save();
+
     // Ensure that the plugin definitions are cleared.
     foreach (ViewExecutable::getPluginTypes() as $plugin_type) {
       $this->container->get("plugin.manager.views.$plugin_type")->clearCachedDefinitions();
@@ -64,7 +70,6 @@ abstract class ViewTestBase extends WebTestBase {
       $query->values($record);
     }
     $query->execute();
-    $this->checkPermissions(array(), TRUE);
   }
 
   /**
@@ -88,7 +93,7 @@ abstract class ViewTestBase extends WebTestBase {
    * @return bool
    *   TRUE if the assertion succeeded, or FALSE otherwise.
    */
-  protected function assertIdenticalResultset($view, $expected_result, $column_map = array(), $message = 'Identical result set.') {
+  protected function assertIdenticalResultset(ViewExecutable $view, $expected_result, $column_map = array(), $message = 'Identical result set.') {
     return $this->assertIdenticalResultsetHelper($view, $expected_result, $column_map, $message, 'assertIdentical');
   }
 
@@ -111,7 +116,7 @@ abstract class ViewTestBase extends WebTestBase {
    * @return bool
    *   TRUE if the assertion succeeded, or FALSE otherwise.
    */
-  protected function assertNotIdenticalResultset($view, $expected_result, $column_map = array(), $message = 'Non-identical result set.') {
+  protected function assertNotIdenticalResultset(ViewExecutable $view, $expected_result, $column_map = array(), $message = 'Non-identical result set.') {
     return $this->assertIdenticalResultsetHelper($view, $expected_result, $column_map, $message, 'assertNotIdentical');
   }
 
@@ -140,7 +145,7 @@ abstract class ViewTestBase extends WebTestBase {
    * @see \Drupal\views\Tests\ViewTestBase::assertIdenticalResultset()
    * @see \Drupal\views\Tests\ViewTestBase::assertNotIdenticalResultset()
    */
-  protected function assertIdenticalResultsetHelper($view, $expected_result, $column_map, $message, $assert_method) {
+  protected function assertIdenticalResultsetHelper(ViewExecutable $view, $expected_result, $column_map, $message, $assert_method) {
     // Convert $view->result to an array of arrays.
     $result = array();
     foreach ($view->result as $key => $value) {
@@ -224,7 +229,7 @@ abstract class ViewTestBase extends WebTestBase {
    * @param array $args
    *   (optional) An array of the view arguments to use for the view.
    */
-  protected function executeView($view, $args = array()) {
+  protected function executeView(ViewExecutable $view, $args = array()) {
     // A view does not really work outside of a request scope, due to many
     // dependencies like the current user.
     $this->container->enterScope('request');

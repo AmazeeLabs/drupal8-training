@@ -25,7 +25,8 @@ use Drupal\user\UserInterface;
  *     "view_builder" = "Drupal\entity_test\EntityTestViewBuilder",
  *     "access" = "Drupal\entity_test\EntityTestAccessController",
  *     "form" = {
- *       "default" = "Drupal\entity_test\EntityTestFormController"
+ *       "default" = "Drupal\entity_test\EntityTestForm",
+ *       "delete" = "Drupal\entity_test\EntityTestDeleteForm"
  *     },
  *     "translation" = "Drupal\content_translation\ContentTranslationHandler"
  *   },
@@ -41,6 +42,7 @@ use Drupal\user\UserInterface;
  *   links = {
  *     "canonical" = "entity_test.render",
  *     "edit-form" = "entity_test.edit_entity_test",
+ *     "delete-form" = "entity_test.delete_entity_test",
  *     "admin-form" = "entity_test.admin_entity_test"
  *   }
  * )
@@ -80,7 +82,12 @@ class EntityTest extends ContentEntityBase implements EntityOwnerInterface {
       ->setLabel(t('Name'))
       ->setDescription(t('The name of the test entity.'))
       ->setTranslatable(TRUE)
-      ->setSetting('max_length', 32);
+      ->setSetting('max_length', 32)
+      ->setDisplayOptions('view', array(
+        'label' => 'hidden',
+        'type' => 'string',
+        'weight' => -5,
+      ));
 
     // @todo: Add allowed values validation.
     $fields['type'] = FieldDefinition::create('string')

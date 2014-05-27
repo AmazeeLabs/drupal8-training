@@ -7,6 +7,7 @@
 
 namespace Drupal\node\Tests\Config;
 
+use Drupal\field\Entity\FieldInstanceConfig;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
@@ -26,8 +27,6 @@ class NodeImportCreateTest extends DrupalUnitTestBase {
    */
   public function setUp() {
     parent::setUp();
-
-    $this->installSchema('system', array('config_snapshot'));
     $this->installSchema('user', array('users'));
 
     // Set default storage backend.
@@ -80,7 +79,7 @@ class NodeImportCreateTest extends DrupalUnitTestBase {
     // Check that the content type was created.
     $node_type = entity_load('node_type', $node_type_id);
     $this->assertTrue($node_type, 'Import node type from staging was created.');
-    $this->assertFalse(field_info_instance('node', 'body', $node_type_id));
+    $this->assertFalse(FieldInstanceConfig::loadByName('node', $node_type_id, 'body'));
   }
 
 }

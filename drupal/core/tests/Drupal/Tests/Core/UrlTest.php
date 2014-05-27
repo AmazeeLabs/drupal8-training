@@ -7,7 +7,6 @@
 
 namespace Drupal\Tests\Core;
 
-use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Url;
 use Drupal\Tests\UnitTestCase;
@@ -309,9 +308,9 @@ class UrlTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getRouteParameter() with an external URL.
+   * Tests the getRouteParameters() with an external URL.
    *
-   * @covers ::getRouteParameter
+   * @covers ::getRouteParameters
    * @expectedException \UnexpectedValueException
    */
   public function testGetRouteParametersWithExternalUrl() {

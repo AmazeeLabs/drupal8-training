@@ -60,7 +60,7 @@ class PerformanceForm extends ConfigFormBase {
   public function buildForm(array $form, array &$form_state) {
     $form['#attached']['library'][] = 'system/drupal.system';
 
-    $config = $this->configFactory->get('system.performance');
+    $config = $this->config('system.performance');
 
     $form['clear_cache'] = array(
       '#type' => 'details',
@@ -84,7 +84,6 @@ class PerformanceForm extends ConfigFormBase {
     $period = array(0, 60, 180, 300, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400);
     $period = array_map('format_interval', array_combine($period, $period));
     $period[0] = '<' . t('no caching') . '>';
-    $period[\Drupal\Core\Cache\Cache::PERMANENT] = t('Forever');
     $form['caching']['page_cache_maximum_age'] = array(
       '#type' => 'select',
       '#title' => t('Page cache maximum age'),
@@ -152,7 +151,7 @@ class PerformanceForm extends ConfigFormBase {
     // form submit.
     $this->renderCache->deleteAll();
 
-    $this->configFactory->get('system.performance')
+    $this->config('system.performance')
       ->set('cache.page.use_internal', $form_state['values']['cache'])
       ->set('cache.page.max_age', $form_state['values']['page_cache_maximum_age'])
       ->set('response.gzip', $form_state['values']['page_compression'])

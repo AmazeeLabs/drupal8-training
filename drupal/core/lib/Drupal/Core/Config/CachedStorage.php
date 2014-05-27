@@ -8,12 +8,12 @@
 namespace Drupal\Core\Config;
 
 use Drupal\Core\Cache\Cache;
-use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\CacheFactoryInterface;
 
 /**
  * Defines the cached storage.
  *
- * The class gets another storage and a cache backend injected. It reads from
+ * The class gets another storage and the cache factory injected. It reads from
  * the cache and delegates the read to the storage on a cache miss. It also
  * handles cache invalidation.
  */
@@ -25,6 +25,13 @@ class CachedStorage implements StorageInterface, StorageCacheInterface {
    * @var \Drupal\Core\Config\StorageInterface
    */
   protected $storage;
+
+  /**
+   * The cache factory.
+   *
+   * @var \Drupal\Core\Cache\CacheFactoryInterface
+   */
+  protected $cacheFactory;
 
   /**
    * The instantiated Cache backend.
@@ -45,12 +52,20 @@ class CachedStorage implements StorageInterface, StorageCacheInterface {
    *
    * @param \Drupal\Core\Config\StorageInterface $storage
    *   A configuration storage to be cached.
-   * @param \Drupal\Core\Cache\CacheBackendInterface $cache
-   *   A cache backend instance to use for caching.
+   * @param \Drupal\Core\Cache\CacheFactoryInterface $cache_factory
+   *   A cache factory used for getting cache backends.
    */
-  public function __construct(StorageInterface $storage, CacheBackendInterface $cache) {
+  public function __construct(StorageInterface $storage, CacheFactoryInterface $cache_factory) {
     $this->storage = $storage;
-    $this->cache = $cache;
+    $this->cacheFactory = $cache_factory;
+    $collection = $this->getCollectionName();
+    if ($collection == StorageInterface::DEFAULT_COLLECTION) {
+      $bin = 'config';
+    }
+    else {
+      $bin = 'config_' . str_replace('.', '_', $collection);
+    }
+    $this->cache = $this->cacheFactory->get($bin);
   }
 
   /**
@@ -93,9 +108,12 @@ class CachedStorage implements StorageInterface, StorageCacheInterface {
       $list = $this->storage->readMultiple($names);
       // Cache configuration objects that were loaded from the storage, cache
       // missing configuration objects as an explicit FALSE.
+      $items = array();
       foreach ($names as $name) {
-        $this->cache->set($name, isset($list[$name]) ? $list[$name] : FALSE);
+        $items[$name] = array('data' => isset($list[$name]) ? $list[$name] : FALSE);
       }
+
+      $this->cache->setMultiple($items);
     }
 
     // Add the configuration objects from the cache to the list.
@@ -235,4 +253,29 @@ class CachedStorage implements StorageInterface, StorageCacheInterface {
   public function resetListCache() {
     $this->findByPrefixCache = array();
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createCollection($collection) {
+    return new static(
+      $this->storage->createCollection($collection),
+      $this->cacheFactory
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getAllCollectionNames() {
+    return $this->storage->getAllCollectionNames();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCollectionName() {
+    return $this->storage->getCollectionName();
+  }
+
 }

@@ -8,6 +8,7 @@
 namespace Drupal\custom_block\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBase;
+use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\custom_block\CustomBlockTypeInterface;
 
@@ -19,9 +20,9 @@ use Drupal\custom_block\CustomBlockTypeInterface;
  *   label = @Translation("Custom block type"),
  *   controllers = {
  *     "form" = {
- *       "default" = "Drupal\custom_block\CustomBlockTypeFormController",
- *       "add" = "Drupal\custom_block\CustomBlockTypeFormController",
- *       "edit" = "Drupal\custom_block\CustomBlockTypeFormController",
+ *       "default" = "Drupal\custom_block\CustomBlockTypeForm",
+ *       "add" = "Drupal\custom_block\CustomBlockTypeForm",
+ *       "edit" = "Drupal\custom_block\CustomBlockTypeForm",
  *       "delete" = "Drupal\custom_block\Form\CustomBlockTypeDeleteForm"
  *     },
  *     "list_builder" = "Drupal\custom_block\CustomBlockTypeListBuilder"
@@ -39,7 +40,7 @@ use Drupal\custom_block\CustomBlockTypeInterface;
  *   }
  * )
  */
-class CustomBlockType extends ConfigEntityBase implements CustomBlockTypeInterface {
+class CustomBlockType extends ConfigEntityBundleBase implements CustomBlockTypeInterface {
 
   /**
    * The custom block type ID.
@@ -76,24 +77,9 @@ class CustomBlockType extends ConfigEntityBase implements CustomBlockTypeInterfa
     parent::postSave($storage, $update);
 
     if (!$update && !$this->isSyncing()) {
-      entity_invoke_bundle_hook('create', 'custom_block', $this->id());
       if (!$this->isSyncing()) {
         custom_block_add_body_field($this->id);
       }
-    }
-    elseif ($this->getOriginalId() != $this->id) {
-      entity_invoke_bundle_hook('rename', 'custom_block', $this->getOriginalId(), $this->id);
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function postDelete(EntityStorageInterface $storage, array $entities) {
-    parent::postDelete($storage, $entities);
-
-    foreach ($entities as $entity) {
-      entity_invoke_bundle_hook('delete', 'custom_block', $entity->id());
     }
   }
 

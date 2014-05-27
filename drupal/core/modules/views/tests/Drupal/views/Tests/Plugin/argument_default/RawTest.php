@@ -40,12 +40,15 @@ class RawTest extends UnitTestCase {
       ->getMock();
 
     $request = new Request(array(), array(), array('_system_path' => 'test/example'));
+    $view->expects($this->any())
+      ->method('getRequest')
+      ->will($this->returnValue($request));
     $alias_manager = $this->getMock('Drupal\Core\Path\AliasManagerInterface');
     $alias_manager->expects($this->never())
-      ->method('getPathAlias');
+      ->method('getAliasByPath');
 
     // Don't use aliases.
-    $raw = new Raw(array(), 'raw', array(), $request, $alias_manager);
+    $raw = new Raw(array(), 'raw', array(), $alias_manager);
     $options = array(
       'use_alias' => FALSE,
       'index' => 0,
@@ -53,7 +56,7 @@ class RawTest extends UnitTestCase {
     $raw->init($view, $display_plugin, $options);
     $this->assertEquals('test', $raw->getArgument());
 
-    $raw = new Raw(array(), 'raw', array(), $request, $alias_manager);
+    $raw = new Raw(array(), 'raw', array(), $alias_manager);
     $options = array(
       'use_alias' => FALSE,
       'index' => 1,
@@ -64,11 +67,11 @@ class RawTest extends UnitTestCase {
     // Setup an alias manager with a path alias.
     $alias_manager = $this->getMock('Drupal\Core\Path\AliasManagerInterface');
     $alias_manager->expects($this->any())
-      ->method('getPathAlias')
+      ->method('getAliasByPath')
       ->with($this->equalTo('test/example'))
       ->will($this->returnValue('other/example'));
 
-    $raw = new Raw(array(), 'raw', array(), $request, $alias_manager);
+    $raw = new Raw(array(), 'raw', array(), $alias_manager);
     $options = array(
       'use_alias' => TRUE,
       'index' => 0,
@@ -76,7 +79,7 @@ class RawTest extends UnitTestCase {
     $raw->init($view, $display_plugin, $options);
     $this->assertEquals('other', $raw->getArgument());
 
-    $raw = new Raw(array(), 'raw', array(), $request, $alias_manager);
+    $raw = new Raw(array(), 'raw', array(), $alias_manager);
     $options = array(
       'use_alias' => TRUE,
       'index' => 1,

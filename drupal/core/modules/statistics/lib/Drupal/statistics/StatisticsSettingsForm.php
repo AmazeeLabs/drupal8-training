@@ -8,7 +8,7 @@ namespace Drupal\statistics;
 
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\ConfigFormBase;
-use Drupal\Core\Config\ConfigFactory;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -26,12 +26,12 @@ class StatisticsSettingsForm extends ConfigFormBase {
   /**
    * Constructs a \Drupal\user\StatisticsSettingsForm object.
    *
-   * @param \Drupal\Core\Config\ConfigFactory $config_factory
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   The factory for configuration objects.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
    */
-  public function __construct(ConfigFactory $config_factory, ModuleHandlerInterface $module_handler) {
+  public function __construct(ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler) {
     parent::__construct($config_factory);
 
     $this->moduleHandler = $module_handler;
@@ -58,7 +58,7 @@ class StatisticsSettingsForm extends ConfigFormBase {
    * Implements \Drupal\Core\Form\FormInterface::buildForm().
    */
   public function buildForm(array $form, array &$form_state) {
-    $config = $this->configFactory->get('statistics.settings');
+    $config = $this->config('statistics.settings');
 
     // Content counter settings.
     $form['content'] = array(
@@ -80,7 +80,7 @@ class StatisticsSettingsForm extends ConfigFormBase {
    * Implements \Drupal\Core\Form\FormInterface::submitForm().
    */
   public function submitForm(array &$form, array &$form_state) {
-    $this->configFactory->get('statistics.settings')
+    $this->config('statistics.settings')
       ->set('count_content_views', $form_state['values']['statistics_count_content_views'])
       ->save();
 

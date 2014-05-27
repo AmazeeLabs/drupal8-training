@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\Utility;
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Path\AliasManagerInterface;
@@ -85,7 +85,7 @@ class LinkGenerator implements LinkGeneratorInterface {
     }
 
     // Set the "active" class if the 'set_active_class' option is not empty.
-    if (!empty($variables['options']['set_active_class'])) {
+    if (!empty($variables['options']['set_active_class']) && !$url->isExternal()) {
       // Add a "data-drupal-link-query" attribute to let the
       // drupal.active-link library know the query in a standardized manner.
       if (!empty($variables['options']['query'])) {

@@ -7,10 +7,11 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Tags;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Component\Utility\String;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Tests for taxonomy term functions.
@@ -202,11 +203,13 @@ class TermTest extends TaxonomyTestBase {
     }
 
     // Delete term 1 from the term edit page.
-    $this->drupalPostForm('taxonomy/term/' . $term_objects['term1']->id() . '/edit', array(), t('Delete'));
+    $this->drupalGet('taxonomy/term/' . $term_objects['term1']->id() . '/edit');
+    $this->clickLink(t('Delete'));
     $this->drupalPostForm(NULL, NULL, t('Delete'));
 
     // Delete term 2 from the term delete page.
-    $this->drupalPostForm('taxonomy/term/' . $term_objects['term2']->id() . '/delete', array(), t('Delete'));
+    $this->drupalGet('taxonomy/term/' . $term_objects['term2']->id() . '/delete');
+    $this->drupalPostForm(NULL, array(), t('Delete'));
     $term_names = array($term_objects['term3']->getName(), $term_objects['term4']->getName());
 
     // Get the node.
@@ -235,7 +238,7 @@ class TermTest extends TaxonomyTestBase {
     $field_name = $this->randomName();
     $tag = $this->randomName();
     $message = t("Taxonomy field @field_name not found.", array('@field_name' => $field_name));
-    $this->assertFalse(field_info_field('node', $field_name), format_string('Field %field_name does not exist.', array('%field_name' => $field_name)));
+    $this->assertFalse(FieldConfig::loadByName('node', $field_name), format_string('Field %field_name does not exist.', array('%field_name' => $field_name)));
     $this->drupalGet('taxonomy/autocomplete/node/' . $field_name, array('query' => array('q' => $tag)));
     $this->assertRaw($message, 'Autocomplete returns correct error message when the taxonomy field does not exist.');
   }
@@ -305,7 +308,7 @@ class TermTest extends TaxonomyTestBase {
       'description[0][value]' => $this->randomName(100),
     );
     // Explicitly set the parents field to 'root', to ensure that
-    // TermFormController::save() handles the invalid term ID correctly.
+    // TermForm::save() handles the invalid term ID correctly.
     $edit['parent[]'] = array(0);
 
     // Create the term to edit.
@@ -366,7 +369,8 @@ class TermTest extends TaxonomyTestBase {
     $this->drupalGet('taxonomy/term/' . $term->id() . '/feed');
 
     // Delete the term.
-    $this->drupalPostForm('taxonomy/term/' . $term->id() . '/edit', array(), t('Delete'));
+    $this->drupalGet('taxonomy/term/' . $term->id() . '/edit');
+    $this->clickLink(t('Delete'));
     $this->drupalPostForm(NULL, NULL, t('Delete'));
 
     // Assert that the term no longer exists.

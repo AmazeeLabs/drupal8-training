@@ -27,18 +27,20 @@ class BreakpointCRUDTest extends BreakpointTestBase {
    */
   public function testBreakpointCRUD() {
     // Add a breakpoint with minimum data only.
+    $label = $this->randomName();
     $breakpoint = entity_create('breakpoint', array(
-      'label' => drupal_strtolower($this->randomName()),
+      'label' => $label,
       'mediaQuery' => '(min-width: 600px)',
+      'name' => drupal_strtolower($label),
     ));
     $breakpoint->save();
 
     $this->verifyBreakpoint($breakpoint);
 
-    // Test breakpoint_load_all
-    $all_breakpoints = entity_load_multiple('breakpoint');
+    // Test BreakPoint::loadMultiple().
+    $all_breakpoints = Breakpoint::loadMultiple();
     $config_name = $breakpoint->id();
-    $this->assertTrue(isset($all_breakpoints[$config_name]), 'breakpoint_load_all: New breakpoint is present when loading all breakpoints.');
+    $this->assertTrue(isset($all_breakpoints[$config_name]), 'New breakpoint is present when loading all breakpoints.');
     $this->verifyBreakpoint($breakpoint, $all_breakpoints[$config_name]);
 
     // Update the breakpoint.
@@ -49,6 +51,6 @@ class BreakpointCRUDTest extends BreakpointTestBase {
 
     // Delete the breakpoint.
     $breakpoint->delete();
-    $this->assertFalse(breakpoint_load($config_name), 'breakpoint_load: Loading a deleted breakpoint returns false.', 'Breakpoints API');
+    $this->assertNull(Breakpoint::load($config_name), 'Loading a deleted breakpoint returns null.', 'Breakpoints API');
   }
 }

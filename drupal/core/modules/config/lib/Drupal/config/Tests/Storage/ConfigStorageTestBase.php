@@ -24,10 +24,14 @@ use Drupal\simpletest\DrupalUnitTestBase;
 abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
 
   /**
+   * @var \Drupal\Core\Config\StorageInterface;
+   */
+  protected $storage;
+
+  /**
    * Tests storage CRUD operations.
    *
    * @todo Coverage: Trigger PDOExceptions / Database exceptions.
-   * @todo Coverage: Trigger Yaml's ParseException and DumpException.
    */
   function testCRUD() {
     $name = 'config_test.storage';
@@ -38,17 +42,6 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
     // Reading a non-existing name returns FALSE.
     $data = $this->storage->read($name);
     $this->assertIdentical($data, FALSE);
-
-    // Reading a name containing non-decodeable data returns FALSE.
-    $this->insert($name, '');
-    $data = $this->storage->read($name);
-    $this->assertIdentical($data, FALSE);
-
-    $this->update($name, 'foo');
-    $data = $this->storage->read($name);
-    $this->assertIdentical($data, FALSE);
-
-    $this->delete($name);
 
     // Writing data returns TRUE and the data has been written.
     $data = array('foo' => 'bar');
@@ -91,14 +84,6 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
     $result = $this->storage->delete($name);
     $this->assertIdentical($result, FALSE);
 
-    // Reading from a non-existing storage bin returns FALSE.
-    $result = $this->invalidStorage->read($name);
-    $this->assertIdentical($result, FALSE);
-
-    // Listing on a non-existing storage bin returns an empty array.
-    $result = $this->invalidStorage->listAll();
-    $this->assertIdentical($result, array());
-
     // Deleting all names with prefix deletes the appropriate data and returns
     // TRUE.
     $files = array(
@@ -114,17 +99,6 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
     $names = $this->storage->listAll('config_test.');
     $this->assertIdentical($result, TRUE);
     $this->assertIdentical($names, array());
-
-
-    // Deleting from a non-existing storage bin throws an exception.
-    try {
-      $this->invalidStorage->delete($name);
-      $this->fail('Exception not thrown upon deleting from a non-existing storage bin.');
-    }
-    catch (\Exception $e) {
-      $class = get_class($e);
-      $this->pass($class . ' thrown upon deleting from a non-existing storage bin.');
-    }
 
     // Test renaming an object that does not exist throws an exception.
     try {
@@ -143,7 +117,40 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
       $class = get_class($e);
       $this->pass($class . ' thrown upon renaming a nonexistent storage bin.');
     }
+  }
 
+  /**
+   * Tests an invalid storage.
+   */
+  public function testInvalidStorage() {
+    $name = 'config_test.storage';
+
+    // Write something to the valid storage to prove that the storages do not
+    // pollute one another.
+    $data = array('foo' => 'bar');
+    $result = $this->storage->write($name, $data);
+    $this->assertIdentical($result, TRUE);
+
+    $raw_data = $this->read($name);
+    $this->assertIdentical($raw_data, $data);
+
+    // Reading from a non-existing storage bin returns FALSE.
+    $result = $this->invalidStorage->read($name);
+    $this->assertIdentical($result, FALSE);
+
+    // Deleting from a non-existing storage bin throws an exception.
+    try {
+      $this->invalidStorage->delete($name);
+      $this->fail('Exception not thrown upon deleting from a non-existing storage bin.');
+    }
+    catch (\Exception $e) {
+      $class = get_class($e);
+      $this->pass($class . ' thrown upon deleting from a non-existing storage bin.');
+    }
+
+    // Listing on a non-existing storage bin returns an empty array.
+    $result = $this->invalidStorage->listAll();
+    $this->assertIdentical($result, array());
     // Writing to a non-existing storage bin creates the bin.
     $this->invalidStorage->write($name, array('foo' => 'bar'));
     $result = $this->invalidStorage->read($name);
@@ -174,6 +181,80 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
     $this->assertIdentical($read_data, $data);
   }
 
+  /**
+   * Tests that the storage supports collections.
+   */
+  public function testCollection() {
+    $name = 'config_test.storage';
+    $data = array('foo' => 'bar');
+    $result = $this->storage->write($name, $data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($data, $this->storage->read($name));
+
+    // Create configuration in a new collection.
+    $new_storage = $this->storage->createCollection('collection.sub.new');
+    $this->assertFalse($new_storage->exists($name));
+    $this->assertEqual(array(), $new_storage->listAll());
+    $new_storage->write($name, $data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($data, $new_storage->read($name));
+    $this->assertEqual(array($name), $new_storage->listAll());
+    $this->assertTrue($new_storage->exists($name));
+    $new_data = array('foo' => 'baz');
+    $new_storage->write($name, $new_data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($new_data, $new_storage->read($name));
+
+    // Create configuration in another collection.
+    $another_storage = $this->storage->createCollection('collection.sub.another');
+    $this->assertFalse($another_storage->exists($name));
+    $this->assertEqual(array(), $another_storage->listAll());
+    $another_storage->write($name, $new_data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($new_data, $another_storage->read($name));
+    $this->assertEqual(array($name), $another_storage->listAll());
+    $this->assertTrue($another_storage->exists($name));
+
+    // Create configuration in yet another collection.
+    $alt_storage = $this->storage->createCollection('alternate');
+    $alt_storage->write($name, $new_data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($new_data, $alt_storage->read($name));
+
+    // Switch back to the collection-less mode and check the data still exists
+    // add has not been touched.
+    $this->assertIdentical($data, $this->storage->read($name));
+
+    // Check that the getAllCollectionNames() method works.
+    $this->assertIdentical(array('alternate', 'collection.sub.another', 'collection.sub.new'), $this->storage->getAllCollectionNames());
+
+    // Check that the collections are removed when they are empty.
+    $alt_storage->delete($name);
+    $this->assertIdentical(array('collection.sub.another', 'collection.sub.new'), $this->storage->getAllCollectionNames());
+
+    // Create configuration in collection called 'collection'. This ensures that
+    // FileStorage's collection storage works regardless of its use of
+    // subdirectories.
+    $parent_storage = $this->storage->createCollection('collection');
+    $this->assertFalse($parent_storage->exists($name));
+    $this->assertEqual(array(), $parent_storage->listAll());
+    $parent_storage->write($name, $new_data);
+    $this->assertIdentical($result, TRUE);
+    $this->assertIdentical($new_data, $parent_storage->read($name));
+    $this->assertEqual(array($name), $parent_storage->listAll());
+    $this->assertTrue($parent_storage->exists($name));
+    $this->assertIdentical(array('collection', 'collection.sub.another', 'collection.sub.new'), $this->storage->getAllCollectionNames());
+    $parent_storage->deleteAll();
+    $this->assertIdentical(array('collection.sub.another', 'collection.sub.new'), $this->storage->getAllCollectionNames());
+
+    // Check that the having an empty collection-less storage does not break
+    // anything. Before deleting check that the previous delete did not affect
+    // data in another collection.
+    $this->assertIdentical($data, $this->storage->read($name));
+    $this->storage->delete($name);
+    $this->assertIdentical(array('collection.sub.another', 'collection.sub.new'), $this->storage->getAllCollectionNames());
+  }
+
   abstract protected function read($name);
 
   abstract protected function insert($name, $data);
@@ -181,4 +262,5 @@ abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
   abstract protected function update($name, $data);
 
   abstract protected function delete($name);
+
 }

@@ -109,10 +109,10 @@ class LocalePathTest extends WebTestBase {
       'langcode' => Language::LANGCODE_NOT_SPECIFIED,
     );
     $this->container->get('path.alias_storage')->save($edit['source'], $edit['alias'], $edit['langcode']);
-    $lookup_path = $this->container->get('path.alias_manager')->getPathAlias('node/' . $node->id(), 'en');
+    $lookup_path = $this->container->get('path.alias_manager')->getAliasByPath('node/' . $node->id(), 'en');
     $this->assertEqual($english_path, $lookup_path, 'English language alias has priority.');
     // Same check for language 'xx'.
-    $lookup_path = $this->container->get('path.alias_manager')->getPathAlias('node/' . $node->id(), $prefix);
+    $lookup_path = $this->container->get('path.alias_manager')->getAliasByPath('node/' . $node->id(), $prefix);
     $this->assertEqual($custom_language_path, $lookup_path, 'Custom language alias has priority.');
     $this->container->get('path.alias_storage')->delete($edit);
 
@@ -139,9 +139,9 @@ class LocalePathTest extends WebTestBase {
     // Test that both node titles link to our path alias.
     $this->drupalGet('<front>');
     $custom_path_url = base_path() . $GLOBALS['script_path'] . $custom_path;
-    $elements = $this->xpath('//a[@href=:href and .=:title]', array(':href' => $custom_path_url, ':title' => $first_node->label()));
+    $elements = $this->xpath('//a[@href=:href]/span[normalize-space(text())=:title]', array(':href' => $custom_path_url, ':title' => $first_node->label()));
     $this->assertTrue(!empty($elements), 'First node links to the path alias.');
-    $elements = $this->xpath('//a[@href=:href and .=:title]', array(':href' => $custom_path_url, ':title' => $second_node->label()));
+    $elements = $this->xpath('//a[@href=:href]/span[normalize-space(text())=:title]', array(':href' => $custom_path_url, ':title' => $second_node->label()));
     $this->assertTrue(!empty($elements), 'Second node links to the path alias.');
 
     // Confirm that the custom path leads to the first node.

@@ -48,18 +48,20 @@ class TwigDebugMarkupTest extends WebTestBase {
 
     // Create a node and test different features of the debug markup.
     $node = $this->drupalCreateNode();
-    $output = _theme('node', node_view($node));
+    $build = node_view($node);
+    $output = drupal_render($build);
     $this->assertTrue(strpos($output, '<!-- THEME DEBUG -->') !== FALSE, 'Twig debug markup found in theme output when debug is enabled.');
     $this->assertTrue(strpos($output, "CALL: _theme('node')") !== FALSE, 'Theme call information found.');
-    $this->assertTrue(strpos($output, 'x node--1' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   * node' . $extension) !== FALSE, 'Suggested template files found in order and node ID specific template shown as current template.');
+    $this->assertTrue(strpos($output, '* node--1--full' . $extension  . PHP_EOL . '   x node--1' . $extension . PHP_EOL . '   * node--page--full' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   * node--full' . $extension . PHP_EOL . '   * node' . $extension) !== FALSE, 'Suggested template files found in order and node ID specific template shown as current template.');
     $template_filename = $templates['node__1']['path'] . '/' . $templates['node__1']['template'] . $extension;
     $this->assertTrue(strpos($output, "BEGIN OUTPUT from '$template_filename'") !== FALSE, 'Full path to current template file found.');
 
     // Create another node and make sure the template suggestions shown in the
     // debug markup are correct.
     $node2 = $this->drupalCreateNode();
-    $output = _theme('node', node_view($node2));
-    $this->assertTrue(strpos($output, '* node--2' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   x node' . $extension) !== FALSE, 'Suggested template files found in order and base template shown as current template.');
+    $build = node_view($node2);
+    $output = drupal_render($build);
+    $this->assertTrue(strpos($output, '* node--2--full' . $extension  . PHP_EOL . '   * node--2' . $extension . PHP_EOL . '   * node--page--full' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   * node--full' . $extension . PHP_EOL . '   x node' . $extension) !== FALSE, 'Suggested template files found in order and base template shown as current template.');
 
     // Create another node and make sure the template suggestions shown in the
     // debug markup are correct.
@@ -68,14 +70,15 @@ class TwigDebugMarkupTest extends WebTestBase {
     $build += node_view($node3);
     $output = drupal_render($build);
     $this->assertTrue(strpos($output, "CALL: _theme('node__foo__bar')") !== FALSE, 'Theme call information found.');
-    $this->assertTrue(strpos($output, '* node--foo--bar' . $extension . PHP_EOL . '   * node--foo' . $extension . PHP_EOL . '   * node--3' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   x node' . $extension) !== FALSE, 'Suggested template files found in order and base template shown as current template.');
+    $this->assertTrue(strpos($output, '* node--foo--bar' . $extension . PHP_EOL . '   * node--foo' . $extension . PHP_EOL . '   * node--3--full' . $extension . PHP_EOL . '   * node--3' . $extension . PHP_EOL . '   * node--page--full' . $extension . PHP_EOL . '   * node--page' . $extension . PHP_EOL . '   * node--full' . $extension . PHP_EOL . '   x node' . $extension) !== FALSE, 'Suggested template files found in order and base template shown as current template.');
 
     // Disable debug, rebuild the service container, and clear all caches.
     $this->settingsSet('twig_debug', FALSE);
     $this->rebuildContainer();
     $this->resetAll();
 
-    $output = _theme('node', node_view($node));
+    $build = node_view($node);
+    $output = drupal_render($build);
     $this->assertFalse(strpos($output, '<!-- THEME DEBUG -->') !== FALSE, 'Twig debug markup not found in theme output when debug is disabled.');
   }
 

@@ -311,7 +311,7 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
     }
 
     // Check that the field type is known.
-    $field_type = $field_type_manager->getDefinition($this->type);
+    $field_type = $field_type_manager->getDefinition($this->type, FALSE);
     if (!$field_type) {
       throw new FieldException(format_string('Attempt to create a field of unknown type %type.', array('%type' => $this->type)));
     }
@@ -376,7 +376,7 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE) {
     // Clear the cache.
-    field_cache_clear();
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
     if ($update) {
       // Invalidate the render cache for all affected entities.
@@ -438,11 +438,12 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
     foreach ($fields as $field) {
       if (!$field->deleted) {
         \Drupal::entityManager()->getStorage($field->entity_type)->onFieldDelete($field);
+        $field->deleted = TRUE;
       }
     }
 
     // Clear the cache.
-    field_cache_clear();
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
   }
 
   /**
@@ -497,7 +498,7 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
    */
   public function getBundles() {
     if (empty($this->deleted)) {
-      $map = field_info_field_map();
+      $map = \Drupal::entityManager()->getFieldMap();
       if (isset($map[$this->entity_type][$this->name]['bundles'])) {
         return $map[$this->entity_type][$this->name]['bundles'];
       }
@@ -656,36 +657,63 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
   /**
    * Determines whether a field has any data.
    *
-   * @return
+   * @return bool
    *   TRUE if the field has data for any entity; FALSE otherwise.
    */
   public function hasData() {
-    if ($this->getBundles()) {
-      $storage_details = $this->getSchema();
-      $columns = array_keys($storage_details['columns']);
-      $factory = \Drupal::service('entity.query');
-      // Entity Query throws an exception if there is no base table.
-      $entity_type = \Drupal::entityManager()->getDefinition($this->entity_type);
-      if (!$entity_type->getBaseTable()) {
-        return FALSE;
+    return $this->entityCount(TRUE);
+  }
+
+  /**
+   * Determines the number of entities that have field data.
+   *
+   * @param bool $as_bool
+   *   (Optional) Optimises query for hasData(). Defaults to FALSE.
+   *
+   * @return bool|int
+   *   The number of entities that have field data. If $as_bool parameter is
+   *   TRUE then the value will either be TRUE or FALSE.
+   */
+  public function entityCount($as_bool = FALSE) {
+    $count = 0;
+    $factory = \Drupal::service('entity.query');
+    $entity_type = \Drupal::entityManager()->getDefinition($this->entity_type);
+    // Entity Query throws an exception if there is no base table.
+    if ($entity_type->getBaseTable()) {
+      if ($this->deleted) {
+        $query = $factory->get($this->entity_type)
+          ->condition('id:' . $this->uuid() . '.deleted', 1);
       }
-      $query = $factory->get($this->entity_type);
-      $group = $query->orConditionGroup();
-      foreach ($columns as $column) {
-        $group->exists($this->name . '.' . $column);
+      elseif ($this->getBundles()) {
+        $storage_details = $this->getSchema();
+        $columns = array_keys($storage_details['columns']);
+        $query = $factory->get($this->entity_type);
+        $group = $query->orConditionGroup();
+        foreach ($columns as $column) {
+          $group->exists($this->name . '.' . $column);
+        }
+        $query = $query->condition($group);
       }
-      $result = $query
-        ->condition($group)
-        ->count()
-        ->accessCheck(FALSE)
-        ->range(0, 1)
-        ->execute();
-      if ($result) {
-        return TRUE;
+
+      if (isset($query)) {
+        $query
+          ->count()
+          ->accessCheck(FALSE);
+        // If we are performing the query just to check if the field has data
+        // limit the number of rows returned by the subquery.
+        if ($as_bool) {
+          $query->range(0, 1);
+        }
+        $count = $query->execute();
       }
     }
 
-    return FALSE;
+    if ($as_bool) {
+      return (bool) $count;
+    }
+    else {
+      return (int) $count;
+    }
   }
 
   /**
@@ -768,6 +796,22 @@ class FieldConfig extends ConfigEntityBase implements FieldConfigInterface {
     $type_definition = \Drupal::typedDataManager()
       ->getDefinition('field_item:' . $this->getType());
     return $type_definition['class'];
+  }
+
+  /**
+   * Loads a field config entity based on the entity type and field name.
+   *
+   * @param string $entity_type_id
+   *   ID of the entity type.
+   * @param string $field_name
+   *   Name of the field.
+   *
+   * @return static
+   *   The field config entity if one exists for the provided field name,
+   *   otherwise NULL.
+   */
+  public static function loadByName($entity_type_id, $field_name) {
+    return \Drupal::entityManager()->getStorage('field_config')->load($entity_type_id . '.' . $field_name);
   }
 
 }

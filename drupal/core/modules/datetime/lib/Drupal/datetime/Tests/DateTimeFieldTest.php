@@ -69,6 +69,7 @@ class DateTimeFieldTest extends WebTestBase {
       'field_name' => $this->field->name,
       'entity_type' => 'entity_test',
       'bundle' => 'entity_test',
+      'required' => TRUE,
     ));
     $this->instance->save();
 
@@ -97,6 +98,7 @@ class DateTimeFieldTest extends WebTestBase {
     // Display creation form.
     $this->drupalGet('entity_test/add');
     $this->assertFieldByName("{$field_name}[0][value][date]", '', 'Date element found.');
+    $this->assertFieldByXPath('//*[@id="edit-' . $field_name . '-wrapper"]/h4[contains(@class, "form-required")]', TRUE, 'Required markup found');
     $this->assertNoFieldByName("{$field_name}[0][value][time]", '', 'Time element not found.');
 
     // Submit a valid date and ensure it is accepted.
@@ -243,7 +245,7 @@ class DateTimeFieldTest extends WebTestBase {
         ),
       ))
       ->save();
-    field_cache_clear();
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
     // Display creation form.
     $this->drupalGet('entity_test/add');
@@ -325,8 +327,8 @@ class DateTimeFieldTest extends WebTestBase {
     $config_entity = $this->container->get('config.factory')->get('field.instance.node.date_content.' . $field->name)->get();
     $this->assertEqual($config_entity['default_value'][0]['default_date'], 'now', 'Default value has been stored successfully');
 
-    // Clean field_info cache in order to avoid stale cache values.
-    field_info_cache_clear();
+    // Clear field cache in order to avoid stale cache values.
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
     // Create a new node to check that datetime field default value is today.
     $new_node = entity_create('node', array('type' => 'date_content'));
@@ -347,8 +349,8 @@ class DateTimeFieldTest extends WebTestBase {
     $config_entity = $this->container->get('config.factory')->get('field.instance.node.date_content.' . $field->name)->get();
     $this->assertTrue(empty($config_entity['default_value']), 'Empty default value has been stored successfully');
 
-    // Clean field_info cache in order to avoid stale cache values.
-    field_info_cache_clear();
+    // Clear field cache in order to avoid stale cache values.
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
     // Create a new node to check that datetime field default value is today.
     $new_node = entity_create('node', array('type' => 'date_content'));
@@ -457,8 +459,8 @@ class DateTimeFieldTest extends WebTestBase {
     }
     $entity = entity_load('entity_test', $id);
     $display = EntityViewDisplay::collectRenderDisplay($entity, $view_mode);
-    $entity->content = $display->build($entity);
-    $output = drupal_render($entity->content);
+    $build = $display->build($entity);
+    $output = drupal_render($build);
     $this->drupalSetContent($output);
     $this->verbose($output);
   }

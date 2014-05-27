@@ -24,7 +24,7 @@ use Drupal\aggregator\FeedInterface;
  *     "storage" = "Drupal\aggregator\FeedStorage",
  *     "view_builder" = "Drupal\aggregator\FeedViewBuilder",
  *     "form" = {
- *       "default" = "Drupal\aggregator\FeedFormController",
+ *       "default" = "Drupal\aggregator\FeedForm",
  *       "delete" = "Drupal\aggregator\Form\FeedDeleteForm",
  *       "delete_items" = "Drupal\aggregator\Form\FeedItemsDeleteForm",
  *     }
@@ -44,13 +44,6 @@ use Drupal\aggregator\FeedInterface;
  * )
  */
 class Feed extends ContentEntityBase implements FeedInterface {
-
-  /**
-   * Implements Drupal\Core\Entity\EntityInterface::id().
-   */
-  public function id() {
-    return $this->get('fid')->value;
-  }
 
   /**
    * Implements Drupal\Core\Entity\EntityInterface::label().

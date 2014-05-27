@@ -38,7 +38,7 @@ class ContentTranslationRouteSubscriber extends RouteSubscriberBase {
   /**
    * {@inheritdoc}
    */
-  protected function alterRoutes(RouteCollection $collection, $provider) {
+  protected function alterRoutes(RouteCollection $collection) {
     foreach ($this->contentTranslationManager->getSupportedEntityTypes() as $entity_type_id => $entity_type) {
       // Try to get the route from the current collection.
       if (!$entity_route = $collection->get($entity_type->getLinkTemplate('canonical'))) {
@@ -50,7 +50,6 @@ class ContentTranslationRouteSubscriber extends RouteSubscriberBase {
        $path,
         array(
           '_content' => '\Drupal\content_translation\Controller\ContentTranslationController::overview',
-          'account' => 'NULL',
           '_entity_type_id' => $entity_type_id,
         ),
         array(

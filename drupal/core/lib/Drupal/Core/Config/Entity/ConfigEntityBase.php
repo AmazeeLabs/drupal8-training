@@ -7,17 +7,26 @@
 
 namespace Drupal\Core\Config\Entity;
 
+use Drupal\Component\Plugin\ConfigurablePluginInterface;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\Entity;
 use Drupal\Core\Config\ConfigDuplicateUUIDException;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\EntityWithPluginBagsInterface;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Plugin\PluginDependencyTrait;
 
 /**
  * Defines a base configuration entity class.
+ *
+ * @ingroup entity_api
  */
 abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface {
+
+  use PluginDependencyTrait {
+    addDependency as addDependencyTrait;
+  }
 
   /**
    * The original ID of the configuration entity.
@@ -35,10 +44,6 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
    *
    * This is needed when the entity utilizes a PluginBag, to dictate where the
    * plugin configuration should be stored.
-   *
-   * @todo Move this to a trait along with
-   *   \Drupal\Core\Config\Entity\EntityWithPluginBagInterface, and give it a
-   *   default value of 'configuration'.
    *
    * @var string
    */
@@ -74,13 +79,6 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
   private $isUninstalling = FALSE;
 
   /**
-   * The configuration entity's dependencies.
-   *
-   * @var array
-   */
-  protected $dependencies = array();
-
-  /**
    * The language code of the entity's default language.
    *
    * @var string
@@ -114,7 +112,7 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
   public function setOriginalId($id) {
     $this->originalId = $id;
 
-    return $this;
+    return parent::setOriginalId($id);
   }
 
   /**
@@ -139,12 +137,11 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
    * {@inheritdoc}
    */
   public function set($property_name, $value) {
-    // @todo When \Drupal\Core\Config\Entity\EntityWithPluginBagInterface moves
-    //   to a trait, switch to class_uses() instead.
-    if ($this instanceof EntityWithPluginBagInterface) {
-      if ($property_name == $this->pluginConfigKey) {
+    if ($this instanceof EntityWithPluginBagsInterface) {
+      $plugin_bags = $this->getPluginBags();
+      if (isset($plugin_bags[$property_name])) {
         // If external code updates the settings, pass it along to the plugin.
-        $this->getPluginBag()->setConfiguration($value);
+        $plugin_bags[$property_name]->setConfiguration($value);
       }
     }
 
@@ -262,13 +259,12 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
   public function preSave(EntityStorageInterface $storage) {
     parent::preSave($storage);
 
-    // @todo When \Drupal\Core\Config\Entity\EntityWithPluginBagInterface moves
-    //   to a trait, switch to class_uses() instead.
-    if ($this instanceof EntityWithPluginBagInterface) {
+    if ($this instanceof EntityWithPluginBagsInterface) {
       // Any changes to the plugin configuration must be saved to the entity's
       // copy as well.
-      $plugin_bag = $this->getPluginBag();
-      $this->set($this->pluginConfigKey, $plugin_bag->getConfiguration());
+      foreach ($this->getPluginBags() as $plugin_config_key => $plugin_bag) {
+        $this->set($plugin_config_key, $plugin_bag->getConfiguration());
+      }
     }
 
     // Ensure this entity's UUID does not exist with a different ID, regardless
@@ -304,22 +300,12 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
     // Dependencies should be recalculated on every save. This ensures stale
     // dependencies are never saved.
     $this->dependencies = array();
-    // @todo When \Drupal\Core\Config\Entity\EntityWithPluginBagInterface moves
-    //   to a trait, switch to class_uses() instead.
-    if ($this instanceof EntityWithPluginBagInterface) {
+    if ($this instanceof EntityWithPluginBagsInterface) {
       // Configuration entities need to depend on the providers of any plugins
       // that they store the configuration for.
-      $plugin_bag = $this->getPluginBag();
-      foreach($plugin_bag as $instance) {
-        $definition = $instance->getPluginDefinition();
-        $this->addDependency('module', $definition['provider']);
-        // Plugins can declare additional dependencies in their definition.
-        if (isset($definition['config_dependencies'])) {
-          foreach ($definition['config_dependencies'] as $type => $dependencies) {
-            foreach ($dependencies as $dependency) {
-              $this->addDependency($type, $dependency);
-            }
-          }
+      foreach ($this->getPluginBags() as $plugin_bag) {
+        foreach ($plugin_bag as $instance) {
+          $this->calculatePluginDependencies($instance);
         }
       }
     }
@@ -348,18 +334,7 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
   }
 
   /**
-   * Creates a dependency.
-   *
-   * @param string $type
-   *   The type of dependency being checked. Either 'module', 'theme', 'entity'.
-   * @param string $name
-   *   If $type equals 'module' or 'theme' then it should be the name of the
-   *   module or theme. In the case of entity it should be the full
-   *   configuration object name.
-   *
-   * @see \Drupal\Core\Config\Entity\ConfigEntityInterface::getConfigDependencyName()
-   *
-   * @return $this
+   * {@inheritdoc}
    */
   protected function addDependency($type, $name) {
     // A config entity is always dependent on its provider. There is no need to
@@ -369,19 +344,8 @@ abstract class ConfigEntityBase extends Entity implements ConfigEntityInterface 
     if ($type == 'module' && ($name == $this->getEntityType()->getProvider() || $name == 'Core')) {
       return $this;
     }
-    if (empty($this->dependencies[$type])) {
-      $this->dependencies[$type] = array($name);
-      if (count($this->dependencies) > 1) {
-        // Ensure a consistent order of type keys.
-        ksort($this->dependencies);
-      }
-    }
-    elseif (!in_array($name, $this->dependencies[$type])) {
-      $this->dependencies[$type][] = $name;
-      // Ensure a consistent order of dependency names.
-      sort($this->dependencies[$type], SORT_FLAG_CASE);
-    }
-    return $this;
+
+    return $this->addDependencyTrait($type, $name);
   }
 
   /**

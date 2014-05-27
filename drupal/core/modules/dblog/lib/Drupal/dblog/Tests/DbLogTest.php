@@ -130,7 +130,7 @@ class DbLogTest extends WebTestBase {
 
     // Prepare the fields to be logged
     $log = array(
-      'type'        => $type,
+      'channel'     => $type,
       'message'     => 'Log entry added to test the dblog row limit.',
       'variables'   => array(),
       'severity'    => $severity,
@@ -138,14 +138,14 @@ class DbLogTest extends WebTestBase {
       'user'        => $this->big_user,
       'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
-      'referer'     => $_SERVER['HTTP_REFERER'],
+      'referer'     => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
       );
     $message = 'Log entry added to test the dblog row limit. Entry #';
     for ($i = 0; $i < $count; $i++) {
       $log['message'] = $message . $i;
-      dblog_watchdog($log);
+      $this->container->get('logger.dblog')->log($severity, $log['message'], $log);
     }
   }
 
@@ -413,7 +413,7 @@ class DbLogTest extends WebTestBase {
     // Get a count of how many watchdog entries already exist.
     $count = db_query('SELECT COUNT(*) FROM {watchdog}')->fetchField();
     $log = array(
-      'type'        => 'custom',
+      'channel'     => 'system',
       'message'     => 'Log entry added to test the doClearTest clear down.',
       'variables'   => array(),
       'severity'    => WATCHDOG_NOTICE,
@@ -421,12 +421,12 @@ class DbLogTest extends WebTestBase {
       'user'        => $this->big_user,
       'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
-      'referer'     => $_SERVER['HTTP_REFERER'],
+      'referer'     => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
     );
     // Add a watchdog entry.
-    dblog_watchdog($log);
+    $this->container->get('logger.dblog')->log($log['severity'], $log['message'], $log);
     // Make sure the table count has actually been incremented.
     $this->assertEqual($count + 1, db_query('SELECT COUNT(*) FROM {watchdog}')->fetchField(), format_string('dblog_watchdog() added an entry to the dblog :count', array(':count' => $count)));
     // Login the admin user.

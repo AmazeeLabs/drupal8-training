@@ -7,7 +7,8 @@
 
 namespace Drupal\menu_ui\Tests;
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
+use Drupal\system\Entity\Menu;
 
 /**
  * Defines a test class for testing menu and menu link functionality.
@@ -52,7 +53,7 @@ class MenuTest extends MenuWebTestBase {
   public static function getInfo() {
     return array(
       'name' => 'Menu link creation/deletion',
-      'description' => 'Add a custom menu, add menu links to the custom menu and Tools menu, check their data, and delete them using the menu module UI.',
+      'description' => 'Add a custom menu, add menu links to the custom menu and Tools menu, check their data, and delete them using the UI.',
       'group' => 'Menu'
     );
   }
@@ -199,7 +200,7 @@ class MenuTest extends MenuWebTestBase {
 
     // Enable the block.
     $this->drupalPlaceBlock('system_menu_block:' . $menu_name);
-    return menu_ui_load($menu_name);
+    return Menu::load($menu_name);
   }
 
   /**
@@ -216,7 +217,7 @@ class MenuTest extends MenuWebTestBase {
     $this->drupalPostForm("admin/structure/menu/manage/$menu_name/delete", array(), t('Delete'));
     $this->assertResponse(200);
     $this->assertRaw(t('The custom menu %title has been deleted.', array('%title' => $label)), 'Custom menu was deleted');
-    $this->assertFalse(menu_ui_load($menu_name), 'Custom menu was deleted');
+    $this->assertNull(Menu::load($menu_name), 'Custom menu was deleted');
     // Test if all menu links associated to the menu were removed from database.
     $result = entity_load_multiple_by_properties('menu_link', array('menu_name' => $menu_name));
     $this->assertFalse($result, 'All menu links associated to the custom menu were deleted.');
@@ -395,6 +396,19 @@ class MenuTest extends MenuWebTestBase {
     // Verify in the database.
     $this->assertMenuLink($item1['mlid'], array('hidden' => 0));
 
+    // Add an external link.
+    $item7 = $this->addMenuLink(0, 'http://drupal.org', $menu_name);
+    $this->assertMenuLink($item7['mlid'], array('link_path' => 'http://drupal.org', 'external' => 1));
+
+    // Add <front> menu item.
+    $item8 = $this->addMenuLink(0, '<front>', $menu_name);
+    $this->assertMenuLink($item8['mlid'], array('link_path' => '<front>', 'external' => 1));
+    $this->drupalGet('');
+    $this->assertResponse(200);
+    // Make sure we get routed correctly.
+    $this->clickLink($item8['link_title']);
+    $this->assertResponse(200);
+
     // Save menu links for later tests.
     $this->items[] = $item1;
     $this->items[] = $item2;
@@ -486,8 +500,8 @@ class MenuTest extends MenuWebTestBase {
   public function testMenuBundles() {
     $this->drupalLogin($this->admin_user);
     $menu = $this->addCustomMenu();
-    // Clear the entity info cache to ensure the static caches are rebuilt.
-    entity_info_cache_clear();
+    // Clear the entity cache to ensure the static caches are rebuilt.
+    \Drupal::entityManager()->clearCachedBundles();
     $bundles = entity_get_bundles('menu_link');
     $this->assertTrue(isset($bundles[$menu->id()]));
     $menus = menu_list_system_menus();
@@ -511,7 +525,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Adds a menu link using the menu module UI.
+   * Adds a menu link using the UI.
    *
    * @param integer $plid
    *   Optional parent menu link id.
@@ -578,7 +592,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Verifies a menu link using the menu module UI.
+   * Verifies a menu link using the UI.
    *
    * @param array $item
    *   Menu link.
@@ -617,7 +631,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Changes the parent of a menu link using the menu module UI.
+   * Changes the parent of a menu link using the UI.
    *
    * @param array $item
    *   The menu link item to move.
@@ -637,7 +651,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Modifies a menu link using the menu module UI.
+   * Modifies a menu link using the UI.
    *
    * @param array $item
    *   Menu link passed by reference.
@@ -660,7 +674,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Resets a standard menu link using the menu module UI.
+   * Resets a standard menu link using the UI.
    *
    * @param array $item
    *   Menu link.
@@ -683,7 +697,7 @@ class MenuTest extends MenuWebTestBase {
   }
 
   /**
-   * Deletes a menu link using the menu module UI.
+   * Deletes a menu link using the UI.
    *
    * @param array $item
    *   Menu link.

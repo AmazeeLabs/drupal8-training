@@ -7,9 +7,9 @@
 
 namespace Drupal\config\Form;
 
+use Drupal\Core\Archiver\ArchiveTar;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Form\FormBase;
-use Drupal\Component\Archiver\ArchiveTar;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -100,7 +100,7 @@ class ConfigImportForm extends FormBase {
         $form_state['redirect_route']['route_name'] = 'config.sync';
       }
       catch (\Exception $e) {
-        $this->setFormError('import_tarball', $form_state, $this->t('Could not extract the contents of the tar file. The error message is <em>@message</em>', array('@message' => $e->getMessage())));
+        drupal_set_message($this->t('Could not extract the contents of the tar file. The error message is <em>@message</em>', array('@message' => $e->getMessage())), 'error');
       }
       drupal_unlink($path);
     }

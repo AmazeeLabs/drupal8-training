@@ -7,12 +7,12 @@
 
 namespace Drupal\config\Controller;
 
-use Drupal\Component\Archiver\ArchiveTar;
+use Drupal\Core\Archiver\ArchiveTar;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\system\FileDownloadController;
-use Symfony\Component\Yaml\Dumper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -84,12 +84,15 @@ class ConfigController implements ContainerInjectionInterface {
   public function downloadExport() {
     file_unmanaged_delete(file_directory_temp() . '/config.tar.gz');
 
-    $dumper = new Dumper();
-    $dumper->setIndentation(2);
-
     $archiver = new ArchiveTar(file_directory_temp() . '/config.tar.gz', 'gz');
-    foreach (\Drupal::service('config.storage')->listAll() as $name) {
-      $archiver->addString("$name.yml", $dumper->dump(\Drupal::config($name)->get(), PHP_INT_MAX, 0, TRUE));
+    foreach ($this->targetStorage->listAll() as $name) {
+      $archiver->addString("$name.yml", Yaml::encode(\Drupal::config($name)->get()));
+    }
+    foreach ($this->targetStorage->getAllCollectionNames() as $collection) {
+      $collection_storage = $this->targetStorage->createCollection($collection);
+      foreach ($collection_storage->listAll() as $name) {
+        $archiver->addString(str_replace('.', '/', $collection) . "/$name.yml", Yaml::encode($collection_storage->read($name)));
+      }
     }
 
     $request = new Request(array('file' => 'config.tar.gz'));
@@ -99,21 +102,29 @@ class ConfigController implements ContainerInjectionInterface {
   /**
    * Shows diff of specificed configuration file.
    *
-   * @param string $config_file
+   * @param string $source_name
    *   The name of the configuration file.
+   * @param string $target_name
+   *   (optional) The name of the target configuration file if different from
+   *   the $source_name.
+   * @param string $collection
+   *   (optional) The configuration collection name. Defaults to the default
+   *   collection.
    *
    * @return string
    *   Table showing a two-way diff between the active and staged configuration.
    */
-  public function diff($config_file) {
-
-    $diff = $this->configManager->diff($this->targetStorage, $this->sourceStorage, $config_file);
+  public function diff($source_name, $target_name = NULL, $collection = NULL) {
+    if (!isset($collection)) {
+      $collection = StorageInterface::DEFAULT_COLLECTION;
+    }
+    $diff = $this->configManager->diff($this->targetStorage, $this->sourceStorage, $source_name, $target_name, $collection);
     $formatter = new \DrupalDiffFormatter();
     $formatter->show_header = FALSE;
 
     $build = array();
 
-    $build['#title'] = t('View changes of @config_file', array('@config_file' => $config_file));
+    $build['#title'] = t('View changes of @config_file', array('@config_file' => $source_name));
     // Add the CSS for the inline diff.
     $build['#attached']['css'][] = drupal_get_path('module', 'system') . '/css/system.diff.css';
 

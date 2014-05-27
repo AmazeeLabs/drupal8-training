@@ -8,11 +8,14 @@
 namespace Drupal\image\Tests;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Test class to check that formatters and display settings are working.
  */
 class ImageFieldDisplayTest extends ImageFieldTestBase {
+
+  protected $dumpHeaders = TRUE;
 
   /**
    * Modules to enable.
@@ -90,6 +93,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = l($image, file_create_url($image_uri), array('html' => TRUE));
     $this->drupalGet('node/' . $nid);
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     $this->assertRaw($default_output, 'Image linked to file formatter displaying correctly on full node view.');
     // Verify that the image can be downloaded.
     $this->assertEqual(file_get_contents($test_image->uri), $this->drupalGet(file_create_url($image_uri)), 'File was downloaded successfully.');
@@ -120,6 +125,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = l($image, 'node/' . $nid, array('html' => TRUE));
     $this->drupalGet('node/' . $nid);
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     $this->assertRaw($default_output, 'Image linked to content formatter displaying correctly on full node view.');
 
     // Test the image style 'thumbnail' formatter.
@@ -140,6 +147,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = drupal_render($image_style);
     $this->drupalGet('node/' . $nid);
+    $cache_tags = explode(' ', $this->drupalGetHeader('X-Drupal-Cache-Tags'));
+    $this->assertTrue(in_array('image_style:thumbnail', $cache_tags));
     $this->assertRaw($default_output, 'Image style thumbnail formatter displaying correctly on full node view.');
 
     if ($scheme == 'private') {
@@ -258,6 +267,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     // Verify that no image is displayed on the page by checking for the class
     // that would be used on the image field.
     $this->assertNoPattern('<div class="(.*?)field-name-' . strtr($field_name, '_', '-') . '(.*?)">', 'No image displayed when no image is attached and no default image specified.');
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
 
     // Add a default image to the public imagefield instance.
     $images = $this->drupalGetTestFiles('image');
@@ -269,9 +280,9 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
       'field[settings][default_image][title]' => $title,
     );
     $this->drupalPostForm("admin/structure/types/manage/article/fields/node.article.$field_name/field", $edit, t('Save field settings'));
-    // Clear field info cache so the new default image is detected.
-    field_info_cache_clear();
-    $field = field_info_field('node', $field_name);
+    // Clear field definition cache so the new default image is detected.
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
+    $field = FieldConfig::loadByName('node', $field_name);
     $default_image = $field->getSetting('default_image');
     $file = file_load($default_image['fid']);
     $this->assertTrue($file->isPermanent(), 'The default image status is permanent.');
@@ -285,6 +296,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = drupal_render($image);
     $this->drupalGet('node/' . $node->id());
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     $this->assertRaw($default_output, 'Default image displayed when no user supplied image is present.');
 
     // Create a node with an image attached and ensure that the default image
@@ -299,6 +312,8 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $image_output = drupal_render($image);
     $this->drupalGet('node/' . $nid);
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     $this->assertNoRaw($default_output, 'Default image is not displayed when user supplied image is present.');
     $this->assertRaw($image_output, 'User supplied image is displayed.');
 
@@ -307,9 +322,9 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
       'field[settings][default_image][fid][fids]' => 0,
     );
     $this->drupalPostForm("admin/structure/types/manage/article/fields/node.article.$field_name/field", $edit, t('Save field settings'));
-    // Clear field info cache so the new default image is detected.
-    field_info_cache_clear();
-    $field = field_info_field('node', $field_name);
+    // Clear field definition cache so the new default image is detected.
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
+    $field = FieldConfig::loadByName('node', $field_name);
     $default_image = $field->getSetting('default_image');
     $this->assertFalse($default_image['fid'], 'Default image removed from field.');
     // Create an image field that uses the private:// scheme and test that the
@@ -323,10 +338,10 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
       'field[settings][default_image][title]' => $title,
     );
     $this->drupalPostForm('admin/structure/types/manage/article/fields/node.article.' . $private_field_name . '/field', $edit, t('Save field settings'));
-    // Clear field info cache so the new default image is detected.
-    field_info_cache_clear();
+    // Clear field definition cache so the new default image is detected.
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
-    $private_field = field_info_field('node', $private_field_name);
+    $private_field = FieldConfig::loadByName('node', $private_field_name);
     $default_image = $private_field->getSetting('default_image');
     $file = file_load($default_image['fid']);
     $this->assertEqual('private', file_uri_scheme($file->getFileUri()), 'Default image uses private:// scheme.');
@@ -344,6 +359,9 @@ class ImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = drupal_render($image);
     $this->drupalGet('node/' . $node->id());
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     $this->assertRaw($default_output, 'Default private image displayed when no user supplied image is present.');
   }
+
 }
