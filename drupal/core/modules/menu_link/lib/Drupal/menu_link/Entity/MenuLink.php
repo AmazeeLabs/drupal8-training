@@ -7,6 +7,8 @@
 
 namespace Drupal\menu_link\Entity;
 
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\Entity;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -24,7 +26,7 @@ use Symfony\Component\Routing\Route;
  *     "storage" = "Drupal\menu_link\MenuLinkStorage",
  *     "access" = "Drupal\menu_link\MenuLinkAccessController",
  *     "form" = {
- *       "default" = "Drupal\menu_link\MenuLinkFormController"
+ *       "default" = "Drupal\menu_link\MenuLinkForm"
  *     }
  *   },
  *   admin_permission = "administer menu",
@@ -368,7 +370,10 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
     $original['machine_name'] = $this->machine_name;
     /** @var \Drupal\menu_link\MenuLinkStorageInterface $storage */
     $storage = \Drupal::entityManager()->getStorage($this->entityTypeId);
+    // @todo Do not create a new entity in order to update it, see
+    //   https://drupal.org/node/2241865
     $new_link = $storage->createFromDefaultLink($original);
+    $new_link->setOriginalId($this->id());
     // Allow the menu to be determined by the parent
     if (!empty($new_link['parent']) && !empty($all_links[$new_link['parent']])) {
       // Walk up the tree to find the menu name.
@@ -449,20 +454,13 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
   public static function postDelete(EntityStorageInterface $storage, array $entities) {
     parent::postDelete($storage, $entities);
 
-    $affected_menus = array();
     // Update the has_children status of the parent.
     foreach ($entities as $entity) {
       if (!$storage->getPreventReparenting()) {
         $storage->updateParentalStatus($entity);
       }
-
-      // Store all menu names for which we need to clear the cache.
-      if (!isset($affected_menus[$entity->menu_name])) {
-        $affected_menus[$entity->menu_name] = $entity->menu_name;
-      }
     }
 
-    Cache::invalidateTags(array('menu' => array_keys($affected_menus)));
     // Also clear the menu system static caches.
     menu_reset_static_cache();
     _menu_clear_page_cache();
@@ -476,7 +474,7 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
 
     // This is the easiest way to handle the unique internal path '<front>',
     // since a path marked as external does not need to match a route.
-    $this->external = (url_is_external($this->link_path) || $this->link_path == '<front>') ? 1 : 0;
+    $this->external = (UrlHelper::isExternal($this->link_path) || $this->link_path == '<front>') ? 1 : 0;
 
     // Try to find a parent link. If found, assign it and derive its menu.
     $parent = $this->findParent($storage);
@@ -520,7 +518,7 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
     }
 
     // Find the route_name.
-    if (!isset($this->route_name)) {
+    if (!$this->external && !isset($this->route_name)) {
       $url = Url::createFromPath($this->link_path);
       $this->route_name = $url->getRouteName();
       $this->route_parameters = $url->getRouteParameters();
@@ -539,10 +537,22 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
     // Check the has_children status of the parent.
     $storage->updateParentalStatus($this);
 
-    Cache::invalidateTags(array('menu' => $this->menu_name));
-    if (isset($this->original) && $this->menu_name != $this->original->menu_name) {
-      Cache::invalidateTags(array('menu' => $this->original->menu_name));
+
+    // Entity::postSave() calls Entity::invalidateTagsOnSave(), which only
+    // handles the regular cases. The MenuLink entity has two special cases.
+    $cache_tags = array();
+    // Case 1: a newly created menu link is *also* added to a menu, so we must
+    // invalidate the associated menu's cache tag.
+    if (!$update) {
+      $cache_tags = $this->getCacheTag();
     }
+    // Case 2: a menu link may be moved from one menu to another; the original
+    // menu's cache tag must also be invalidated.
+    if (isset($this->original) && $this->menu_name != $this->original->menu_name) {
+      $cache_tags = NestedArray::mergeDeep($cache_tags, $this->original->getCacheTag());
+    }
+    Cache::invalidateTags($cache_tags);
+
     // Also clear the menu system static caches.
     menu_reset_static_cache();
 
@@ -651,6 +661,20 @@ class MenuLink extends Entity implements \ArrayAccess, MenuLinkInterface {
       '#options' => !empty($this->localized_options) ? $this->localized_options : array(),
     );
     return $build;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTag() {
+    return entity_load('menu', $this->menu_name)->getCacheTag();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getListCacheTags() {
+    return entity_load('menu', $this->menu_name)->getListCacheTags();
   }
 
 }

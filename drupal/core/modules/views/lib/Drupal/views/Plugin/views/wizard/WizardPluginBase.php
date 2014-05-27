@@ -241,11 +241,14 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     $form['displays']['page']['options']['title'] = array(
       '#title' => t('Page title'),
       '#type' => 'textfield',
+      '#maxlength' => 255,
     );
     $form['displays']['page']['options']['path'] = array(
       '#title' => t('Path'),
       '#type' => 'textfield',
       '#field_prefix' => $path_prefix,
+      // Account for the leading backslash.
+      '#maxlength' => 254,
     );
     $form['displays']['page']['options']['style'] = array(
       '#type' => 'fieldset',
@@ -332,6 +335,8 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
         '#title' => t('Feed path'),
         '#type' => 'textfield',
         '#field_prefix' => $path_prefix,
+        // Account for the leading backslash.
+        '#maxlength' => 254,
       );
       // This will almost never be visible.
       $form['displays']['page']['options']['feed_properties']['row_plugin'] = array(
@@ -385,6 +390,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     $form['displays']['block']['options']['title'] = array(
       '#title' => t('Block title'),
       '#type' => 'textfield',
+      '#maxlength' => 255,
     );
     $form['displays']['block']['options']['style'] = array(
       '#type' => 'fieldset',
@@ -761,6 +767,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     foreach ($display_options as &$options) {
       $options['options'] = array();
       $options['provider'] = 'views';
+      $options['dependencies'] = array();
     }
 
     // Add a least one field so the view validates and the user has a preview.
@@ -786,7 +793,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     // Load the plugin ID and module.
     $base_field = $data['table']['base']['field'];
     $display_options['fields'][$base_field]['plugin_id'] = $data[$base_field]['field']['id'];
-    if ($definition = Views::pluginManager('field')->getDefinition($display_options['fields'][$base_field]['plugin_id'])) {
+    if ($definition = Views::pluginManager('field')->getDefinition($display_options['fields'][$base_field]['plugin_id'], FALSE)) {
       $display_options['fields'][$base_field]['provider'] = isset($definition['provider']) ? $definition['provider'] : 'views';
     }
 

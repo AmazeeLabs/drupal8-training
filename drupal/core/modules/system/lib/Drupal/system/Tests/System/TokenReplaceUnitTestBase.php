@@ -11,16 +11,16 @@ use Drupal\Core\Language\Language;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
- * Test token replacement in strings.
+ * Base class for token replacement tests.
  */
-class TokenReplaceUnitTestBase extends EntityUnitTestBase {
+abstract class TokenReplaceUnitTestBase extends EntityUnitTestBase {
 
   /**
    * The interface language.
    *
    * @var \Drupal\Core\Language\Language
    */
-  protected $languageInterface;
+  protected $interfaceLanguage;
 
   /**
    * Token service.
@@ -41,7 +41,7 @@ class TokenReplaceUnitTestBase extends EntityUnitTestBase {
     // Install default system configuration.
     $this->installConfig(array('system'));
 
-    $this->languageInterface = \Drupal::languageManager()->getCurrentLanguage();
+    $this->interfaceLanguage = \Drupal::languageManager()->getCurrentLanguage();
     $this->tokenService = \Drupal::token();
   }
 

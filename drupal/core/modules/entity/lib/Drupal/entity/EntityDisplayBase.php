@@ -11,7 +11,7 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Entity\Display\EntityDisplayInterface;
-use Drupal\field\Field;
+use Drupal\field\Entity\FieldInstanceConfig;
 
 /**
  * Provides a common base class for entity view and form displays.
@@ -161,17 +161,20 @@ abstract class EntityDisplayBase extends ConfigEntityBase implements EntityDispl
       $bundle_entity = \Drupal::entityManager()->getStorage($bundle_entity_type_id)->load($this->bundle);
       $this->addDependency('entity', $bundle_entity->getConfigDependencyName());
     }
+    else {
+      // Depend on the provider of the entity type.
+      $this->addDependency('module', $target_entity_type->getProvider());
+    }
     // Create dependencies on both hidden and visible fields.
     $fields = $this->content + $this->hidden;
     foreach ($fields as $field_name => $component) {
-      $field_instance = Field::fieldInfo()->getInstance($this->targetEntityType, $this->bundle, $field_name);
+      $field_instance = FieldInstanceConfig::loadByName($this->targetEntityType, $this->bundle, $field_name);
       if ($field_instance) {
         $this->addDependency('entity', $field_instance->getConfigDependencyName());
       }
       // Create a dependency on the module that provides the formatter or
       // widget.
-      if (isset($component['type'])) {
-        $definition = $this->pluginManager->getDefinition($component['type']);
+      if (isset($component['type']) && $definition = $this->pluginManager->getDefinition($component['type'], FALSE)) {
         $this->addDependency('module', $definition['provider']);
       }
     }
@@ -236,7 +239,9 @@ abstract class EntityDisplayBase extends ConfigEntityBase implements EntityDispl
    */
   protected function init() {
     // Fill in defaults for extra fields.
-    $extra_fields = field_info_extra_fields($this->targetEntityType, $this->bundle, ($this->displayContext == 'view' ? 'display' : $this->displayContext));
+    $context = $this->displayContext == 'view' ? 'display' : $this->displayContext;
+    $extra_fields = \Drupal::entityManager()->getExtraFields($this->targetEntityType, $this->bundle);
+    $extra_fields = isset($extra_fields[$context]) ? $extra_fields[$context] : array();
     foreach ($extra_fields as $name => $definition) {
       if (!isset($this->content[$name]) && !isset($this->hidden[$name])) {
         // Extra fields are visible by default unless they explicitly say so.
@@ -365,16 +370,23 @@ abstract class EntityDisplayBase extends ConfigEntityBase implements EntityDispl
 
     if (!isset($this->fieldDefinitions)) {
       $definitions = \Drupal::entityManager()->getFieldDefinitions($this->targetEntityType, $this->bundle);
-
-      // The display only cares about fields that specify display options.
-      // Discard base fields that are not rendered through formatters / widgets.
-      $display_context = $this->displayContext;
-      $this->fieldDefinitions = array_filter($definitions, function (FieldDefinitionInterface $definition) use ($display_context) {
-        return $definition->getDisplayOptions($display_context);
-      });
+      $this->fieldDefinitions = array_filter($definitions, array($this, 'fieldHasDisplayOptions'));
     }
 
     return $this->fieldDefinitions;
+  }
+
+  /**
+   * Determines if a field has options for a given display.
+   *
+   * @param FieldDefinitionInterface $definition
+   *   A field instance definition.
+   * @return array|null
+   */
+  private function fieldHasDisplayOptions(FieldDefinitionInterface $definition) {
+    // The display only cares about fields that specify display options.
+    // Discard base fields that are not rendered through formatters / widgets.
+    return $definition->getDisplayOptions($this->displayContext);
   }
 
 }

@@ -7,7 +7,8 @@
 
 namespace Drupal\views\Plugin\views\display;
 
-use Drupal\Core\KeyValueStore\StateInterface;
+use Drupal\Core\Form\FormErrorInterface;
+use Drupal\Core\State\StateInterface;
 use Drupal\Core\Routing\RouteCompiler;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\views\Views;
@@ -35,9 +36,16 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   /**
    * The state key value store.
    *
-   * @var \Drupal\Core\KeyValueStore\StateInterface
+   * @var \Drupal\Core\State\StateInterface
    */
   protected $state;
+
+  /**
+   * The form error helper.
+   *
+   * @var \Drupal\Core\Form\FormErrorInterface
+   */
+  protected $formError;
 
   /**
    * Constructs a PathPluginBase object.
@@ -50,14 +58,17 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
    *   The plugin implementation definition.
    * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
    *   The route provider.
-   * @param \Drupal\Core\KeyValueStore\StateInterface $state
+   * @param \Drupal\Core\State\StateInterface $state
    *   The state key value store.
+   * @param \Drupal\Core\Form\FormErrorInterface $form_error
+   *   The form error helper.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, FormErrorInterface $form_error) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
     $this->routeProvider = $route_provider;
     $this->state = $state;
+    $this->formError = $form_error;
   }
 
   /**
@@ -69,7 +80,8 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $plugin_id,
       $plugin_definition,
       $container->get('router.route_provider'),
-      $container->get('state')
+      $container->get('state'),
+      $container->get('form_validator')
     );
   }
 
@@ -197,7 +209,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     $route->setOption('_access_mode', 'ANY');
 
     // Set the argument map, in order to support named parameters.
-    $route->setDefault('_view_argument_map', $argument_map);
+    $route->setOption('_view_argument_map', $argument_map);
 
     return $route;
   }
@@ -253,7 +265,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
           $argument_map['arg_' . $position] = $parameter_name;
         }
         // Set the corrected path and the mapping to the route object.
-        $route->setDefault('_view_argument_map', $argument_map);
+        $route->setOption('_view_argument_map', $argument_map);
         $route->setPath($path);
 
         $collection->add($name, $route);
@@ -381,6 +393,8 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
           '#field_prefix' => '<span dir="ltr">' . url(NULL, array('absolute' => TRUE)),
           '#field_suffix' => '</span>&lrm;',
           '#attributes' => array('dir' => 'ltr'),
+          // Account for the leading backslash.
+          '#maxlength' => 254,
         );
         break;
     }
@@ -393,8 +407,9 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     parent::validateOptionsForm($form, $form_state);
 
     if ($form_state['section'] == 'path') {
-      if (strpos($form_state['values']['path'], '%') === 0) {
-        form_error($form['path'], $form_state, t('"%" may not be used for the first segment of a path.'));
+      $errors = $this->validatePath($form_state['values']['path']);
+      foreach ($errors as $error) {
+        $this->formError->setError($form['path'], $form_state, $error);
       }
 
       // Automatically remove '/' and trailing whitespace from path.
@@ -412,5 +427,45 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $this->setOption('path', $form_state['values']['path']);
     }
   }
+
+  /**
+   * Validates the path of the display.
+   *
+   * @param string $path
+   *   The path to validate.
+   *
+   * @return array
+   *   A list of error strings.
+   */
+  protected function validatePath($path) {
+    $errors = array();
+    if (strpos($path, '%') === 0) {
+      $errors[] = $this->t('"%" may not be used for the first segment of a path.');
+    }
+
+    $path_sections = explode('/', $path);
+    // Symfony routing does not allow to use numeric placeholders.
+    // @see \Symfony\Component\Routing\RouteCompiler
+    $numeric_placeholders = array_filter($path_sections, function ($section) {
+      return (preg_match('/^%(.*)/', $section, $matches)
+        && is_numeric($matches[1]));
+    });
+    if (!empty($numeric_placeholders)) {
+      $errors[] = $this->t("Numeric placeholders may not be used. Please use plain placeholders (%).");
+    }
+    return $errors;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validate() {
+    $errors = parent::validate();
+
+    $errors += $this->validatePath($this->getOption('path'));
+
+    return $errors;
+  }
+
 
 }

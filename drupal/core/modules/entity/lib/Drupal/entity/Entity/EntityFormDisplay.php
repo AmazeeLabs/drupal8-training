@@ -157,6 +157,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
       if ($widget = $this->getRenderer($name)) {
         $items->filterEmptyItems();
         $form[$name] = $widget->form($items, $form, $form_state);
+        $form[$name]['#access'] = $items->access('edit');
 
         // Assign the correct weight. This duplicates the reordering done in
         // processForm(), but is needed for other forms calling this method
@@ -183,7 +184,8 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
     }
 
     // Hide extra fields.
-    $extra_fields = field_info_extra_fields($this->targetEntityType, $this->bundle, 'form');
+    $extra_fields = \Drupal::entityManager()->getExtraFields($this->targetEntityType, $this->bundle);
+    $extra_fields = isset($extra_fields['form']) ? $extra_fields['form'] : array();
     foreach ($extra_fields as $extra_field => $info) {
       if (!$this->getComponent($extra_field)) {
         $element[$extra_field]['#access'] = FALSE;

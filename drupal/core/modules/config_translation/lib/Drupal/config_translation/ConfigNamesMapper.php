@@ -17,6 +17,7 @@ use Drupal\locale\LocaleConfigManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 /**
  * Configuration mapper base implementation.
@@ -52,6 +53,13 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
   protected $baseRoute;
 
   /**
+   * The available routes.
+   *
+   * @var \Symfony\Component\Routing\RouteCollection
+   */
+  protected $routeCollection;
+
+  /**
    * The language code of the language this mapper, if any.
    *
    * @var string|null
@@ -81,24 +89,23 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    *   The mapper plugin discovery service.
    * @param \Drupal\Core\Routing\RouteProviderInterface
    *   The route provider.
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation_manager
+   * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
    *   The string translation manager.
    *
    * @throws \Symfony\Component\Routing\Exception\RouteNotFoundException
    *   Throws an exception if the route specified by the 'base_route_name' in
    *   the plugin definition could not be found by the route provider.
    */
-  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $translation_manager) {
+  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $string_translation) {
     $this->pluginId = $plugin_id;
     $this->pluginDefinition = $plugin_definition;
+    $this->routeProvider = $route_provider;
 
     $this->configFactory = $config_factory;
     $this->localeConfigManager = $locale_config_manager;
     $this->configMapperManager = $config_mapper_manager;
 
-    $this->setTranslationManager($translation_manager);
-
-    $this->baseRoute = $route_provider->getRouteByName($this->getBaseRouteName());
+    $this->stringTranslation = $string_translation;
   }
 
   /**
@@ -116,6 +123,13 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
       $container->get('router.route_provider'),
       $container->get('string_translation')
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setRouteCollection(RouteCollection $collection) {
+    $this->routeCollection = $collection;
   }
 
   /**
@@ -145,7 +159,12 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    * {@inheritdoc}
    */
   public function getBaseRoute() {
-    return $this->baseRoute;
+    if ($this->routeCollection) {
+      return $this->routeCollection->get($this->getBaseRouteName());
+    }
+    else {
+      return $this->routeProvider->getRouteByName($this->getBaseRouteName());
+    }
   }
 
   /**

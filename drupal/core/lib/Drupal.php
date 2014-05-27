@@ -336,7 +336,7 @@ class Drupal {
    * needs to be the same across development, production, etc. environments
    * (for example, the system maintenance message) should use \Drupal::config() instead.
    *
-   * @return \Drupal\Core\KeyValueStore\StateInterface
+   * @return \Drupal\Core\State\StateInterface
    */
   public static function state() {
     return static::$container->get('state');
@@ -349,7 +349,7 @@ class Drupal {
    *   A guzzle http client instance.
    */
   public static function httpClient() {
-    return static::$container->get('http_default_client');
+    return static::$container->get('http_client');
   }
 
   /**
@@ -618,8 +618,22 @@ class Drupal {
    * @return bool
    *   Returns TRUE is syncing flag set.
    */
-  public function isConfigSyncing() {
+  public static function isConfigSyncing() {
     return static::$container->get('config.installer')->isSyncing();
+  }
+
+  /**
+   * Returns a channel logger object.
+   *
+   * @param string $channel
+   *   The name of the channel. Can be any string, but the general practice is
+   *   to use the name of the subsystem calling this.
+   *
+   * @return \Drupal\Core\Logger\LoggerChannelInterface
+   *   The logger for this channel.
+   */
+  public static function logger($channel) {
+    return static::$container->get('logger.factory')->get($channel);
   }
 
 }

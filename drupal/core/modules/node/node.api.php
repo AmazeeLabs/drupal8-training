@@ -161,12 +161,12 @@ use Drupal\Component\Utility\Xss;
  * sure to restore your {node_access} record after node_access_rebuild() is
  * called.
  *
- * @param $account
- *   The user object whose grants are requested.
- * @param $op
+ * @param \Drupal\Core\Session\AccountInterface $account
+ *   The acccount object whose grants are requested.
+ * @param string $op
  *   The node operation to be performed, such as 'view', 'update', or 'delete'.
  *
- * @return
+ * @return array
  *   An array whose keys are "realms" of grants, and whose values are arrays of
  *   the grant IDs within this realm that this user is being granted.
  *
@@ -176,7 +176,7 @@ use Drupal\Component\Utility\Xss;
  * @see node_access_rebuild()
  * @ingroup node_access
  */
-function hook_node_grants($account, $op) {
+function hook_node_grants(\Drupal\Core\Session\AccountInterface $account, $op) {
   if (user_access('access private content', $account)) {
     $grants['example'] = array(1);
   }
@@ -349,11 +349,11 @@ function hook_node_access_records_alter(&$grants, Drupal\node\NodeInterface $nod
  * permissions assigned to a user role, or specific attributes of a user
  * account.
  *
- * @param $grants
+ * @param array $grants
  *   The $grants array returned by hook_node_grants().
- * @param $account
- *   The user account requesting access to content.
- * @param $op
+ * @param \Drupal\Core\Session\AccountInterface $account
+ *   The account requesting access to content.
+ * @param string $op
  *   The operation being performed, 'view', 'update' or 'delete'.
  *
  * @see hook_node_grants()
@@ -361,7 +361,7 @@ function hook_node_access_records_alter(&$grants, Drupal\node\NodeInterface $nod
  * @see hook_node_access_records_alter()
  * @ingroup node_access
  */
-function hook_node_grants_alter(&$grants, $account, $op) {
+function hook_node_grants_alter(&$grants, \Drupal\Core\Session\AccountInterface $account, $op) {
   // Our sample module never allows certain roles to edit or delete
   // content. Since some other node access modules might allow this
   // permission, we expressly remove it by returning an empty $grants
@@ -592,7 +592,7 @@ function hook_node_access(\Drupal\node\NodeInterface $node, $op, $account, $lang
 /**
  * Act on a node object about to be shown on the add/edit form.
  *
- * This hook is invoked from NodeFormController::prepareEntity().
+ * This hook is invoked from NodeForm::prepareEntity().
  *
  * @param \Drupal\node\NodeInterface $node
  *   The node that is about to be shown on the form.
@@ -711,7 +711,7 @@ function hook_node_update_index(\Drupal\node\NodeInterface $node, $langcode) {
 /**
  * Perform node validation before a node is created or updated.
  *
- * This hook is invoked from NodeFormController::validate(), after a user has
+ * This hook is invoked from NodeForm::validate(), after a user has
  * finished editing the node and is previewing or submitting it. It is invoked
  * at the end of all the standard validation steps.
  *
@@ -770,15 +770,16 @@ function hook_node_submit(\Drupal\node\NodeInterface $node, $form, &$form_state)
 /**
  * Act on a node that is being assembled before rendering.
  *
- * The module may add elements to $node->content prior to rendering.
- * The structure of $node->content is a renderable array as expected by
- * drupal_render().
+ * The module may add elements to a node's renderable array array prior to
+ * rendering.
  *
  * When $view_mode is 'rss', modules can also add extra RSS elements and
  * namespaces to $node->rss_elements and $node->rss_namespaces respectively for
  * the RSS item generated for this node.
  * For details on how this is used, see node_feed().
  *
+ * @param array &$build
+ *   A renderable array representing the node content.
  * @param \Drupal\node\NodeInterface $node
  *   The node that is being assembled for rendering.
  * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
@@ -794,12 +795,12 @@ function hook_node_submit(\Drupal\node\NodeInterface $node, $form, &$form_state)
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view(\Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode, $langcode) {
+function hook_node_view(array &$build, \Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode, $langcode) {
   // Only do the extra work if the component is configured to be displayed.
   // This assumes a 'mymodule_addition' extra field has been defined for the
   // node type in hook_entity_extra_field_info().
   if ($display->getComponent('mymodule_addition')) {
-    $node->content['mymodule_addition'] = array(
+    $build['mymodule_addition'] = array(
       '#markup' => mymodule_addition($node),
       '#theme' => 'mymodule_my_additional_field',
     );
@@ -819,7 +820,7 @@ function hook_node_view(\Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Di
  * node.html.twig. See drupal_render() and _theme() documentation respectively
  * for details.
  *
- * @param $build
+ * @param &$build
  *   A renderable array representing the node content.
  * @param \Drupal\node\NodeInterface $node
  *   The node being rendered.
@@ -832,7 +833,7 @@ function hook_node_view(\Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Di
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view_alter(&$build, \Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display) {
+function hook_node_view_alter(array &$build, \Drupal\node\NodeInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display) {
   if ($build['#view_mode'] == 'full' && isset($build['an_additional_field'])) {
     // Change its weight.
     $build['an_additional_field']['#weight'] = -10;
@@ -898,7 +899,7 @@ function hook_ranking() {
         // always 0, should be 0.
         'score' => 'vote_node_data.average / CAST(%f AS DECIMAL)',
         // Pass in the highest possible voting score as a decimal argument.
-        'arguments' => array(\Drupal::config('vote.settings').get('score_max')),
+        'arguments' => array(\Drupal::config('vote.settings')->get('score_max')),
       ),
     );
   }

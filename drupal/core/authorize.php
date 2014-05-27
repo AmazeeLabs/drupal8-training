@@ -20,7 +20,8 @@
  * @link authorize Authorized operation helper functions @endlink
  */
 
-use Drupal\Component\Utility\Settings;
+use Drupal\Core\Site\Settings;
+use Drupal\Core\Page\DefaultHtmlPageRenderer;
 
 // Change the directory to the Drupal root.
 chdir('..');
@@ -61,6 +62,7 @@ require_once __DIR__ . '/includes/ajax.inc';
 // Prepare a minimal bootstrap.
 drupal_bootstrap(DRUPAL_BOOTSTRAP_PAGE_CACHE);
 $request = \Drupal::request();
+\Drupal::service('request_stack')->push($request);
 
 // We have to enable the user and system modules, even to check access and
 // display errors via the maintenance theme.
@@ -79,8 +81,6 @@ if (authorize_access_allowed()) {
   // Load both the Form API and Batch API.
   require_once __DIR__ . '/includes/form.inc';
   require_once __DIR__ . '/includes/batch.inc';
-  // Load the code that drives the authorize process.
-  require_once __DIR__ . '/includes/authorize.inc';
 
   if (isset($_SESSION['authorize_page_title'])) {
     $page_title = $_SESSION['authorize_page_title'];
@@ -138,7 +138,7 @@ if (authorize_access_allowed()) {
     }
     elseif (!$batch = batch_get()) {
       // We have a batch to process, show the filetransfer form.
-      $elements = \Drupal::formBuilder()->getForm('authorize_filetransfer_form');
+      $elements = \Drupal::formBuilder()->getForm('Drupal\Core\FileTransfer\Form\FileTransferAuthorizeForm');
       $output = drupal_render($elements);
     }
   }
@@ -147,20 +147,14 @@ if (authorize_access_allowed()) {
 }
 else {
   drupal_add_http_header('Status', '403 Forbidden');
-  watchdog('access denied', 'authorize.php', NULL, WATCHDOG_WARNING);
+  watchdog('access denied', 'authorize.php', array(), WATCHDOG_WARNING);
   $page_title = t('Access denied');
   $output = t('You are not allowed to access this page.');
 }
 
 if (!empty($output)) {
   drupal_add_http_header('Content-Type', 'text/html; charset=utf-8');
-  $maintenance_page = array(
-    '#page' => array(
-      '#title' => $page_title,
-    ),
-    '#theme' => 'maintenance_page',
-    '#content' => $output,
+  print DefaultHtmlPageRenderer::renderPage($output, $page_title, 'maintenance', array(
     '#show_messages' => $show_messages,
-  );
-  print drupal_render($maintenance_page);
+  ));
 }

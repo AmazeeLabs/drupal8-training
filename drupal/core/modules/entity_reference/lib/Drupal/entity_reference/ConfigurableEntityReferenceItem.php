@@ -10,6 +10,7 @@ namespace Drupal\entity_reference;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
+use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\AllowedValuesInterface;
 use Drupal\Core\TypedData\DataDefinition;
@@ -69,7 +70,7 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements All
   public function getSettableValues(AccountInterface $account = NULL) {
     // Flatten options first, because "settable options" may contain group
     // arrays.
-    $flatten_options = \Drupal::formBuilder()->flattenOptions($this->getSettableOptions($account));
+    $flatten_options = OptGroup::flattenOptions($this->getSettableOptions($account));
     return array_keys($flatten_options);
   }
 
@@ -162,7 +163,7 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements All
     $element['target_type'] = array(
       '#type' => 'select',
       '#title' => t('Type of item to reference'),
-      '#options' => \Drupal::entityManager()->getEntityTypeLabels(),
+      '#options' => \Drupal::entityManager()->getEntityTypeLabels(TRUE),
       '#default_value' => $this->getSetting('target_type'),
       '#required' => TRUE,
       '#disabled' => $has_data,

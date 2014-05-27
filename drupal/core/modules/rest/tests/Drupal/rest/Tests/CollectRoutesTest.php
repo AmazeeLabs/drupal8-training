@@ -82,13 +82,16 @@ class CollectRoutesTest extends UnitTestCase {
       ->getMock();
     $container->set('router.route_provider', $route_provider);
 
-    $state = $this->getMock('\Drupal\Core\KeyValueStore\StateInterface');
+    $state = $this->getMock('\Drupal\Core\State\StateInterface');
     $container->set('state', $state);
 
     $style_manager = $this->getMockBuilder('\Drupal\views\Plugin\ViewsPluginManager')
       ->disableOriginalConstructor()
       ->getMock();
     $container->set('plugin.manager.views.style', $style_manager);
+
+    $form_error = $this->getMock('Drupal\Core\Form\FormErrorInterface');
+    $container->set('form_validator', $form_error);
 
     \Drupal::setContainer($container);
 

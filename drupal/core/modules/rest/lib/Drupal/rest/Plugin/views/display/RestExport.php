@@ -7,14 +7,13 @@
 
 namespace Drupal\rest\Plugin\views\display;
 
-
-use Drupal\Core\KeyValueStore\StateInterface;
+use Drupal\Core\Form\FormErrorInterface;
+use Drupal\Core\State\StateInterface;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\ContentNegotiation;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\PathPluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouteCollection;
 
@@ -80,13 +79,6 @@ class RestExport extends PathPluginBase {
   protected $contentNegotiation;
 
   /**
-   * The request object.
-   *
-   * @var \Symfony\Component\HttpFoundation\Request
-   */
-  protected $request;
-
-  /**
    * Constructs a Drupal\rest\Plugin\ResourceBase object.
    *
    * @param array $configuration
@@ -97,17 +89,16 @@ class RestExport extends PathPluginBase {
    *   The plugin implementation definition.
    * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
    *   The route provider
-   * @param \Drupal\Core\KeyValueStore\StateInterface $state
+   * @param \Drupal\Core\State\StateInterface $state
    *   The state key value store.
+   * @param \Drupal\Core\Form\FormErrorInterface $form_error
+   *   The form error helper.
    * @param \Drupal\Core\ContentNegotiation $content_negotiation
    *   The content negotiation library.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request object.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, ContentNegotiation $content_negotiation, Request $request) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition, $route_provider, $state);
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, FormErrorInterface $form_error, ContentNegotiation $content_negotiation) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $route_provider, $state, $form_error);
     $this->contentNegotiation = $content_negotiation;
-    $this->request = $request;
   }
 
   /**
@@ -120,8 +111,8 @@ class RestExport extends PathPluginBase {
       $plugin_definition,
       $container->get('router.route_provider'),
       $container->get('state'),
-      $container->get('content_negotiation'),
-      $container->get('request')
+      $container->get('form_validator'),
+      $container->get('content_negotiation')
     );
   }
 
@@ -131,7 +122,7 @@ class RestExport extends PathPluginBase {
   public function initDisplay(ViewExecutable $view, array &$display, array &$options = NULL) {
     parent::initDisplay($view, $display, $options);
 
-    $request_content_type = $this->contentNegotiation->getContentType($this->request);
+    $request_content_type = $this->contentNegotiation->getContentType($this->view->getRequest());
     // Only use the requested content type if it's not 'html'. If it is then
     // default to 'json' to aid debugging.
     // @todo Remove the need for this when we have better content negotiation.
@@ -139,7 +130,7 @@ class RestExport extends PathPluginBase {
       $this->setContentType($request_content_type);
     }
 
-    $this->setMimeType($this->request->getMimeType($this->contentType));
+    $this->setMimeType($this->view->getRequest()->getMimeType($this->contentType));
   }
 
   /**

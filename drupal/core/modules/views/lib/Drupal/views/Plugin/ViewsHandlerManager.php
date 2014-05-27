@@ -45,7 +45,7 @@ class ViewsHandlerManager extends DefaultPluginManager {
    *   An object that implements \Traversable which contains the root paths
    *   keyed by the corresponding namespace to look for plugin implementations,
    * @param \Drupal\views\ViewsData $views_data
-    *   The views data cache.
+   *   The views data cache.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache_backend
    *   Cache backend instance to use.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
@@ -128,6 +128,18 @@ class ViewsHandlerManager extends DefaultPluginManager {
 
     // Finally, use the 'broken' handler.
     return $this->createInstance('broken', array('optional' => $optional, 'original_configuration' => $item));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createInstance($plugin_id, array $configuration = array()) {
+    $instance = parent::createInstance($plugin_id, $configuration);
+    if ($instance instanceof HandlerBase) {
+      $instance->setModuleHandler($this->moduleHandler);
+      $instance->setViewsData($this->viewsData);
+    }
+    return $instance;
   }
 
 }

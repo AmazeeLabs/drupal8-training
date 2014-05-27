@@ -8,6 +8,7 @@
 namespace Drupal\Tests\Core\Controller;
 
 use Drupal\Core\Controller\ControllerResolver;
+use Drupal\Core\DependencyInjection\ClassResolver;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Tests\UnitTestCase;
@@ -59,7 +60,9 @@ class ControllerResolverTest extends UnitTestCase {
     parent::setUp();
 
     $this->container = new ContainerBuilder();
-    $this->controllerResolver = new ControllerResolver($this->container);
+    $class_resolver = new ClassResolver();
+    $class_resolver->setContainer($this->container);
+    $this->controllerResolver = new ControllerResolver($class_resolver);
   }
 
   /**

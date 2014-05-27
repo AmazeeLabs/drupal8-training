@@ -13,11 +13,14 @@ use Drupal\Component\Annotation\Reflection\MockFileFinder;
 use Doctrine\Common\Annotations\SimpleAnnotationReader;
 use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Reflection\StaticReflectionParser;
+use Drupal\Component\Plugin\Discovery\DiscoveryTrait;
 
 /**
  * Defines a discovery mechanism to find annotated plugins in PSR-0 namespaces.
  */
 class AnnotatedClassDiscovery implements DiscoveryInterface {
+
+  use DiscoveryTrait;
 
   /**
    * The namespaces within which to find plugin classes.
@@ -76,14 +79,6 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
   }
 
   /**
-   * Implements Drupal\Component\Plugin\Discovery\DiscoveryInterface::getDefinition().
-   */
-  public function getDefinition($plugin_id) {
-    $plugins = $this->getDefinitions();
-    return isset($plugins[$plugin_id]) ? $plugins[$plugin_id] : NULL;
-  }
-
-  /**
    * Implements Drupal\Component\Plugin\Discovery\DiscoveryInterface::getDefinitions().
    */
   public function getDefinitions() {
@@ -99,7 +94,6 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
     // Search for classes within all PSR-0 namespace locations.
     foreach ($this->getPluginNamespaces() as $namespace => $dirs) {
       foreach ($dirs as $dir) {
-        $dir .= DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $namespace);
         if (file_exists($dir)) {
           $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS)

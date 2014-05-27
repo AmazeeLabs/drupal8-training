@@ -16,6 +16,8 @@ use Drupal\image\Tests\ImageFieldTestBase;
  */
 class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
 
+  protected $dumpHeaders = TRUE;
+
   /**
    * Modules to enable.
    *
@@ -42,7 +44,7 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
 
     // Create user.
     $this->admin_user = $this->drupalCreateUser(array(
-      'administer responsive image',
+      'administer responsive images',
       'access content',
       'access administration pages',
       'administer site configuration',
@@ -58,7 +60,7 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
 
     // Add breakpoint_group and breakpoints.
     $breakpoint_group = entity_create('breakpoint_group', array(
-      'id' => 'atestset',
+      'name' => 'atestset',
       'label' => 'A test set',
       'sourceType' => Breakpoint::SOURCE_TYPE_USER_DEFINED,
     ));
@@ -85,7 +87,7 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
     $responsive_image_mapping = entity_create('responsive_image_mapping', array(
       'id' => 'mapping_one',
       'label' => 'Mapping One',
-      'breakpointGroup' => 'atestset',
+      'breakpointGroup' => $breakpoint_group->id(),
     ));
     $responsive_image_mapping->save();
     $mappings = array();
@@ -152,6 +154,9 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
     );
     $default_output = l($image, file_create_url($image_uri), array('html' => TRUE));
     $this->drupalGet('node/' . $nid);
+    $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+    $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
+
     $this->assertRaw($default_output, 'Image linked to file formatter displaying correctly on full node view.');
     // Verify that the image can be downloaded.
     $this->assertEqual(file_get_contents($test_image->uri), $this->drupalGet(file_create_url($image_uri)), 'File was downloaded successfully.');
@@ -186,6 +191,11 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
     $this->assertRaw('media="(min-width: 200px)"');
     $this->assertRaw('media="(min-width: 400px)"');
     $this->assertRaw('media="(min-width: 600px)"');
+    $cache_tags = explode(' ', $this->drupalGetHeader('X-Drupal-Cache-Tags'));
+    $this->assertTrue(in_array('responsive_image_mapping:mapping_one', $cache_tags));
+    $this->assertTrue(in_array('image_style:thumbnail', $cache_tags));
+    $this->assertTrue(in_array('image_style:medium', $cache_tags));
+    $this->assertTrue(in_array('image_style:large', $cache_tags));
 
     // Test the fallback image style.
     $large_style = entity_load('image_style', 'large');
@@ -202,6 +212,8 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
       $this->drupalLogout();
       $this->drupalGet($large_style->buildUrl($image_uri));
       $this->assertResponse('403', 'Access denied to image style thumbnail as anonymous user.');
+      $cache_tags_header = $this->drupalGetHeader('X-Drupal-Cache-Tags');
+      $this->assertTrue(!preg_match('/ image_style\:/', $cache_tags_header), 'No image style cache tag found.');
     }
   }
 

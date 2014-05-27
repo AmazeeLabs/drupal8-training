@@ -33,8 +33,6 @@ class UpdateServiceProvider implements ServiceProviderInterface, ServiceModifier
       $container->removeDefinition('config.storage');
       $container->setAlias('config.storage', 'config.storage.active');
 
-      $container->register('module_handler', 'Drupal\Core\Extension\UpdateModuleHandler')
-        ->addArgument('%container.modules%');
       $container
         ->register('cache_factory', 'Drupal\Core\Cache\MemoryBackendFactory');
       $container
@@ -43,7 +41,7 @@ class UpdateServiceProvider implements ServiceProviderInterface, ServiceModifier
       $container->register('theme_handler', 'Drupal\Core\Extension\ThemeHandler')
         ->addArgument(new Reference('config.factory'))
         ->addArgument(new Reference('module_handler'))
-        ->addArgument(new Reference('cache.default'))
+        ->addArgument(new Reference('state'))
         ->addArgument(new Reference('info_parser'));
     }
   }

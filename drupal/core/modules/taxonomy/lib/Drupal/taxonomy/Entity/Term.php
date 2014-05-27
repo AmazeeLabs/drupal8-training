@@ -27,7 +27,7 @@ use Drupal\taxonomy\TermInterface;
  *     "view_builder" = "Drupal\taxonomy\TermViewBuilder",
  *     "access" = "Drupal\taxonomy\TermAccessController",
  *     "form" = {
- *       "default" = "Drupal\taxonomy\TermFormController",
+ *       "default" = "Drupal\taxonomy\TermForm",
  *       "delete" = "Drupal\taxonomy\Form\TermDeleteForm"
  *     },
  *     "translation" = "Drupal\taxonomy\TermTranslationHandler"
@@ -53,13 +53,6 @@ use Drupal\taxonomy\TermInterface;
  * )
  */
 class Term extends ContentEntityBase implements TermInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public function id() {
-    return $this->get('tid')->value;
-  }
 
   /**
    * {@inheritdoc}

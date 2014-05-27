@@ -16,7 +16,7 @@ dependencies:
   - contact
   - datetime
   - custom_block
-  - edit
+  - quickedit
   - editor
   - entity_reference
   - help
@@ -35,3 +35,6 @@ dependencies:
   - views
   - views_ui
   - tour
+themes:
+  - bartik
+  - seven

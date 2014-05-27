@@ -9,6 +9,7 @@ namespace Drupal\comment\Tests;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\content_translation\Tests\ContentTranslationUITest;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Tests the Comment Translation UI.
@@ -59,10 +60,6 @@ class CommentTranslationUITest extends ContentTranslationUITest {
     $this->container->get('comment.manager')->addDefaultField('node', 'page', 'comment');
     // Mark this bundle as translatable.
     content_translation_set_config('comment', 'node__comment_article', 'enabled', TRUE);
-    // Refresh entity info.
-    entity_info_cache_clear();
-    // Flush the permissions after adding the translatable comment bundle.
-    $this->checkPermissions(array(), TRUE);
   }
 
   /**
@@ -77,7 +74,7 @@ class CommentTranslationUITest extends ContentTranslationUITest {
    */
   function setupTestFields() {
     parent::setupTestFields();
-    $field = field_info_field('comment', 'comment_body');
+    $field = FieldConfig::loadByName('comment', 'comment_body');
     $field->translatable = TRUE;
     $field->save();
   }

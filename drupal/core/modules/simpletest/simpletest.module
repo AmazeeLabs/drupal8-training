@@ -5,6 +5,7 @@ use Drupal\Core\Page\HtmlPage;
 use Drupal\Core\Extension\ExtensionDiscovery;
 use Drupal\Core\Render\Element;
 use Drupal\simpletest\TestBase;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Process\PhpExecutableFinder;
 
 /**
@@ -15,9 +16,9 @@ use Symfony\Component\Process\PhpExecutableFinder;
 /**
  * Implements hook_help().
  */
-function simpletest_help($path, $arg) {
-  switch ($path) {
-    case 'admin/help#simpletest':
+function simpletest_help($route_name, Request $request) {
+  switch ($route_name) {
+    case 'help.page.simpletest':
       $output = '';
       $output .= '<h3>' . t('About') . '</h3>';
       $output .= '<p>' . t('The Testing module provides a framework for running automated tests. It can be used to verify a working state of Drupal before and after any code changes, or as a means for developers to write and execute tests for their modules. For more information, see <a href="!simpletest">the online documentation for the Testing module</a>.', array('!simpletest' => 'https://drupal.org/documentation/modules/simpletest')) . '</p>';
@@ -29,7 +30,7 @@ function simpletest_help($path, $arg) {
       $output .= '</dl>';
       return $output;
 
-    case 'admin/config/development/testing':
+    case 'simpletest.test_form':
       $output = t('Select the test(s) or test group(s) you would like to run, and click <em>Run tests</em>.');
       return $output;
   }
@@ -466,21 +467,25 @@ function simpletest_test_get_all($module = NULL) {
       }
       $classes = array();
       foreach ($all_data as $name => $data) {
-        // Build directory in which the test files would reside.
-        $tests_dir = DRUPAL_ROOT . '/' . $data->getPath() . '/lib/Drupal/' . $name . '/Tests';
+        $extension_dir = DRUPAL_ROOT . '/' . $data->getPath();
+
+        // Build directories in which the test files would reside.
+        $tests_dirs = array(
+          $extension_dir . '/lib/Drupal/' . $name . '/Tests',
+          $extension_dir . '/src/Tests',
+        );
+
+        $namespace = 'Drupal\\' . $name . '\Tests\\';
         // Scan it for test files if it exists.
-        if (is_dir($tests_dir)) {
-          $files = file_scan_directory($tests_dir, '/\.php$/');
-          if (!empty($files)) {
-            $basedir = DRUPAL_ROOT . '/' . $data->getPath() . '/lib/';
-            foreach ($files as $file) {
-              // Convert the file name into the namespaced class name.
-              $replacements = array(
-                '/' => '\\',
-                $basedir => '',
-                '.php' => '',
-              );
-              $classes[] = strtr($file->uri, $replacements);
+        foreach ($tests_dirs as $tests_dir) {
+          if (is_dir($tests_dir)) {
+            $files = file_scan_directory($tests_dir, '/\.php$/');
+            if (!empty($files)) {
+              $strlen = strlen($tests_dir) + 1;
+              // Convert the file names into the namespaced class names.
+              foreach ($files as $file) {
+                $classes[] = $namespace . str_replace('/', '\\', substr($file->uri, $strlen, -4));
+              }
             }
           }
         }
@@ -569,7 +574,10 @@ function simpletest_classloader_register() {
   foreach ($types as $type) {
     foreach ($extensions[$type] as $name => $uri) {
       drupal_classloader_register($name, dirname($uri));
-      $classloader->add('Drupal\\' . $name . '\\Tests', DRUPAL_ROOT . '/' . dirname($uri) . '/tests');
+      $classloader->addPsr4('Drupal\\' . $name . '\\Tests\\', array(
+        DRUPAL_ROOT . '/' . dirname($uri) . '/tests/Drupal/' . $name . '/Tests',
+        DRUPAL_ROOT . '/' . dirname($uri) . '/tests/src',
+      ));
       // While being there, prime drupal_get_filename().
       drupal_get_filename($type, $name, $uri);
     }

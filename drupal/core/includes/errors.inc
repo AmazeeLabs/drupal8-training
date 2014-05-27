@@ -6,6 +6,7 @@
  */
 
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Page\DefaultHtmlPageRenderer;
 use Drupal\Core\Utility\Error;
 use Drupal\Component\Utility\String;
 use Symfony\Component\HttpFoundation\Response;
@@ -61,10 +62,6 @@ function _drupal_error_handler_real($error_level, $message, $filename, $line, $c
     list($severity_msg, $severity_level) = $types[$error_level];
     $backtrace = debug_backtrace();
     $caller = Error::getLastCaller($backtrace);
-
-    if (!function_exists('filter_xss_admin')) {
-      require_once __DIR__ . '/common.inc';
-    }
 
     // We treat recoverable errors as fatal.
     _drupal_log_error(array(
@@ -232,12 +229,7 @@ function _drupal_log_error($error, $fatal = FALSE) {
         install_display_output($output, $GLOBALS['install_state']);
       }
       else {
-        $output = array(
-          '#theme' => 'maintenance_page',
-          '#title' => 'Error',
-          '#content' => $message,
-        );
-        $output = drupal_render($output);
+        $output = DefaultHtmlPageRenderer::renderPage($message, 'Error');
       }
 
       $response = new Response($output, 500);

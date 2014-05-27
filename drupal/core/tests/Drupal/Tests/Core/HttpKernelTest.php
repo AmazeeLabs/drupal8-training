@@ -8,6 +8,7 @@
 namespace Drupal\Tests\Core;
 
 use Drupal\Core\Controller\ControllerResolver;
+use Drupal\Core\DependencyInjection\ClassResolver;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\HttpKernel;
 use Drupal\Tests\UnitTestCase;
@@ -46,9 +47,12 @@ class HttpKernelTest extends UnitTestCase {
     $container->set('request', $request, 'request');
 
     $dispatcher = new EventDispatcher();
-    $controller_resolver = new ControllerResolver($container);
+    $class_resolver = new ClassResolver();
+    $class_resolver->setContainer($container);
+    $controller_resolver = new ControllerResolver($class_resolver);
 
-    $http_kernel = new HttpKernel($dispatcher, $container, $controller_resolver);
+    $http_kernel = new HttpKernel($dispatcher, $controller_resolver);
+    $http_kernel->setContainer($container);
 
     $test_controller = '\Drupal\Tests\Core\Controller\TestController';
     $random_attribute = $this->randomName();

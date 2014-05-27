@@ -70,8 +70,8 @@ class MTimeProtectedFastFileStorage extends FileStorage {
 
     // Write the file out to a temporary location. Prepend with a '.' to keep it
     // hidden from listings and web servers.
-    $temporary_path = $this->directory . '/.' . str_replace('/', '#', $name);
-    if (!@file_put_contents($temporary_path, $data)) {
+    $temporary_path = tempnam($this->directory, '.');
+    if (!$temporary_path || !@file_put_contents($temporary_path, $data)) {
       return FALSE;
     }
     // The file will not be chmod() in the future so this is the final
@@ -102,6 +102,8 @@ class MTimeProtectedFastFileStorage extends FileStorage {
       // Reset the file back in the temporary location if this is not the first
       // iteration.
       if ($i > 0) {
+        $this->unlink($temporary_path);
+        $temporary_path = tempnam($this->directory, '.');
         rename($full_path, $temporary_path);
         // Make sure to not loop infinitely on a hopelessly slow filesystem.
         if ($i > 10) {
@@ -138,7 +140,7 @@ class MTimeProtectedFastFileStorage extends FileStorage {
    * @return string
    *   The full path where the file is or should be stored.
    */
-  protected function getFullPath($name, &$directory = NULL, &$directory_mtime = NULL) {
+  public function getFullPath($name, &$directory = NULL, &$directory_mtime = NULL) {
     if (!isset($directory)) {
       $directory = $this->getContainingDirectoryFullPath($name);
     }
@@ -146,6 +148,17 @@ class MTimeProtectedFastFileStorage extends FileStorage {
       $directory_mtime = file_exists($directory) ? filemtime($directory) : 0;
     }
     return $directory . '/' . hash_hmac('sha256', $name, $this->secret . $directory_mtime) . '.php';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function delete($name) {
+    $path = $this->getContainingDirectoryFullPath($name);
+    if (file_exists($path)) {
+      return $this->unlink($path);
+    }
+    return FALSE;
   }
 
   /**

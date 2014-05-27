@@ -44,6 +44,10 @@ class InstallerTranslationTest extends InstallerTestBase {
     $string = (string) current($elements);
     $this->assertNotEqual($string, 'Save and continue');
     $this->translations['Save and continue'] = $string;
+
+    // Check the language direction.
+    $direction = (string) current($this->xpath('/html/@dir'));
+    $this->assertEqual($direction, 'ltr');
   }
 
   /**
@@ -51,6 +55,10 @@ class InstallerTranslationTest extends InstallerTestBase {
    */
   public function testInstaller() {
     $this->assertUrl('user/1');
+    $this->assertResponse(200);
+
+    // Ensure that we can enable basic_auth on a non-english site.
+    $this->drupalPostForm('admin/modules', array('modules[Web services][basic_auth][enable]' => TRUE), t('Save configuration'));
     $this->assertResponse(200);
   }
 

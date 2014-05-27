@@ -25,7 +25,7 @@ use Drupal\Core\Field\FieldItemListInterface;
  *     "text_long",
  *     "text_with_summary"
  *   },
- *   edit = {
+ *   quickedit = {
  *     "editor" = "form"
  *   }
  * )
@@ -79,7 +79,16 @@ class TextTrimmedFormatter extends FormatterBase {
         $output = $item->processed;
         $output = text_summary($output, $text_processing ? $item->format : NULL, $this->getSetting('trim_length'));
       }
-      $elements[$delta] = array('#markup' => $output);
+      $elements[$delta] = array(
+        '#markup' => $output,
+        '#cache' => array(
+          'tags' => array(
+            'filter_format' => array(
+              $item->format,
+            ),
+          ),
+        ),
+      );
     }
 
     return $elements;

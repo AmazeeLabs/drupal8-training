@@ -893,8 +893,7 @@ abstract class DisplayPluginBase extends PluginBase {
         // @todo Remove dependency on Request object
         //   https://drupal.org/node/2059003.
         try {
-          $request = \Drupal::request();
-          if ($request->request->get('form_id') && isset($this->view->temporary_options[$type][$id])) {
+          if ($this->view->getRequest()->request->get('form_id') && isset($this->view->temporary_options[$type][$id])) {
             $info = $this->view->temporary_options[$type][$id];
           }
         }
@@ -1126,7 +1125,7 @@ abstract class DisplayPluginBase extends PluginBase {
     $options['title'] = array(
       'category' => 'title',
       'title' => t('Title'),
-      'value' => $title,
+      'value' => views_ui_truncate($title, 32),
       'desc' => t('Change the title that this display will use.'),
     );
 
@@ -1429,6 +1428,7 @@ abstract class DisplayPluginBase extends PluginBase {
           '#type' => 'textfield',
           '#description' => t('This title will be displayed with the view, wherever titles are normally displayed; i.e, as the page title, block title, etc.'),
           '#default_value' => $this->getOption('title'),
+          '#maxlength' => 255,
         );
         break;
       case 'css_class':
@@ -2345,33 +2345,33 @@ abstract class DisplayPluginBase extends PluginBase {
     return TRUE;
   }
 
- /**
-  * Is the output of the view empty.
-  *
-  * If a view has no result and neither the empty, nor the footer nor the header
-  * does show anything return FALSE.
-  *
-  * @return bool
-  *   Returns TRUE if the output is empty, else FALSE.
-  */
- public function outputIsEmpty() {
-   if (!empty($this->view->result)) {
-     return FALSE;
-   }
+  /**
+   * Is the output of the view empty.
+   *
+   * If a view has no result and neither the empty, nor the footer nor the header
+   * does show anything return FALSE.
+   *
+   * @return bool
+   *   Returns TRUE if the output is empty, else FALSE.
+   */
+  public function outputIsEmpty() {
+    if (!empty($this->view->result)) {
+      return FALSE;
+    }
 
-   // Check whether all of the area handlers are empty.
-   foreach (array('empty', 'footer', 'header') as $type) {
-     $handlers = $this->getHandlers($type);
-     foreach ($handlers as $handler) {
-       // If one is not empty, return FALSE now.
-       if (!$handler->isEmpty()) {
-         return FALSE;
-       }
-     }
-   }
+    // Check whether all of the area handlers are empty.
+    foreach (array('empty', 'footer', 'header') as $type) {
+      $handlers = $this->getHandlers($type);
+      foreach ($handlers as $handler) {
+        // If one is not empty, return FALSE now.
+        if (!$handler->isEmpty()) {
+          return FALSE;
+        }
+      }
+    }
 
-   return TRUE;
- }
+    return TRUE;
+  }
 
   /**
    * Provide the block system with any exposed widget blocks for this display.

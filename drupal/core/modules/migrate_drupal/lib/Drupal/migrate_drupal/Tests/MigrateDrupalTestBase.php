@@ -9,7 +9,10 @@ namespace Drupal\migrate_drupal\Tests;
 
 use Drupal\migrate\Tests\MigrateTestBase;
 
-class MigrateDrupalTestBase extends MigrateTestBase {
+/**
+ * Base class for Drupal migration tests.
+ */
+abstract class MigrateDrupalTestBase extends MigrateTestBase {
 
   /**
    * Modules to enable.
@@ -17,4 +20,15 @@ class MigrateDrupalTestBase extends MigrateTestBase {
    * @var array
    */
   public static $modules = array('migrate_drupal');
+
+  /**
+   * Returns the path to the dump directory.
+   *
+   * @return string
+   *   A string that represents the dump directory path.
+   */
+  protected function getDumpDirectory() {
+    return __DIR__ . '/Dump';
+  }
+
 }

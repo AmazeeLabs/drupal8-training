@@ -37,9 +37,7 @@ class CategoryAutocompleteTest extends UnitTestCase {
   }
 
   public function setUp() {
-    $block_manager = $this->getMockBuilder('Drupal\block\Plugin\Type\BlockManager')
-      ->disableOriginalConstructor()
-      ->getMock();
+    $block_manager = $this->getMock('Drupal\block\BlockManagerInterface');
     $block_manager->expects($this->any())
       ->method('getCategories')
       ->will($this->returnValue(array('Comment', 'Node', 'None & Such', 'User')));
@@ -61,8 +59,8 @@ class CategoryAutocompleteTest extends UnitTestCase {
    */
   public function testAutocompleteSuggestions($string, $suggestions) {
     $suggestions = array_map(function ($suggestion) {
-      return String::checkPlain($suggestion);
-    }, array_combine($suggestions, $suggestions));
+      return array('value' => $suggestion, 'label' => String::checkPlain($suggestion));
+    }, $suggestions);
     $result = $this->autocompleteController->autocomplete(new Request(array('q' => $string)));
     $this->assertSame($suggestions, json_decode($result->getContent(), TRUE));
   }

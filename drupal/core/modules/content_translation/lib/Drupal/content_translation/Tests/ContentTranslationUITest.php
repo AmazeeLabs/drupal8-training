@@ -54,6 +54,8 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
     $this->assertTrue($entity, 'Entity found in the database.');
     $this->drupalGet($entity->getSystemPath());
     $this->assertResponse(200, 'Entity URL is valid.');
+    $this->drupalGet($entity->getSystemPath('drupal:content-translation-overview'));
+    $this->assertNoText('Source language', 'Source language column correctly hidden.');
 
     $translation = $this->getTranslation($entity, $default_langcode);
     foreach ($values[$default_langcode] as $property => $value) {
@@ -74,20 +76,27 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
       $this->assertNoFieldByXPath('//select[@id="edit-langcode"]', NULL, 'Language selector correctly disabled on translations.');
     }
     $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
+    $this->drupalGet($entity->getSystemPath('drupal:content-translation-overview'));
+    $this->assertNoText('Source language', 'Source language column correctly hidden.');
 
     // Switch the source language.
     $langcode = 'fr';
     $source_langcode = 'it';
     $edit = array('source_langcode[source]' => $source_langcode);
     $path = $langcode . '/' . $content_translation_path . '/add/' . $default_langcode . '/' . $langcode;
+    // This does not save anything, it merely reloads the form and fills in the
+    // fields with the values from the different source language.
     $this->drupalPostForm($path, $edit, t('Change'));
     $this->assertFieldByXPath("//input[@name=\"{$this->fieldName}[0][value]\"]", $values[$source_langcode][$this->fieldName][0]['value'], 'Source language correctly switched.');
 
     // Add another translation and mark the other ones as outdated.
     $values[$langcode] = $this->getNewEntityValues($langcode);
     $edit = $this->getEditValues($values, $langcode) + array('content_translation[retranslate]' => TRUE);
+    $path = $langcode . '/' . $content_translation_path . '/add/' . $source_langcode . '/' . $langcode;
     $this->drupalPostForm($path, $edit, $this->getFormSubmitActionForNewTranslation($entity, $langcode));
     $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
+    $this->drupalGet($entity->getSystemPath('drupal:content-translation-overview'));
+    $this->assertText('Source language', 'Source language column correctly shown.');
 
     // Check that the entered values have been correctly stored.
     foreach ($values as $langcode => $property_values) {
@@ -130,21 +139,21 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
     $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
 
     // Check that every translation has the correct "outdated" status.
-    foreach ($this->langcodes as $enabled_langcode) {
-      $prefix = $enabled_langcode != $default_langcode ? $enabled_langcode . '/' : '';
+    foreach ($this->langcodes as $added_langcode) {
+      $prefix = $added_langcode != $default_langcode ? $added_langcode . '/' : '';
       $path = $prefix . $edit_path;
       $this->drupalGet($path);
-      if ($enabled_langcode == $langcode) {
+      if ($added_langcode == $langcode) {
         $this->assertFieldByXPath('//input[@name="content_translation[retranslate]"]', FALSE, 'The retranslate flag is not checked by default.');
       }
       else {
         $this->assertFieldByXPath('//input[@name="content_translation[outdated]"]', TRUE, 'The translate flag is checked by default.');
         $edit = array('content_translation[outdated]' => FALSE);
-        $this->drupalPostForm($path, $edit, $this->getFormSubmitAction($entity, $enabled_langcode));
+        $this->drupalPostForm($path, $edit, $this->getFormSubmitAction($entity, $added_langcode));
         $this->drupalGet($path);
         $this->assertFieldByXPath('//input[@name="content_translation[retranslate]"]', FALSE, 'The retranslate flag is now shown.');
         $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
-        $this->assertFalse($entity->translation[$enabled_langcode]['outdated'], 'The "outdated" status has been correctly stored.');
+        $this->assertFalse($entity->translation[$added_langcode]['outdated'], 'The "outdated" status has been correctly stored.');
       }
     }
   }

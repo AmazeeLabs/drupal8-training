@@ -7,19 +7,19 @@
 
 namespace Drupal\Core\Routing;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Log\LoggerInterface;
 
 use Symfony\Component\Routing\Route as SymfonyRoute;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 use Symfony\Cmf\Component\Routing\ProviderBasedGenerator;
 
-use Drupal\Component\Utility\Settings;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\PathProcessor\OutboundPathProcessorInterface;
 use Drupal\Core\RouteProcessor\OutboundRouteProcessorInterface;
+use Drupal\Core\Site\Settings;
 
 /**
  * Generates URLs from route names and parameters.
@@ -86,9 +86,9 @@ class UrlGenerator extends ProviderBasedGenerator implements UrlGeneratorInterfa
    *   The route processor.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config
    *    The config factory.
-   * @param \Drupal\Component\Utility\Settings $settings
+   * @param \Drupal\Core\Site\Settings $settings
    *    The read only settings.
-   * @param \Symfony\Component\HttpKernel\Log\LoggerInterface $logger
+   * @param \Psr\Log\LoggerInterface $logger
    *   An optional logger for recording errors.
    */
   public function __construct(RouteProviderInterface $provider, OutboundPathProcessorInterface $path_processor, OutboundRouteProcessorInterface $route_processor, ConfigFactoryInterface $config, Settings $settings, LoggerInterface $logger = NULL) {
@@ -246,8 +246,9 @@ class UrlGenerator extends ProviderBasedGenerator implements UrlGeneratorInterfa
       // call the slow
       // \Drupal\Component\Utility\UrlHelper::stripDangerousProtocols() if $path
       // contains a ':' before any / ? or #. Note: we could use
-      // url_is_external($path) here, but that would require another function
-      // call, and performance inside url() is critical.
+      // \Drupal\Component\Utility\UrlHelper::isExternal($path) here, but that
+      // would require another function call, and performance inside url() is
+      // critical.
       $colonpos = strpos($path, ':');
       $options['external'] = ($colonpos !== FALSE && !preg_match('![/?#]!', substr($path, 0, $colonpos)) && UrlHelper::stripDangerousProtocols($path) == $path);
     }

@@ -9,7 +9,7 @@ namespace Drupal\editor\Plugin\InPlaceEditor;
 
 use Drupal\Component\Plugin\PluginBase;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\edit\Plugin\InPlaceEditorInterface;
+use Drupal\quickedit\Plugin\InPlaceEditorInterface;
 use Drupal\filter\Plugin\FilterInterface;
 
 /**
@@ -37,7 +37,7 @@ class Editor extends PluginBase implements InPlaceEditorInterface {
     // associated editor and that editor supports inline editing.
     elseif ($field_definition->getSetting('text_processing')) {
       if ($editor = editor_load($items[0]->format)) {
-        $definition = \Drupal::service('plugin.manager.editor')->getDefinition($editor->editor);
+        $definition = \Drupal::service('plugin.manager.editor')->getDefinition($editor->getEditor());
         if ($definition['supports_inline_editing'] === TRUE) {
           return TRUE;
         }
@@ -78,9 +78,11 @@ class Editor extends PluginBase implements InPlaceEditorInterface {
     // Filter the current user's formats to those that support inline editing.
     $formats = array();
     foreach ($user_format_ids as $format_id) {
-      $editor = editor_load($format_id);
-      if ($editor && isset($definitions[$editor->editor]) && isset($definitions[$editor->editor]['supports_inline_editing']) && $definitions[$editor->editor]['supports_inline_editing'] === TRUE) {
-        $formats[] = $format_id;
+      if ($editor = editor_load($format_id)) {
+        $editor_id = $editor->getEditor();
+        if (isset($definitions[$editor_id]['supports_inline_editing']) && $definitions[$editor_id]['supports_inline_editing'] === TRUE) {
+          $formats[] = $format_id;
+        }
       }
     }
 
@@ -88,7 +90,7 @@ class Editor extends PluginBase implements InPlaceEditorInterface {
     $attachments = $manager->getAttachments($formats);
 
     // Also include editor.module's formatted text editor.
-    $attachments['library'][] = 'editor/edit.inPlaceEditor.formattedText';
+    $attachments['library'][] = 'editor/quickedit.inPlaceEditor.formattedText';
 
     return $attachments;
   }

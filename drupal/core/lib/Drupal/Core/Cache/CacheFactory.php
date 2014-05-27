@@ -10,23 +10,26 @@ namespace Drupal\Core\Cache;
 /**
  * Defines the cache backend factory.
  */
-use Drupal\Component\Utility\Settings;
-use Symfony\Component\DependencyInjection\ContainerAware;
+use Drupal\Core\Site\Settings;
+use Symfony\Component\DependencyInjection\ContainerAwareInterface;
+use Symfony\Component\DependencyInjection\ContainerAwareTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class CacheFactory extends ContainerAware implements CacheFactoryInterface {
+class CacheFactory implements CacheFactoryInterface,  ContainerAwareInterface {
+
+  use ContainerAwareTrait;
 
   /**
    * The settings array.
    *
-   * @var \Drupal\Component\Utility\Settings
+   * @var \Drupal\Core\Site\Settings
    */
   protected $settings;
 
   /**
    * Constructs CacheFactory object.
    *
-   * @param \Drupal\Component\Utility\Settings $settings
+   * @param \Drupal\Core\Site\Settings $settings
    *   The settings array.
    */
   function __construct(Settings $settings) {
@@ -51,7 +54,7 @@ class CacheFactory extends ContainerAware implements CacheFactoryInterface {
   public function get($bin) {
     $cache_settings = $this->settings->get('cache');
     if (isset($cache_settings['bins'][$bin])) {
-      $service_name = $cache_settings[$bin];
+      $service_name = $cache_settings['bins'][$bin];
     }
     elseif (isset($cache_settings['default'])) {
       $service_name = $cache_settings['default'];

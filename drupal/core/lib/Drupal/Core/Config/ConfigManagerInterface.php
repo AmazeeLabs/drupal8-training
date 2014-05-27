@@ -46,15 +46,21 @@ interface ConfigManagerInterface {
    *   The storage to diff configuration from.
    * @param \Drupal\Core\Config\StorageInterface $target_storage
    *   The storage to diff configuration to.
-   * @param string $name
-   *   The name of the configuration object to diff.
+   * @param string $source_name
+   *   The name of the configuration object in the source storage to diff.
+   * @param string $target_name
+   *   (optional) The name of the configuration object in the target storage.
+   *   If omitted, the source name is used.
+   * @param string $collection
+   *   (optional) The configuration collection name. Defaults to the default
+   *   collection.
    *
    * @return core/lib/Drupal/Component/Diff
    *   A formatted string showing the difference between the two storages.
    *
    * @todo Make renderer injectable
    */
-  public function diff(StorageInterface $source_storage, StorageInterface $target_storage, $name);
+  public function diff(StorageInterface $source_storage, StorageInterface $target_storage, $source_name, $target_name = NULL, $collection = StorageInterface::DEFAULT_COLLECTION);
 
   /**
    * Creates a configuration snapshot following a successful import.
@@ -106,5 +112,23 @@ interface ConfigManagerInterface {
    */
   public function findConfigEntityDependentsAsEntities($type, array $names);
 
+  /**
+   * Determines if the provided collection supports configuration entities.
+   *
+   * @param string $collection
+   *   The collection to check.
+   *
+   * @return bool
+   *   TRUE if the collection support configuration entities, FALSE if not.
+   */
+  public function supportsConfigurationEntities($collection);
+
+  /**
+   * Gets available collection information using the event system.
+   *
+   * @return \Drupal\Core\Config\ConfigCollectionInfo
+   *   The object which contains information about the available collections.
+   */
+  public function getConfigCollectionInfo();
 
 }

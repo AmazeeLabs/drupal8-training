@@ -38,7 +38,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
   protected $bundle;
 
   /**
-   * The enabled languages.
+   * The added languages.
    *
    * @var array
    */
@@ -96,7 +96,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
   }
 
   /**
-   * Enables additional languages.
+   * Adds additional languages.
    */
   protected function setupLanguages() {
     $this->langcodes = array('it', 'fr');
@@ -165,7 +165,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
     // picked up.
     content_translation_set_config($this->entityTypeId, $this->bundle, 'enabled', TRUE);
     drupal_static_reset();
-    entity_info_cache_clear();
+    \Drupal::entityManager()->clearCachedDefinitions();
     \Drupal::service('router.builder')->rebuild();
   }
 

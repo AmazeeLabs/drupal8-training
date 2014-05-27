@@ -10,52 +10,6 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Template\Attribute;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-
-/**
- * Menu callback; Set the default theme.
- */
-function system_theme_default() {
-  $request = \Drupal::request();
-  $theme = $request->get('theme');
-  if (!empty($theme)) {
-    // Get current list of themes.
-    $themes = list_themes();
-
-    // Check if the specified theme is one recognized by the system.
-    if (!empty($themes[$theme])) {
-      // Enable the theme if it is currently disabled.
-      if (empty($themes[$theme]->status)) {
-       theme_enable(array($theme));
-      }
-      // Set the default theme.
-      \Drupal::config('system.theme')
-        ->set('default', $theme)
-        ->save();
-
-      \Drupal::service('router.builder')->setRebuildNeeded();
-
-      // The status message depends on whether an admin theme is currently in use:
-      // a value of 0 means the admin theme is set to be the default theme.
-      $admin_theme = \Drupal::config('system.theme')->get('admin');
-      if ($admin_theme != 0 && $admin_theme != $theme) {
-        drupal_set_message(t('Please note that the administration theme is still set to the %admin_theme theme; consequently, the theme on this page remains unchanged. All non-administrative sections of the site, however, will show the selected %selected_theme theme by default.', array(
-          '%admin_theme' => $themes[$admin_theme]->info['name'],
-          '%selected_theme' => $themes[$theme]->info['name'],
-        )));
-      }
-      else {
-        drupal_set_message(t('%theme is now the default theme.', array('%theme' => $themes[$theme]->info['name'])));
-      }
-    }
-    else {
-      drupal_set_message(t('The %theme theme was not found.', array('%theme' => $theme)), 'error');
-    }
-    return new RedirectResponse(url('admin/appearance', array('absolute' => TRUE)));
-  }
-  throw new AccessDeniedHttpException();
-}
 
 /**
  * Recursively check compatibility.
@@ -148,62 +102,40 @@ function template_preprocess_admin_page(&$variables) {
 }
 
 /**
- * Returns HTML for the output of the admin index page.
+ * Prepares variables for admin index templates.
+ *
+ * Default template: system-admin-index.html.twig.
  *
  * @param $variables
  *   An associative array containing:
  *   - menu_items: An array of modules to be displayed.
- *
- * @ingroup themeable
  */
-function theme_system_admin_index($variables) {
-  $menu_items = $variables['menu_items'];
-
-  $container = array('left' => '', 'right' => '');
-  $flip = array('left' => 'right', 'right' => 'left');
-  $position = 'left';
-
+function template_preprocess_system_admin_index(&$variables) {
+  $variables['system_compact_link'] = array(
+    '#theme' => 'system_compact_link',
+  );
+  $variables['containers'] = array();
+  $stripe = 0;
   // Iterate over all modules.
-  foreach ($menu_items as $module => $block) {
+  foreach ($variables['menu_items'] as $module => $block) {
     list($description, $items) = $block;
-
+    $position = ++$stripe % 2 ? 'left' : 'right';
     // Output links.
     if (count($items)) {
-      $admin_block_content = array(
-        '#theme' => 'admin_block_content',
-        '#content' => $items,
-      );
-      $block = array();
-      $block['title'] = $module;
-      $block['content'] = drupal_render($admin_block_content);
-      $block['description'] = t($description);
-
-      $admin_block = array(
+      $variables['containers'][$position][] = array(
         '#theme' => 'admin_block',
-        '#block' => $block,
+        '#block' => array(
+          'position' => $position,
+          'title' => $module,
+          'content' => array(
+            '#theme' => 'admin_block_content',
+            '#content' => $items,
+          ),
+          'description' => t($description),
+        ),
       );
-      if ($block_output = drupal_render($admin_block)) {
-        if (!isset($block['position'])) {
-          // Perform automatic striping.
-          $block['position'] = $position;
-          $position = $flip[$position];
-        }
-        $container[$block['position']] .= $block_output;
-      }
     }
   }
-
-  $system_compact_link = array('#theme' => 'system_compact_link');
-  $output = '<div class="admin clearfix">';
-  $output .= drupal_render($system_compact_link);
-  foreach ($container as $id => $data) {
-    $output .= '<div class="' . $id . ' clearfix">';
-    $output .= $data;
-    $output .= '</div>';
-  }
-  $output .= '</div>';
-
-  return $output;
 }
 
 /**

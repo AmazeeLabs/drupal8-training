@@ -8,7 +8,7 @@
 namespace Drupal\search\Tests;
 
 use Drupal\Core\Language\Language;
-use Drupal\field\Field;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Tests entities with multilingual fields.
@@ -58,7 +58,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // Make the body field translatable. The title is already translatable by
     // definition. The parent class has already created the article and page
     // content types.
-    $field = Field::fieldInfo()->getField('node', 'body');
+    $field = FieldConfig::loadByName('node', 'body');
     $field->translatable = TRUE;
     $field->save();
 
@@ -127,7 +127,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
 
     // Now index the rest of the nodes.
     // Make sure index throttle is high enough, via the UI.
-    $this->drupalPostForm('admin/config/search/settings', array('cron_limit' => 20), t('Save configuration'));
+    $this->drupalPostForm('admin/config/search/pages', array('cron_limit' => 20), t('Save configuration'));
     $this->assertEqual(20, \Drupal::config('search.settings')->get('index.cron_limit', 100), 'Config setting was saved correctly');
 
     $this->plugin->updateIndex();
@@ -184,6 +184,26 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // Mark one node for reindexing by saving it, and verify indexing status.
     $this->searchable_nodes[1]->save();
     $this->assertIndexCounts(1, 3, 'after marking one node to reindex via save');
+
+    // The request time is always the same throughout test runs. Update the
+    // request time to a previous time, to simulate it having been marked
+    // previously.
+    $current = REQUEST_TIME;
+    $old = $current - 10;
+    db_update('search_dataset')
+      ->fields(array('reindex' => $old))
+      ->condition('reindex', $current, '>=')
+      ->execute();
+
+    // Save the node again. Verify that the request time on it is not updated.
+    $this->searchable_nodes[1]->save();
+    $result = db_select('search_dataset', 'd')
+      ->fields('d', array('reindex'))
+      ->condition('type', 'node_search')
+      ->condition('sid', $this->searchable_nodes[1]->id())
+      ->execute()
+      ->fetchField();
+    $this->assertEqual($result, $old, 'Reindex time was not updated if node was already marked');
   }
 
   /**

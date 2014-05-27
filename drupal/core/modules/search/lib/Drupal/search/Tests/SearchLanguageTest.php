@@ -8,7 +8,7 @@
 namespace Drupal\search\Tests;
 
 use Drupal\Core\Language\Language;
-use Drupal\field\Field;
+use Drupal\field\Entity\FieldConfig;
 
 /**
  * Test node search with multiple languages.
@@ -25,7 +25,7 @@ class SearchLanguageTest extends SearchTestBase {
   public static function getInfo() {
     return array(
       'name' => 'Search language selection',
-      'description' => 'Tests advanced search with different languages enabled.',
+      'description' => 'Tests advanced search with different languages added.',
       'group' => 'Search',
     );
   }
@@ -47,7 +47,7 @@ class SearchLanguageTest extends SearchTestBase {
     // Make the body field translatable. The title is already translatable by
     // definition. The parent class has already created the article and page
     // content types.
-    $field = Field::fieldInfo()->getField('node', 'body');
+    $field = FieldConfig::loadByName('node', 'body');
     $field->translatable = TRUE;
     $field->save();
 
@@ -108,7 +108,7 @@ class SearchLanguageTest extends SearchTestBase {
 
     // Ensure selecting no language does not make the query different.
     $this->drupalPostForm('search/node', array(), t('Advanced search'));
-    $this->assertEqual($this->getUrl(), url('search/node/', array('absolute' => TRUE)), 'Correct page redirection, no language filtering.');
+    $this->assertEqual($this->getUrl(), url('search/node/', array('query' => array('keys' => ''), 'absolute' => TRUE)), 'Correct page redirection, no language filtering.');
 
     // Pick French and ensure it is selected.
     $edit = array('language[fr]' => TRUE);

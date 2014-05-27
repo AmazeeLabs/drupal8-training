@@ -47,8 +47,8 @@ node.add:
 node.view:
   path: '/node/{node}'
   defaults:
-    _content: '\Drupal\node\Controller\NodeController::page'
-    _title_callback: '\Drupal\node\Controller\NodeController::pageTitle'
+    _content: '\Drupal\node\Controller\NodeViewController::view'
+    _title_callback: '\Drupal\node\Controller\NodeViewController::title'
   requirements:
     _entity_access: 'node.view'
 
@@ -56,6 +56,7 @@ node.delete_confirm:
   path: '/node/{node}/delete'
   defaults:
     _entity_form: 'node.delete'
+    _title: 'Delete'
   requirements:
     _entity_access: 'node.delete'
   options:

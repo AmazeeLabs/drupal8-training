@@ -17,9 +17,12 @@ class EntityReferenceAdminTest extends WebTestBase {
   /**
    * Modules to enable.
    *
+   * Enable path module to ensure that the selection handler does not fail for
+   * entities with a path field.
+   *
    * @var array
    */
-  public static $modules = array('node', 'field_ui', 'entity_reference');
+  public static $modules = array('node', 'field_ui', 'entity_reference', 'path');
 
   /**
    * {@inheritdoc}
@@ -124,7 +127,7 @@ class EntityReferenceAdminTest extends WebTestBase {
     if ($fields) {
       $field = $fields[0];
       $options = $this->getAllOptionsList($field);
-      return $this->assertIdentical($options, $expected_options);
+      return $this->assertIdentical(sort($options), sort($expected_options));
     }
     else {
       return $this->fail('Unable to find field ' . $name);

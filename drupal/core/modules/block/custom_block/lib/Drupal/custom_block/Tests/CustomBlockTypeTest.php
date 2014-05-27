@@ -78,20 +78,19 @@ class CustomBlockTypeTest extends CustomBlockTestBase {
     // We need two block types to prevent /block/add redirecting.
     $this->createCustomBlockType('other');
 
-    $instance = field_info_instance('custom_block', 'body', 'basic');
-    $this->assertEqual($instance->getLabel(), 'Block body', 'Body field was found.');
+    $field_definition = \Drupal::entityManager()->getFieldDefinitions('custom_block', 'other')['body'];
+    $this->assertEqual($field_definition->getLabel(), 'Body', 'Body field was found.');
 
     // Verify that title and body fields are displayed.
     $this->drupalGet('block/add/basic');
     $this->assertRaw('Block description', 'Block info field was found.');
-    $this->assertRaw('Block body', 'Body field was found.');
+    $this->assertRaw('Body', 'Body field was found.');
 
     // Change the block type name.
     $edit = array(
       'label' => 'Bar',
     );
     $this->drupalPostForm('admin/structure/block/custom-blocks/manage/basic', $edit, t('Save'));
-    field_info_cache_clear();
 
     $this->drupalGet('block/add');
     $this->assertRaw('Bar', 'New name was displayed.');
@@ -104,7 +103,7 @@ class CustomBlockTypeTest extends CustomBlockTestBase {
     $this->drupalPostForm('admin/structure/block/custom-blocks/manage/basic', array(), t('Save'));
     // Check that the body field doesn't exist.
     $this->drupalGet('block/add/basic');
-    $this->assertNoRaw('Block body', 'Body field was not found.');
+    $this->assertNoRaw('Body', 'Body field was not found.');
   }
 
   /**

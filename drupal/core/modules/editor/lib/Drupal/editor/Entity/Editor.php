@@ -28,29 +28,31 @@ class Editor extends ConfigEntityBase implements EditorInterface {
    * is associated.
    *
    * @var string
+   *
+   * @see getFilterFormat()
    */
-  public $format;
+  protected $format;
 
   /**
    * The name (plugin ID) of the text editor.
    *
    * @var string
    */
-  public $editor;
+  protected $editor;
 
   /**
-   * The array of text editor plugin-specific settings for the text editor.
+   * The structured array of text editor plugin-specific settings.
    *
    * @var array
    */
-  public $settings = array();
+  protected $settings = array();
 
   /**
-   * The array of image upload settings for the text editor.
+   * The structured array of image upload settings.
    *
    * @var array
    */
-  public $image_upload = array();
+  protected $image_upload = array();
 
   /**
    * The filter format this text editor is associated with.
@@ -93,11 +95,18 @@ class Editor extends ConfigEntityBase implements EditorInterface {
     parent::calculateDependencies();
     // Create a dependency on the associated FilterFormat.
     $this->addDependency('entity', $this->getFilterFormat()->getConfigDependencyName());
-    // @todo use EntityWithPluginBagInterface so configuration between config
+    // @todo use EntityWithPluginBagsInterface so configuration between config
     //   entity and dependency on provider is managed automatically.
     $definition = $this->editorPluginManager()->createInstance($this->editor)->getPluginDefinition();
     $this->addDependency('module', $definition['provider']);
     return $this->dependencies;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasAssociatedFilterFormat() {
+    return $this->format !== NULL;
   }
 
   /**
@@ -121,6 +130,60 @@ class Editor extends ConfigEntityBase implements EditorInterface {
     }
 
     return $this->editorPluginManager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getEditor() {
+    return $this->editor;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSettings() {
+    return $this->settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setSettings(array $settings) {
+    $this->settings = $settings;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getImageUploadSettings() {
+    return $this->image_upload;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setImageUploadSettings(array $image_upload_settings) {
+    $this->image_upload = $image_upload_settings;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function toArray() {
+    $properties = parent::toArray();
+    $names = array(
+      'format',
+      'editor',
+      'settings',
+      'image_upload',
+    );
+    foreach ($names as $name) {
+      $properties[$name] = $this->get($name);
+    }
+    return $properties;
   }
 
 }

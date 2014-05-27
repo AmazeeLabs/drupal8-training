@@ -8,6 +8,7 @@
 namespace Drupal\filter\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\filter\Plugin\FilterInterface;
 
 /**
  * Tests the administrative functionality of the Filter module.
@@ -15,12 +16,13 @@ use Drupal\simpletest\WebTestBase;
 class FilterAdminTest extends WebTestBase {
 
   /**
-   * The installation profile to use with this test.
-   *
-   * @var string
+   * {@inheritdoc}
    */
-  protected $profile = 'standard';
+  public static $modules = array('filter', 'node');
 
+  /**
+   * {@inheritdoc}
+   */
   public static function getInfo() {
     return array(
       'name' => 'Filter administration functionality',
@@ -29,13 +31,62 @@ class FilterAdminTest extends WebTestBase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   function setUp() {
     parent::setUp();
 
-    // Create users.
-    $basic_html_format = entity_load('filter_format', 'basic_html');
-    $restricted_html_format = entity_load('filter_format', 'restricted_html');
-    $full_html_format = entity_load('filter_format', 'full_html');
+    $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
+
+    // Set up the filter formats used by this test.
+    $basic_html_format = entity_create('filter_format', array(
+      'format' => 'basic_html',
+      'name' => 'Basic HTML',
+      'filters' => array(
+        'filter_html' => array(
+          'status' => 1,
+          'settings' => array(
+            'allowed_html' => '<p> <br> <strong> <a> <em>',
+          ),
+        ),
+      ),
+    ));
+    $basic_html_format->save();
+    $restricted_html_format = entity_create('filter_format', array(
+      'format' => 'restricted_html',
+      'name' => 'Restricted HTML',
+      'filters' => array(
+        'filter_html' => array(
+          'status' => TRUE,
+          'weight' => -10,
+          'settings' => array(
+            'allowed_html' => '<p> <br> <strong> <a> <em> <h4>',
+          ),
+        ),
+        'filter_autop' => array(
+          'status' => TRUE,
+          'weight' => 0,
+        ),
+        'filter_url' => array(
+          'status' => TRUE,
+          'weight' => 0,
+        ),
+        'filter_htmlcorrector' => array(
+          'status' => TRUE,
+          'weight' => 10,
+        ),
+      ),
+    ));
+    $restricted_html_format->save();
+    $full_html_format = entity_create('filter_format', array(
+      'format' => 'full_html',
+      'name' => 'Full HTML',
+      'weight' => 1,
+      'filters' => array(),
+    ));
+    $full_html_format->save();
+
     $this->admin_user = $this->drupalCreateUser(array(
       'administer filters',
       $basic_html_format->getPermissionName(),
@@ -44,6 +95,8 @@ class FilterAdminTest extends WebTestBase {
     ));
 
     $this->web_user = $this->drupalCreateUser(array('create page content', 'edit own page content'));
+    user_role_grant_permissions('authenticated', array($basic_html_format->getPermissionName()));
+    user_role_grant_permissions('anonymous', array($restricted_html_format->getPermissionName()));
     $this->drupalLogin($this->admin_user);
   }
 
@@ -143,8 +196,8 @@ class FilterAdminTest extends WebTestBase {
 
     // Verify access permissions to Full HTML format.
     $full_format = entity_load('filter_format', $full);
-    $this->assertTrue($full_format->access('view', $this->admin_user), 'Admin user may use Full HTML.');
-    $this->assertFalse($full_format->access('view', $this->web_user), 'Web user may not use Full HTML.');
+    $this->assertTrue($full_format->access('use', $this->admin_user), 'Admin user may use Full HTML.');
+    $this->assertFalse($full_format->access('use', $this->web_user), 'Web user may not use Full HTML.');
 
     // Add an additional tag.
     $edit = array();
@@ -153,8 +206,6 @@ class FilterAdminTest extends WebTestBase {
     $this->assertUrl('admin/config/content/formats');
     $this->drupalGet('admin/config/content/formats/manage/' . $restricted);
     $this->assertFieldByName('filters[filter_html][settings][allowed_html]', $edit['filters[filter_html][settings][allowed_html]'], 'Allowed HTML tag added.');
-
-    $this->assertTrue(\Drupal::cache('filter')->isEmpty(), 'Cache cleared.');
 
     $elements = $this->xpath('//select[@name=:first]/following::select[@name=:second]', array(
       ':first' => 'filters[' . $first_filter . '][weight]',
@@ -302,4 +353,74 @@ class FilterAdminTest extends WebTestBase {
     $this->drupalPostForm('admin/config/content/formats/manage/basic_html', $edit, t('Save configuration'));
     $this->assertNoRaw(t('The text format %format has been updated.', array('%format' => 'Basic HTML')));
   }
+
+  /**
+   * Tests that changing filter properties clears the filter cache.
+   */
+  public function testFilterAdminClearsFilterCache() {
+    $restricted = 'restricted_html';
+    $original_markup = '<h4>Small headers</h4> small headers are <em>allowed</em> in restricted html by default';
+
+    // Check that the filter cache is empty for the test markup.
+    $cid = $this->computeFilterCacheId($original_markup, $restricted, '', TRUE);
+    $this->assertFalse(\Drupal::cache('filter')->get($cid));
+
+    // Check that the filter cache gets populated when check_markup is called.
+    $actual_markup = check_markup($original_markup, $restricted, '', TRUE);
+    $this->assertTrue(\Drupal::cache('filter')->get($cid));
+    $this->assertIdentical(strpos($actual_markup, '<h4>'), 0, 'The h4 tag is present in the resulting markup');
+
+    // Edit the restricted filter format.
+    $edit = array();
+    $edit['filters[filter_html][settings][allowed_html]'] = '<a> <em> <strong> <cite> <code>';
+    $this->drupalPostForm('admin/config/content/formats/manage/' . $restricted, $edit, t('Save configuration'));
+    $this->assertUrl('admin/config/content/formats');
+    $this->drupalGet('admin/config/content/formats/manage/' . $restricted);
+    $this->assertFieldByName('filters[filter_html][settings][allowed_html]', $edit['filters[filter_html][settings][allowed_html]'], 'Allowed HTML tag added.');
+
+    // Check that the filter cache is empty after the format was changed.
+    $this->assertFalse(\Drupal::cache('filter')->get($cid));
+
+    // Check that after changind the filter, the changes are reflected in the
+    // filtered markup.
+    $actual_markup = check_markup($original_markup, $restricted, '', TRUE);
+    $this->assertIdentical(strpos($actual_markup, '<h4>'), FALSE, 'The h4 tag is not present in the resulting markup');
+  }
+
+
+  /**
+   * Computes the cache-key for the given text just like check_markup().
+   *
+   * Note that this is copied over from check_markup().
+   *
+   * @return string|NULL
+   *   The cache-key used to store the text in the filter cache.
+   */
+  protected function computeFilterCacheId($text, $format_id = NULL, $langcode = '', $cache = FALSE, $filter_types_to_skip = array()) {
+    if (!isset($format_id)) {
+      $format_id = filter_fallback_format();
+    }
+    // If the requested text format does not exist, the text cannot be filtered.
+    if (!$format = entity_load('filter_format', $format_id)) {
+      return;
+    }
+
+    // Prevent FilterInterface::TYPE_HTML_RESTRICTOR from being skipped.
+    if (in_array(FilterInterface::TYPE_HTML_RESTRICTOR, $filter_types_to_skip)) {
+      $filter_types_to_skip = array_diff($filter_types_to_skip, array(FilterInterface::TYPE_HTML_RESTRICTOR));
+    }
+
+    // When certain filters should be skipped, don't perform caching.
+    if ($filter_types_to_skip) {
+      $cache = FALSE;
+    }
+
+    // Compute the cache key if the text is cacheable.
+    $cache = $cache && !empty($format->cache);
+    $cache_id = '';
+    if ($cache) {
+      return $format->format . ':' . $langcode . ':' . hash('sha256', $text);
+    }
+  }
+
 }

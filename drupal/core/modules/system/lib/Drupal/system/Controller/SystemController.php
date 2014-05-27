@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Controller;
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Extension\ThemeHandlerInterface;
@@ -125,7 +125,7 @@ class SystemController extends ControllerBase {
             continue;
           }
           // The link description, either derived from 'description' in hook_menu()
-          // or customized via menu module is used as title attribute.
+          // or customized via Menu UI module is used as title attribute.
           if (!empty($item['localized_options']['attributes']['title'])) {
             $item['description'] = $item['localized_options']['attributes']['title'];
             unset($item['localized_options']['attributes']['title']);
@@ -183,16 +183,19 @@ class SystemController extends ControllerBase {
    *
    * @return string
    *   An HTML string of the theme listing page.
+   *
+   * @todo Move into ThemeController.
    */
   public function themesPage() {
     $config = $this->config('system.theme');
-    // Get current list of themes.
-    $themes = $this->themeHandler->listInfo();
+    // Get all available themes.
+    $themes = $this->themeHandler->rebuildThemeData();
     uasort($themes, 'system_sort_modules_by_info_name');
 
     $theme_default = $config->get('default');
-    $theme_groups  = array();
+    $theme_groups  = array('enabled' => array(), 'disabled' => array());
     $admin_theme = $config->get('admin');
+    $admin_theme_options = array();
 
     foreach ($themes as &$theme) {
       if (!empty($theme->info['hidden'])) {
@@ -299,10 +302,10 @@ class SystemController extends ControllerBase {
 
     // There are two possible theme groups.
     $theme_group_titles = array(
-      'enabled' => $this->translationManager()->formatPlural(count($theme_groups['enabled']), 'Enabled theme', 'Enabled themes'),
+      'enabled' => $this->formatPlural(count($theme_groups['enabled']), 'Enabled theme', 'Enabled themes'),
     );
     if (!empty($theme_groups['disabled'])) {
-      $theme_group_titles['disabled'] = $this->translationManager()->formatPlural(count($theme_groups['disabled']), 'Disabled theme', 'Disabled themes');
+      $theme_group_titles['disabled'] = $this->formatPlural(count($theme_groups['disabled']), 'Disabled theme', 'Disabled themes');
     }
 
     uasort($theme_groups['enabled'], 'system_sort_themes');
@@ -317,14 +320,6 @@ class SystemController extends ControllerBase {
     $build[] = $this->formBuilder->getForm('Drupal\system\Form\ThemeAdminForm', $admin_theme_options);
 
     return $build;
-  }
-
-  /**
-   * @todo Remove system_theme_default().
-   */
-  public function themeSetDefault() {
-    module_load_include('admin.inc', 'system');
-    return system_theme_default();
   }
 
   /**

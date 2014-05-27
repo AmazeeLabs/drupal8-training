@@ -8,9 +8,10 @@
 namespace Drupal\content_translation\Form;
 
 use Drupal\Core\Form\ConfirmFormBase;
+use Drupal\Core\Url;
 
 /**
- * Temporary form controller for content_translation module.
+ * Delete translation form for content_translation module.
  */
 class ContentTranslationDeleteForm extends ConfirmFormBase {
 
@@ -62,12 +63,7 @@ class ContentTranslationDeleteForm extends ConfirmFormBase {
    * {@inheritdoc}
    */
   public function getCancelRoute() {
-    return array(
-      'route_name' => $this->entity->getEntityType()->getLinkTemplate('drupal:content-translation-overview'),
-      'route_parameters' => array(
-        $this->entity->getEntityTypeId() => $this->entity->id(),
-      ),
-    );
+    return $this->entity->urlInfo('drupal:content-translation-overview');
   }
 
   /**

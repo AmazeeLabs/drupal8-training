@@ -9,11 +9,10 @@ namespace Drupal\user;
 
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Password\PasswordInterface;
 use Drupal\Core\Database\Connection;
-use Drupal\field\FieldInfo;
-use Drupal\user\UserDataInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Entity\ContentEntityDatabaseStorage;
 
@@ -46,8 +45,8 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    *   The entity type definition.
    * @param \Drupal\Core\Database\Connection $database
    *   The database connection to be used.
-   * @param \Drupal\field\FieldInfo $field_info
-   *   The field info service.
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
    * @param \Drupal\Component\Uuid\UuidInterface $uuid_service
    *   The UUID Service.
    * @param \Drupal\Core\Password\PasswordInterface $password
@@ -55,8 +54,8 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    * @param \Drupal\user\UserDataInterface $user_data
    *   The user data service.
    */
-  public function __construct(EntityTypeInterface $entity_type, Connection $database, FieldInfo $field_info, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
-    parent::__construct($entity_type, $database, $field_info, $uuid_service);
+  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
+    parent::__construct($entity_type, $database, $entity_manager, $uuid_service);
 
     $this->password = $password;
     $this->userData = $user_data;
@@ -69,7 +68,7 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
     return new static(
       $entity_type,
       $container->get('database'),
-      $container->get('field.info'),
+      $container->get('entity.manager'),
       $container->get('uuid'),
       $container->get('password'),
       $container->get('user.data')
@@ -79,30 +78,29 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
   /**
    * {@inheritdoc}
    */
-  function postLoad(array &$queried_users) {
-    foreach ($queried_users as $key => $record) {
-      $queried_users[$key]->roles = array();
+  function mapFromStorageRecords(array $records) {
+    foreach ($records as $record) {
+      $record->roles = array();
       if ($record->uid) {
-        $queried_users[$record->uid]->roles[] = DRUPAL_AUTHENTICATED_RID;
+        $record->roles[] = DRUPAL_AUTHENTICATED_RID;
       }
       else {
-        $queried_users[$record->uid]->roles[] = DRUPAL_ANONYMOUS_RID;
+        $record->roles[] = DRUPAL_ANONYMOUS_RID;
       }
     }
 
     // Add any additional roles from the database.
-    $this->addRoles($queried_users);
-
-    // Call the default postLoad() method. This will add fields and call
-    // hook_user_load().
-    parent::postLoad($queried_users);
+    $this->addRoles($records);
+    return parent::mapFromStorageRecords($records);
   }
 
   /**
    * {@inheritdoc}
    */
   public function save(EntityInterface $entity) {
-    if (!$entity->id()) {
+    // The anonymous user account is saved with the fixed user ID of 0.
+    // Therefore we need to check for NULL explicitly.
+    if ($entity->id() === NULL) {
       $entity->uid->value = $this->database->nextId($this->database->query('SELECT MAX(uid) FROM {users}')->fetchField());
       $entity->enforceIsNew();
     }
@@ -129,9 +127,11 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    * {@inheritdoc}
    */
   public function addRoles(array $users) {
-    $result = $this->database->query('SELECT rid, uid FROM {users_roles} WHERE uid IN (:uids)', array(':uids' => array_keys($users)));
-    foreach ($result as $record) {
-      $users[$record->uid]->roles[] = $record->rid;
+    if ($users) {
+      $result = $this->database->query('SELECT rid, uid FROM {users_roles} WHERE uid IN (:uids)', array(':uids' => array_keys($users)));
+      foreach ($result as $record) {
+        $users[$record->uid]->roles[] = $record->rid;
+      }
     }
   }
 

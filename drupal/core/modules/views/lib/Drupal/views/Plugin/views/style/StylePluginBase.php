@@ -71,13 +71,13 @@ abstract class StylePluginBase extends PluginBase {
   protected $usesFields = FALSE;
 
   /**
-    * Stores the rendered field values, keyed by the row index and field name.
-    *
-    * @see \Drupal\views\Plugin\views\style\StylePluginBase::renderFields()
-    * @see \Drupal\views\Plugin\views\style\StylePluginBase::getField()
-    *
-    * @var array|null
-    */
+   * Stores the rendered field values, keyed by the row index and field name.
+   *
+   * @see \Drupal\views\Plugin\views\style\StylePluginBase::renderFields()
+   * @see \Drupal\views\Plugin\views\style\StylePluginBase::getField()
+   *
+   * @var array|null
+   */
   protected $rendered_fields;
 
   /**
@@ -227,7 +227,6 @@ abstract class StylePluginBase extends PluginBase {
     if ($this->usesRowClass()) {
       $options['row_class'] = array('default' => '');
       $options['default_row_class'] = array('default' => TRUE, 'bool' => TRUE);
-      $options['row_class_special'] = array('default' => TRUE, 'bool' => TRUE);
     }
     $options['uses_fields'] = array('default' => FALSE, 'bool' => TRUE);
 
@@ -312,12 +311,6 @@ abstract class StylePluginBase extends PluginBase {
         '#description' => t('Add the default row classes like views-row-1 to the output. You can use this to quickly reduce the amount of markup the view provides by default, at the cost of making it more difficult to apply CSS.'),
         '#type' => 'checkbox',
         '#default_value' => $this->options['default_row_class'],
-      );
-      $form['row_class_special'] = array(
-        '#title' => t('Add striping (odd/even), first/last row classes'),
-        '#description' => t('Add css classes to the first and last line, as well as odd/even classes for striping.'),
-        '#type' => 'checkbox',
-        '#default_value' => $this->options['row_class_special'],
       );
     }
 
@@ -661,13 +654,13 @@ abstract class StylePluginBase extends PluginBase {
   }
 
   /**
-  * Get the raw field value.
-  *
-  * @param $index
-  *   The index count of the row.
-  * @param $field
-  *    The id of the field.
-  */
+   * Get the raw field value.
+   *
+   * @param $index
+   *   The index count of the row.
+   * @param $field
+   *    The id of the field.
+   */
   protected function getFieldValue($index, $field) {
     $this->view->row_index = $index;
     $value = $this->view->field[$field]->getValue($this->view->result[$index]);

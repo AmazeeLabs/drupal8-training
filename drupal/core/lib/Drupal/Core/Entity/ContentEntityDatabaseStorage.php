@@ -11,7 +11,6 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Language\Language;
-use Drupal\field\FieldInfo;
 use Drupal\field\FieldConfigUpdateForbiddenException;
 use Drupal\field\FieldConfigInterface;
 use Drupal\field\FieldInstanceConfigInterface;
@@ -59,13 +58,6 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   protected $revisionDataTable;
 
   /**
-   * Whether this entity type should use the static cache.
-   *
-   * @var boolean
-   */
-  protected $cache;
-
-  /**
    * Active database connection.
    *
    * @var \Drupal\Core\Database\Connection
@@ -73,11 +65,11 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   protected $database;
 
   /**
-   * The field info object.
+   * The entity manager.
    *
-   * @var \Drupal\field\FieldInfo
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
-  protected $fieldInfo;
+  protected $entityManager;
 
   /**
    * {@inheritdoc}
@@ -86,7 +78,7 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
     return new static(
       $entity_type,
       $container->get('database'),
-      $container->get('field.info')
+      $container->get('entity.manager')
     );
   }
 
@@ -97,25 +89,19 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
    *   The entity type definition.
    * @param \Drupal\Core\Database\Connection $database
    *   The database connection to be used.
-   * @param \Drupal\field\FieldInfo $field_info
-   *   The field info service.
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
    */
-  public function __construct(EntityTypeInterface $entity_type, Connection $database, FieldInfo $field_info) {
+  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager) {
     parent::__construct($entity_type);
 
     $this->database = $database;
-    $this->fieldInfo = $field_info;
-
-    // Check if the entity type supports IDs.
-    if ($this->entityType->hasKey('id')) {
-      $this->idKey = $this->entityType->getKey('id');
-    }
+    $this->entityManager = $entity_manager;
 
     // Check if the entity type supports UUIDs.
     $this->uuidKey = $this->entityType->getKey('uuid');
 
-    // Check if the entity type supports revisions.
-    if ($this->entityType->hasKey('revision')) {
+    if ($this->entityType->isRevisionable()) {
       $this->revisionKey = $this->entityType->getKey('revision');
       $this->revisionTable = $this->entityType->getRevisionTable();
     }
@@ -134,73 +120,26 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   /**
    * {@inheritdoc}
    */
-  public function loadMultiple(array $ids = NULL) {
-    $entities = array();
+  protected function doLoadMultiple(array $ids = NULL) {
+    // Build and execute the query.
+    $records = $this
+      ->buildQuery($ids)
+      ->execute()
+      ->fetchAllAssoc($this->idKey);
 
-    // Create a new variable which is either a prepared version of the $ids
-    // array for later comparison with the entity cache, or FALSE if no $ids
-    // were passed. The $ids array is reduced as items are loaded from cache,
-    // and we need to know if it's empty for this reason to avoid querying the
-    // database when all requested entities are loaded from cache.
-    $passed_ids = !empty($ids) ? array_flip($ids) : FALSE;
-    // Try to load entities from the static cache, if the entity type supports
-    // static caching.
-    if ($this->cache && $ids) {
-      $entities += $this->cacheGet($ids);
-      // If any entities were loaded, remove them from the ids still to load.
-      if ($passed_ids) {
-        $ids = array_keys(array_diff_key($passed_ids, $entities));
-      }
-    }
-
-    // Load any remaining entities from the database. This is the case if $ids
-    // is set to NULL (so we load all entities) or if there are any ids left to
-    // load.
-    if ($ids === NULL || $ids) {
-      // Build and execute the query.
-      $query_result = $this->buildQuery($ids)->execute();
-      $queried_entities = $query_result->fetchAllAssoc($this->idKey);
-    }
-
-    // Pass all entities loaded from the database through $this->postLoad(),
-    // which attaches fields (if supported by the entity type) and calls the
-    // entity type specific load callback, for example hook_node_load().
-    if (!empty($queried_entities)) {
-      $this->postLoad($queried_entities);
-      $entities += $queried_entities;
-    }
-
-    if ($this->cache) {
-      // Add entities to the cache.
-      if (!empty($queried_entities)) {
-        $this->cacheSet($queried_entities);
-      }
-    }
-
-    // Ensure that the returned array is ordered the same as the original
-    // $ids array if this was passed in and remove any invalid ids.
-    if ($passed_ids) {
-      // Remove any invalid ids from the array.
-      $passed_ids = array_intersect_key($passed_ids, $entities);
-      foreach ($entities as $entity) {
-        $passed_ids[$entity->id()] = $entity;
-      }
-      $entities = $passed_ids;
-    }
-
-    return $entities;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function load($id) {
-    $entities = $this->loadMultiple(array($id));
-    return isset($entities[$id]) ? $entities[$id] : NULL;
+    return $this->mapFromStorageRecords($records);
   }
 
   /**
    * Maps from storage records to entity objects.
+   *
+   * This will attach fields, if the entity is fieldable. It calls
+   * hook_entity_load() for modules which need to add data to all entities.
+   * It also calls hook_TYPE_load() on the loaded entities. For example
+   * hook_node_load() or hook_user_load(). If your hook_TYPE_load()
+   * expects special parameters apart from the queried entities, you can set
+   * $this->hookLoadArguments prior to calling the method.
+   * See Drupal\node\NodeStorage::attachLoad() for an example.
    *
    * @param array $records
    *   Associative array of query results, keyed on the entity ID.
@@ -209,6 +148,10 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
    *   An array of entity objects implementing the EntityInterface.
    */
   protected function mapFromStorageRecords(array $records) {
+    if (!$records) {
+      return array();
+    }
+
     $entities = array();
     foreach ($records as $id => $record) {
       $entities[$id] = array();
@@ -237,6 +180,12 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
       }
     }
     $this->attachPropertyData($entities);
+
+    // Attach field values.
+    if ($this->entityType->isFieldable()) {
+      $this->loadFieldItems($entities);
+    }
+
     return $entities;
   }
 
@@ -319,15 +268,14 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   public function loadRevision($revision_id) {
     // Build and execute the query.
     $query_result = $this->buildQuery(array(), $revision_id)->execute();
-    $queried_entities = $query_result->fetchAllAssoc($this->idKey);
+    $records = $query_result->fetchAllAssoc($this->idKey);
 
-    // Pass the loaded entities from the database through $this->postLoad(),
-    // which attaches fields (if supported by the entity type) and calls the
-    // entity type specific load callback, for example hook_node_load().
-    if (!empty($queried_entities)) {
-      $this->postLoad($queried_entities);
+    if (!empty($records)) {
+      // Convert the raw records to entity objects.
+      $entities = $this->mapFromStorageRecords($records);
+      $this->postLoad($entities);
+      return reset($entities);
     }
-    return reset($queried_entities);
   }
 
   /**
@@ -388,7 +336,7 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
    *   The ID of the revision to load, or FALSE if this query is asking for the
    *   most current revision(s).
    *
-   * @return SelectQuery
+   * @return \Drupal\Core\Database\Query\Select
    *   A SelectQuery object for loading the entity.
    */
   protected function buildQuery($ids, $revision_id = FALSE) {
@@ -438,32 +386,6 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   }
 
   /**
-   * Attaches data to entities upon loading.
-   *
-   * This will attach fields, if the entity is fieldable. It calls
-   * hook_entity_load() for modules which need to add data to all entities.
-   * It also calls hook_TYPE_load() on the loaded entities. For example
-   * hook_node_load() or hook_user_load(). If your hook_TYPE_load()
-   * expects special parameters apart from the queried entities, you can set
-   * $this->hookLoadArguments prior to calling the method.
-   * See Drupal\node\NodeStorage::attachLoad() for an example.
-   *
-   * @param $queried_entities
-   *   Associative array of query results, keyed on the entity ID.
-   */
-  protected function postLoad(array &$queried_entities) {
-    // Map the loaded records into entity objects and according fields.
-    $queried_entities = $this->mapFromStorageRecords($queried_entities);
-
-    // Attach field values.
-    if ($this->entityType->isFieldable()) {
-      $this->loadFieldItems($queried_entities);
-    }
-
-    parent::postLoad($queried_entities);
-  }
-
-  /**
    * Implements \Drupal\Core\Entity\EntityStorageInterface::delete().
    */
   public function delete(array $entities) {
@@ -474,48 +396,8 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
 
     $transaction = $this->database->startTransaction();
     try {
-      $entity_class = $this->entityClass;
-      $entity_class::preDelete($this, $entities);
+      parent::delete($entities);
 
-      foreach ($entities as $entity) {
-        $this->invokeHook('predelete', $entity);
-      }
-      $ids = array_keys($entities);
-
-      $this->database->delete($this->entityType->getBaseTable())
-        ->condition($this->idKey, $ids)
-        ->execute();
-
-      if ($this->revisionTable) {
-        $this->database->delete($this->revisionTable)
-          ->condition($this->idKey, $ids)
-          ->execute();
-      }
-
-      if ($this->dataTable) {
-        $this->database->delete($this->dataTable)
-          ->condition($this->idKey, $ids)
-          ->execute();
-      }
-
-      if ($this->revisionDataTable) {
-        $this->database->delete($this->revisionDataTable)
-          ->condition($this->idKey, $ids)
-          ->execute();
-      }
-
-      foreach ($entities as $entity) {
-        $this->invokeFieldMethod('delete', $entity);
-        $this->deleteFieldItems($entity);
-      }
-
-      // Reset the cache as soon as the changes have been applied.
-      $this->resetCache($ids);
-
-      $entity_class::postDelete($this, $entities);
-      foreach ($entities as $entity) {
-        $this->invokeHook('delete', $entity);
-      }
       // Ignore slave server temporarily.
       db_ignore_slave();
     }
@@ -529,92 +411,53 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   /**
    * {@inheritdoc}
    */
+  protected function doDelete($entities) {
+    $ids = array_keys($entities);
+
+    $this->database->delete($this->entityType->getBaseTable())
+      ->condition($this->idKey, $ids)
+      ->execute();
+
+    if ($this->revisionTable) {
+      $this->database->delete($this->revisionTable)
+        ->condition($this->idKey, $ids)
+        ->execute();
+    }
+
+    if ($this->dataTable) {
+      $this->database->delete($this->dataTable)
+        ->condition($this->idKey, $ids)
+        ->execute();
+    }
+
+    if ($this->revisionDataTable) {
+      $this->database->delete($this->revisionDataTable)
+        ->condition($this->idKey, $ids)
+        ->execute();
+    }
+
+    foreach ($entities as $entity) {
+      $this->invokeFieldMethod('delete', $entity);
+      $this->deleteFieldItems($entity);
+    }
+
+    // Reset the cache as soon as the changes have been applied.
+    $this->resetCache($ids);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function save(EntityInterface $entity) {
     $transaction = $this->database->startTransaction();
     try {
       // Sync the changes made in the fields array to the internal values array.
       $entity->updateOriginalValues();
 
-      // Load the stored entity, if any.
-      if (!$entity->isNew() && !isset($entity->original)) {
-        $id = $entity->id();
-        if ($entity->getOriginalId() !== NULL) {
-          $id = $entity->getOriginalId();
-        }
-        $entity->original = $this->loadUnchanged($id);
-      }
-
-      $entity->preSave($this);
-      $this->invokeFieldMethod('preSave', $entity);
-      $this->invokeHook('presave', $entity);
-
-      // Create the storage record to be saved.
-      $record = $this->mapToStorageRecord($entity);
-
-      if (!$entity->isNew()) {
-        if ($entity->isDefaultRevision()) {
-          $return = drupal_write_record($this->entityType->getBaseTable(), $record, $this->idKey);
-        }
-        else {
-          // @todo, should a different value be returned when saving an entity
-          // with $isDefaultRevision = FALSE?
-          $return = FALSE;
-        }
-        if ($this->revisionTable) {
-          $record->{$this->revisionKey} = $this->saveRevision($entity);
-        }
-        if ($this->dataTable) {
-          $this->savePropertyData($entity);
-        }
-        if ($this->revisionDataTable) {
-          $this->savePropertyData($entity, 'revision_data_table');
-        }
-        if ($this->revisionTable) {
-          $entity->setNewRevision(FALSE);
-        }
-        $this->invokeFieldMethod('update', $entity);
-        $this->saveFieldItems($entity, TRUE);
-        $this->resetCache(array($entity->id()));
-        $entity->postSave($this, TRUE);
-        $this->invokeHook('update', $entity);
-        if ($this->dataTable) {
-          $this->invokeTranslationHooks($entity);
-        }
-      }
-      else {
-        // Ensure the entity is still seen as new after assigning it an id,
-        // while storing its data.
-        $entity->enforceIsNew();
-        $return = drupal_write_record($this->entityType->getBaseTable(), $record);
-        $entity->{$this->idKey}->value = (string) $record->{$this->idKey};
-        if ($this->revisionTable) {
-          $entity->setNewRevision();
-          $record->{$this->revisionKey} = $this->saveRevision($entity);
-        }
-        if ($this->dataTable) {
-          $this->savePropertyData($entity);
-        }
-        if ($this->revisionDataTable) {
-          $this->savePropertyData($entity, 'revision_data_table');
-        }
-
-        $entity->enforceIsNew(FALSE);
-        if ($this->revisionTable) {
-          $entity->setNewRevision(FALSE);
-        }
-
-        $this->invokeFieldMethod('insert', $entity);
-        $this->saveFieldItems($entity, FALSE);
-        // Reset general caches, but keep caches specific to certain entities.
-        $this->resetCache(array());
-        $entity->postSave($this, FALSE);
-        $this->invokeHook('insert', $entity);
-      }
+      $return = parent::save($entity);
 
       // Ignore slave server temporarily.
       db_ignore_slave();
-      unset($entity->original);
-
       return $return;
     }
     catch (\Exception $e) {
@@ -622,6 +465,77 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
       watchdog_exception($this->entityTypeId, $e);
       throw new EntityStorageException($e->getMessage(), $e->getCode(), $e);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function doSave($id, EntityInterface $entity) {
+    // Create the storage record to be saved.
+    $record = $this->mapToStorageRecord($entity);
+
+    $is_new = $entity->isNew();
+    if (!$is_new) {
+      if ($entity->isDefaultRevision()) {
+        $return = drupal_write_record($this->entityType->getBaseTable(), $record, $this->idKey);
+      }
+      else {
+        // @todo, should a different value be returned when saving an entity
+        // with $isDefaultRevision = FALSE?
+        $return = FALSE;
+      }
+      if ($this->revisionTable) {
+        $record->{$this->revisionKey} = $this->saveRevision($entity);
+      }
+      if ($this->dataTable) {
+        $this->savePropertyData($entity);
+      }
+      if ($this->revisionDataTable) {
+        $this->savePropertyData($entity, 'revision_data_table');
+      }
+      if ($this->revisionTable) {
+        $entity->setNewRevision(FALSE);
+      }
+      $cache_ids = array($entity->id());
+    }
+    else {
+      // Ensure the entity is still seen as new after assigning it an id,
+      // while storing its data.
+      $entity->enforceIsNew();
+      $return = drupal_write_record($this->entityType->getBaseTable(), $record);
+      $entity->{$this->idKey}->value = (string) $record->{$this->idKey};
+      if ($this->revisionTable) {
+        $entity->setNewRevision();
+        $record->{$this->revisionKey} = $this->saveRevision($entity);
+      }
+      if ($this->dataTable) {
+        $this->savePropertyData($entity);
+      }
+      if ($this->revisionDataTable) {
+        $this->savePropertyData($entity, 'revision_data_table');
+      }
+      $entity->enforceIsNew(FALSE);
+      if ($this->revisionTable) {
+        $entity->setNewRevision(FALSE);
+      }
+      // Reset general caches, but keep caches specific to certain entities.
+      $cache_ids = array();
+    }
+    $this->invokeFieldMethod($is_new ? 'insert' : 'update', $entity);
+    $this->saveFieldItems($entity, !$is_new);
+    $this->resetCache($cache_ids);
+
+    if (!$is_new && $this->dataTable) {
+      $this->invokeTranslationHooks($entity);
+    }
+    return $return;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function has($id, EntityInterface $entity) {
+    return !$entity->isNew();
   }
 
   /**
@@ -661,9 +575,19 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  protected function invokeHook($hook, EntityInterface $entity) {
+    if ($hook == 'presave') {
+      $this->invokeFieldMethod('preSave', $entity);
+    }
+    parent::invokeHook($hook, $entity);
+  }
+
+  /**
    * Maps from an entity object to the storage record.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity object.
    * @param string $table_key
    *   (optional) The entity key identifying the target table. Defaults to
@@ -672,10 +596,9 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
    * @return \stdClass
    *   The record to store.
    */
-  protected function mapToStorageRecord(EntityInterface $entity, $table_key = 'base_table') {
+  protected function mapToStorageRecord(ContentEntityInterface $entity, $table_key = 'base_table') {
     $record = new \stdClass();
     $values = array();
-    $definitions = $entity->getFieldDefinitions();
     $schema = drupal_get_schema($this->entityType->get($table_key));
     $is_new = $entity->isNew();
 
@@ -687,7 +610,23 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
         $multi_column_fields[$field] = TRUE;
         continue;
       }
-      $values[$name] = isset($definitions[$name]) && isset($entity->$name->value) ? $entity->$name->value : NULL;
+      $values[$name] = NULL;
+      if ($entity->hasField($name)) {
+        // Only the first field item is stored.
+        $field_item = $entity->get($name)->first();
+        $main_property = $entity->getFieldDefinition($name)->getMainPropertyName();
+        if ($main_property && isset($field_item->$main_property)) {
+          // If the field has a main property, store the value of that.
+          $values[$name] = $field_item->$main_property;
+        }
+        elseif (!$main_property) {
+          // If there is no main property, get all properties from the first
+          // field item and assume that they will be stored serialized.
+          // @todo Give field types more control over this behavior in
+          //   https://drupal.org/node/2232427.
+          $values[$name] = $field_item->getValue();
+        }
+      }
     }
 
     // Handle fields that store multiple properties and match each property name
@@ -791,8 +730,10 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
     // Collect impacted fields.
     $fields = array();
     foreach ($bundles as $bundle => $v) {
-      foreach ($this->fieldInfo->getBundleInstances($this->entityTypeId, $bundle) as $field_name => $instance) {
-        $fields[$field_name] = $instance->getField();
+      foreach ($this->entityManager->getFieldDefinitions($this->entityTypeId, $bundle) as $field_name => $instance) {
+        if ($instance instanceof FieldInstanceConfigInterface) {
+          $fields[$field_name] = $instance->getField();
+        }
       }
     }
 
@@ -856,7 +797,10 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
       $vid = $id;
     }
 
-    foreach ($this->fieldInfo->getBundleInstances($entity_type, $bundle) as $field_name => $instance) {
+    foreach ($this->entityManager->getFieldDefinitions($entity_type, $bundle) as $field_name => $instance) {
+      if (!($instance instanceof FieldInstanceConfigInterface)) {
+        continue;
+      }
       $field = $instance->getField();
       $table_name = static::_fieldTableName($field);
       $revision_name = static::_fieldRevisionTableName($field);
@@ -930,7 +874,10 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
    * {@inheritdoc}
    */
   protected function doDeleteFieldItems(EntityInterface $entity) {
-    foreach ($this->fieldInfo->getBundleInstances($entity->getEntityTypeId(), $entity->bundle()) as $instance) {
+    foreach ($this->entityManager->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle()) as $instance) {
+      if (!($instance instanceof FieldInstanceConfigInterface)) {
+        continue;
+      }
       $field = $instance->getField();
       $table_name = static::_fieldTableName($field);
       $revision_name = static::_fieldRevisionTableName($field);
@@ -949,7 +896,10 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
   protected function doDeleteFieldItemsRevision(EntityInterface $entity) {
     $vid = $entity->getRevisionId();
     if (isset($vid)) {
-      foreach ($this->fieldInfo->getBundleInstances($entity->getEntityTypeId(), $entity->bundle()) as $instance) {
+      foreach ($this->entityManager->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle()) as $instance) {
+        if (!($instance instanceof FieldInstanceConfigInterface)) {
+          continue;
+        }
         $revision_name = static::_fieldRevisionTableName($instance->getField());
         $this->database->delete($revision_name)
           ->condition('entity_id', $entity->id())
@@ -1211,7 +1161,7 @@ class ContentEntityDatabaseStorage extends ContentEntityStorageBase {
 
     // Define the revision ID schema, default to integer if there is no revision
     // ID.
-    $revision_id_definition = $entity_type->hasKey('revision_id') ? $definitions[$entity_type->getKey('revision_id')] : NULL;
+    $revision_id_definition = $entity_type->hasKey('revision') ? $definitions[$entity_type->getKey('revision')] : NULL;
     if (!$revision_id_definition || $revision_id_definition->getType() == 'integer') {
       $revision_id_schema = array(
         'type' => 'int',

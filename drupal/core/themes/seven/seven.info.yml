@@ -10,11 +10,12 @@ stylesheets:
     - style.css
     - css/components/buttons.css
     - css/components/buttons.theme.css
+    - css/components/tour.theme.css
 stylesheets-override:
   - vertical-tabs.css
   - jquery.ui.theme.css
-edit_stylesheets:
-  - edit.css
+quickedit_stylesheets:
+  - quickedit.css
 regions:
   content: Content
   help: Help

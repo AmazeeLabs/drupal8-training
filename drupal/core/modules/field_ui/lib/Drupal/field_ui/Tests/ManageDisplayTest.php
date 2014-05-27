@@ -214,6 +214,7 @@ class ManageDisplayTest extends FieldUiTestBase {
       'fields[_add_new_field][field_name]' => 'test',
     );
     $this->fieldUIAddNewField('admin/structure/types/manage/' . $this->type, $edit);
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
     // For this test, use a formatter setting value that is an integer unlikely
     // to appear in a rendered node other than as part of the field being tested
     // (for example, unlikely to be part of the "Submitted by ... on ..." line).
@@ -311,10 +312,11 @@ class ManageDisplayTest extends FieldUiTestBase {
    */
   function testNoFieldsDisplayOverview() {
     // Create a fresh content type without any fields.
-    $this->drupalCreateContentType(array('type' => 'no_fields', 'name' => 'No fields'));
-
-    // Remove the 'body' field.
-    field_info_instance('node', 'body', 'no_fields')->delete();
+    $this->drupalCreateContentType(array(
+      'type' => 'no_fields',
+      'name' => 'No fields',
+      'create_body' => FALSE,
+    ));
 
     $this->drupalGet('admin/structure/types/manage/no_fields/display');
     $this->assertRaw(t('There are no fields yet added. You can add new fields on the <a href="@link">Manage fields</a> page.', array('@link' => url('admin/structure/types/manage/no_fields/fields'))));
@@ -380,7 +382,7 @@ class ManageDisplayTest extends FieldUiTestBase {
   function assertNodeViewTextHelper(EntityInterface $node, $view_mode, $text, $message, $not_exists) {
     // Make sure caches on the tester side are refreshed after changes
     // submitted on the tested side.
-    field_info_cache_clear();
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
 
     // Save current content so that we can restore it when we're done.
     $old_content = $this->drupalGetContent();

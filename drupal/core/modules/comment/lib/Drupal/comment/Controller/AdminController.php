@@ -8,7 +8,7 @@
 namespace Drupal\comment\Controller;
 
 use Drupal\comment\CommentManagerInterface;
-use Drupal\field\FieldInfo;
+use Drupal\field\FieldConfigInterface;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Form\FormBuilderInterface;
@@ -20,13 +20,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Returns responses for comment module administrative routes.
  */
 class AdminController extends ControllerBase {
-
-  /**
-   * The field info service.
-   *
-   * @var \Drupal\field\FieldInfo
-   */
-  protected $fieldInfo;
 
   /**
    * The comment manager service.
@@ -47,7 +40,6 @@ class AdminController extends ControllerBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('field.info'),
       $container->get('comment.manager'),
       $container->get('form_builder')
     );
@@ -56,15 +48,12 @@ class AdminController extends ControllerBase {
   /**
    * Constructs an AdminController object.
    *
-   * @param \Drupal\field\FieldInfo $field_info
-   *   The field info service.
    * @param \Drupal\comment\CommentManagerInterface $comment_manager
    *   The comment manager service.
    * @param \Drupal\Core\Form\FormBuilderInterface $form_builder
    *   The form builder.
    */
-  public function __construct(FieldInfo $field_info, CommentManagerInterface $comment_manager, FormBuilderInterface $form_builder) {
-    $this->fieldInfo = $field_info;
+  public function __construct(CommentManagerInterface $comment_manager, FormBuilderInterface $form_builder) {
     $this->commentManager = $comment_manager;
     $this->formBuilder = $form_builder;
   }
@@ -105,24 +94,29 @@ class AdminController extends ControllerBase {
     $fields = $this->commentManager->getAllFields();
 
     foreach ($fields as $entity_type => $data) {
+      $field_storage_definitions = $this->entityManager()->getFieldStorageDefinitions($entity_type);
       foreach ($data as $field_name => $field_info_map) {
-        $field_info = $this->fieldInfo->getField($entity_type, $field_name);
+        $storage_definition = $field_storage_definitions[$field_name];
         // Initialize the row.
         $row = array(
-          'class' => $field_info->get('locked') ? array('field-disabled') : array(''),
+          'class' => $storage_definition->get('locked') ? array('field-disabled') : array(''),
         );
 
-        $bundles = $field_info->getBundles();
-        $sample_bundle = reset($bundles);
-        $sample_instance = $this->fieldInfo->getInstance($entity_type, $sample_bundle, $field_name);
+        $label = $storage_definition->getLabel();
+        if ($storage_definition instanceof FieldConfigInterface) {
+          $bundles = $storage_definition->getBundles();
+          $sample_bundle = reset($bundles);
+          $field_definitions = $this->entityManager()->getFieldDefinitions($entity_type, $sample_bundle);
+          $label = $field_definitions[$field_name]->getLabel();
+        }
 
         $tokens = array(
-          '@label' => $sample_instance->label,
+          '@label' => $label,
           '@field_name' => $field_name,
         );
-        $row['data']['field_name']['data'] = $field_info->get('locked') ? $this->t('@label (@field_name) (Locked)', $tokens) : $this->t('@label (@field_name)', $tokens);
+        $row['data']['field_name']['data'] = $storage_definition->get('locked') ? $this->t('@label (@field_name) (Locked)', $tokens) : $this->t('@label (@field_name)', $tokens);
 
-        $row['data']['description']['data'] = $field_info->getSetting('description');
+        $row['data']['description']['data'] = $storage_definition->getSetting('description');
         $row['data']['usage']['data'] = array(
           '#theme' => 'item_list',
           '#items' => array(),
@@ -131,7 +125,7 @@ class AdminController extends ControllerBase {
           if (isset($entity_bundles[$entity_type][$bundle])) {
             // Add the current instance.
             if ($field_ui_enabled && $route_info = FieldUI::getOverviewRouteInfo($entity_type, $bundle)) {
-              $row['data']['usage']['data']['#items'][] = $this->l($entity_bundles[$entity_type][$bundle]['label'], $route_info['route_name'], $route_info['route_parameters']);
+              $row['data']['usage']['data']['#items'][] = \Drupal::linkGenerator()->generateFromUrl($entity_bundles[$entity_type][$bundle]['label'], $route_info);
             }
             else {
               $row['data']['usage']['data']['#items'][] = $entity_bundles[$entity_type][$bundle]['label'];
@@ -182,65 +176,6 @@ class AdminController extends ControllerBase {
     $build['#title'] = $this->t('Comment forms');
 
     return $build;
-  }
-
-  /**
-   * Returns an overview of the entity types a comment field is attached to.
-   *
-   * @param string $commented_entity_type
-   *   The entity type to which the comment field is attached.
-   * @param string $field_name
-   *   The comment field for which the overview is to be displayed.
-   *
-   * @return array
-   *   A renderable array containing the list of entity types and bundle
-   *   combinations on which the comment field is in use.
-   */
-  public function bundleInfo($commented_entity_type, $field_name) {
-    // Add a link to manage entity fields if the Field UI module is enabled.
-    $field_ui_enabled = $this->moduleHandler()->moduleExists('field_ui');
-
-    $field_info = $this->fieldInfo->getField($commented_entity_type, $field_name);
-
-    $entity_type_info = $this->entityManager()->getDefinition($commented_entity_type);
-    $entity_bundle_info = $this->entityManager()->getBundleInfo($commented_entity_type);
-
-    $build['usage'] = array(
-      '#theme' => 'item_list',
-      '#title' => String::checkPlain($entity_type_info->getLabel()),
-      '#items' => array(),
-    );
-    // Loop over all of bundles to which this comment field is attached.
-    foreach ($field_info->getBundles() as $bundle) {
-      // Add the current instance to the list of bundles.
-      if ($field_ui_enabled && $route_info = FieldUI::getOverviewRouteInfo($commented_entity_type, $bundle)) {
-        // Add a link to configure the fields on the given bundle and entity
-        // type combination.
-        $build['usage']['#items'][] = $this->l($entity_bundle_info[$bundle]['label'], $route_info['route_name'], $route_info['route_parameters']);
-      }
-      else {
-        // Field UI is disabled so fallback to a list of bundle labels
-        // instead of links to configure fields.
-        $build['usage']['#items'][] = String::checkPlain($entity_bundle_info[$bundle]['label']);
-      }
-    }
-
-    return $build;
-  }
-
-  /**
-   * Route title callback.
-   *
-   * @param string $commented_entity_type
-   *   The entity type to which the comment field is attached.
-   * @param string $field_name
-   *   The comment field for which the overview is to be displayed.
-   *
-   * @return string
-   *   The human readable field name.
-   */
-  public function bundleTitle($commented_entity_type, $field_name) {
-    return $this->commentManager->getFieldUIPageTitle($commented_entity_type, $field_name);
   }
 
   /**

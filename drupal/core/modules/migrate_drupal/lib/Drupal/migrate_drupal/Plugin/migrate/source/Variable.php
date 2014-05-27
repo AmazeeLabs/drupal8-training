@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\migrate\Plugin\migrate\source\d6\Variable.
+ * Contains \Drupal\migrate_drupal\Plugin\migrate\source\Variable.
  */
 
 namespace Drupal\migrate_drupal\Plugin\migrate\source;
@@ -10,7 +10,7 @@ namespace Drupal\migrate_drupal\Plugin\migrate\source;
 use Drupal\migrate\Entity\MigrationInterface;
 
 /**
- * Drupal 6 variable source from database.
+ * Drupal variable source from database.
  *
  * This source class always returns a single row and as such is not a good
  * example for any normal source class returning multiple rows.
@@ -36,10 +36,28 @@ class Variable extends DrupalSqlBase {
     $this->variables = $this->configuration['variables'];
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function runQuery() {
-    return new \ArrayIterator(array(array_map('unserialize', $this->prepareQuery()->execute()->fetchAllKeyed())));
+    return new \ArrayIterator(array($this->values()));
   }
 
+  /**
+   * Return the values of the variables specified in the plugin configuration.
+   *
+   * @return array
+   *   An associative array where the keys are the variables specified in the
+   *   plugin configuration and the values are the values found in the source.
+   *   Only those values are returned that are actually in the database.
+   */
+  protected function values() {
+    return array_map('unserialize', $this->prepareQuery()->execute()->fetchAllKeyed());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function count() {
     return intval($this->query()->countQuery()->execute()->fetchField() > 0);
   }
@@ -67,4 +85,5 @@ class Variable extends DrupalSqlBase {
   public function getIds() {
     return array();
   }
+
 }

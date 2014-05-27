@@ -8,7 +8,7 @@
 namespace Drupal\filter\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\Core\Config\Entity\EntityWithPluginBagInterface;
+use Drupal\Core\Entity\EntityWithPluginBagsInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\filter\FilterBag;
@@ -22,12 +22,12 @@ use Drupal\filter\Plugin\FilterInterface;
  *   label = @Translation("Text format"),
  *   controllers = {
  *     "form" = {
- *       "add" = "Drupal\filter\FilterFormatAddFormController",
- *       "edit" = "Drupal\filter\FilterFormatEditFormController",
+ *       "add" = "Drupal\filter\FilterFormatAddForm",
+ *       "edit" = "Drupal\filter\FilterFormatEditForm",
  *       "disable" = "Drupal\filter\Form\FilterDisableForm"
  *     },
  *     "list_builder" = "Drupal\filter\FilterFormatListBuilder",
- *     "access" = "Drupal\filter\FilterFormatAccessController",
+ *     "access" = "Drupal\filter\FilterFormatAccess",
  *   },
  *   config_prefix = "format",
  *   admin_permission = "administer filters",
@@ -43,7 +43,7 @@ use Drupal\filter\Plugin\FilterInterface;
  *   }
  * )
  */
-class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, EntityWithPluginBagInterface {
+class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, EntityWithPluginBagsInterface {
 
   /**
    * Unique machine name of the format.
@@ -128,11 +128,6 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
   /**
    * {@inheritdoc}
    */
-  protected $pluginConfigKey = 'filters';
-
-  /**
-   * {@inheritdoc}
-   */
   public function id() {
     return $this->format;
   }
@@ -141,22 +136,21 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    * {@inheritdoc}
    */
   public function filters($instance_id = NULL) {
-    $filter_bag = $this->getPluginBag();
-    if (isset($instance_id)) {
-      return $filter_bag->get($instance_id);
+    if (!isset($this->filterBag)) {
+      $this->filterBag = new FilterBag(\Drupal::service('plugin.manager.filter'), $this->filters);
+      $this->filterBag->sort();
     }
-    return $filter_bag;
+    if (isset($instance_id)) {
+      return $this->filterBag->get($instance_id);
+    }
+    return $this->filterBag;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getPluginBag() {
-    if (!isset($this->filterBag)) {
-      $this->filterBag = new FilterBag(\Drupal::service('plugin.manager.filter'), $this->filters);
-      $this->filterBag->sort();
-    }
-    return $this->filterBag;
+  public function getPluginBags() {
+    return array('filters' => $this->filters());
   }
 
   /**

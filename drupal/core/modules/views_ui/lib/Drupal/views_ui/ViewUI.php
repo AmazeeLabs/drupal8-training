@@ -890,6 +890,27 @@ class ViewUI implements ViewStorageInterface {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public static function load($id) {
+    return View::load($id);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function loadMultiple(array $ids = NULL) {
+    return View::loadMultiple($ids);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(array $values = array()) {
+    return View::create($values);
+  }
+
+  /**
    * Implements \Drupal\Core\Entity\EntityInterface::delete().
    */
   public function delete() {
