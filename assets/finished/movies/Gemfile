@@ -1,0 +1,25 @@
+# A sample Gemfile
+source "https://rubygems.org"
+
+# gem "rails"
+gem 'breakpoint'
+gem 'compass', '~> 1.0.0.alpha.19'
+gem 'compass-normalize'
+gem 'compass-rgbapng'
+gem 'compass-validator'
+gem 'css_parser'
+gem 'guard'
+gem 'guard-compass'
+gem 'guard-livereload'
+gem 'guard-shell'
+gem 'oily_png'
+gem 'rb-fchange'
+gem 'rb-fsevent'
+gem 'rb-inotify', '~> 0.9'
+gem 'sass'
+gem 'sass-globbing'
+gem 'singularitygs'
+gem 'sprockets', '~> 2.11.0'
+gem 'susy'
+gem 'toolkit'
+gem 'yajl-ruby'

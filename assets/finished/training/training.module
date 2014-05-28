@@ -1,0 +1,46 @@
+<?php
+/**
+ * @file
+ * Code or the training module 
+ * 
+ * Note: API key is ppznkqtt59k8kcmzratmjfk9
+ */
+
+const ROTTENTOMATOES_API_KEY = 'ppznkqtt59k8kcmzratmjfk9';
+
+/**
+ * Uses the Rotten Tomatoes API to get the top upcoming movies (US).
+ *
+ * @return array
+ *   Array of links and ratings from Rotten Tomatoes.
+ */
+function training_upcoming_movies() {
+  // Fetch the movie rating data from Rotten Tomatoes.
+  $uri = 'http://api.rottentomatoes.com/api/public/v1.0/lists/movies/upcoming.json?page_limit=16&page=1&country=us&apikey=' . ROTTENTOMATOES_API_KEY;
+  try {
+    $request = \Drupal::httpClient()->get($uri, array('headers' => array('Accept' => 'text/javascript')));
+  } catch (Exception $e) {
+    return array('Couldn\'t load movies from Rotten Tomatoes. Error: ' . $e->getMessage());
+  }
+
+  $request_body = $request->getBody();
+  $response = json_decode($request_body);
+
+  if (!isset($response->movies)) {
+    return array('Couldn\'t load movies from Rotten Tomatoes.');
+  }
+
+  $list = array();
+  // Create the linked list of titles and their current ratings.
+  foreach($response->movies as $movie) {
+    // Some of the movies won't have ratings yet.
+    if (empty($movie->ratings->critics_rating)) {
+	    $movie->ratings->critics_rating = 'No reviews yet!';
+	    $movie->ratings->critics_score = '0';
+    }
+    // Create each item as a translatable link.
+    $list[] = t('!link: @score% @rating', array('!link' => l($movie->title, 'http://rottentomatoes.com/m/' . $movie->id), '@score' => $movie->ratings->critics_score, '@rating' => $movie->ratings->critics_rating));
+  }
+    
+  return $list;
+}

@@ -1,0 +1,40 @@
+<?php
+/**
+ * @file
+ * Contains theme override and preprocess functions.
+ */
+
+/**
+ * Implements hook_theme_suggestions_HOOK_alter().
+ */
+function movies_theme_suggestions_node_alter(array &$suggestions, array $variables) {
+  $node = $variables['elements']['#node'];
+  if (!empty($variables['elements']['#view_mode'])) {
+    $suggestions[] = 'node__' . $variables['elements']['#view_mode'];
+    $suggestions[] = 'node__' . $node->bundle() . '_' . $variables['elements']['#view_mode'];
+  }
+}
+
+/**
+ * Override or insert variables into the page template.
+ */
+function movies_preprocess_page(&$vars, $hook) {
+  $libraries = array(
+    '#attached' => array(
+      'library' => array(
+        'movies/movies-corescripts',
+      ),
+    ),
+  );
+  drupal_render($libraries);
+}
+
+/**
+ * Implements template_preprocess_HOOK() for node.
+ */
+function movies_preprocess_node(&$variables) {
+  if ($variables['view_mode'] == 'teaser') {
+    $comment_count = $variables['node']->get('field_movie_comment')->comment_count;
+    $variables['comment_count'] = format_plural($comment_count, '1 comment', '@count comments');
+  }
+}
