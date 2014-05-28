@@ -1,0 +1,32 @@
+
+// Styling for the site title (regardless if it's an H1 or just a div)
+// =============================================================================
+.name-and-slogan {
+  @include breakpoint($tablet-up) {
+    @include span(4 of 14);
+    @include pre(1);
+    padding: 0 30px 0 0;
+    text-transform: uppercase;
+  }
+}
+.site-name {
+  background: #000;
+  font-size: 24px;
+  font-size: 2.4rem;
+  margin: 0;
+  line-height: 30px;
+  line-height: 3.0rem;
+  font-weight: normal;
+  @include breakpoint($tablet-up) {
+    text-align: right;
+  }
+  a {
+    background: #000;
+    color: #fff;
+    float: left;
+    padding: 30px;
+    &:hover {
+      color: #fff;
+    }
+  }
+}

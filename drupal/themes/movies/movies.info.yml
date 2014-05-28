@@ -1,0 +1,20 @@
+name: Movies
+type: theme
+description: An Amazee Labs demo theme for the 'Drupal 8 for Drupalistas' training — DrupalCon Austin 2014.
+package: Core
+core: 8.x
+
+stylesheets:
+  all:
+    - css/styles.css
+  print:
+    - css/print.css
+
+# stylesheets-remove:
+#   - normalize.css
+
+regions:
+  header: Header
+  content: Content
+  sidebar: Sidebar
+  footer: Footer
