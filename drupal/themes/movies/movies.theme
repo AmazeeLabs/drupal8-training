@@ -4,13 +4,3 @@
  * Contains theme override and preprocess functions.
  */
 
-/**
- * Implements hook_theme_suggestions_HOOK_alter().
- */
-function movies_theme_suggestions_node_alter(array &$suggestions, array $variables) {
-  $node = $variables['elements']['#node'];
-  if (!empty($variables['elements']['#view_mode'])) {
-    $suggestions[] = 'node__' . $variables['elements']['#view_mode'];
-    $suggestions[] = 'node__' . $node->bundle() . '_' . $variables['elements']['#view_mode'];
-  }
-}
