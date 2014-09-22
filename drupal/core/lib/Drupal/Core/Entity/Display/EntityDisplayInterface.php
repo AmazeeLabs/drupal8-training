@@ -7,10 +7,12 @@
 
 namespace Drupal\Core\Entity\Display;
 
+use Drupal\Core\Config\Entity\ThirdPartySettingsInterface;
+
 /**
  * Provides a common interface for entity displays.
  */
-interface EntityDisplayInterface {
+interface EntityDisplayInterface extends ThirdPartySettingsInterface {
 
   /**
    * Creates a duplicate of the entity display object on a different view mode.
@@ -21,8 +23,7 @@ interface EntityDisplayInterface {
    * @param $view_mode
    *   The view mode for the new object.
    *
-   * @return self
-   *   The new object.
+   * @return static
    */
   public function createCopy($view_mode);
 
@@ -54,8 +55,7 @@ interface EntityDisplayInterface {
    * @param array $options
    *   The display options.
    *
-   * @return self
-   *   The entity display object.
+   * @return $this
    */
   public function setComponent($name, array $options = array());
 
@@ -65,8 +65,7 @@ interface EntityDisplayInterface {
    * @param string $name
    *   The name of the component.
    *
-   * @return self
-   *   The entity display object.
+   * @return $this
    */
   public function removeComponent($name);
 

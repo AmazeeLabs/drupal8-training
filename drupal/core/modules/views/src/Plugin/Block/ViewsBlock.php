@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\Block;
 
 use Drupal\Core\Config\Entity\Query\Query;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -17,7 +18,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @Block(
  *   id = "views_block",
  *   admin_label = @Translation("Views Block"),
- *   derivative = "Drupal\views\Plugin\Derivative\ViewsBlock"
+ *   deriver = "Drupal\views\Plugin\Derivative\ViewsBlock"
  * )
  */
 class ViewsBlock extends ViewsBlockBase {
@@ -78,7 +79,7 @@ class ViewsBlock extends ViewsBlockBase {
   /**
    * {@inheritdoc}
    */
-  public function blockForm($form, &$form_state) {
+  public function blockForm($form, FormStateInterface $form_state) {
     if ($this->displaySet) {
       return $this->view->display_handler->blockForm($this, $form, $form_state);
     }
@@ -89,7 +90,7 @@ class ViewsBlock extends ViewsBlockBase {
   /**
    * {@inheritdoc}
    */
-  public function blockValidate($form, &$form_state) {
+  public function blockValidate($form, FormStateInterface $form_state) {
     if ($this->displaySet) {
       $this->view->display_handler->blockValidate($this, $form, $form_state);
     }
@@ -98,7 +99,7 @@ class ViewsBlock extends ViewsBlockBase {
   /**
    * {@inheritdoc}
    */
-  public function blockSubmit($form, &$form_state) {
+  public function blockSubmit($form, FormStateInterface $form_state) {
     parent::blockSubmit($form, $form_state);
     if ($this->displaySet) {
       $this->view->display_handler->blockSubmit($this, $form, $form_state);

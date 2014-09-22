@@ -11,6 +11,8 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests configuration overrides via $config in settings.php.
+ *
+ * @group config
  */
 class ConfigOverrideTest extends DrupalUnitTestBase {
 
@@ -21,15 +23,7 @@ class ConfigOverrideTest extends DrupalUnitTestBase {
    */
   public static $modules = array('system', 'config_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Configuration overrides',
-      'description' => 'Tests configuration overrides via $config in settings.php.',
-      'group' => 'Configuration',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->copyConfig($this->container->get('config.storage'), $this->container->get('config.storage.staging'));
   }

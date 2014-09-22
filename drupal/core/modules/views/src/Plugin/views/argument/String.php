@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\views\argument;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ManyToOneHelper;
@@ -54,7 +55,7 @@ class String extends ArgumentPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['glossary'] = array(
@@ -188,7 +189,7 @@ class String extends ArgumentPluginBase {
     }
 
     if (!empty($this->options['break_phrase'])) {
-      $this->breakPhraseString($argument, $this);
+      $this->unpackArgumentValue();
     }
     else {
       $this->value = array($argument);
@@ -262,7 +263,7 @@ class String extends ArgumentPluginBase {
     }
 
     if (!empty($this->options['break_phrase'])) {
-      $this->breakPhraseString($this->argument, $this);
+      $this->unpackArgumentValue();
     }
     else {
       $this->value = array($this->argument);

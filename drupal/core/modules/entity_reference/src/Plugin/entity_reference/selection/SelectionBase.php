@@ -7,21 +7,32 @@
 
 namespace Drupal\entity_reference\Plugin\entity_reference\selection;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Database\Query\AlterableInterface;
 use Drupal\Core\Database\Query\SelectInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\entity_reference\Plugin\Type\Selection\SelectionInterface;
 
 /**
- * Plugin implementation of the 'selection' entity_reference.
+ * Default plugin implementation of the Entity Reference Selection plugin.
+ *
+ * Also serves as a base class for specific types of Entity Reference
+ * Selection plugins.
+ *
+ * @see \Drupal\entity_reference\Plugin\Type\SelectionPluginManager
+ * @see \Drupal\entity_reference\Annotation\EntityReferenceSelection
+ * @see \Drupal\entity_reference\Plugin\Type\Selection\SelectionInterface
+ * @see \Drupal\entity_reference\Plugin\Derivative\SelectionBase
+ * @see plugin_api
  *
  * @EntityReferenceSelection(
  *   id = "default",
  *   label = @Translation("Default"),
  *   group = "default",
  *   weight = 0,
- *   derivative = "Drupal\entity_reference\Plugin\Derivative\SelectionBase"
+ *   deriver = "Drupal\entity_reference\Plugin\Derivative\SelectionBase"
  * )
  */
 class SelectionBase implements SelectionInterface {
@@ -106,19 +117,19 @@ class SelectionBase implements SelectionInterface {
         $bundle_fields = array_filter($entity_manager->getFieldDefinitions($entity_type_id, $bundle), function ($field_definition) {
           return !$field_definition->isComputed();
         });
-        foreach ($bundle_fields as $instance_name => $field_definition) {
+        foreach ($bundle_fields as $field_name => $field_definition) {
           /* @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition */
-          $columns = $field_definition->getColumns();
+          $columns = $field_definition->getFieldStorageDefinition()->getColumns();
           // If there is more than one column, display them all, otherwise just
           // display the field label.
           // @todo: Use property labels instead of the column name.
           if (count($columns) > 1) {
-            foreach ($field_definition->getColumns() as $column_name => $column_info) {
-              $fields[$instance_name . '.' . $column_name] = t('@label (@column)', array('@label' => $field_definition->getLabel(), '@column' => $column_name));
+            foreach ($columns as $column_name => $column_info) {
+              $fields[$field_name . '.' . $column_name] = t('@label (@column)', array('@label' => $field_definition->getLabel(), '@column' => $column_name));
             }
           }
           else {
-            $fields[$instance_name] = t('@label', array('@label' => $field_definition->getLabel()));
+            $fields[$field_name] = t('@label', array('@label' => $field_definition->getLabel()));
           }
         }
       }
@@ -183,7 +194,7 @@ class SelectionBase implements SelectionInterface {
     $entities = entity_load_multiple($target_type, $result);
     foreach ($entities as $entity_id => $entity) {
       $bundle = $entity->bundle();
-      $options[$bundle][$entity_id] = check_plain($entity->label());
+      $options[$bundle][$entity_id] = String::checkPlain($entity->label());
     }
 
     return $options;
@@ -219,8 +230,12 @@ class SelectionBase implements SelectionInterface {
   /**
    * {@inheritdoc}
    */
-  public function validateAutocompleteInput($input, &$element, &$form_state, $form, $strict = TRUE) {
-    $entities = $this->getReferenceableEntities($input, '=', 6);
+  public function validateAutocompleteInput($input, &$element, FormStateInterface $form_state, $form, $strict = TRUE) {
+    $bundled_entities = $this->getReferenceableEntities($input, '=', 6);
+    $entities = array();
+    foreach ($bundled_entities as $entities_list) {
+      $entities += $entities_list;
+    }
     $params = array(
       '%value' => $input,
       '@value' => $input,
@@ -228,13 +243,13 @@ class SelectionBase implements SelectionInterface {
     if (empty($entities)) {
       if ($strict) {
         // Error if there are no entities available for a required field.
-        form_error($element, $form_state, t('There are no entities matching "%value".', $params));
+        $form_state->setError($element, t('There are no entities matching "%value".', $params));
       }
     }
     elseif (count($entities) > 5) {
       $params['@id'] = key($entities);
       // Error if there are more than 5 matching entities.
-      form_error($element, $form_state, t('Many entities are called %value. Specify the one you want by appending the id in parentheses, like "@value (@id)".', $params));
+      $form_state->setError($element, t('Many entities are called %value. Specify the one you want by appending the id in parentheses, like "@value (@id)".', $params));
     }
     elseif (count($entities) > 1) {
       // More helpful error if there are only a few matching entities.
@@ -243,7 +258,7 @@ class SelectionBase implements SelectionInterface {
         $multiples[] = $name . ' (' . $id . ')';
       }
       $params['@id'] = $id;
-      form_error($element, $form_state, t('Multiple entities match this reference; "%multiple". Specify the one you want by appending the id in parentheses, like "@value (@id)".', array('%multiple' => implode('", "', $multiples))));
+      $form_state->setError($element, t('Multiple entities match this reference; "%multiple". Specify the one you want by appending the id in parentheses, like "@value (@id)".', array('%multiple' => implode('", "', $multiples))));
     }
     else {
       // Take the one and only matching entity.

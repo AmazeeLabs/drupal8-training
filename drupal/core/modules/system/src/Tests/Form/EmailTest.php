@@ -11,7 +11,9 @@ use Drupal\Component\Serialization\Json;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests email element.
+ * Tests the form API email element.
+ *
+ * @group Form
  */
 class EmailTest extends WebTestBase {
 
@@ -24,14 +26,6 @@ class EmailTest extends WebTestBase {
 
   protected $profile = 'testing';
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Form API email',
-      'description' => 'Tests the form API email element.',
-      'group' => 'Form API',
-    );
-  }
-
   /**
    * Tests that #type 'email' fields are properly validated.
    */
@@ -40,7 +34,7 @@ class EmailTest extends WebTestBase {
     $edit['email'] = 'invalid';
     $edit['email_required'] = ' ';
     $this->drupalPostForm('form-test/email', $edit, 'Submit');
-    $this->assertRaw(t('The e-mail address %mail is not valid.', array('%mail' => 'invalid')));
+    $this->assertRaw(t('The email address %mail is not valid.', array('%mail' => 'invalid')));
     $this->assertRaw(t('!name field is required.', array('!name' => 'Address')));
 
     $edit = array();

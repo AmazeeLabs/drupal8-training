@@ -13,29 +13,34 @@ use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery;
 use Drupal\entity_reference\Plugin\Type\Selection\SelectionBroken;
 
 /**
- * Plugin type manager for the Entity Reference Selection plugin.
+ * Plugin type manager for Entity Reference Selection plugins.
+ *
+ * @see \Drupal\entity_reference\Annotation\EntityReferenceSelection
+ * @see \Drupal\entity_reference\Plugin\Type\Selection\SelectionInterface
+ * @see \Drupal\entity_reference\Plugin\entity_reference\selection\SelectionBase
+ * @see \Drupal\entity_reference\Plugin\Derivative\SelectionBase
+ * @see plugin_api
  */
 class SelectionPluginManager extends DefaultPluginManager {
 
   /**
    * {@inheritdoc}
    */
-  public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ModuleHandlerInterface $module_handler) {
+  public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler) {
     $this->discovery = new AnnotatedClassDiscovery('Plugin/entity_reference/selection', $namespaces, 'Drupal\entity_reference\Annotation\EntityReferenceSelection');
 
     // We're not using the parent constructor because we use a different factory
     // method and don't need the derivative discovery decorator.
-    $this->factory = new ReflectionFactory($this);
+    $this->factory = new ReflectionFactory($this, '\Drupal\entity_reference\Plugin\Type\Selection\SelectionInterface');
 
     $this->moduleHandler = $module_handler;
     $this->alterInfo('entity_reference_selection');
-    $this->setCacheBackend($cache_backend, $language_manager, 'entity_reference_selection_plugins');
+    $this->setCacheBackend($cache_backend, 'entity_reference_selection_plugins');
   }
 
   /**

@@ -8,7 +8,9 @@
 namespace Drupal\system\Tests\File;
 
 /**
- * Deletion related tests on remote filesystems.
+ * Tests the unmanaged file delete function.
+ *
+ * @group File
  */
 class RemoteFileUnmanagedDeleteTest extends UnmanagedDeleteTest {
 
@@ -33,13 +35,7 @@ class RemoteFileUnmanagedDeleteTest extends UnmanagedDeleteTest {
    */
   protected $classname = 'Drupal\file_test\DummyRemoteStreamWrapper';
 
-  public static function getInfo() {
-    $info = parent::getInfo();
-    $info['group'] = 'File API (remote)';
-    return $info;
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     \Drupal::config('system.file')->set('default_scheme', 'dummy-remote')->save();
   }

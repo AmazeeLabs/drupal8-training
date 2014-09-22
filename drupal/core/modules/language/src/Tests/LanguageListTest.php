@@ -7,11 +7,15 @@
 
 namespace Drupal\language\Tests;
 
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
- * Functional tests for the language list configuration forms.
+ * Adds a new language and tests changing its status and the default language.
+ *
+ * @group language
  */
 class LanguageListTest extends WebTestBase {
 
@@ -22,19 +26,10 @@ class LanguageListTest extends WebTestBase {
    */
   public static $modules = array('language');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Language list configuration',
-      'description' => 'Adds a new language and tests changing its status and the default language.',
-      'group' => 'Language',
-    );
-  }
-
   /**
    * Functional tests for adding, editing and deleting languages.
    */
   function testLanguageList() {
-    global $base_url;
 
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'administer site configuration'));
@@ -50,12 +45,12 @@ class LanguageListTest extends WebTestBase {
 
     // Add custom language.
     $langcode = 'xx';
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => Language::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     $this->assertEqual($this->getUrl(), url('admin/config/regional/language', array('absolute' => TRUE)), 'Correct page redirection.');
@@ -83,9 +78,9 @@ class LanguageListTest extends WebTestBase {
     $this->clickLink(t('Edit'));
     $this->assertTitle(t('Edit language | Drupal'), 'Page title is "Edit language".');
     // Edit a language.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     $edit = array(
-      'name' => $name,
+      'label' => $name,
     );
     $this->drupalPostForm('admin/config/regional/language/edit/' . $langcode, $edit, t('Save language'));
     $this->assertRaw($name, 'The language has been updated.');
@@ -118,12 +113,9 @@ class LanguageListTest extends WebTestBase {
     $this->assertResponse(404, 'Language no longer found.');
     // Make sure the "language_count" state has been updated correctly.
     $this->container->get('language_manager')->reset();
-    $languages = $this->container->get('language_manager')->getLanguages();
     // Delete French.
     $this->drupalPostForm('admin/config/regional/language/delete/fr', array(), t('Delete'));
-    // Get the count of languages.
     $this->container->get('language_manager')->reset();
-    $languages = $this->container->get('language_manager')->getLanguages();
     // We need raw here because %language and %langcode will add HTML.
     $t_args = array('%language' => 'French', '%langcode' => 'fr');
     $this->assertRaw(t('The %language (%langcode) language has been removed.', $t_args), 'The French language has been removed.');
@@ -137,12 +129,12 @@ class LanguageListTest extends WebTestBase {
     // language so we must add a new language and make it the default before
     // deleting English.
     $langcode = 'xx';
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => Language::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     $this->assertEqual($this->getUrl(), url('admin/config/regional/language', array('absolute' => TRUE)), 'Correct page redirection.');
@@ -164,6 +156,10 @@ class LanguageListTest extends WebTestBase {
     // We need raw here because %language and %langcode will add HTML.
     $t_args = array('%language' => 'English', '%langcode' => 'en');
     $this->assertRaw(t('The %language (%langcode) language has been removed.', $t_args), 'The English language has been removed.');
+
+    // Ensure we can't delete a locked language.
+    $this->drupalGet('admin/config/regional/language/delete/und');
+    $this->assertResponse(403, 'Can not delete locked language');
   }
 
   /**
@@ -171,18 +167,18 @@ class LanguageListTest extends WebTestBase {
    */
   function testLanguageStates() {
     // Add some languages, and also lock some of them.
-    language_save(new Language(array('name' => $this->randomName(), 'id' => 'l1')));
-    language_save(new Language(array('name' => $this->randomName(), 'id' => 'l2', 'locked' => TRUE)));
-    language_save(new Language(array('name' => $this->randomName(), 'id' => 'l3')));
-    language_save(new Language(array('name' => $this->randomName(), 'id' => 'l4', 'locked' => TRUE)));
+    ConfigurableLanguage::create(array('label' => $this->randomMachineName(), 'id' => 'l1'))->save();
+    ConfigurableLanguage::create(array('label' => $this->randomMachineName(), 'id' => 'l2', 'locked' => TRUE))->save();
+    ConfigurableLanguage::create(array('label' => $this->randomMachineName(), 'id' => 'l3'))->save();
+    ConfigurableLanguage::create(array('label' => $this->randomMachineName(), 'id' => 'l4', 'locked' => TRUE))->save();
     $expected_locked_languages = array('l4' => 'l4', 'l2' => 'l2', 'und' => 'und', 'zxx' => 'zxx');
     $expected_all_languages = array('l4' => 'l4', 'l3' => 'l3', 'l2' => 'l2', 'l1' => 'l1', 'en' => 'en', 'und' => 'und', 'zxx' => 'zxx');
     $expected_conf_languages = array('l3' => 'l3', 'l1' => 'l1', 'en' => 'en');
 
-    $locked_languages = $this->container->get('language_manager')->getLanguages(Language::STATE_LOCKED);
+    $locked_languages = $this->container->get('language_manager')->getLanguages(LanguageInterface::STATE_LOCKED);
     $this->assertEqual(array_diff_key($expected_locked_languages, $locked_languages), array(), 'Locked languages loaded correctly.');
 
-    $all_languages = $this->container->get('language_manager')->getLanguages(Language::STATE_ALL);
+    $all_languages = $this->container->get('language_manager')->getLanguages(LanguageInterface::STATE_ALL);
     $this->assertEqual(array_diff_key($expected_all_languages, $all_languages), array(), 'All languages loaded correctly.');
 
     $conf_languages = $this->container->get('language_manager')->getLanguages();

@@ -7,6 +7,10 @@
 
 namespace Drupal\system\Controller;
 
+use Drupal\Core\Form\FormState;
+use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -14,7 +18,33 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * Defines a controller to respond to form Ajax requests.
  */
-class FormAjaxController {
+class FormAjaxController implements ContainerInjectionInterface {
+
+  /**
+   * A logger instance.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
+   * Constructs a FormAjaxController object.
+   *
+   * @param \Psr\Log\LoggerInterface $logger
+   *   A logger instance.
+   */
+  public function __construct(LoggerInterface $logger) {
+    $this->logger = $logger;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('logger.factory')->get('ajax')
+    );
+  }
 
   /**
    * Processes an Ajax form submission.
@@ -42,9 +72,12 @@ class FormAjaxController {
     // up to the #ajax['callback'] function of the element (may or may not be a
     // button) that triggered the Ajax request to determine what needs to be
     // rendered.
-    if (!empty($form_state['triggering_element'])) {
-      $callback = $form_state['triggering_element']['#ajax']['callback'];
+    $callback = NULL;
+    /** @var $form_state \Drupal\Core\Form\FormStateInterface */
+    if ($triggering_element = $form_state->getTriggeringElement()) {
+      $callback = $triggering_element['#ajax']['callback'];
     }
+    $callback = $form_state->prepareCallback($callback);
     if (empty($callback) || !is_callable($callback)) {
       throw new HttpException(500, t('Internal Server Error'));
     }
@@ -70,7 +103,7 @@ class FormAjaxController {
    * @throws Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
    */
   protected function getForm(Request $request) {
-    $form_state = form_state_defaults();
+    $form_state = new FormState();
     $form_build_id = $request->request->get('form_build_id');
 
     // Get the form from the cache.
@@ -81,22 +114,24 @@ class FormAjaxController {
       // system/ajax without actually viewing the concerned form in the browser.
       // This is likely a hacking attempt as it never happens under normal
       // circumstances.
-      watchdog('ajax', 'Invalid form POST data.', array(), WATCHDOG_WARNING);
+      $this->logger->warning('Invalid form POST data.');
       throw new BadRequestHttpException();
     }
 
     // Since some of the submit handlers are run, redirects need to be disabled.
-    $form_state['no_redirect'] = TRUE;
+    $form_state->disableRedirect();
 
     // When a form is rebuilt after Ajax processing, its #build_id and #action
     // should not change.
-    // @see drupal_rebuild_form()
-    $form_state['rebuild_info']['copy']['#build_id'] = TRUE;
-    $form_state['rebuild_info']['copy']['#action'] = TRUE;
+    // @see \Drupal\Core\Form\FormBuilderInterface::rebuildForm()
+    $form_state->addRebuildInfo('copy', [
+      '#build_id' => TRUE,
+      '#action' => TRUE,
+    ]);
 
     // The form needs to be processed; prepare for that by setting a few internal
     // variables.
-    $form_state['input'] = $request->request->all();
+    $form_state->setUserInput($request->request->all());
     $form_id = $form['#form_id'];
 
     return array($form, $form_state, $form_id, $form_build_id);

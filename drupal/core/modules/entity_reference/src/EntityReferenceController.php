@@ -64,7 +64,7 @@ class EntityReferenceController extends ControllerBase {
    *   Defaults to ''.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
-   *   Throws access denied when either the field or field instance does not
+   *   Throws access denied when either the field storage or field does not
    *   exists or the user does not have access to edit the field.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
@@ -78,8 +78,8 @@ class EntityReferenceController extends ControllerBase {
     }
 
     $field_definition = $definitions[$field_name];
-    $access_controller = $this->entityManager()->getAccessController($entity_type);
-    if ($field_definition->getType() != 'entity_reference' || !$access_controller->fieldAccess('edit', $field_definition)) {
+    $access_control_handler = $this->entityManager()->getAccessControlHandler($entity_type);
+    if ($field_definition->getType() != 'entity_reference' || !$access_control_handler->fieldAccess('edit', $field_definition)) {
       throw new AccessDeniedHttpException();
     }
 

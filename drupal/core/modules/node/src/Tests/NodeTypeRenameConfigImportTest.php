@@ -9,12 +9,13 @@ namespace Drupal\node\Tests;
 
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
-use Drupal\Component\Utility\Xss;
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests importing renamed node type via configuration synchronisation.
+ *
+ * @group node
  */
 class NodeTypeRenameConfigImportTest extends WebTestBase {
 
@@ -28,18 +29,7 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Import renamed node type',
-      'description' => 'Tests importing renamed node type via configuration synchronisation.',
-      'group' => 'Configuration',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->web_user = $this->drupalCreateUser(array('synchronize configuration'));
     $this->drupalLogin($this->web_user);
@@ -50,11 +40,20 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
    */
   public function testConfigurationRename() {
     $content_type = entity_create('node_type', array(
-      'type' => Unicode::strtolower($this->randomName(16)),
-      'name' => $this->randomName(),
+      'type' => Unicode::strtolower($this->randomMachineName(16)),
+      'name' => $this->randomMachineName(),
     ));
     $content_type->save();
     $staged_type = $content_type->type;
+
+    // Check the default status value for a node of this type.
+    $node = entity_create('node', array('type' => $staged_type));
+    $this->assertTrue($node->status->value, 'Node status defaults to TRUE.');
+
+    // Override a core base field.
+    $fields = \Drupal::entityManager()->getFieldDefinitions($content_type->getEntityType()->getBundleOf(), $content_type->id());
+    $fields['status']->getConfig($content_type->id())->setDefaultValue(FALSE)->save();
+
     $active = $this->container->get('config.storage');
     $staging = $this->container->get('config.storage.staging');
 
@@ -63,9 +62,14 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
     $this->copyConfig($active, $staging);
 
     // Change the machine name of the content type.
-    $content_type->type = Unicode::strtolower($this->randomName(8));
+    $content_type->type = Unicode::strtolower($this->randomMachineName(8));
     $content_type->save();
     $active_type = $content_type->type;
+
+    // Ensure the base field override has been renamed and the value is correct.
+    $node = entity_create('node', array('type' => $active_type));
+    $this->assertFalse($node->status->value, 'Node status defaults to FALSE.');
+
     $renamed_config_name = $content_type->getEntityType()->getConfigPrefix() . '.' . $content_type->id();
     $this->assertTrue($active->exists($renamed_config_name), 'The content type has the new name in the active store.');
     $this->assertFalse($active->exists($config_name), "The content type's old name does not exist active store.");
@@ -81,10 +85,11 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
     // @see \Drupal\node\Entity\NodeType::postSave()
     $expected = array(
       'node.type.' . $active_type . '::node.type.' . $staged_type,
-      'entity.form_display.node.' . $active_type . '.default::entity.form_display.node.' . $staged_type . '.default',
-      'entity.view_display.node.' . $active_type . '.default::entity.view_display.node.' . $staged_type . '.default',
-      'entity.view_display.node.' . $active_type . '.teaser::entity.view_display.node.' . $staged_type . '.teaser',
-      'field.instance.node.' . $active_type . '.body::field.instance.node.' . $staged_type . '.body',
+      'core.base_field_override.node.' . $active_type . '.status::core.base_field_override.node.' . $staged_type . '.status',
+      'core.entity_form_display.node.' . $active_type . '.default::core.entity_form_display.node.' . $staged_type . '.default',
+      'core.entity_view_display.node.' . $active_type . '.default::core.entity_view_display.node.' . $staged_type . '.default',
+      'core.entity_view_display.node.' . $active_type . '.teaser::core.entity_view_display.node.' . $staged_type . '.teaser',
+      'field.field.node.' . $active_type . '.body::field.field.node.' . $staged_type . '.body',
     );
     $renames = $this->configImporter()->getUnprocessedConfiguration('rename');
     $this->assertIdentical($expected, $renames);
@@ -119,34 +124,15 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
 
     // Run the import.
     $this->drupalPostForm('admin/config/development/configuration', array(), t('Import all'));
-    $this->assertText(t('There are no configuration changes.'));
+    $this->assertText(t('There are no configuration changes to import.'));
 
     $this->assertFalse(entity_load('node_type', $active_type), 'The content no longer exists with the old name.');
     $content_type = entity_load('node_type', $staged_type);
     $this->assertIdentical($staged_type, $content_type->type);
-  }
 
-  /**
-   * Asserts that a Perl regex pattern is found in the text content.
-   *
-   * @param string $pattern
-   *   Perl regex to look for including the regex delimiters.
-   * @param string $message
-   *   (optional) A message to display with the assertion.
-   *
-   * @return bool
-   *   TRUE on pass, FALSE on failure.
-   */
-  protected function assertTextPattern($pattern, $message = NULL) {
-    // @see WebTestBase::assertTextHelper()
-    if ($this->plainTextContent === FALSE) {
-      $this->plainTextContent = Xss::filter($this->drupalGetContent(), array());
-    }
-    // @see WebTestBase::assertPattern()
-    if (!$message) {
-      $message = String::format('Pattern "@pattern" found', array('@pattern' => $pattern));
-    }
-    return $this->assert((bool) preg_match($pattern, $this->plainTextContent), $message);
+    // Ensure the base field override has been renamed and the value is correct.
+    $node = entity_create('node', array('type' => $staged_type));
+    $this->assertFALSE($node->status->value, 'Node status defaults to FALSE.');
   }
 
 }

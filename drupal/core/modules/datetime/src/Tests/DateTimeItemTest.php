@@ -13,6 +13,8 @@ use Drupal\field\Tests\FieldUnitTestBase;
 
 /**
  * Tests the new entity API for the date field type.
+ *
+ * @group datetime
  */
 class DateTimeItemTest extends FieldUnitTestBase {
 
@@ -23,34 +25,25 @@ class DateTimeItemTest extends FieldUnitTestBase {
    */
   public static $modules = array('datetime');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Date field item',
-      'description' => 'Tests the new entity API for the Date field type.',
-      'group' => 'Field types',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a field with settings to validate.
-    $this->field = entity_create('field_config', array(
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'field_datetime',
       'type' => 'datetime',
       'entity_type' => 'entity_test',
       'settings' => array('datetime_type' => 'date'),
     ));
-    $this->field->save();
-    $this->instance = entity_create('field_instance_config', array(
-      'field_name' => $this->field->getName(),
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $field = entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'entity_test',
       'settings' => array(
         'default_value' => 'blank',
       ),
     ));
-    $this->instance->save();
+    $field->save();
   }
 
   /**
@@ -61,7 +54,7 @@ class DateTimeItemTest extends FieldUnitTestBase {
     $entity = entity_create('entity_test');
     $value = '2014-01-01T20:00:00Z';
     $entity->field_datetime = $value;
-    $entity->name->value = $this->randomName();
+    $entity->name->value = $this->randomMachineName();
     $entity->save();
 
     // Verify entity has been created properly.
@@ -73,7 +66,7 @@ class DateTimeItemTest extends FieldUnitTestBase {
     $this->assertEqual($entity->field_datetime[0]->value, $value);
 
     // Verify changing the date value.
-    $new_value = $this->randomName();
+    $new_value = $this->randomMachineName();
     $entity->field_datetime->value = $new_value;
     $this->assertEqual($entity->field_datetime->value, $new_value);
 
@@ -81,6 +74,11 @@ class DateTimeItemTest extends FieldUnitTestBase {
     $entity->save();
     $entity = entity_load('entity_test', $id);
     $this->assertEqual($entity->field_datetime->value, $new_value);
+
+    // Test the generateSampleValue() method.
+    $entity = entity_create('entity_test');
+    $entity->field_datetime->generateSampleItems();
+    $this->entityValidateAndSave($entity);
   }
 
   /**

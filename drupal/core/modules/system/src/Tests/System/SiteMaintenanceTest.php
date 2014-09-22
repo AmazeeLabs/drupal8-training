@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\System;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests site maintenance functionality.
+ * Tests access to site while in maintenance mode.
+ *
+ * @group system
  */
 class SiteMaintenanceTest extends WebTestBase {
 
@@ -23,15 +25,7 @@ class SiteMaintenanceTest extends WebTestBase {
 
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Site maintenance mode functionality',
-      'description' => 'Test access to site while in maintenance mode.',
-      'group' => 'System',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Configure 'node' as front page.
@@ -104,13 +98,13 @@ class SiteMaintenanceTest extends WebTestBase {
 
     // Verify that custom site offline message is not displayed on user/password.
     $this->drupalGet('user/password');
-    $this->assertText(t('Username or e-mail address'), 'Anonymous users can access user/password');
+    $this->assertText(t('Username or email address'), 'Anonymous users can access user/password');
 
     // Submit password reset form.
     $edit = array(
       'name' => $this->user->getUsername(),
     );
-    $this->drupalPostForm('user/password', $edit, t('E-mail new password'));
+    $this->drupalPostForm('user/password', $edit, t('Email new password'));
     $mails = $this->drupalGetMails();
     $start = strpos($mails[0]['body'], 'user/reset/'. $this->user->id());
     $path = substr($mails[0]['body'], $start, 66 + strlen($this->user->id()));

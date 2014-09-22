@@ -9,18 +9,19 @@ namespace Drupal\system\Tests\Routing;
 
 use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
 use Drupal\Core\State\State;
+use Drupal\simpletest\KernelTestBase;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
-
-use Drupal\simpletest\UnitTestBase;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Routing\MatcherDumper;
 use Drupal\Tests\Core\Routing\RoutingFixtures;
 
 /**
- * Basic tests for the UrlMatcherDumper.
+ * Confirm that the matcher dumper is functioning properly.
+ *
+ * @group Routing
  */
-class MatcherDumperTest extends UnitTestBase {
+class MatcherDumperTest extends KernelTestBase {
 
   /**
    * A collection of shared fixture data for tests.
@@ -36,23 +37,11 @@ class MatcherDumperTest extends UnitTestBase {
    */
   protected $state;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Dumper tests',
-      'description' => 'Confirm that the matcher dumper is functioning properly.',
-      'group' => 'Routing',
-    );
-  }
-
-  function __construct($test_id = NULL) {
-    parent::__construct($test_id);
+  protected function setUp() {
+    parent::setUp();
 
     $this->fixtures = new RoutingFixtures();
     $this->state = new State(new KeyValueMemoryFactory());
-  }
-
-  function setUp() {
-    parent::setUp();
   }
 
   /**

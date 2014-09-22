@@ -10,7 +10,9 @@ namespace Drupal\block\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Unit tests for block_theme_suggestions_block().
+ * Tests the block_theme_suggestions_block() function.
+ *
+ * @group block
  */
 class BlockTemplateSuggestionsUnitTest extends WebTestBase {
 
@@ -21,14 +23,6 @@ class BlockTemplateSuggestionsUnitTest extends WebTestBase {
    */
   public static $modules = array('block');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Block template suggestions',
-      'description' => 'Test the block_theme_suggestions_block() function.',
-      'group' => 'Block',
-    );
-  }
-
   /**
    * Tests template suggestions from block_theme_suggestions_block().
    */
@@ -37,6 +31,7 @@ class BlockTemplateSuggestionsUnitTest extends WebTestBase {
     // an underscore (not transformed) and a hyphen (transformed to underscore),
     // and generates possibilities for each level of derivative.
     // @todo Clarify this comment.
+    /** @var \Drupal\block\BlockInterface $block */
     $block = entity_create('block', array(
       'plugin' => 'system_menu_block:admin',
       'region' => 'footer',
@@ -44,11 +39,11 @@ class BlockTemplateSuggestionsUnitTest extends WebTestBase {
     ));
 
     $variables = array();
-    $variables['elements']['#block'] = $block;
     $plugin = $block->getPlugin();
     $variables['elements']['#configuration'] = $plugin->getConfiguration();
     $variables['elements']['#plugin_id'] = $plugin->getPluginId();
-    $variables['elements']['#base_plugin_id'] = $plugin->getBasePluginId();
+    $variables['elements']['#id'] = $block->id();
+    $variables['elements']['#base_plugin_id'] = $plugin->getBaseId();
     $variables['elements']['#derivative_plugin_id'] = $plugin->getDerivativeId();
     $variables['elements']['content'] = array();
     $suggestions = block_theme_suggestions_block($variables);

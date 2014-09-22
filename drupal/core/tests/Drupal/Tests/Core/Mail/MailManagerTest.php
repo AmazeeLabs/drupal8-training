@@ -11,12 +11,8 @@ use Drupal\Core\Mail\MailManager;
 use Drupal\Component\Plugin\Discovery\DiscoveryInterface;
 
 /**
- * Tests the mail plugin manager.
- *
- * @group Drupal
+ * @coversDefaultClass \Drupal\Core\Mail\MailManager
  * @group Mail
- *
- * @see \Drupal\Core\Mail\MailManager
  */
 class MailManagerTest extends UnitTestCase {
 
@@ -26,13 +22,6 @@ class MailManagerTest extends UnitTestCase {
    * @var \Drupal\Core\Cache\CacheBackendInterface|\PHPUnit_Framework_MockObject_MockObject
    */
   protected $cache;
-
-  /**
-   * The language manager.
-   *
-   * @var \Drupal\Core\Language\LanguageManagerInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $languageManager;
 
   /**
    * The module handler.
@@ -56,6 +45,13 @@ class MailManagerTest extends UnitTestCase {
   protected $discovery;
 
   /**
+   * The mail manager under test.
+   *
+   * @var \Drupal\Tests\Core\Mail\TestMailManager
+   */
+  protected $mailManager;
+
+  /**
    * A list of mail plugin definitions.
    *
    * @var array
@@ -74,26 +70,10 @@ class MailManagerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Mail manager test',
-      'description' => 'Tests the mail plugin manager.',
-      'group' => 'Mail',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
     // Prepare the default constructor arguments required by MailManager.
     $this->cache = $this->getMock('Drupal\Core\Cache\CacheBackendInterface');
-
-    $this->languageManager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
-    $this->languageManager->expects($this->any())
-      ->method('getCurrentLanguage')
-      ->will($this->returnValue((object) array('id' => 'en')));
 
     $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
 
@@ -109,11 +89,15 @@ class MailManagerTest extends UnitTestCase {
    */
   protected function setUpMailManager($interface = array()) {
     // Use the provided config for system.mail.interface settings.
-    $this->configFactory = $this->getConfigFactoryStub(array('system.mail' => array(
-      'interface' => $interface,
-    )));
+    $this->configFactory = $this->getConfigFactoryStub(array(
+      'system.mail' => array(
+        'interface' => $interface,
+      ),
+    ));
+    $logger_factory = $this->getMock('\Drupal\Core\Logger\LoggerChannelFactoryInterface');
+    $string_translation = $this->getStringTranslationStub();
     // Construct the manager object and override its discovery.
-    $this->mailManager = new TestMailManager(new \ArrayObject(), $this->cache, $this->languageManager, $this->moduleHandler, $this->configFactory);
+    $this->mailManager = new TestMailManager(new \ArrayObject(), $this->cache, $this->moduleHandler, $this->configFactory, $logger_factory, $string_translation);
     $this->mailManager->setDiscovery($this->discovery);
   }
 

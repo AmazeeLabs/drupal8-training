@@ -7,8 +7,12 @@
 
 namespace Drupal\Core\Field;
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Base class for 'Field formatter' plugin implementations.
+ *
+ * @ingroup field_formatter
  */
 abstract class FormatterBase extends PluginSettingsBase implements FormatterInterface {
 
@@ -55,14 +59,17 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
    *   The formatter label display setting.
    * @param string $view_mode
    *   The view mode.
+   * @param array $third_party_settings
+   *   Any third party settings settings.
    */
-  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, $label, $view_mode) {
+  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, $label, $view_mode, array $third_party_settings) {
     parent::__construct(array(), $plugin_id, $plugin_definition);
 
     $this->fieldDefinition = $field_definition;
     $this->settings = $settings;
     $this->label = $label;
     $this->viewMode = $view_mode;
+    $this->thirdPartySettings = $third_party_settings;
   }
 
   /**
@@ -101,7 +108,7 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     return array();
   }
 
@@ -138,6 +145,14 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
    */
   protected function getFieldSetting($setting_name) {
     return $this->fieldDefinition->getSetting($setting_name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function isApplicable(FieldDefinitionInterface $field_definition) {
+    // By default, formatters are available for all fields.
+    return TRUE;
   }
 
 }

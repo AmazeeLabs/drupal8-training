@@ -12,6 +12,8 @@ use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
  * Tests comment validation constraints.
+ *
+ * @group comment
  */
 class CommentValidationTest extends EntityUnitTestBase {
 
@@ -25,20 +27,10 @@ class CommentValidationTest extends EntityUnitTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Comment Validation',
-      'description' => 'Tests the comment validation constraints.',
-      'group' => 'Comment',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('node', array('node', 'node_field_data', 'node_field_revision', 'node_revision'));
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('comment');
     $this->installSchema('comment', array('comment_entity_statistics'));
   }
 
@@ -46,11 +38,21 @@ class CommentValidationTest extends EntityUnitTestBase {
    * Tests the comment validation constraints.
    */
   public function testValidation() {
+    // Add comment type.
+    $this->entityManager->getStorage('comment_type')->create(array(
+      'id' => 'comment',
+      'label' => 'comment',
+      'target_entity_type_id' => 'node',
+    ))->save();
+
     // Add comment field to content.
-    $this->entityManager->getStorage('field_config')->create(array(
+    $this->entityManager->getStorage('field_storage_config')->create(array(
       'entity_type' => 'node',
       'name' => 'comment',
       'type' => 'comment',
+      'settings' => array(
+        'comment_type' => 'comment',
+      )
     ))->save();
 
     // Create a page node type.
@@ -59,8 +61,8 @@ class CommentValidationTest extends EntityUnitTestBase {
       'name' => 'page',
     ))->save();
 
-    // Add comment field instance to page content.
-    $this->entityManager->getStorage('field_instance_config')->create(array(
+    // Add comment field to page content.
+    $this->entityManager->getStorage('field_config')->create(array(
       'field_name' => 'comment',
       'entity_type' => 'node',
       'bundle' => 'page',
@@ -77,7 +79,7 @@ class CommentValidationTest extends EntityUnitTestBase {
       'entity_id' => $node->id(),
       'entity_type' => 'node',
       'field_name' => 'comment',
-      'comment_body' => $this->randomName(),
+      'comment_body' => $this->randomMachineName(),
     ));
 
     $violations = $comment->validate();
@@ -110,7 +112,7 @@ class CommentValidationTest extends EntityUnitTestBase {
     $this->assertEqual($violations[0]->getMessage(), t('This value is not a valid email address.'));
 
     $comment->set('mail', NULL);
-    $comment->set('homepage', 'http://example.com/' . $this->randomName(237));
+    $comment->set('homepage', 'http://example.com/' . $this->randomMachineName(237));
     $this->assertLengthViolation($comment, 'homepage', 255);
 
     $comment->set('homepage', 'invalid');

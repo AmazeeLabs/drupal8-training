@@ -15,16 +15,10 @@ use Drupal\Core\Path\AliasWhitelist;
 
 /**
  * Tests path alias CRUD and lookup functionality.
+ *
+ * @group Path
  */
 class AliasTest extends PathUnitTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => t('Path Alias Unit Tests'),
-      'description' => t('Tests path alias CRUD and lookup functionality.'),
-      'group' => t('Path API'),
-    );
-  }
 
   function testCRUD() {
     //Prepare database table.
@@ -58,7 +52,9 @@ class AliasTest extends PathUnitTestBase {
 
     //Update a few aliases
     foreach ($aliases as $alias) {
-      $aliasStorage->save($alias['source'], $alias['alias'] . '_updated', $alias['langcode'], $alias['pid']);
+      $fields = $aliasStorage->save($alias['source'], $alias['alias'] . '_updated', $alias['langcode'], $alias['pid']);
+
+      $this->assertEqual($alias['alias'], $fields['original']['alias']);
 
       $result = $connection->query('SELECT pid FROM {url_alias} WHERE source = :source AND alias= :alias AND langcode = :langcode', array(':source' => $alias['source'], ':alias' => $alias['alias'] . '_updated', ':langcode' => $alias['langcode']));
       $pid = $result->fetchField();
@@ -154,7 +150,7 @@ class AliasTest extends PathUnitTestBase {
     $aliasStorage->save('user/2', 'bar');
     // Hook that clears cache is not executed with unit tests.
     $aliasManager->cacheClear();
-    $this->assertEqual($aliasManager->getPathByAlias('bar'), 'user/2', 'Newer alias record is returned when comparing two Language::LANGCODE_NOT_SPECIFIED paths with the same alias.');
+    $this->assertEqual($aliasManager->getPathByAlias('bar'), 'user/2', 'Newer alias record is returned when comparing two LanguageInterface::LANGCODE_NOT_SPECIFIED paths with the same alias.');
   }
 
   /**
@@ -178,28 +174,28 @@ class AliasTest extends PathUnitTestBase {
 
     // Non-existing path roots should be NULL too. Use a length of 7 to avoid
     // possible conflict with random aliases below.
-    $this->assertNull($whitelist->get($this->randomName()));
+    $this->assertNull($whitelist->get($this->randomMachineName()));
 
     // Add an alias for user/1, user should get whitelisted now.
-    $aliasStorage->save('user/1', $this->randomName());
+    $aliasStorage->save('user/1', $this->randomMachineName());
     $aliasManager->cacheClear();
     $this->assertTrue($whitelist->get('user'));
     $this->assertNull($whitelist->get('admin'));
-    $this->assertNull($whitelist->get($this->randomName()));
+    $this->assertNull($whitelist->get($this->randomMachineName()));
 
     // Add an alias for admin, both should get whitelisted now.
-    $aliasStorage->save('admin/something', $this->randomName());
+    $aliasStorage->save('admin/something', $this->randomMachineName());
     $aliasManager->cacheClear();
     $this->assertTrue($whitelist->get('user'));
     $this->assertTrue($whitelist->get('admin'));
-    $this->assertNull($whitelist->get($this->randomName()));
+    $this->assertNull($whitelist->get($this->randomMachineName()));
 
     // Remove the user alias again, whitelist entry should be removed.
     $aliasStorage->delete(array('source' => 'user/1'));
     $aliasManager->cacheClear();
     $this->assertNull($whitelist->get('user'));
     $this->assertTrue($whitelist->get('admin'));
-    $this->assertNull($whitelist->get($this->randomName()));
+    $this->assertNull($whitelist->get($this->randomMachineName()));
 
     // Destruct the whitelist so that the caches are written.
     $whitelist->destruct();
@@ -211,7 +207,7 @@ class AliasTest extends PathUnitTestBase {
     $whitelist = new AliasWhitelist('path_alias_whitelist', $memoryCounterBackend, $this->container->get('lock'), $this->container->get('state'), $aliasStorage);
     $this->assertNull($whitelist->get('user'));
     $this->assertTrue($whitelist->get('admin'));
-    $this->assertNull($whitelist->get($this->randomName()));
+    $this->assertNull($whitelist->get($this->randomMachineName()));
     $this->assertEqual($memoryCounterBackend->getCounter('get', 'path_alias_whitelist'), 1);
     $this->assertEqual($memoryCounterBackend->getCounter('set', 'path_alias_whitelist'), 0);
 

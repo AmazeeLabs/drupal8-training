@@ -9,6 +9,8 @@ namespace Drupal\system\Tests\Entity;
 
 /**
  * Tests the entity view builder.
+ *
+ * @group Entity
  */
 class EntityViewBuilderTest extends EntityUnitTestBase {
 
@@ -19,18 +21,10 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
    */
   public static $modules = array('entity_reference');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity rendering',
-      'description' => 'Tests the entity view builder.',
-      'group' => 'Entity API',
-    );
-  }
-
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->installConfig(array('entity_test'));
   }
@@ -40,8 +34,9 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
    */
   public function testEntityViewBuilderCache() {
     // Force a request via GET so we can get drupal_render() cache working.
-    $request_method = \Drupal::request()->server->get('REQUEST_METHOD');
-    $this->container->get('request')->setMethod('GET');
+    $request = \Drupal::request();
+    $request_method = $request->server->get('REQUEST_METHOD');
+    $request->setMethod('GET');
 
     $entity_test = $this->createTestEntity('entity_test');
 
@@ -77,7 +72,7 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
     $this->assertFalse($this->container->get('cache.' . $bin)->get($cid), 'The entity render cache has been cleared when the entity was deleted.');
 
     // Restore the previous request method.
-    $this->container->get('request')->setMethod($request_method);
+    $request->setMethod($request_method);
   }
 
   /**
@@ -85,12 +80,15 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
    */
   public function testEntityViewBuilderCacheWithReferences() {
     // Force a request via GET so we can get drupal_render() cache working.
-    $request_method = \Drupal::request()->server->get('REQUEST_METHOD');
-    $this->container->get('request')->setMethod('GET');
+    $request = \Drupal::request();
+    $request_method = $request->server->get('REQUEST_METHOD');
+    $request->setMethod('GET');
 
     // Create an entity reference field and an entity that will be referenced.
-    entity_reference_create_instance('entity_test', 'entity_test', 'reference_field', 'Reference', 'entity_test');
-    entity_get_display('entity_test', 'entity_test', 'full')->setComponent('reference_field')->save();
+    entity_reference_create_field('entity_test', 'entity_test', 'reference_field', 'Reference', 'entity_test');
+    entity_get_display('entity_test', 'entity_test', 'full')->setComponent('reference_field', [
+      'settings' => ['link' => FALSE],
+    ])->save();
     $entity_test_reference = $this->createTestEntity('entity_test');
     $entity_test_reference->save();
 
@@ -131,7 +129,7 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
     $this->assertFalse($this->container->get('cache.' . $bin_reference)->get($cid_reference), 'The entity render cache for the referenced entity has been cleared when the entity was deleted.');
 
     // Restore the previous request method.
-    $this->container->get('request')->setMethod($request_method);
+    $request->setMethod($request_method);
   }
 
   /**
@@ -158,6 +156,24 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
   }
 
   /**
+   * Tests weighting of display components.
+   */
+  public function testEntityViewBuilderWeight() {
+    // Set a weight for the label component.
+    entity_get_display('entity_test', 'entity_test', 'full')
+      ->setComponent('label', array('weight' => 20))
+      ->save();
+
+    // Create and build a test entity.
+    $entity_test = $this->createTestEntity('entity_test');
+    $view =  $this->container->get('entity.manager')->getViewBuilder('entity_test')->view($entity_test, 'full');
+    drupal_render($view);
+
+    // Check that the weight is respected.
+    $this->assertEqual($view['label']['#weight'], 20, 'The weight of a display component is respected.');
+  }
+
+  /**
    * Creates an entity for testing.
    *
    * @param string $entity_type
@@ -169,7 +185,7 @@ class EntityViewBuilderTest extends EntityUnitTestBase {
   protected function createTestEntity($entity_type) {
     $data = array(
       'bundle' => $entity_type,
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
     );
     return $this->container->get('entity.manager')->getStorage($entity_type)->create($data);
   }

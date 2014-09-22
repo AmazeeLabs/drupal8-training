@@ -8,7 +8,7 @@
 namespace Drupal\Core\Session;
 
 use Drupal\Core\Authentication\AuthenticationManagerInterface;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * A proxied implementation of AccountInterface.
@@ -26,9 +26,9 @@ class AccountProxy implements AccountProxyInterface {
   /**
    * The current request.
    *
-   * @var \Symfony\Component\HttpFoundation\Request
+   * @var \Symfony\Component\HttpFoundation\RequestStack
    */
-  protected $request;
+  protected $requestStack;
 
   /**
    * The authentication manager.
@@ -52,16 +52,16 @@ class AccountProxy implements AccountProxyInterface {
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object used for authenticating.
    */
-  public function __construct(AuthenticationManagerInterface $authentication_manager, Request $request) {
+  public function __construct(AuthenticationManagerInterface $authentication_manager, RequestStack $requestStack) {
     $this->authenticationManager = $authentication_manager;
-    $this->request = $request;
+    $this->requestStack = $requestStack;
   }
 
   /**
    * {@inheritdoc}
    */
   public function setAccount(AccountInterface $account) {
-    // If the passed account is already proxyed, use the actual account instead
+    // If the passed account is already proxied, use the actual account instead
     // to prevent loops.
     if ($account instanceof static) {
       $account = $account->getAccount();
@@ -74,7 +74,9 @@ class AccountProxy implements AccountProxyInterface {
    */
   public function getAccount() {
     if (!isset($this->account)) {
-      $this->setAccount($this->authenticationManager->authenticate($this->request));
+      // Use the master request to prevent subrequests authenticating to a
+      // different user.
+      $this->setAccount($this->authenticationManager->authenticate($this->requestStack->getMasterRequest()));
     }
     return $this->account;
   }
@@ -145,15 +147,15 @@ class AccountProxy implements AccountProxyInterface {
   /**
    * {@inheritdoc}
    */
-  public function getPreferredLangcode($default = NULL) {
-    return $this->getAccount()->getPreferredLangcode($default);
+  public function getPreferredLangcode($fallback_to_default = TRUE) {
+    return $this->getAccount()->getPreferredLangcode($fallback_to_default);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getPreferredAdminLangcode($default = NULL) {
-    return $this->getAccount()->getPreferredAdminLangcode($default);
+  public function getPreferredAdminLangcode($fallback_to_default = TRUE) {
+    return $this->getAccount()->getPreferredAdminLangcode($fallback_to_default);
   }
 
   /**

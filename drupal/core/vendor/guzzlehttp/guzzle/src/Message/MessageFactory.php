@@ -2,6 +2,7 @@
 
 namespace GuzzleHttp\Message;
 
+use GuzzleHttp\Event\ListenerAttacherTrait;
 use GuzzleHttp\Post\PostFileInterface;
 use GuzzleHttp\Subscriber\Cookie;
 use GuzzleHttp\Cookie\CookieJar;
@@ -19,11 +20,16 @@ use GuzzleHttp\Url;
  */
 class MessageFactory implements MessageFactoryInterface
 {
+    use ListenerAttacherTrait;
+
     /** @var HttpError */
     private $errorPlugin;
 
     /** @var Redirect */
     private $redirectPlugin;
+
+    /** @var array */
+    protected static $classMethods = [];
 
     public function __construct()
     {
@@ -59,7 +65,10 @@ class MessageFactory implements MessageFactoryInterface
         unset($options['config']);
 
         // Use a POST body by default
-        if ($method == 'POST' && !isset($options['body'])) {
+        if ($method == 'POST' &&
+            !isset($options['body']) &&
+            !isset($options['json'])
+        ) {
             $options['body'] = [];
         }
 
@@ -123,9 +132,12 @@ class MessageFactory implements MessageFactoryInterface
      */
     protected function addPostData(RequestInterface $request, array $body)
     {
+        static $fields = ['string' => true, 'array' => true, 'NULL' => true,
+            'boolean' => true, 'double' => true, 'integer' => true];
+
         $post = new PostBody();
         foreach ($body as $key => $value) {
-            if (is_string($value) || is_array($value)) {
+            if (isset($fields[gettype($value)])) {
                 $post->setField($key, $value);
             } elseif ($value instanceof PostFileInterface) {
                 $post->addFile($value);
@@ -135,7 +147,6 @@ class MessageFactory implements MessageFactoryInterface
         }
 
         $request->setBody($post);
-        $post->applyRequestHeaders($request);
     }
 
     protected function applyOptions(
@@ -146,10 +157,17 @@ class MessageFactory implements MessageFactoryInterface
         static $configMap = ['connect_timeout' => 1, 'timeout' => 1,
             'verify' => 1, 'ssl_key' => 1, 'cert' => 1, 'proxy' => 1,
             'debug' => 1, 'save_to' => 1, 'stream' => 1, 'expect' => 1];
-        static $methods;
-        if (!$methods) {
-            $methods = array_flip(get_class_methods(__CLASS__));
+
+        // Take the class of the instance, not the parent
+        $selfClass = get_class($this);
+
+        // Check if we already took it's class methods and had them saved
+        if (!isset(self::$classMethods[$selfClass])) {
+            self::$classMethods[$selfClass] = array_flip(get_class_methods($this));
         }
+
+        // Take class methods of this particular instance
+        $methods = self::$classMethods[$selfClass];
 
         // Iterate over each key value pair and attempt to apply a config using
         // double dispatch.
@@ -298,27 +316,9 @@ class MessageFactory implements MessageFactoryInterface
             throw new \InvalidArgumentException('events value must be an array');
         }
 
-        $emitter = $request->getEmitter();
-        foreach ($value as $name => $method) {
-            if (is_callable($method)) {
-                $emitter->on($name, $method);
-            } elseif (!is_array($method) || !isset($method['fn'])) {
-                throw new \InvalidArgumentException('Each event must be a '
-                    . 'callable or associative array containing a "fn" key');
-            } elseif (isset($method['once']) && $method['once'] === true) {
-                $emitter->once(
-                    $name,
-                    $method['fn'],
-                    isset($method['priority']) ? $method['priority'] : 0
-                );
-            } else {
-                $emitter->on(
-                    $name,
-                    $method['fn'],
-                    isset($method['priority']) ? $method['priority'] : 0
-                );
-            }
-        }
+        $this->attachListeners($request, $this->prepareListeners($value,
+            ['before', 'complete', 'error', 'headers']
+        ));
     }
 
     private function add_subscribers(RequestInterface $request, $value)
@@ -331,5 +331,14 @@ class MessageFactory implements MessageFactoryInterface
         foreach ($value as $subscribers) {
             $emitter->attach($subscribers);
         }
+    }
+
+    private function add_json(RequestInterface $request, $value)
+    {
+        if (!$request->hasHeader('Content-Type')) {
+            $request->setHeader('Content-Type', 'application/json');
+        }
+
+        $request->setBody(Stream\create(json_encode($value)));
     }
 }

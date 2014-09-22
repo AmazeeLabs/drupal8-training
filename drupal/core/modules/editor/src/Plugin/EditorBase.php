@@ -7,6 +7,7 @@
 
 namespace Drupal\editor\Plugin;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\editor\Entity\Editor;
 use Drupal\editor\Plugin\EditorPluginInterface;
@@ -41,6 +42,11 @@ use Drupal\editor\Plugin\EditorPluginInterface;
  *   is_xss_safe = FALSE
  * )
  * @endcode
+ *
+ * @see \Drupal\editor\Annotation\Editor
+ * @see \Drupal\editor\Plugin\EditorPluginInterface
+ * @see \Drupal\editor\Plugin\EditorManager
+ * @see plugin_api
  */
 abstract class EditorBase extends PluginBase implements EditorPluginInterface {
 
@@ -54,20 +60,20 @@ abstract class EditorBase extends PluginBase implements EditorPluginInterface {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state, Editor $editor) {
+  public function settingsForm(array $form, FormStateInterface $form_state, Editor $editor) {
     return $form;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function settingsFormValidate(array $form, array &$form_state) {
+  public function settingsFormValidate(array $form, FormStateInterface $form_state) {
   }
 
   /**
    * {@inheritdoc}
    */
-  public function settingsFormSubmit(array $form, array &$form_state) {
+  public function settingsFormSubmit(array $form, FormStateInterface $form_state) {
   }
 
 }

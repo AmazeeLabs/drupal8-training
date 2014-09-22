@@ -10,7 +10,9 @@ namespace Drupal\help\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests help display and user access for all modules implementing help.
+ * Verify help display and user access to help based on permissions.
+ *
+ * @group help
  */
 class HelpTest extends WebTestBase {
 
@@ -34,15 +36,7 @@ class HelpTest extends WebTestBase {
    */
   protected $anyUser;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Help functionality',
-      'description' => 'Verify help display and user access to help based on permissions.',
-      'group' => 'Help',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->getModuleList();

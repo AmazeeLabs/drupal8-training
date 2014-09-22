@@ -8,14 +8,19 @@
 namespace Drupal\Core\TypedData;
 
 use Drupal\Component\Plugin\PluginInspectionInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 
 /**
  * The abstract base class for typed data.
  *
  * Classes deriving from this base class have to declare $value
  * or override getValue() or setValue().
+ *
+ * @ingroup typed_data
  */
 abstract class TypedData implements TypedDataInterface, PluginInspectionInterface {
+
+  use StringTranslationTrait;
 
   /**
    * The data definition.
@@ -113,7 +118,12 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
    */
   public function getConstraints() {
     // @todo: Add the typed data manager as proper dependency.
-    return \Drupal::typedDataManager()->getConstraints($this->definition);
+    $constraint_manager = \Drupal::typedDataManager()->getValidationConstraintManager();
+    $constraints = array();
+    foreach ($this->definition->getConstraints() as $name => $options) {
+      $constraints[] = $constraint_manager->create($name, $options);
+    }
+    return $constraints;
   }
 
   /**

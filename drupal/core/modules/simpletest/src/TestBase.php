@@ -7,6 +7,7 @@
 
 namespace Drupal\simpletest;
 
+use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Database\Database;
 use Drupal\Component\Utility\String;
@@ -15,7 +16,6 @@ use Drupal\Core\Config\StorageComparer;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Database\ConnectionNotDefinedException;
 use Drupal\Core\Config\StorageInterface;
-use Drupal\Core\DrupalKernel;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Session\AccountProxy;
 use Drupal\Core\Session\AnonymousUserSession;
@@ -23,13 +23,14 @@ use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Utility\Error;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
  * Base class for Drupal tests.
  *
  * Do not extend this class directly; use either
- * \Drupal\simpletest\WebTestBase or \Drupal\simpletest\UnitTestBase.
+ * \Drupal\simpletest\WebTestBase or \Drupal\simpletest\KernelTestBase.
  */
 abstract class TestBase {
   /**
@@ -52,6 +53,13 @@ abstract class TestBase {
    * @var string
    */
   protected $databasePrefix = NULL;
+
+  /**
+   * The site directory of the original parent site.
+   *
+   * @var string
+   */
+  protected $originalSite;
 
   /**
    * The original file directory, before it was changed for testing purposes.
@@ -190,6 +198,11 @@ abstract class TestBase {
   protected $randomGenerator;
 
   /**
+   * The name of the session cookie.
+   */
+  protected $originalSessionName;
+
+  /**
    * Constructor for Test.
    *
    * @param $test_id
@@ -197,27 +210,6 @@ abstract class TestBase {
    */
   public function __construct($test_id = NULL) {
     $this->testId = $test_id;
-  }
-
-  /**
-   * Provides meta information about this test case, such as test name.
-   *
-   * @return array
-   *   An array of untranslated strings with the following keys:
-   *   - name: An overview of what is tested by the class; for example, "User
-   *     access rules".
-   *   - description: One sentence describing the test, starting with a verb.
-   *   - group: The human-readable name of the module ("Node", "Statistics"), or
-   *     the human-readable name of the Drupal facility tested (e.g. "Form API"
-   *     or "XML-RPC").
-   */
-  public static function getInfo() {
-    // PHP does not allow us to declare this method as abstract public static,
-    // so we simply throw an exception here if this has not been implemented by
-    // a child class.
-    throw new \RuntimeException(String::format('@class must implement \Drupal\simpletest\TestBase::getInfo().', array(
-      '@class' => get_called_class(),
-    )));
   }
 
   /**
@@ -653,7 +645,7 @@ abstract class TestBase {
    *   TRUE if the assertion succeeded, FALSE otherwise.
    *
    * @see TestBase::prepareEnvironment()
-   * @see _drupal_bootstrap_configuration()
+   * @see \Drupal\Core\DrupalKernel::bootConfiguration()
    */
   protected function assertNoErrorsLogged() {
     // Since PHP only creates the error.log file when an actual error is
@@ -733,10 +725,10 @@ abstract class TestBase {
   }
 
   /**
-   * Logs verbose message in a text file.
+   * Logs a verbose message in a text file.
    *
-   * The a link to the vebose message will be placed in the test results via
-   * as a passing assertion with the text '[verbose message]'.
+   * The link to the verbose message will be placed in the test results as a
+   * passing assertion with the text '[verbose message]'.
    *
    * @param $message
    *   The verbose message to be stored.
@@ -1029,8 +1021,17 @@ abstract class TestBase {
     $this->originalProfile = drupal_get_profile();
     $this->originalUser = isset($user) ? clone $user : NULL;
 
-    // Ensure that the current session is not changed by the new environment.
-    \Drupal::service('session_manager')->disable();
+    // Prevent that session data is leaked into the UI test runner by closing
+    // the session and then setting the session-name (i.e. the name of the
+    // session cookie) to a random value. If a test starts a new session, then
+    // it will be associated with a different session-name. After the test-run
+    // it can be safely destroyed.
+    // @see TestBase::restoreEnvironment()
+    if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE) {
+      session_write_close();
+    }
+    $this->originalSessionName = session_name();
+    session_name('SIMPLETEST' . Crypt::randomBytesBase64());
 
     // Save and clean the shutdown callbacks array because it is static cached
     // and will be changed by the test run. Otherwise it will contain callbacks
@@ -1057,7 +1058,6 @@ abstract class TestBase {
 
     // Unregister all custom stream wrappers of the parent site.
     // Availability of Drupal stream wrappers varies by test base class:
-    // - UnitTestBase operates in a completely empty environment.
     // - KernelTestBase supports and maintains stream wrappers in a custom
     //   way.
     // - WebTestBase re-initializes Drupal stream wrappers after installation.
@@ -1071,40 +1071,14 @@ abstract class TestBase {
     // Reset statics.
     drupal_static_reset();
 
-    // Reset and create a new service container.
-    $this->container = new ContainerBuilder();
-
-    // @todo Remove this once this class has no calls to t() and format_plural()
-    $this->container->setParameter('language.default_values', Language::$defaultValues);
-    $this->container->register('language.default', 'Drupal\Core\Language\LanguageDefault')
-      ->addArgument('%language.default_values%');
-    $this->container->register('language_manager', 'Drupal\Core\Language\LanguageManager')
-      ->addArgument(new Reference('language.default'));
-    $this->container->register('string_translation', 'Drupal\Core\StringTranslation\TranslationManager')
-      ->addArgument(new Reference('language_manager'));
-
-    // Register info parser.
-    $this->container->register('info_parser', 'Drupal\Core\Extension\InfoParser');
-
-    $request = Request::create('/');
-    $this->container->set('request', $request);
-
-    // Run all tests as a anonymous user by default, web tests will replace that
-    // during the test set up.
-    $this->container->set('current_user', new AnonymousUserSession());
-
-    \Drupal::setContainer($this->container);
+    // Ensure there is no service container.
+    $this->container = NULL;
+    \Drupal::setContainer(NULL);
 
     // Unset globals.
     unset($GLOBALS['config_directories']);
     unset($GLOBALS['config']);
     unset($GLOBALS['conf']);
-    unset($GLOBALS['theme_key']);
-    unset($GLOBALS['theme']);
-    unset($GLOBALS['theme_info']);
-    unset($GLOBALS['base_theme_info']);
-    unset($GLOBALS['theme_engine']);
-    unset($GLOBALS['theme_path']);
 
     // Log fatal errors.
     ini_set('log_errors', 1);
@@ -1145,6 +1119,15 @@ abstract class TestBase {
    * @see TestBase::prepareEnvironment()
    */
   private function restoreEnvironment() {
+    // Destroy the session if one was started during the test-run.
+    $_SESSION = array();
+    if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE) {
+      session_destroy();
+      $params = session_get_cookie_params();
+      setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_name($this->originalSessionName);
+
     // Reset all static variables.
     // Unsetting static variables will potentially invoke destruct methods,
     // which might call into functions that prime statics and caches again.
@@ -1152,12 +1135,12 @@ abstract class TestBase {
     // which means they may need to access its filesystem and database.
     drupal_static_reset();
 
-    if ($this->container->has('state') && $state = $this->container->get('state')) {
+    if ($this->container && $this->container->has('state') && $state = $this->container->get('state')) {
       $captured_emails = $state->get('system.test_mail_collector') ?: array();
       $emailCount = count($captured_emails);
       if ($emailCount) {
-        $message = $emailCount == 1 ? '1 e-mail was sent during this test.' : $emailCount . ' e-mails were sent during this test.';
-        $this->pass($message, 'E-mail');
+        $message = $emailCount == 1 ? '1 email was sent during this test.' : $emailCount . ' emails were sent during this test.';
+        $this->pass($message, 'Email');
       }
     }
 
@@ -1196,14 +1179,6 @@ abstract class TestBase {
     // this second reset is guaranteed to reset everything to nothing.
     drupal_static_reset();
 
-    // Reset global theme variables.
-    unset($GLOBALS['theme_key']);
-    unset($GLOBALS['theme']);
-    unset($GLOBALS['theme_info']);
-    unset($GLOBALS['base_theme_info']);
-    unset($GLOBALS['theme_engine']);
-    unset($GLOBALS['theme_path']);
-
     // Restore original in-memory configuration.
     $GLOBALS['config'] = $this->originalConfig;
     $GLOBALS['conf'] = $this->originalConf;
@@ -1227,10 +1202,6 @@ abstract class TestBase {
     // Restore original shutdown callbacks.
     $callbacks = &drupal_register_shutdown_function();
     $callbacks = $this->originalShutdownCallbacks;
-
-    // Restore original user session.
-    $this->container->set('current_user', $this->originalUser);
-    \Drupal::service('session_manager')->enable();
   }
 
   /**
@@ -1312,22 +1283,35 @@ abstract class TestBase {
   }
 
   /**
-   * Generates a unique random string of ASCII characters of codes 32 to 126.
+   * Generates a pseudo-random string of ASCII characters of codes 32 to 126.
    *
    * Do not use this method when special characters are not possible (e.g., in
    * machine or file names that have already been validated); instead, use
-   * \Drupal\simpletest\TestBase::randomName().
+   * \Drupal\simpletest\TestBase::randomMachineName(). If $length is greater
+   * than 2 the random string will include at least one ampersand ('&')
+   * character to ensure coverage for special characters and avoid the
+   * introduction of random test failures.
    *
    * @param int $length
    *   Length of random string to generate.
    *
    * @return string
-   *   Randomly generated unique string.
+   *   Pseudo-randomly generated unique string including special characters.
    *
    * @see \Drupal\Component\Utility\Random::string()
    */
   public function randomString($length = 8) {
-    return $this->getRandomGenerator()->string($length, TRUE, array($this, 'randomStringValidate'));
+    if ($length < 3) {
+      return $this->getRandomGenerator()->string($length, TRUE, array($this, 'randomStringValidate'));
+    }
+
+    // To prevent the introduction of random test failures, ensure that the
+    // returned string contains a character that needs to be escaped in HTML by
+    // injecting an ampersand into it.
+    $replacement_pos = floor($length / 2);
+    // Remove 1 from the length to account for the ampersand character.
+    $string = $this->getRandomGenerator()->string($length - 1, TRUE, array($this, 'randomStringValidate'));
+    return substr_replace($string, '&', $replacement_pos, 0);
   }
 
   /**
@@ -1377,7 +1361,7 @@ abstract class TestBase {
    *
    * @see \Drupal\Component\Utility\Random::name()
    */
-  public function randomName($length = 8) {
+  public function randomMachineName($length = 8) {
     return $this->getRandomGenerator()->name($length, TRUE);
   }
 

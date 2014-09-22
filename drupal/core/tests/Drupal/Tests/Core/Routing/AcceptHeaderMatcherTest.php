@@ -14,9 +14,9 @@ use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Basic tests for the AcceptHeaderMatcher class.
+ * Confirm that the mime types partial matcher is functioning properly.
  *
- * @coversClassDefault \Drupal\Core\Routing\AcceptHeaderMatcher
+ * @group Routing
  */
 class AcceptHeaderMatcherTest extends UnitTestCase {
 
@@ -37,18 +37,7 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Partial matcher MIME types tests',
-      'description' => 'Confirm that the mime types partial matcher is functioning properly.',
-      'group' => 'Routing',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->fixtures = new RoutingFixtures();

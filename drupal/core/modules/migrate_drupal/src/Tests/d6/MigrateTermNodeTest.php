@@ -10,20 +10,11 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\migrate\MigrateExecutable;
 
 /**
- * Tests the Drupal 6 term-node association to Drupal 8 migration.
+ * Upgrade taxonomy term node associations.
+ *
+ * @group migrate_drupal
  */
 class MigrateTermNodeTest extends MigrateTermNodeTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate taxonomy term node',
-      'description'  => 'Upgrade taxonomy term node associations',
-      'group' => 'Migrate Drupal',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -45,11 +36,11 @@ class MigrateTermNodeTest extends MigrateTermNodeTestBase {
     $nodes = node_load_multiple(array(1, 2), TRUE);
     $node = $nodes[1];
     $this->assertEqual(count($node->vocabulary_1_i_0_), 1);
-    $this->assertEqual($node->vocabulary_1_i_0_[0]->value, 1);
+    $this->assertEqual($node->vocabulary_1_i_0_[0]->target_id, 1);
     $node = $nodes[2];
     $this->assertEqual(count($node->vocabulary_2_i_1_), 2);
-    $this->assertEqual($node->vocabulary_2_i_1_[0]->value, 2);
-    $this->assertEqual($node->vocabulary_2_i_1_[1]->value, 3);
+    $this->assertEqual($node->vocabulary_2_i_1_[0]->target_id, 2);
+    $this->assertEqual($node->vocabulary_2_i_1_[1]->target_id, 3);
   }
 
 }

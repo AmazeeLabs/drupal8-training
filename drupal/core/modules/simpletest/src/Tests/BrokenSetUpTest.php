@@ -10,13 +10,14 @@ namespace Drupal\simpletest\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests a test case that does not run parent::setUp() in its setUp() method.
+ * Tests a test case that does not call parent::setUp().
  *
  * If a test case does not call parent::setUp(), running
  * \Drupal\simpletest\WebTestBase::tearDown() would destroy the main site's
  * database tables. Therefore, we ensure that tests which are not set up
  * properly are skipped.
  *
+ * @group simpletest
  * @see \Drupal\simpletest\WebTestBase
  */
 class BrokenSetUpTest extends WebTestBase {
@@ -35,15 +36,7 @@ class BrokenSetUpTest extends WebTestBase {
    */
   protected $sharedTriggerFile;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Broken SimpleTest method',
-      'description' => 'Tests a test case that does not call parent::setUp().',
-      'group' => 'SimpleTest'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     // If the test is being run from the main site, set up normally.
     if (!$this->isInChildSite()) {
       parent::setUp();
@@ -65,7 +58,7 @@ class BrokenSetUpTest extends WebTestBase {
     }
   }
 
-  function tearDown() {
+  protected function tearDown() {
     // If the test is being run from the main site, tear down normally.
     if (!$this->isInChildSite()) {
       unlink($this->sharedTriggerFile);

@@ -18,7 +18,7 @@ use Drupal\tour\TourInterface;
  * @ConfigEntityType(
  *   id = "tour",
  *   label = @Translation("Tour"),
- *   controllers = {
+ *   handlers = {
  *     "view_builder" = "Drupal\tour\TourViewBuilder"
  *   },
  *   entity_keys = {
@@ -118,21 +118,6 @@ class Tour extends ConfigEntityBase implements TourInterface {
 
     \Drupal::moduleHandler()->alter('tour_tips', $tips, $this);
     return array_values($tips);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function toArray() {
-    $properties = parent::toArray();
-    $names = array(
-      'routes',
-      'tips',
-    );
-    foreach ($names as $name) {
-      $properties[$name] = $this->get($name);
-    }
-    return $properties;
   }
 
   /**

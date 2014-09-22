@@ -7,25 +7,19 @@
 
 namespace Drupal\search\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
- * Tests that numbers with different formats can be searched.
+ * Tests that numbers can be searched.
+ *
+ * @group search
  */
 class SearchNumbersTest extends SearchTestBase {
   protected $test_user;
   protected $numbers;
   protected $nodes;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Search numbers',
-      'description' => 'Check that numbers can be searched',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->test_user = $this->drupalCreateUser(array('search content', 'access content', 'administer nodes', 'access site reports'));
@@ -55,7 +49,7 @@ class SearchNumbersTest extends SearchTestBase {
       $info = array(
         'body' => array(array('value' => $num)),
         'type' => 'page',
-        'language' => Language::LANGCODE_NOT_SPECIFIED,
+        'language' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
         'title' => $doc . ' number',
       );
       $this->nodes[$doc] = $this->drupalCreateNode($info);

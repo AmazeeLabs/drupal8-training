@@ -10,6 +10,7 @@ namespace Drupal\language\Form;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -58,7 +59,7 @@ class ContentLanguageSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $entity_types = $this->entityManager->getDefinitions();
     $labels = array();
     $default = array();
@@ -146,9 +147,9 @@ class ContentLanguageSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $config = $this->config('language.settings');
-    foreach ($form_state['values']['settings'] as $entity_type => $entity_settings) {
+    foreach ($form_state->getValue('settings') as $entity_type => $entity_settings) {
       foreach ($entity_settings as $bundle => $bundle_settings) {
         $config->set(language_get_default_configuration_settings_key($entity_type, $bundle), array(
           'langcode' => $bundle_settings['settings']['language']['langcode'],

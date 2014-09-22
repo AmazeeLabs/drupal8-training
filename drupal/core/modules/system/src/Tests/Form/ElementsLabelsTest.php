@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Form;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test form element labels, required markers and associated output.
+ * Tests form element labels, required markers and associated output.
+ *
+ * @group Form
  */
 class ElementsLabelsTest extends WebTestBase {
 
@@ -20,14 +22,6 @@ class ElementsLabelsTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('form_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Form element and label output test',
-      'description' => 'Test form element labels, required markers and associated output.',
-      'group' => 'Form API',
-    );
-  }
 
   /**
    * Test form elements, labels, title attibutes and required marks output
@@ -77,6 +71,9 @@ class ElementsLabelsTest extends WebTestBase {
     $elements = $this->xpath('//label[@for="edit-form-textfield-test-title-no-show"]');
     $this->assertFalse(isset($elements[0]), 'No label tag when title set not to display.');
 
+    $elements = $this->xpath('//div[contains(@class, "form-item-form-textfield-test-title-invisible") and contains(@class, "form-no-label")]');
+    $this->assertTrue(isset($elements[0]), 'Field class is form-no-label when there is no label.');
+
     // Check #field_prefix and #field_suffix placement.
     $elements = $this->xpath('//span[@class="field-prefix"]/following-sibling::div[@id="edit-form-radios-test"]');
     $this->assertTrue(isset($elements[0]), 'Properly placed the #field_prefix element after the label and before the field.');
@@ -97,4 +94,32 @@ class ElementsLabelsTest extends WebTestBase {
     $elements = $this->xpath('//div[@id="edit-form-radios-title-attribute"]');
     $this->assertEqual($elements[0]['title'], 'Radios test' . ' (' . t('Required') . ')', 'Title attribute found.');
   }
+
+  /**
+   * Tests different display options for form element descriptions.
+   */
+  function testFormDescriptions() {
+    $this->drupalGet('form_test/form-descriptions');
+
+    // Check #description placement with #description_display='after'.
+    $field_id = 'edit-form-textfield-test-description-after';
+    $description_id = $field_id . '--description';
+    $elements = $this->xpath('//input[@id="' . $field_id . '" and @aria-describedby="' . $description_id . '"]/following-sibling::div[@id="' . $description_id . '"]');
+    $this->assertTrue(isset($elements[0]), t('Properly places the #description element after the form item.'));
+
+    // Check #description placement with #description_display='before'.
+    $field_id = 'edit-form-textfield-test-description-before';
+    $description_id = $field_id . '--description';
+    $elements = $this->xpath('//input[@id="' . $field_id . '" and @aria-describedby="' . $description_id . '"]/preceding-sibling::div[@id="' . $description_id . '"]');
+    $this->assertTrue(isset($elements[0]), t('Properly places the #description element before the form item.'));
+
+    // Check if the class is 'visually-hidden' on the form element description
+    // for the option with #description_display='invisible' and also check that
+    // the description is placed after the form element.
+    $field_id = 'edit-form-textfield-test-description-invisible';
+    $description_id = $field_id . '--description';
+    $elements = $this->xpath('//input[@id="' . $field_id . '" and @aria-describedby="' . $description_id . '"]/following-sibling::div[contains(@class, "visually-hidden")]');
+    $this->assertTrue(isset($elements[0]), t('Properly renders the #description element visually-hidden.'));
+  }
+
 }

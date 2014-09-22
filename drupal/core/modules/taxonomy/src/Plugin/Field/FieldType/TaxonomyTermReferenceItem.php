@@ -9,9 +9,10 @@ namespace Drupal\taxonomy\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\TypedData\AllowedValuesInterface;
+use Drupal\Core\TypedData\OptionsProviderInterface;
 
 /**
  * Plugin implementation of the 'term_reference' field type.
@@ -22,15 +23,15 @@ use Drupal\Core\TypedData\AllowedValuesInterface;
  *   description = @Translation("This field stores a reference to a taxonomy term."),
  *   default_widget = "options_select",
  *   default_formatter = "taxonomy_term_reference_link",
- *   list_class = "\Drupal\taxonomy\Plugin\Field\FieldType\TaxonomyTermReferenceFieldItemList"
+ *   list_class = "\Drupal\Core\Field\EntityReferenceFieldItemList"
  * )
  */
-class TaxonomyTermReferenceItem extends EntityReferenceItem implements AllowedValuesInterface {
+class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsProviderInterface {
 
   /**
    * {@inheritdoc}
    */
-  public static function defaultSettings() {
+  public static function defaultStorageSettings() {
     return array(
       'target_type' => 'taxonomy_term',
       'options_list_callback' => NULL,
@@ -40,7 +41,7 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements AllowedVa
           'parent' => 0,
         ),
       ),
-    ) + parent::defaultSettings();
+    ) + parent::defaultStorageSettings();
   }
 
   /**
@@ -119,7 +120,7 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements AllowedVa
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state, $has_data) {
+  public function storageSettingsForm(array &$form, FormStateInterface $form_state, $has_data) {
     $vocabularies = entity_load_multiple('taxonomy_vocabulary');
     $options = array();
     foreach ($vocabularies as $vocabulary) {
@@ -151,7 +152,7 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements AllowedVa
   /**
    * {@inheritdoc}
    */
-  public function instanceSettingsForm(array $form, array &$form_state) {
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     return array();
   }
 

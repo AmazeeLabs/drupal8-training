@@ -10,9 +10,7 @@ namespace Drupal\taxonomy\Entity;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
-use Drupal\Core\Field\FieldDefinition;
-use Drupal\Core\Language\Language;
-use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\taxonomy\TermInterface;
 
 /**
@@ -22,10 +20,12 @@ use Drupal\taxonomy\TermInterface;
  *   id = "taxonomy_term",
  *   label = @Translation("Taxonomy term"),
  *   bundle_label = @Translation("Vocabulary"),
- *   controllers = {
+ *   handlers = {
  *     "storage" = "Drupal\taxonomy\TermStorage",
+ *     "storage_schema" = "Drupal\taxonomy\TermStorageSchema",
  *     "view_builder" = "Drupal\taxonomy\TermViewBuilder",
- *     "access" = "Drupal\taxonomy\TermAccessController",
+ *     "access" = "Drupal\taxonomy\TermAccessControlHandler",
+ *     "views_data" = "Drupal\taxonomy\TermViewsData",
  *     "form" = {
  *       "default" = "Drupal\taxonomy\TermForm",
  *       "delete" = "Drupal\taxonomy\Form\TermDeleteForm"
@@ -33,6 +33,7 @@ use Drupal\taxonomy\TermInterface;
  *     "translation" = "Drupal\taxonomy\TermTranslationHandler"
  *   },
  *   base_table = "taxonomy_term_data",
+ *   data_table = "taxonomy_term_field_data",
  *   uri_callback = "taxonomy_term_uri",
  *   fieldable = TRUE,
  *   translatable = TRUE,
@@ -43,11 +44,11 @@ use Drupal\taxonomy\TermInterface;
  *     "uuid" = "uuid"
  *   },
  *   bundle_entity_type = "taxonomy_vocabulary",
+ *   field_ui_base_route = "entity.taxonomy_vocabulary.overview_form",
  *   links = {
- *     "canonical" = "taxonomy.term_page",
- *     "delete-form" = "taxonomy.term_delete",
- *     "edit-form" = "taxonomy.term_edit",
- *     "admin-form" = "taxonomy.overview_terms"
+ *     "canonical" = "entity.taxonomy_term.canonical",
+ *     "delete-form" = "entity.taxonomy_term.delete_form",
+ *     "edit-form" = "entity.taxonomy_term.edit_form",
  *   },
  *   permission_granularity = "bundle"
  * )
@@ -91,7 +92,7 @@ class Term extends ContentEntityBase implements TermInterface {
 
     // Only change the parents if a value is set, keep the existing values if
     // not.
-    if (isset($this->parent->value)) {
+    if (isset($this->parent->target_id)) {
       $storage->deleteTermHierarchy(array($this->id()));
       $storage->updateTermHierarchy($this);
     }
@@ -101,30 +102,30 @@ class Term extends ContentEntityBase implements TermInterface {
    * {@inheritdoc}
    */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type) {
-    $fields['tid'] = FieldDefinition::create('integer')
+    $fields['tid'] = BaseFieldDefinition::create('integer')
       ->setLabel(t('Term ID'))
       ->setDescription(t('The term ID.'))
       ->setReadOnly(TRUE)
       ->setSetting('unsigned', TRUE);
 
-    $fields['uuid'] = FieldDefinition::create('uuid')
+    $fields['uuid'] = BaseFieldDefinition::create('uuid')
       ->setLabel(t('UUID'))
       ->setDescription(t('The term UUID.'))
       ->setReadOnly(TRUE);
 
-    $fields['vid'] = FieldDefinition::create('entity_reference')
+    $fields['vid'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Vocabulary'))
       ->setDescription(t('The vocabulary to which the term is assigned.'))
-      ->setSetting('target_type', 'taxonomy_vocabulary')
-      ->setSetting('max_length', EntityTypeInterface::BUNDLE_MAX_LENGTH);
+      ->setSetting('target_type', 'taxonomy_vocabulary');
 
-    $fields['langcode'] = FieldDefinition::create('language')
+    $fields['langcode'] = BaseFieldDefinition::create('language')
       ->setLabel(t('Language code'))
       ->setDescription(t('The term language code.'));
 
-    $fields['name'] = FieldDefinition::create('string')
+    $fields['name'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Name'))
       ->setDescription(t('The term name.'))
+      ->setTranslatable(TRUE)
       ->setRequired(TRUE)
       ->setSetting('max_length', 255)
       ->setDisplayOptions('view', array(
@@ -133,15 +134,15 @@ class Term extends ContentEntityBase implements TermInterface {
         'weight' => -5,
       ))
       ->setDisplayOptions('form', array(
-        'type' => 'string',
+        'type' => 'string_textfield',
         'weight' => -5,
       ))
       ->setDisplayConfigurable('form', TRUE);
 
-    $fields['description'] = FieldDefinition::create('text_long')
+    $fields['description'] = BaseFieldDefinition::create('text_long')
       ->setLabel(t('Description'))
       ->setDescription(t('A description of the term.'))
-      ->setSetting('text_processing', 1)
+      ->setTranslatable(TRUE)
       ->setDisplayOptions('view', array(
         'label' => 'hidden',
         'type' => 'text_default',
@@ -154,22 +155,19 @@ class Term extends ContentEntityBase implements TermInterface {
       ))
       ->setDisplayConfigurable('form', TRUE);
 
-    $fields['weight'] = FieldDefinition::create('integer')
+    $fields['weight'] = BaseFieldDefinition::create('integer')
       ->setLabel(t('Weight'))
       ->setDescription(t('The weight of this term in relation to other terms.'))
-      ->setSetting('default_value', 0);
+      ->setDefaultValue(0);
 
-    // @todo Convert this to an entity_reference field, see
-    // https://drupal.org/node/1915056
-    $fields['parent'] = FieldDefinition::create('integer')
+    $fields['parent'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Term Parents'))
       ->setDescription(t('The parents of this term.'))
-      // Save new terms with no parents by default.
-      ->setSetting('default_value', 0)
-      ->setSetting('unsigned', TRUE)
-      ->addConstraint('TermParent', array());
+      ->setSetting('target_type', 'taxonomy_term')
+      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED)
+      ->setCustomStorage(TRUE);
 
-    $fields['changed'] = FieldDefinition::create('changed')
+    $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(t('Changed'))
       ->setDescription(t('The time that the term was last edited.'));
 

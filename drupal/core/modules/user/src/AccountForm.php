@@ -10,7 +10,8 @@ namespace Drupal\user;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\user\Plugin\LanguageNegotiation\LanguageNegotiationUserAdmin;
@@ -66,7 +67,7 @@ abstract class AccountForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     /** @var \Drupal\user\UserInterface $account */
     $account = $this->entity;
     $user = $this->currentUser();
@@ -84,11 +85,11 @@ abstract class AccountForm extends ContentEntityForm {
 
     // The mail field is NOT required if account originally had no mail set
     // and the user performing the edit has 'administer users' permission.
-    // This allows users without e-mail address to be edited and deleted.
+    // This allows users without email address to be edited and deleted.
     $form['account']['mail'] = array(
       '#type' => 'email',
-      '#title' => $this->t('E-mail address'),
-      '#description' => $this->t('A valid e-mail address. All e-mails from the system will be sent to this address. The e-mail address is not made public and will only be used if you wish to receive a new password or wish to receive certain news or notifications by e-mail.'),
+      '#title' => $this->t('Email address'),
+      '#description' => $this->t('A valid email address. All emails from the system will be sent to this address. The email address is not made public and will only be used if you wish to receive a new password or wish to receive certain news or notifications by email.'),
       '#required' => !(!$account->getEmail() && $user->hasPermission('administer users')),
       '#default_value' => (!$register ? $account->getEmail() : ''),
     );
@@ -131,7 +132,7 @@ abstract class AccountForm extends ContentEntityForm {
       if (!$pass_reset) {
         $protected_values['mail'] = $form['account']['mail']['#title'];
         $protected_values['pass'] = $this->t('Password');
-        $request_new = l($this->t('Request new password'), 'user/password', array('attributes' => array('title' => $this->t('Request new password via e-mail.'))));
+        $request_new = l($this->t('Request new password'), 'user/password', array('attributes' => array('title' => $this->t('Request new password via email.'))));
         $current_pass_description = $this->t('Required if you want to change the %mail or %pass below. !request_new.', array('%mail' => $protected_values['mail'], '%pass' => $protected_values['pass'], '!request_new' => $request_new));
       }
 
@@ -155,7 +156,7 @@ abstract class AccountForm extends ContentEntityForm {
           '#attributes' => array('autocomplete' => 'off'),
         );
 
-        $form_state['user'] = $account;
+        $form_state->set('user', $account);
         $form['#validate'][] = 'user_validate_current_pass';
       }
     }
@@ -193,19 +194,7 @@ abstract class AccountForm extends ContentEntityForm {
       '#access' => $admin,
     );
 
-    $roles = array_map('check_plain', user_role_names(TRUE));
-    // The disabled checkbox subelement for the 'authenticated user' role
-    // must be generated separately and added to the checkboxes element,
-    // because of a limitation in Form API not supporting a single disabled
-    // checkbox within a set of checkboxes.
-    // @todo This should be solved more elegantly. See issue #119038.
-    $checkbox_authenticated = array(
-      '#type' => 'checkbox',
-      '#title' => $roles[DRUPAL_AUTHENTICATED_RID],
-      '#default_value' => TRUE,
-      '#disabled' => TRUE,
-    );
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
+    $roles = array_map(array('\Drupal\Component\Utility\String', 'checkPlain'), user_role_names(TRUE));
 
     $form['account']['roles'] = array(
       '#type' => 'checkboxes',
@@ -213,7 +202,12 @@ abstract class AccountForm extends ContentEntityForm {
       '#default_value' => (!$register ? $account->getRoles() : array()),
       '#options' => $roles,
       '#access' => $roles && $user->hasPermission('administer permissions'),
-      DRUPAL_AUTHENTICATED_RID => $checkbox_authenticated,
+    );
+
+    // Special handling for the inevitable "Authenticated user" role.
+    $form['account']['roles'][DRUPAL_AUTHENTICATED_RID] = array(
+      '#default_value' => TRUE,
+      '#disabled' => TRUE,
     );
 
     $form['account']['notify'] = array(
@@ -247,13 +241,13 @@ abstract class AccountForm extends ContentEntityForm {
 
     $user_preferred_langcode = $register ? $language_interface->id : $account->getPreferredLangcode();
 
-    $user_preferred_admin_langcode = $register ? $language_interface->id : $account->getPreferredAdminLangcode();
+    $user_preferred_admin_langcode = $register ? $language_interface->id : $account->getPreferredAdminLangcode(FALSE);
 
     // Is the user preferred language added?
     $user_language_added = FALSE;
     if ($this->languageManager instanceof ConfigurableLanguageManagerInterface) {
       $negotiator = $this->languageManager->getNegotiator();
-      $user_language_added = $negotiator && $negotiator->isNegotiationMethodEnabled(LanguageNegotiationUser::METHOD_ID, Language::TYPE_INTERFACE);
+      $user_language_added = $negotiator && $negotiator->isNegotiationMethodEnabled(LanguageNegotiationUser::METHOD_ID, LanguageInterface::TYPE_INTERFACE);
     }
     $form['language'] = array(
       '#type' => $this->languageManager->isMultilingual() ? 'details' : 'container',
@@ -267,9 +261,9 @@ abstract class AccountForm extends ContentEntityForm {
     $form['language']['preferred_langcode'] = array(
       '#type' => 'language_select',
       '#title' => $this->t('Site language'),
-      '#languages' => Language::STATE_CONFIGURABLE,
+      '#languages' => LanguageInterface::STATE_CONFIGURABLE,
       '#default_value' => $user_preferred_langcode,
-      '#description' => $user_language_added ? $this->t("This account's preferred language for e-mails and site presentation.") : $this->t("This account's preferred language for e-mails."),
+      '#description' => $user_language_added ? $this->t("This account's preferred language for emails and site presentation.") : $this->t("This account's preferred language for emails."),
     );
 
     // Only show the account setting for Administration pages language to users
@@ -282,9 +276,11 @@ abstract class AccountForm extends ContentEntityForm {
     $form['language']['preferred_admin_langcode'] = array(
       '#type' => 'language_select',
       '#title' => $this->t('Administration pages language'),
-      '#languages' => Language::STATE_CONFIGURABLE,
+      '#languages' => LanguageInterface::STATE_CONFIGURABLE,
       '#default_value' => $user_preferred_admin_langcode,
       '#access' => $show_admin_language,
+      '#empty_option' => $this->t('- No preference -'),
+      '#empty_value' => '',
     );
     // User entities contain both a langcode property (for identifying the
     // language of the entity data) and a preferred_langcode property (see
@@ -308,15 +304,15 @@ abstract class AccountForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function buildEntity(array $form, array &$form_state) {
+  public function buildEntity(array $form, FormStateInterface $form_state) {
     // Change the roles array to a list of enabled roles.
     // @todo: Alter the form state as the form values are directly extracted and
     //   set on the field, which throws an exception as the list requires
     //   numeric keys. Allow to override this per field. As this function is
     //   called twice, we have to prevent it from getting the array keys twice.
 
-    if (is_string(key($form_state['values']['roles']))) {
-      $form_state['values']['roles'] = array_keys(array_filter($form_state['values']['roles']));
+    if (is_string(key($form_state->getValue('roles')))) {
+      $form_state->setValue('roles', array_keys(array_filter($form_state->getValue('roles'))));
     }
     return parent::buildEntity($form, $form_state);
   }
@@ -324,32 +320,32 @@ abstract class AccountForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
     $account = $this->entity;
     // Validate new or changing username.
-    if (isset($form_state['values']['name'])) {
-      if ($error = user_validate_name($form_state['values']['name'])) {
-        $this->setFormError('name', $form_state, $error);
+    if ($form_state->hasValue('name')) {
+      if ($error = user_validate_name($form_state->getValue('name'))) {
+        $form_state->setErrorByName('name', $error);
       }
       // Cast the user ID as an integer. It might have been set to NULL, which
       // could lead to unexpected results.
       else {
         $name_taken = (bool) $this->entityQuery->get('user')
           ->condition('uid', (int) $account->id(), '<>')
-          ->condition('name', $form_state['values']['name'])
+          ->condition('name', $form_state->getValue('name'))
           ->range(0, 1)
           ->count()
           ->execute();
 
         if ($name_taken) {
-          $this->setFormError('name', $form_state, $this->t('The name %name is already taken.', array('%name' => $form_state['values']['name'])));
+          $form_state->setErrorByName('name', $this->t('The name %name is already taken.', array('%name' => $form_state->getValue('name'))));
         }
       }
     }
 
-    $mail = $form_state['values']['mail'];
+    $mail = $form_state->getValue('mail');
 
     if (!empty($mail)) {
       $mail_taken = (bool) $this->entityQuery->get('user')
@@ -362,25 +358,28 @@ abstract class AccountForm extends ContentEntityForm {
       if ($mail_taken) {
         // Format error message dependent on whether the user is logged in or not.
         if (\Drupal::currentUser()->isAuthenticated()) {
-          $this->setFormError('mail', $form_state, $this->t('The e-mail address %email is already taken.', array('%email' => $mail)));
+          $form_state->setErrorByName('mail', $this->t('The email address %email is already taken.', array('%email' => $mail)));
         }
         else {
-          $this->setFormError('mail', $form_state, $this->t('The e-mail address %email is already registered. <a href="@password">Have you forgotten your password?</a>', array('%email' => $mail, '@password' => url('user/password'))));
+          $form_state->setErrorByName('mail', $this->t('The email address %email is already registered. <a href="@password">Have you forgotten your password?</a>', array('%email' => $mail, '@password' => url('user/password'))));
         }
       }
     }
 
     // Make sure the signature isn't longer than the size of the database field.
     // Signatures are disabled by default, so make sure it exists first.
-    if (isset($form_state['values']['signature'])) {
+    if ($signature = $form_state->getValue('signature')) {
       // Move text format for user signature into 'signature_format'.
-      $form_state['values']['signature_format'] = $form_state['values']['signature']['format'];
+      $form_state->setValue('signature_format', $signature['format']);
       // Move text value for user signature into 'signature'.
-      $form_state['values']['signature'] = $form_state['values']['signature']['value'];
+      $form_state->setValue('signature', $signature['value']);
 
-      $user_schema = drupal_get_schema('users');
-      if (drupal_strlen($form_state['values']['signature']) > $user_schema['fields']['signature']['length']) {
-        $this->setFormError('signature', $form_state, $this->t('The signature is too long: it must be %max characters or less.', array('%max' => $user_schema['fields']['signature']['length'])));
+      // @todo Make the user signature field use a widget to benefit from
+      //   automatic typed data validation in https://drupal.org/node/2227381.
+      $field_definitions = $this->entityManager->getFieldDefinitions('user', $this->getEntity()->bundle());
+      $max_length = $field_definitions['signature']->getSetting('max_length');
+      if (drupal_strlen($form_state->getValue('signature')) > $max_length) {
+        $form_state->setErrorByName('signature', $this->t('The signature is too long: it must be %max characters or less.', array('%max' => $max_length)));
       }
     }
   }
@@ -388,8 +387,8 @@ abstract class AccountForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function submit(array $form, array &$form_state) {
-    parent::submit($form, $form_state);
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    parent::submitForm($form, $form_state);
 
     $user = $this->getEntity($form_state);
     // If there's a session set to the users id, remove the password reset tag

@@ -15,8 +15,9 @@ use Drupal\views\ResultRow;
 use Drupal\views_test_data\Plugin\views\style\StyleTest as StyleTestPlugin;
 
 /**
- * Tests some general style plugin related functionality.
+ * Tests general style functionality.
  *
+ * @group views
  * @see \Drupal\views_test_data\Plugin\views\style\StyleTest.
  */
 class StyleTest extends ViewTestBase {
@@ -34,14 +35,6 @@ class StyleTest extends ViewTestBase {
    * @var \SimpleXMLElement
    */
   protected $elements;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Style: General',
-      'description' => 'Test general style functionality.',
-      'group' => 'Views Plugins',
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -68,7 +61,7 @@ class StyleTest extends ViewTestBase {
     $view->style_plugin->init($view, $view->display_handler);
     $this->assertTrue($view->rowPlugin instanceof RowTest, 'Make sure the right row plugin class is loaded.');
 
-    $random_text = $this->randomName();
+    $random_text = $this->randomMachineName();
     $view->rowPlugin->setOutput($random_text);
 
     $output = $view->preview();
@@ -87,7 +80,7 @@ class StyleTest extends ViewTestBase {
     $this->assertTrue($view->style_plugin instanceof StyleTestPlugin, 'Make sure the right style plugin class is loaded.');
     $this->assertTrue($view->rowPlugin instanceof Fields, 'Make sure that rowPlugin is now a fields instance.');
 
-    $random_text = $this->randomName();
+    $random_text = $this->randomMachineName();
     // Set some custom text to the output and make sure that this value is
     // rendered.
     $view->style_plugin->setOutput($random_text);
@@ -128,18 +121,21 @@ class StyleTest extends ViewTestBase {
         'table' => 'views_test_data',
         'field' => 'name',
         'relationship' => 'none',
+        'label' => 'Name',
       ),
       'job' => array(
         'id' => 'job',
         'table' => 'views_test_data',
         'field' => 'job',
         'relationship' => 'none',
+        'label' => 'Job',
       ),
       'age' => array(
         'id' => 'age',
         'table' => 'views_test_data',
         'field' => 'age',
         'relationship' => 'none',
+        'label' => 'Age',
       ),
     ));
 
@@ -151,14 +147,14 @@ class StyleTest extends ViewTestBase {
     $expected['Job: Singer']['group'] = 'Job: Singer';
     $expected['Job: Singer']['rows']['Age: 25'] = array();
     $expected['Job: Singer']['rows']['Age: 25']['group'] = 'Age: 25';
-    $expected['Job: Singer']['rows']['Age: 25']['rows'][0] = new ResultRow();
+    $expected['Job: Singer']['rows']['Age: 25']['rows'][0] = new ResultRow(['index' => 0]);
     $expected['Job: Singer']['rows']['Age: 25']['rows'][0]->views_test_data_name = 'John';
     $expected['Job: Singer']['rows']['Age: 25']['rows'][0]->views_test_data_job = 'Singer';
     $expected['Job: Singer']['rows']['Age: 25']['rows'][0]->views_test_data_age = '25';
     $expected['Job: Singer']['rows']['Age: 25']['rows'][0]->views_test_data_id = '1';
     $expected['Job: Singer']['rows']['Age: 27'] = array();
     $expected['Job: Singer']['rows']['Age: 27']['group'] = 'Age: 27';
-    $expected['Job: Singer']['rows']['Age: 27']['rows'][1] = new ResultRow();
+    $expected['Job: Singer']['rows']['Age: 27']['rows'][1] = new ResultRow(['index' => 1]);
     $expected['Job: Singer']['rows']['Age: 27']['rows'][1]->views_test_data_name = 'George';
     $expected['Job: Singer']['rows']['Age: 27']['rows'][1]->views_test_data_job = 'Singer';
     $expected['Job: Singer']['rows']['Age: 27']['rows'][1]->views_test_data_age = '27';
@@ -167,7 +163,7 @@ class StyleTest extends ViewTestBase {
     $expected['Job: Drummer']['group'] = 'Job: Drummer';
     $expected['Job: Drummer']['rows']['Age: 28'] = array();
     $expected['Job: Drummer']['rows']['Age: 28']['group'] = 'Age: 28';
-    $expected['Job: Drummer']['rows']['Age: 28']['rows'][2] = new ResultRow();
+    $expected['Job: Drummer']['rows']['Age: 28']['rows'][2] = new ResultRow(['index' => 2]);
     $expected['Job: Drummer']['rows']['Age: 28']['rows'][2]->views_test_data_name = 'Ringo';
     $expected['Job: Drummer']['rows']['Age: 28']['rows'][2]->views_test_data_job = 'Drummer';
     $expected['Job: Drummer']['rows']['Age: 28']['rows'][2]->views_test_data_age = '28';
@@ -178,14 +174,14 @@ class StyleTest extends ViewTestBase {
     if ($stripped) {
 
       // Add some html to the result and expected value.
-      $rand = '<a data="' . $this->randomName() . '" />';
+      $rand = '<a data="' . $this->randomMachineName() . '" />';
       $view->result[0]->views_test_data_job .= $rand;
       $expected['Job: Singer']['rows']['Age: 25']['rows'][0]->views_test_data_job = 'Singer' . $rand;
       $expected['Job: Singer']['group'] = 'Job: Singer';
-      $rand = '<a data="' . $this->randomName() . '" />';
+      $rand = '<a data="' . $this->randomMachineName() . '" />';
       $view->result[1]->views_test_data_job .= $rand;
       $expected['Job: Singer']['rows']['Age: 27']['rows'][1]->views_test_data_job = 'Singer' . $rand;
-      $rand = '<a data="' . $this->randomName() . '" />';
+      $rand = '<a data="' . $this->randomMachineName() . '" />';
       $view->result[2]->views_test_data_job .= $rand;
       $expected['Job: Drummer']['rows']['Age: 28']['rows'][2]->views_test_data_job = 'Drummer' . $rand;
       $expected['Job: Drummer']['group'] = 'Job: Drummer';
@@ -229,7 +225,7 @@ class StyleTest extends ViewTestBase {
 
     // Setup some random css class.
     $view->initStyle();
-    $random_name = $this->randomName();
+    $random_name = $this->randomMachineName();
     $view->style_plugin->options['row_class'] = $random_name . " test-token-[name]";
 
     $output = $view->preview();

@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Entity;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests \Drupal\Core\Entity\Controller\EntityViewController.
+ * Tests EntityViewController functionality.
+ *
+ * @group Entity
  */
 class EntityViewControllerTest extends WebTestBase {
 
@@ -28,19 +30,11 @@ class EntityViewControllerTest extends WebTestBase {
    */
   protected $entities = array();
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity View Controller',
-      'description' => 'Tests EntityViewController functionality.',
-      'group' => 'Entity API',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Create some dummy entity_test entities.
     for ($i = 0; $i < 2; $i++) {
-      $random_label = $this->randomName();
+      $random_label = $this->randomMachineName();
       $data = array('bundle' => 'entity_test', 'name' => $random_label);
       $entity_test = $this->container->get('entity.manager')->getStorage('entity_test')->create($data);
       $entity_test->save();
@@ -88,7 +82,7 @@ class EntityViewControllerTest extends WebTestBase {
       ->save();
 
     // Create an entity and save test value in field_test_text.
-    $test_value = $this->randomName();
+    $test_value = $this->randomMachineName();
     $entity = entity_create('entity_test');
     $entity->field_test_text = $test_value;
     $entity->save();
@@ -96,12 +90,14 @@ class EntityViewControllerTest extends WebTestBase {
     // Browse to the entity and verify that the attribute is rendered in the
     // field item HTML markup.
     $this->drupalGet('entity_test/' . $entity->id());
-    $xpath = $this->xpath('//div[@data-field-item-attr="foobar" and text()=:value]', array(':value' => $test_value));
+    $xpath = $this->xpath('//div[@data-field-item-attr="foobar"]/p[text()=:value]', array(':value' => $test_value));
     $this->assertTrue($xpath, 'The field item attribute has been found in the rendered output of the field.');
 
     // Enable the RDF module to ensure that two modules can add attributes to
     // the same field item.
     \Drupal::moduleHandler()->install(array('rdf'));
+    $this->resetAll();
+
     // Set an RDF mapping for the field_test_text field. This RDF mapping will
     // be turned into RDFa attributes in the field item output.
     $mapping = rdf_get_mapping('entity_test', 'entity_test');
@@ -111,7 +107,7 @@ class EntityViewControllerTest extends WebTestBase {
     // Browse to the entity and verify that the attributes from both modules
     // are rendered in the field item HTML markup.
     $this->drupalGet('entity_test/' . $entity->id());
-    $xpath = $this->xpath('//div[@data-field-item-attr="foobar" and @property="schema:text" and text()=:value]', array(':value' => $test_value));
+    $xpath = $this->xpath('//div[@data-field-item-attr="foobar" and @property="schema:text"]/p[text()=:value]', array(':value' => $test_value));
     $this->assertTrue($xpath, 'The field item attributes from both modules have been found in the rendered output of the field.');
   }
 

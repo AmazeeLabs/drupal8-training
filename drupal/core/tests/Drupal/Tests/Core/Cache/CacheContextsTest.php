@@ -12,42 +12,10 @@ use Drupal\Core\Cache\CacheContextInterface;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Fake cache context class.
- */
-class FooCacheContext implements CacheContextInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getLabel() {
-    return 'Foo';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getContext() {
-    return 'bar';
-  }
-
-}
-
-/**
- * Tests the CacheContexts service.
- *
+ * @coversDefaultClass \Drupal\Core\Cache\CacheContexts
  * @group Cache
- *
- * @see \Drupal\Core\Cache\CacheContexts
  */
 class CacheContextsTest extends UnitTestCase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'CacheContext test',
-      'description' => 'Tests cache contexts.',
-      'group' => 'Cache',
-    );
-  }
 
   public function testContextPlaceholdersAreReplaced() {
     $container = $this->getMockContainer();
@@ -95,3 +63,25 @@ class CacheContextsTest extends UnitTestCase {
                 ->getMock();
   }
 }
+
+/**
+ * Fake cache context class.
+ */
+class FooCacheContext implements CacheContextInterface {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getLabel() {
+    return 'Foo';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getContext() {
+    return 'bar';
+  }
+
+}
+

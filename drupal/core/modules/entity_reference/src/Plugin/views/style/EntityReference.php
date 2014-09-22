@@ -8,6 +8,7 @@
 namespace Drupal\entity_reference\Plugin\views\style;
 
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\style\StylePluginBase;
 
 /**
@@ -54,7 +55,7 @@ class EntityReference extends StylePluginBase {
   /**
    * Overrides \Drupal\views\Plugin\views\style\StylePluginBase\StylePluginBase::buildOptionsForm().
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $options = $this->displayHandler->getFieldLabels(TRUE);
@@ -87,17 +88,14 @@ class EntityReference extends StylePluginBase {
     // @todo We don't display grouping info for now. Could be useful for select
     // widget, though.
     $results = array();
-    $this->view->row_index = 0;
     foreach ($sets as $records) {
       foreach ($records as $values) {
         // Sanitize HTML, remove line breaks and extra whitespace.
         $output = $this->view->rowPlugin->render($values);
         $output = drupal_render($output);
         $results[$values->{$id_field_alias}] = Xss::filterAdmin(preg_replace('/\s\s+/', ' ', str_replace("\n", '', $output)));
-        $this->view->row_index++;
       }
     }
-    unset($this->view->row_index);
     return $results;
   }
 

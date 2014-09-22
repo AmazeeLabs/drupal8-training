@@ -10,6 +10,7 @@ namespace Drupal\filter;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\Query\QueryFactory;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\filter\Plugin\Filter\FilterNull;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -47,7 +48,7 @@ abstract class FilterFormatFormBase extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     $format = $this->entity;
     $is_fallback = ($format->id() == $this->config('filter.settings')->get('fallback_format'));
 
@@ -56,7 +57,7 @@ abstract class FilterFormatFormBase extends EntityForm {
 
     $form['name'] = array(
       '#type' => 'textfield',
-      '#title' => t('Name'),
+      '#title' => $this->t('Name'),
       '#default_value' => $format->label(),
       '#required' => TRUE,
       '#weight' => -30,
@@ -77,13 +78,13 @@ abstract class FilterFormatFormBase extends EntityForm {
     // Add user role access selection.
     $form['roles'] = array(
       '#type' => 'checkboxes',
-      '#title' => t('Roles'),
+      '#title' => $this->t('Roles'),
       '#options' => array_map('\Drupal\Component\Utility\String::checkPlain', user_role_names()),
       '#disabled' => $is_fallback,
       '#weight' => -10,
     );
     if ($is_fallback) {
-      $form['roles']['#description'] = t('All roles for this text format must be enabled and cannot be changed.');
+      $form['roles']['#description'] = $this->t('All roles for this text format must be enabled and cannot be changed.');
     }
     if (!$format->isNew()) {
       // If editing an existing text format, pre-select its current permissions.
@@ -103,7 +104,7 @@ abstract class FilterFormatFormBase extends EntityForm {
       // When a filter is missing, it is replaced by the null filter. Remove it
       // here, so that saving the form will remove the missing filter.
       if ($filter instanceof FilterNull) {
-        drupal_set_message(t('The %filter filter is missing, and will be removed once this format is saved.', array('%filter' => $filter_id)), 'warning');
+        drupal_set_message($this->t('The %filter filter is missing, and will be removed once this format is saved.', array('%filter' => $filter_id)), 'warning');
         $filters->removeInstanceID($filter_id);
       }
     }
@@ -111,7 +112,7 @@ abstract class FilterFormatFormBase extends EntityForm {
     // Filter status.
     $form['filters']['status'] = array(
       '#type' => 'item',
-      '#title' => t('Enabled filters'),
+      '#title' => $this->t('Enabled filters'),
       '#prefix' => '<div id="filters-status-wrapper">',
       '#suffix' => '</div>',
       // This item is used as a pure wrapping container with heading. Ignore its
@@ -124,7 +125,7 @@ abstract class FilterFormatFormBase extends EntityForm {
       '#type' => 'table',
       // For filter.admin.js
       '#attributes' => array('id' => 'filter-order'),
-      '#title' => t('Filter processing order'),
+      '#title' => $this->t('Filter processing order'),
       '#tabledrag' => array(
         array(
          'action' => 'order',
@@ -139,7 +140,7 @@ abstract class FilterFormatFormBase extends EntityForm {
     // Filter settings.
     $form['filter_settings'] = array(
       '#type' => 'vertical_tabs',
-      '#title' => t('Filter settings'),
+      '#title' => $this->t('Filter settings'),
     );
 
     foreach ($filters as $name => $filter) {
@@ -159,7 +160,7 @@ abstract class FilterFormatFormBase extends EntityForm {
       );
       $form['filters']['order'][$name]['weight'] = array(
         '#type' => 'weight',
-        '#title' => t('Weight for @title', array('@title' => $filter->getLabel())),
+        '#title' => $this->t('Weight for @title', array('@title' => $filter->getLabel())),
         '#title_display' => 'invisible',
         '#delta' => 50,
         '#default_value' => $filter->weight,
@@ -209,12 +210,12 @@ abstract class FilterFormatFormBase extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
     // @todo Move trimming upstream.
-    $format_format = trim($form_state['values']['format']);
-    $format_name = trim($form_state['values']['name']);
+    $format_format = trim($form_state->getValue('format'));
+    $format_name = trim($form_state->getValue('name'));
 
     // Ensure that the values to be saved later are exactly the ones validated.
     form_set_value($form['format'], $format_format, $form_state);
@@ -226,19 +227,19 @@ abstract class FilterFormatFormBase extends EntityForm {
       ->condition('name', $format_name)
       ->execute();
     if ($format_exists) {
-      $this->setFormError('name', $form_state, $this->t('Text format names must be unique. A format named %name already exists.', array('%name' => $format_name)));
+      $form_state->setErrorByName('name', $this->t('Text format names must be unique. A format named %name already exists.', array('%name' => $format_name)));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function submit(array $form, array &$form_state) {
-    parent::submit($form, $form_state);
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    parent::submitForm($form, $form_state);
 
     // Add the submitted form values to the text format, and save it.
     $format = $this->entity;
-    foreach ($form_state['values'] as $key => $value) {
+    foreach ($form_state->getValues() as $key => $value) {
       if ($key != 'filters') {
         $format->set($key, $value);
       }
@@ -252,12 +253,12 @@ abstract class FilterFormatFormBase extends EntityForm {
 
     // Save user permissions.
     if ($permission = $format->getPermissionName()) {
-      foreach ($form_state['values']['roles'] as $rid => $enabled) {
+      foreach ($form_state->getValue('roles') as $rid => $enabled) {
         user_role_change_permissions($rid, array($permission => $enabled));
       }
     }
 
-    $form_state['redirect_route']['route_name'] = 'filter.admin_overview';
+    $form_state->setRedirect('filter.admin_overview');
 
     return $this->entity;
   }
@@ -265,9 +266,9 @@ abstract class FilterFormatFormBase extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  protected function actions(array $form, array &$form_state) {
+  protected function actions(array $form, FormStateInterface $form_state) {
     $actions = parent::actions($form, $form_state);
-    $actions['submit']['#value'] = t('Save configuration');
+    $actions['submit']['#value'] = $this->t('Save configuration');
     return $actions;
   }
 

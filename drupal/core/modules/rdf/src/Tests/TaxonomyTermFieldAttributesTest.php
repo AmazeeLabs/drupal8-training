@@ -7,11 +7,13 @@
 
 namespace Drupal\rdf\Tests;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\taxonomy\Tests\TaxonomyTestBase;
 
 /**
  * Tests RDFa markup generation for taxonomy term fields.
+ *
+ * @group rdf
  */
 class TaxonomyTermFieldAttributesTest extends TaxonomyTestBase {
 
@@ -36,25 +38,15 @@ class TaxonomyTermFieldAttributesTest extends TaxonomyTestBase {
    */
   protected $vocabulary;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'RDFa markup for taxonomy term fields',
-      'description' => 'Tests the RDFa markup of taxonomy term fields.',
-      'group' => 'RDF',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array('bypass node access', 'administer taxonomy'));
     $this->drupalLogin($web_user);
     $this->vocabulary = $this->createVocabulary();
 
-    // Setup a field and instance.
-    $this->fieldName = 'field_taxonomy_test';
-
     // Create the field.
+    $this->fieldName = 'field_taxonomy_test';
     $this->createTaxonomyTermReferenceField($this->fieldName, $this->vocabulary);
 
     // Set the RDF mapping for the new field.
@@ -155,11 +147,11 @@ class TaxonomyTermFieldAttributesTest extends TaxonomyTestBase {
    * @todo Move this to TaxonomyTestBase, like the other field modules.
    */
   protected function createTaxonomyTermReferenceField($field_name, $vocabulary) {
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -169,7 +161,7 @@ class TaxonomyTermFieldAttributesTest extends TaxonomyTestBase {
         ),
       ),
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $field_name,
       'entity_type' => 'node',
       'bundle' => 'article',

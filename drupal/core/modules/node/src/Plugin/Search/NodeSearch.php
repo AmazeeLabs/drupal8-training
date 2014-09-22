@@ -7,13 +7,16 @@
 
 namespace Drupal\node\Plugin\Search;
 
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\String;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Config\Config;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\Query\SelectExtender;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\State\StateInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Access\AccessibleInterface;
 use Drupal\Core\Database\Query\Condition;
@@ -62,13 +65,6 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   protected $searchSettings;
 
   /**
-   * The Drupal state object used to set 'node.cron_last'.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
-
-  /**
    * The Drupal account to use for checking for access to advanced search.
    *
    * @var \Drupal\Core\Session\AccountInterface
@@ -114,7 +110,6 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
       $container->get('entity.manager'),
       $container->get('module_handler'),
       $container->get('config.factory')->get('search.settings'),
-      $container->get('state'),
       $container->get('current_user')
     );
   }
@@ -136,17 +131,14 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
    *   A module manager object.
    * @param \Drupal\Core\Config\Config $search_settings
    *   A config object for 'search.settings'.
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The Drupal state object used to set 'node.cron_last'.
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The $account object to use for checking for access to advanced search.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, Connection $database, EntityManagerInterface $entity_manager, ModuleHandlerInterface $module_handler, Config $search_settings, StateInterface $state, AccountInterface $account = NULL) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, Connection $database, EntityManagerInterface $entity_manager, ModuleHandlerInterface $module_handler, Config $search_settings, AccountInterface $account = NULL) {
     $this->database = $database;
     $this->entityManager = $entity_manager;
     $this->moduleHandler = $module_handler;
     $this->searchSettings = $search_settings;
-    $this->state = $state;
     $this->account = $account;
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
@@ -154,8 +146,9 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   /**
    * {@inheritdoc}
    */
-  public function access($operation = 'view', AccountInterface $account = NULL) {
-    return !empty($account) && $account->hasPermission('access content');
+  public function access($operation = 'view', AccountInterface $account = NULL, $return_as_object = FALSE) {
+    $result = AccessResult::allowedIfHasPermission($account, 'access content');
+    return $return_as_object ? $result : $result->isAllowed();
   }
 
   /**
@@ -181,7 +174,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
 
     // Build matching conditions.
     $query = $this->database
-      ->select('search_index', 'i', array('target' => 'slave'))
+      ->select('search_index', 'i', array('target' => 'replica'))
       ->extend('Drupal\search\SearchQuery')
       ->extend('Drupal\Core\Database\Query\PagerSelectExtender');
     $query->join('node_field_data', 'n', 'n.nid = i.sid');
@@ -265,10 +258,12 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
       $node = $node_storage->load($item->sid)->getTranslation($item->langcode);
       $build = $node_render->view($node, 'search_result', $item->langcode);
       unset($build['#theme']);
-      $node->rendered = drupal_render($build);
 
       // Fetch comment count for snippet.
-      $node->rendered .= ' ' . $this->moduleHandler->invoke('comment', 'node_update_index', array($node, $item->langcode));
+      $node->rendered = SafeMarkup::set(
+        drupal_render($build) . ' ' .
+        SafeMarkup::escape($this->moduleHandler->invoke('comment', 'node_update_index', array($node, $item->langcode)))
+      );
 
       $extra = $this->moduleHandler->invokeAll('node_search_result', array($node, $item->langcode));
 
@@ -279,7 +274,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
       );
       $results[] = array(
         'link' => $node->url('canonical', array('absolute' => TRUE, 'language' => $language)),
-        'type' => check_plain($this->entityManager->getStorage('node_type')->load($node->bundle())->label()),
+        'type' => String::checkPlain($this->entityManager->getStorage('node_type')->load($node->bundle())->label()),
         'title' => $node->label(),
         'user' => drupal_render($username),
         'date' => $node->getChangedTime(),
@@ -324,7 +319,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
     // per cron run.
     $limit = (int) $this->searchSettings->get('index.cron_limit');
 
-    $result = $this->database->queryRange("SELECT n.nid, MAX(sd.reindex) FROM {node} n LEFT JOIN {search_dataset} sd ON sd.sid = n.nid AND sd.type = :type WHERE sd.sid IS NULL OR sd.reindex <> 0 GROUP BY n.nid ORDER BY MAX(sd.reindex) is null DESC, MAX(sd.reindex) ASC, n.nid ASC", 0, $limit, array(':type' => $this->getPluginId()), array('target' => 'slave'));
+    $result = $this->database->queryRange("SELECT n.nid, MAX(sd.reindex) FROM {node} n LEFT JOIN {search_dataset} sd ON sd.sid = n.nid AND sd.type = :type WHERE sd.sid IS NULL OR sd.reindex <> 0 GROUP BY n.nid ORDER BY MAX(sd.reindex) is null DESC, MAX(sd.reindex) ASC, n.nid ASC", 0, $limit, array(':type' => $this->getPluginId()), array('target' => 'replica'));
     $nids = $result->fetchCol();
     if (!$nids) {
       return;
@@ -343,10 +338,6 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
    *   The node to index.
    */
   protected function indexNode(NodeInterface $node) {
-    // Save the changed time of the most recent indexed node, for the search
-    // results half-life calculation.
-    $this->state->set('node.cron_last', $node->getChangedTime());
-
     $languages = $node->getTranslationLanguages();
     $node_render = $this->entityManager->getViewBuilder('node');
 
@@ -358,7 +349,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
       unset($build['#theme']);
       $node->rendered = drupal_render($build);
 
-      $text = '<h1>' . check_plain($node->label($language->id)) . '</h1>' . $node->rendered;
+      $text = '<h1>' . String::checkPlain($node->label($language->id)) . '</h1>' . $node->rendered;
 
       // Fetch extra data normally not visible.
       $extra = $this->moduleHandler->invokeAll('node_update_index', array($node, $language->id));
@@ -394,7 +385,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   /**
    * {@inheritdoc}
    */
-  public function searchFormAlter(array &$form, array &$form_state) {
+  public function searchFormAlter(array &$form, FormStateInterface $form_state) {
     // Add advanced search keyword-related boxes.
     $form['advanced'] = array(
       '#type' => 'details',
@@ -430,7 +421,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
     );
 
     // Add node types.
-    $types = array_map('check_plain', node_type_get_names());
+    $types = array_map(array('\Drupal\Component\Utility\String', 'checkPlain'), node_type_get_names());
     $form['advanced']['types-fieldset'] = array(
       '#type' => 'fieldset',
       '#title' => t('Types'),
@@ -452,7 +443,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
 
     // Add languages.
     $language_options = array();
-    $language_list = \Drupal::languageManager()->getLanguages(Language::STATE_ALL);
+    $language_list = \Drupal::languageManager()->getLanguages(LanguageInterface::STATE_ALL);
     foreach ($language_list as $langcode => $language) {
       // Make locked languages appear special in the list.
       $language_options[$langcode] = $language->locked ? t('- @name -', array('@name' => $language->name)) : $language->name;
@@ -475,47 +466,47 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   /*
    * {@inheritdoc}
    */
-  public function buildSearchUrlQuery($form_state) {
+  public function buildSearchUrlQuery(FormStateInterface $form_state) {
     // Read keyword and advanced search information from the form values,
     // and put these into the GET parameters.
-    $keys = trim($form_state['values']['keys']);
+    $keys = trim($form_state->getValue('keys'));
 
     // Collect extra filters.
     $filters = array();
-    if (isset($form_state['values']['type']) && is_array($form_state['values']['type'])) {
+    if ($form_state->hasValue('type') && is_array($form_state->getValue('type'))) {
       // Retrieve selected types - Form API sets the value of unselected
       // checkboxes to 0.
-      foreach ($form_state['values']['type'] as $type) {
+      foreach ($form_state->getValue('type') as $type) {
         if ($type) {
           $filters[] = 'type:' . $type;
         }
       }
     }
 
-    if (isset($form_state['values']['term']) && is_array($form_state['values']['term'])) {
-      foreach ($form_state['values']['term'] as $term) {
+    if ($form_state->hasValue('term') && is_array($form_state->getValue('term'))) {
+      foreach ($form_state->getValue('term') as $term) {
         $filters[] = 'term:' . $term;
       }
     }
-    if (isset($form_state['values']['language']) && is_array($form_state['values']['language'])) {
-      foreach ($form_state['values']['language'] as $language) {
+    if ($form_state->hasValue('language') && is_array($form_state->getValue('language'))) {
+      foreach ($form_state->getValue('language') as $language) {
         if ($language) {
           $filters[] = 'language:' . $language;
         }
       }
     }
-    if ($form_state['values']['or'] != '') {
-      if (preg_match_all('/ ("[^"]+"|[^" ]+)/i', ' ' . $form_state['values']['or'], $matches)) {
+    if ($form_state->getValue('or') != '') {
+      if (preg_match_all('/ ("[^"]+"|[^" ]+)/i', ' ' . $form_state->getValue('or'), $matches)) {
         $keys .= ' ' . implode(' OR ', $matches[1]);
       }
     }
-    if ($form_state['values']['negative'] != '') {
-      if (preg_match_all('/ ("[^"]+"|[^" ]+)/i', ' ' . $form_state['values']['negative'], $matches)) {
+    if ($form_state->getValue('negative') != '') {
+      if (preg_match_all('/ ("[^"]+"|[^" ]+)/i', ' ' . $form_state->getValue('negative'), $matches)) {
         $keys .= ' -' . implode(' -', $matches[1]);
       }
     }
-    if ($form_state['values']['phrase'] != '') {
-      $keys .= ' "' . str_replace('"', ' ', $form_state['values']['phrase']) . '"';
+    if ($form_state->getValue('phrase') != '') {
+      $keys .= ' "' . str_replace('"', ' ', $form_state->getValue('phrase')) . '"';
     }
     $keys = trim($keys);
 
@@ -556,7 +547,7 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   /**
    * {@inheritdoc}
    */
-  public function buildConfigurationForm(array $form, array &$form_state) {
+  public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     // Output form for defining rank factor weights.
     $form['content_ranking'] = array(
       '#type' => 'details',
@@ -585,10 +576,10 @@ class NodeSearch extends ConfigurableSearchPluginBase implements AccessibleInter
   /**
    * {@inheritdoc}
    */
-  public function submitConfigurationForm(array &$form, array &$form_state) {
+  public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
     foreach ($this->getRankings() as $var => $values) {
-      if (!empty($form_state['values']["rankings_$var"])) {
-        $this->configuration['rankings'][$var] = $form_state['values']["rankings_$var"];
+      if (!$form_state->isValueEmpty("rankings_$var")) {
+        $this->configuration['rankings'][$var] = $form_state->getValue("rankings_$var");
       }
       else {
         unset($this->configuration['rankings'][$var]);

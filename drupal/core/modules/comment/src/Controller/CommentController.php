@@ -114,7 +114,7 @@ class CommentController extends ControllerBase {
       $field_definition = $this->entityManager()->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle())[$comment->getFieldName()];
 
       // Find the current display page for this comment.
-      $page = comment_get_display_page($comment->id(), $field_definition);
+      $page = $this->entityManager()->getStorage('comment')->getDisplayOrdinal($comment, $field_definition->getSetting('default_mode'), $field_definition->getSetting('per_page'));
       // @todo: Cleaner sub request handling.
       $redirect_request = Request::create($entity->getSystemPath(), 'GET', $request->query->all(), $request->cookies->all(), array(), $request->server->all());
       $redirect_request->query->set('page', $page);
@@ -143,7 +143,7 @@ class CommentController extends ControllerBase {
     if (!empty($fields) && ($field_names = array_keys($fields)) && ($field_name = reset($field_names))) {
       return $this->redirect('comment.reply', array(
         'entity_type' => 'node',
-        'entity_id' => $node->id(),
+        'entity' => $node->id(),
         'field_name' => $field_name,
       ));
     }
@@ -162,10 +162,8 @@ class CommentController extends ControllerBase {
    *
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The current request object.
-   * @param string $entity_type
-   *   Every comment belongs to an entity. This is the type of the entity.
-   * @param string $entity_id
-   *   Every comment belongs to an entity. This is the ID of the entity.
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity this comment belongs to.
    * @param string $field_name
    *   The field_name to which the comment belongs.
    * @param int $pid
@@ -191,11 +189,10 @@ class CommentController extends ControllerBase {
    *     - If user is not authorized to view comments.
    *     - If current entity comments are disable.
    */
-  public function getReplyForm(Request $request, $entity_type, $entity_id, $field_name, $pid = NULL) {
-
+  public function getReplyForm(Request $request, EntityInterface $entity, $field_name, $pid = NULL) {
     // Check if entity and field exists.
-    $fields = $this->commentManager->getFields($entity_type);
-    if (empty($fields[$field_name]) || !($entity = $this->entityManager()->getStorage($entity_type)->load($entity_id))) {
+    $fields = $this->commentManager->getFields($entity->getEntityTypeId());
+    if (empty($fields[$field_name])) {
       throw new NotFoundHttpException();
     }
 
@@ -255,7 +252,7 @@ class CommentController extends ControllerBase {
       'entity_id' => $entity->id(),
       'pid' => $pid,
       'entity_type' => $entity->getEntityTypeId(),
-      'field_id' => $entity->getEntityTypeId() . '__' . $field_name,
+      'field_name' => $field_name,
     ));
     $build['comment_form'] = $this->entityFormBuilder()->getForm($comment);
 
@@ -289,11 +286,13 @@ class CommentController extends ControllerBase {
     $links = array();
     foreach ($nids as $nid) {
       $node = node_load($nid);
-      $new = comment_num_new($node->id(), 'node');
-      $query = comment_new_page_count($node->{$field_name}->comment_count, $new, $node);
+      $new = $this->commentManager->getCountNewComments($node);
+      $page_number = $this->entityManager()->getStorage('comment')
+        ->getNewCommentPageNumber($node->{$field_name}->comment_count, $new, $node);
+      $query = $page_number ? array('page' => $page_number) : NULL;
       $links[$nid] = array(
         'new_comment_count' => (int) $new,
-        'first_new_comment_link' => $this->urlGenerator()->generateFromPath('node/' . $node->id(), array('query' => $query, 'fragment' => 'new')),
+        'first_new_comment_link' => $this->getUrlGenerator()->generateFromPath('node/' . $node->id(), array('query' => $query, 'fragment' => 'new')),
       );
     }
 

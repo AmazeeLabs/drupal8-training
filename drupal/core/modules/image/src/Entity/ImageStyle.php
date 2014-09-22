@@ -9,9 +9,11 @@ namespace Drupal\image\Entity;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
+use Drupal\Core\Config\Entity\ThirdPartySettingsTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginBagsInterface;
 use Drupal\Core\Routing\RequestHelper;
+use Drupal\Core\Site\Settings;
 use Drupal\image\ImageEffectBag;
 use Drupal\image\ImageEffectInterface;
 use Drupal\image\ImageStyleInterface;
@@ -25,7 +27,7 @@ use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
  * @ConfigEntityType(
  *   id = "image_style",
  *   label = @Translation("Image style"),
- *   controllers = {
+ *   handlers = {
  *     "form" = {
  *       "add" = "Drupal\image\Form\ImageStyleAddForm",
  *       "edit" = "Drupal\image\Form\ImageStyleEditForm",
@@ -41,13 +43,15 @@ use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
  *     "label" = "label"
  *   },
  *   links = {
- *     "flush-form" = "image.style_flush",
- *     "edit-form" = "image.style_edit",
- *     "delete-form" = "image.style_delete"
+ *     "flush-form" = "entity.image_style.flush_form",
+ *     "edit-form" = "entity.image_style.edit_form",
+ *     "delete-form" = "entity.image_style.delete_form"
  *   }
  * )
  */
 class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, EntityWithPluginBagsInterface {
+
+  use ThirdPartySettingsTrait;
 
   /**
    * The name of the image style to use as replacement upon delete.
@@ -101,7 +105,7 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
       if (!empty($this->original) && $this->id() !== $this->original->id()) {
         // The old image style name needs flushing after a rename.
         $this->original->flush();
-        // Update field instance settings if necessary.
+        // Update field settings if necessary.
         if (!$this->isSyncing()) {
           static::replaceImageStyle($this);
         }
@@ -122,7 +126,7 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
     foreach ($entities as $style) {
       // Flush cached media for the deleted style.
       $style->flush();
-      // Check whether field instance settings need to be updated.
+      // Check whether field settings need to be updated.
       // In case no replacement style was specified, all image fields that are
       // using the deleted style are left in a broken state.
       if (!$style->isSyncing() && $new_id = $style->getReplacementID()) {
@@ -134,7 +138,7 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
   }
 
   /**
-   * Update field instance settings if the image style name is changed.
+   * Update field settings if the image style name is changed.
    *
    * @param \Drupal\image\ImageStyleInterface $style
    *   The image style.
@@ -271,12 +275,12 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
 
     // Build the destination folder tree if it doesn't already exist.
     if (!file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS)) {
-      watchdog('image', 'Failed to create style directory: %directory', array('%directory' => $directory), WATCHDOG_ERROR);
+      \Drupal::logger('image')->error('Failed to create style directory: %directory', array('%directory' => $directory));
       return FALSE;
     }
 
     $image = \Drupal::service('image.factory')->get($original_uri);
-    if (!$image->isExisting()) {
+    if (!$image->isValid()) {
       return FALSE;
     }
 
@@ -286,7 +290,7 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
 
     if (!$image->save($derivative_uri)) {
       if (file_exists($derivative_uri)) {
-        watchdog('image', 'Cached image file %destination already exists. There may be an issue with your rewrite configuration.', array('%destination' => $derivative_uri), WATCHDOG_ERROR);
+        \Drupal::logger('image')->error('Cached image file %destination already exists. There may be an issue with your rewrite configuration.', array('%destination' => $derivative_uri));
       }
       return FALSE;
     }
@@ -308,7 +312,7 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
    */
   public function getPathToken($uri) {
     // Return the first 8 characters.
-    return substr(Crypt::hmacBase64($this->id() . ':' . $uri, \Drupal::service('private_key')->get() . drupal_get_hash_salt()), 0, 8);
+    return substr(Crypt::hmacBase64($this->id() . ':' . $uri, \Drupal::service('private_key')->get() . Settings::getHashSalt()), 0, 8);
   }
 
   /**
@@ -348,24 +352,10 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface, Entity
   /**
    * {@inheritdoc}
    */
-  public function saveImageEffect(array $configuration) {
-    $effect_id = $this->getEffects()->updateConfiguration($configuration);
-    $this->save();
-    return $effect_id;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function toArray() {
-    $properties = parent::toArray();
-    $names = array(
-      'effects',
-    );
-    foreach ($names as $name) {
-      $properties[$name] = $this->get($name);
-    }
-    return $properties;
+  public function addImageEffect(array $configuration) {
+    $configuration['uuid'] = $this->uuidGenerator()->generate();
+    $this->getEffects()->addInstanceId($configuration['uuid'], $configuration);
+    return $configuration['uuid'];
   }
 
   /**

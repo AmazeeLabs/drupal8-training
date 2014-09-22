@@ -11,7 +11,9 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Functional tests for the hook_entity_operations_alter().
+ * Implement hook entity operations alter.
+ *
+ * @group block
  */
 class BlockHookOperationTest extends WebTestBase {
 
@@ -22,15 +24,7 @@ class BlockHookOperationTest extends WebTestBase {
    */
   public static $modules = array('block', 'entity_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Block operations hook',
-      'description' => 'Implement hook entity operations alter.',
-      'group' => 'Block',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $permissions = array(
@@ -48,7 +42,7 @@ class BlockHookOperationTest extends WebTestBase {
   public function testBlockOperationAlter() {
     // Add a test block, any block will do.
     // Set the machine name so the test_operation link can be built later.
-    $block_id = Unicode::strtolower($this->randomName(16));
+    $block_id = Unicode::strtolower($this->randomMachineName(16));
     $this->drupalPlaceBlock('system_powered_by_block', array('id' => $block_id));
 
     // Get the Block listing.

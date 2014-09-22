@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\relationship\RelationshipPluginBase.
+ * Contains \Drupal\views\Plugin\views\relationship\RelationshipPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\relationship;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\HandlerBase;
@@ -16,7 +17,15 @@ use Drupal\views\Views;
 /**
  * @defgroup views_relationship_handlers Views relationship handlers
  * @{
- * Handlers to tell Views how to create alternate relationships.
+ * Plugins for handling views relationships.
+ *
+ * Relationship handlers extend
+ * \Drupal\views\Plugin\views\relationship\RelationshipPluginBase. They must
+ * be annotated with \Drupal\views\Annotation\ViewsRelationship annotation,
+ * and they must be in namespace directory Plugin\views\relationship.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
@@ -79,7 +88,9 @@ abstract class RelationshipPluginBase extends HandlerBase {
 
     // Relationships definitions should define a default label, but if they aren't get another default value.
     if (!empty($this->definition['label'])) {
-      $label = $this->definition['label'];
+      // Cast the label to a string since it is an object.
+      // @see \Drupal\Core\StringTranslation\TranslationWrapper
+      $label = (string) $this->definition['label'];
     }
     else {
       $label = !empty($this->definition['field']) ? $this->definition['field'] : $this->definition['base field'];
@@ -94,7 +105,7 @@ abstract class RelationshipPluginBase extends HandlerBase {
   /**
    * {@inheritdoc}
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     unset($form['admin_label']['#fieldset']);

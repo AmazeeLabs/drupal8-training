@@ -78,6 +78,9 @@ class UrlTest extends \PHPUnit_Framework_TestCase
 
         $url = Url::buildUrl(['path' => '0']);
         $this->assertSame('0', $url);
+
+        $url = Url::buildUrl(['host' => '', 'path' => '0']);
+        $this->assertSame('0', $url);
     }
 
     public function testUrlStoresParts()
@@ -159,7 +162,9 @@ class UrlTest extends \PHPUnit_Framework_TestCase
             ['http://www.example.com/path',       'http://u:a@www.example.com/', 'http://u:a@www.example.com/'],
             ['/path?q=2', 'http://www.test.com/', 'http://www.test.com/path?q=2'],
             ['http://api.flickr.com/services/',   'http://www.flickr.com/services/oauth/access_token', 'http://www.flickr.com/services/oauth/access_token'],
-            ['https://www.example.com/path',       '//foo.com/abc', 'https://foo.com/abc'],
+            ['https://www.example.com/path',      '//foo.com/abc', 'https://foo.com/abc'],
+            ['https://www.example.com/0/',        'relative/foo', 'https://www.example.com/0/relative/foo'],
+            ['',                                  '0', '0'],
             // RFC 3986 test cases
             [self::RFC3986_BASE, 'g:h',           'g:h'],
             [self::RFC3986_BASE, 'g',             'http://a/b/c/g'],
@@ -193,6 +198,7 @@ class UrlTest extends \PHPUnit_Framework_TestCase
             [self::RFC3986_BASE, 'g..',           'http://a/b/c/g..'],
             [self::RFC3986_BASE, '..g',           'http://a/b/c/..g'],
             [self::RFC3986_BASE, './../g',        'http://a/b/g'],
+            [self::RFC3986_BASE, 'foo////g',      'http://a/b/c/foo////g'],
             [self::RFC3986_BASE, './g/.',         'http://a/b/c/g/'],
             [self::RFC3986_BASE, 'g/./h',         'http://a/b/c/g/h'],
             [self::RFC3986_BASE, 'g/../h',        'http://a/b/c/h'],
@@ -248,7 +254,8 @@ class UrlTest extends \PHPUnit_Framework_TestCase
     {
         return array(
             array('/foo/..', '/'),
-            array('//foo//..', '/'),
+            array('//foo//..', '//foo/'),
+            array('/foo//', '/foo//'),
             array('/foo/../..', '/'),
             array('/foo/../.', '/'),
             array('/./foo/..', '/'),

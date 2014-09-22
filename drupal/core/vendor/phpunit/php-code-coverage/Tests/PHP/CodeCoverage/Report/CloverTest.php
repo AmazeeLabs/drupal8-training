@@ -2,7 +2,7 @@
 /**
  * PHP_CodeCoverage
  *
- * Copyright (c) 2009-2013, Sebastian Bergmann <sebastian@phpunit.de>.
+ * Copyright (c) 2009-2014, Sebastian Bergmann <sebastian@phpunit.de>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@
  * @package    CodeCoverage
  * @subpackage Tests
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2009-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2009-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://github.com/sebastianbergmann/php-code-coverage
  * @since      File available since Release 1.0.0
@@ -61,7 +61,7 @@ require_once TEST_FILES_PATH . '../TestCase.php';
  * @package    CodeCoverage
  * @subpackage Tests
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2009-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2009-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://github.com/sebastianbergmann/php-code-coverage
  * @since      Class available since Release 1.0.0
@@ -77,7 +77,7 @@ class PHP_CodeCoverage_Report_CloverTest extends PHP_CodeCoverage_TestCase
 
         $this->assertStringMatchesFormatFile(
           TEST_FILES_PATH . 'BankAccount-clover.xml',
-          $clover->process($this->getCoverageForBankAccount(), NULL, 'BankAccount')
+          $clover->process($this->getCoverageForBankAccount(), null, 'BankAccount')
         );
     }
 
@@ -91,6 +91,19 @@ class PHP_CodeCoverage_Report_CloverTest extends PHP_CodeCoverage_TestCase
         $this->assertStringMatchesFormatFile(
           TEST_FILES_PATH . 'ignored-lines-clover.xml',
           $clover->process($this->getCoverageForFileWithIgnoredLines())
+        );
+    }
+
+    /**
+     * @covers PHP_CodeCoverage_Report_Clover
+     */
+    public function testCloverForClassWithAnonymousFunction()
+    {
+        $clover = new PHP_CodeCoverage_Report_Clover;
+
+        $this->assertStringMatchesFormatFile(
+          TEST_FILES_PATH . 'class-with-anonymous-function-clover.xml',
+          $clover->process($this->getCoverageForClassWithAnonymousFunction())
         );
     }
 }

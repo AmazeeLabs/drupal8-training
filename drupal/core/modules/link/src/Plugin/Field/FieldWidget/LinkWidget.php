@@ -7,14 +7,10 @@
 
 namespace Drupal\link\Plugin\Field\FieldWidget;
 
-use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\WidgetBase;
-use Drupal\Core\ParamConverter\ParamNotConvertedException;
-use Drupal\Core\Routing\MatchingRouteNotFoundException;
-use Drupal\Core\Url;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\link\LinkItemInterface;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Plugin implementation of the 'link' widget.
@@ -42,13 +38,14 @@ class LinkWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, array &$form_state) {
+  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
 
     $default_url_value = NULL;
     if (isset($items[$delta]->url)) {
-      $url = Url::createFromPath($items[$delta]->url);
-      $url->setOptions($items[$delta]->options);
-      $default_url_value = ltrim($url->toString(), '/');
+      if ($url = \Drupal::pathValidator()->getUrlIfValid($items[$delta]->url)) {
+        $url->setOptions($items[$delta]->options);
+        $default_url_value = ltrim($url->toString(), '/');
+      }
     }
     $element['url'] = array(
       '#type' => 'url',
@@ -87,8 +84,7 @@ class LinkWidget extends WidgetBase {
     // Post-process the title field to make it conditionally required if URL is
     // non-empty. Omit the validation on the field edit form, since the field
     // settings cannot be saved otherwise.
-    $is_field_edit_form = ($element['#entity'] === NULL);
-    if (!$is_field_edit_form && $this->getFieldSetting('title') == DRUPAL_REQUIRED) {
+    if (!$form_state->get('default_value_widget') && $this->getFieldSetting('title') == DRUPAL_REQUIRED) {
       $element['#element_validate'][] = array($this, 'validateTitle');
     }
 
@@ -103,7 +99,7 @@ class LinkWidget extends WidgetBase {
 
     // If cardinality is 1, ensure a label is output for the field by wrapping it
     // in a details element.
-    if ($this->fieldDefinition->getCardinality() == 1) {
+    if ($this->fieldDefinition->getFieldStorageDefinition()->getCardinality() == 1) {
       $element += array(
         '#type' => 'fieldset',
       );
@@ -139,7 +135,7 @@ class LinkWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     $elements = parent::settingsForm($form, $form_state);
 
     $elements['placeholder_url'] = array(
@@ -191,45 +187,29 @@ class LinkWidget extends WidgetBase {
    *
    * Conditionally requires the link title if a URL value was filled in.
    */
-  public function validateTitle(&$element, &$form_state, $form) {
+  public function validateTitle(&$element, FormStateInterface $form_state, $form) {
     if ($element['url']['#value'] !== '' && $element['title']['#value'] === '') {
       $element['title']['#required'] = TRUE;
-      \Drupal::formBuilder()->setError($element['title'], $form_state, $this->t('!name field is required.', array('!name' => $element['title']['#title'])));
+      $form_state->setError($element['title'], $this->t('!name field is required.', array('!name' => $element['title']['#title'])));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function massageFormValues(array $values, array $form, array &$form_state) {
+  public function massageFormValues(array $values, array $form, FormStateInterface $form_state) {
     foreach ($values as &$value) {
       if (!empty($value['url'])) {
-        try {
-          $parsed_url = UrlHelper::parse($value['url']);
-
-          // If internal links are supported, look up whether the given value is
-          // a path alias and store the system path instead.
-          if ($this->supportsInternalLinks() && !UrlHelper::isExternal($value['url'])) {
-            $parsed_url['path'] = \Drupal::service('path.alias_manager')->getPathByAlias($parsed_url['path']);
-          }
-
-          $url = Url::createFromPath($parsed_url['path']);
-          $url->setOption('query', $parsed_url['query']);
-          $url->setOption('fragment', $parsed_url['fragment']);
-          $url->setOption('attributes', $value['attributes']);
-
-          $value += $url->toArray();
-          // Reset the URL value to contain only the path.
-          $value['url'] = $parsed_url['path'];
+        $url = \Drupal::pathValidator()->getUrlIfValid($value['url']);
+        if (!$url) {
+          return $values;
         }
-        catch (NotFoundHttpException $e) {
-          // Nothing to do here, LinkTypeConstraintValidator emits errors.
-        }
-        catch (MatchingRouteNotFoundException $e) {
-          // Nothing to do here, LinkTypeConstraintValidator emits errors.
-        }
-        catch (ParamNotConvertedException $e) {
-          // Nothing to do here, LinkTypeConstraintValidator emits errors.
+
+        $value += $url->toArray();
+
+        // Reset the URL value to contain only the path.
+        if (!$url->isExternal() && $this->supportsInternalLinks()) {
+          $value['url'] = substr($url->toString(), strlen(\Drupal::request()->getBasePath() . '/'));
         }
       }
     }

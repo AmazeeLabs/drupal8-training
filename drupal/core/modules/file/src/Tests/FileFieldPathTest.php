@@ -7,25 +7,17 @@
 
 namespace Drupal\file\Tests;
 
-use Drupal\Core\Language\Language;
-
 /**
  * Tests that files are uploaded to proper locations.
+ *
+ * @group file
  */
 class FileFieldPathTest extends FileFieldTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'File field file path tests',
-      'description' => 'Test that files are uploaded to the proper location with token support.',
-      'group' => 'File',
-    );
-  }
-
   /**
    * Tests the normal formatter display on node display.
    */
   function testUploadPath() {
-    $field_name = strtolower($this->randomName());
+    $field_name = strtolower($this->randomMachineName());
     $type_name = 'article';
     $this->createFileField($field_name, 'node', $type_name);
     $test_file = $this->getTestFile('text');

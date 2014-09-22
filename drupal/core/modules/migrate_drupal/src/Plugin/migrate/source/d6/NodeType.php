@@ -51,7 +51,6 @@ class NodeType extends DrupalSqlBase {
         'module',
         'description',
         'help',
-        'has_title',
         'title_label',
         'has_body',
         'body_label',
@@ -74,7 +73,6 @@ class NodeType extends DrupalSqlBase {
       'module' => $this->t('The module providing the node type.'),
       'description' => $this->t('Description of the node type.'),
       'help' => $this->t('Help text for the node type.'),
-      'has_title' => $this->t('Flag indicating the node type has a title.'),
       'title_label' => $this->t('Title label.'),
       'has_body' => $this->t('Flag indicating the node type has a body field.'),
       'body_label' => $this->t('Body label.'),
@@ -105,13 +103,14 @@ class NodeType extends DrupalSqlBase {
     $row->setSourceProperty('node_preview', $this->nodePreview);
 
     $type = $row->getSourceProperty('type');
-    $options = $this->variableGet('node_options_' . $type, array('promote', 'sticky'));
+    $source_options = $this->variableGet('node_options_' . $type, array('promote', 'sticky'));
+    $options = array();
     foreach (array('promote', 'sticky', 'status', 'revision') as $item) {
-      $options[$item] = isset($options[$item]);
+      $options[$item] = in_array($item, $source_options);
     }
     $row->setSourceProperty('options', $options);
     $submitted = isset($this->themeSettings['toggle_node_info_' . $type]) ? $this->themeSettings['toggle_node_info_' . $type] : FALSE;
-    $row->setSourceProperty('submitted', $submitted);
+    $row->setSourceProperty('display_submitted', $submitted);
 
     return parent::prepareRow($row);
   }

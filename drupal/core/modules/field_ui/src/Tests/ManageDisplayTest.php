@@ -7,27 +7,24 @@
 
 namespace Drupal\field_ui\Tests;
 
+use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
- * Tests the functionality of the 'Manage display' screens.
+ * Tests the Field UI "Manage display" and "Manage form display" screens.
+ *
+ * @group field_ui
  */
 class ManageDisplayTest extends FieldUiTestBase {
+
+  use SchemaCheckTestTrait;
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('search', 'field_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Manage display',
-      'description' => 'Test the Field UI "Manage display" and "Manage form display" screens.',
-      'group' => 'Field UI',
-    );
-  }
+  public static $modules = array('search', 'field_test', 'field_third_party_test');
 
   /**
    * Tests formatter settings.
@@ -43,7 +40,8 @@ class ManageDisplayTest extends FieldUiTestBase {
     );
     $this->fieldUIAddNewField($manage_fields, $edit);
 
-    // Clear the test-side cache and get the saved field instance.
+    // Get the display options (formatter and settings) that were automatically
+    // assigned for the 'default' display.
     $display = entity_get_display('node', $this->type, 'default');
     $display_options = $display->getComponent('field_test');
     $format = $display_options['type'];
@@ -69,6 +67,7 @@ class ManageDisplayTest extends FieldUiTestBase {
       'field_test_default',
       'field_test_multiple',
       'field_test_with_prepare_view',
+      'field_test_applicable',
       'hidden',
     );
     $this->assertEqual($options, $expected_options, 'The expected formatter ordering is respected.');
@@ -100,13 +99,22 @@ class ManageDisplayTest extends FieldUiTestBase {
     $this->drupalPostAjaxForm(NULL, array(), "field_test_settings_edit");
 
     // Assert that the field added in
-    // field_test_field_formatter_settings_form_alter() is present.
-    $fieldname = 'fields[field_test][settings_edit_form][settings][field_test_formatter_settings_form_alter]';
-    $this->assertField($fieldname, 'The field added in hook_field_formatter_settings_form_alter() is present on the settings form.');
+    // field_test_field_formatter_third_party_settings_form() is present.
+    $fieldname = 'fields[field_test][settings_edit_form][third_party_settings][field_third_party_test][field_test_field_formatter_third_party_settings_form]';
+    $this->assertField($fieldname, 'The field added in hook_field_formatter_third_party_settings_form() is present on the settings form.');
     $edit = array($fieldname => 'foo');
     $this->drupalPostAjaxForm(NULL, $edit, "field_test_plugin_settings_update");
 
-    // Confirm that the extra settings are not updated on the settings form.
+    // Save the form to save the third party settings.
+    $this->drupalPostForm(NULL, array(), t('Save'));
+
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
+    $display = entity_load('entity_view_display', 'node.' . $this->type . '.default', TRUE);
+    $this->assertEqual($display->getRenderer('field_test')->getThirdPartySetting('field_third_party_test', 'field_test_field_formatter_third_party_settings_form'), 'foo');
+    $this->assertTrue(in_array('field_third_party_test', $display->calculateDependencies()['module']), 'The display has a dependency on field_third_party_test module.');
+    $this->assertConfigSchema(\Drupal::service('config.typed'), $display->getEntityType()->getConfigPrefix() . '.' . $display->id(), $display->toArray());
+
+    // Confirm that the third party settings are not updated on the settings form.
     $this->drupalPostAjaxForm(NULL, array(), "field_test_settings_edit");
     $this->assertFieldByName($fieldname, '');
 
@@ -121,9 +129,15 @@ class ManageDisplayTest extends FieldUiTestBase {
     $this->drupalPostAjaxForm(NULL, $edit, "field_test_plugin_settings_update");
     $this->assertText('Default empty setting now has a value.');
 
-    // Test the no settings form behavior.
+    // Test the settings form behavior. An edit button should be present since
+    // there are third party settings to configure.
     $edit = array('fields[field_test][type]' => 'field_no_settings', 'refresh_rows' => 'field_test');
     $this->drupalPostAjaxForm(NULL, $edit, array('op' => t('Refresh')));
+    $this->assertFieldByName('field_test_settings_edit');
+    // Uninstall the module providing third party settings and ensure the button
+    // is no longer there.
+    \Drupal::moduleHandler()->uninstall(array('field_third_party_test'));
+    $this->drupalGet($manage_display);
     $this->assertNoFieldByName('field_test_settings_edit');
   }
 
@@ -131,17 +145,21 @@ class ManageDisplayTest extends FieldUiTestBase {
    * Tests widget settings.
    */
   public function testWidgetUI() {
+    // Admin Manage Fields page.
     $manage_fields = 'admin/structure/types/manage/' . $this->type;
+    // Admin Manage Display page.
     $manage_display = $manage_fields . '/form-display';
 
-    // Create a field, and a node with some data for the field.
+    // Creates a new field that can be used with multiple formatters.
+    // Reference: Drupal\field_test\Plugin\Field\FieldWidget\TestFieldWidgetMultiple::isApplicable().
     $edit = array(
       'fields[_add_new_field][label]' => 'Test field',
       'fields[_add_new_field][field_name]' => 'test',
     );
     $this->fieldUIAddNewField($manage_fields, $edit);
 
-    // Clear the test-side cache and get the saved field instance.
+    // Get the display options (formatter and settings) that were automatically
+    // assigned for the 'default' display.
     $display = entity_get_form_display('node', $this->type, 'default');
     $display_options = $display->getComponent('field_test');
     $widget_type = $display_options['type'];
@@ -149,7 +167,7 @@ class ManageDisplayTest extends FieldUiTestBase {
     $setting_name = key($default_settings);
     $setting_value = $display_options['settings'][$setting_name];
 
-    // Display the "Manage form display" screen and check that the expected
+    // Display the "Manage form display" screen and check if the expected
     // widget is selected.
     $this->drupalGet($manage_display);
     $this->assertFieldByName('fields[field_test][type]', $widget_type, 'The expected widget is selected.');
@@ -193,15 +211,38 @@ class ManageDisplayTest extends FieldUiTestBase {
     $this->drupalPostAjaxForm(NULL, array(), "field_test_settings_edit");
 
     // Assert that the field added in
-    // field_test_field_widget_settings_form_alter() is present.
-    $fieldname = 'fields[field_test][settings_edit_form][settings][field_test_widget_settings_form_alter]';
-    $this->assertField($fieldname, 'The field added in hook_field_widget_settings_form_alter() is present on the settings form.');
+    // field_test_field_widget_third_party_settings_form() is present.
+    $fieldname = 'fields[field_test][settings_edit_form][third_party_settings][field_third_party_test][field_test_widget_third_party_settings_form]';
+    $this->assertField($fieldname, 'The field added in hook_field_widget_third_party_settings_form() is present on the settings form.');
     $edit = array($fieldname => 'foo');
     $this->drupalPostAjaxForm(NULL, $edit, "field_test_plugin_settings_update");
 
-    // Confirm that the extra settings are not updated on the settings form.
+    // Save the form to save the third party settings.
+    $this->drupalPostForm(NULL, array(), t('Save'));
+    \Drupal::entityManager()->clearCachedFieldDefinitions();
+    $display = entity_load('entity_form_display', 'node.' . $this->type . '.default', TRUE);
+    $this->assertEqual($display->getRenderer('field_test')->getThirdPartySetting('field_third_party_test', 'field_test_widget_third_party_settings_form'), 'foo');
+    $this->assertTrue(in_array('field_third_party_test', $display->calculateDependencies()['module']), 'Form display does not have a dependency on field_third_party_test module.');
+    $this->assertConfigSchema(\Drupal::service('config.typed'), $display->getEntityType()->getConfigPrefix() . '.' . $display->id(), $display->toArray());
+
+    // Confirm that the third party settings are not updated on the settings form.
     $this->drupalPostAjaxForm(NULL, array(), "field_test_settings_edit");
     $this->assertFieldByName($fieldname, '');
+
+    // Creates a new field that can not be used with the multiple formatter.
+    // Reference: Drupal\field_test\Plugin\Field\FieldWidget\TestFieldWidgetMultiple::isApplicable().
+    $edit = array(
+      'fields[_add_new_field][label]' => 'One Widget Field',
+      'fields[_add_new_field][field_name]' => 'onewidgetfield',
+    );
+    $this->fieldUIAddNewField($manage_fields, $edit);
+
+    // Go to the Manage Form Display.
+    $this->drupalGet($manage_display);
+
+    // Checks if the select elements contain the specified options.
+    $this->assertFieldSelectOptions('fields[field_test][type]', array('test_field_widget', 'test_field_widget_multiple', 'hidden'));
+    $this->assertFieldSelectOptions('fields[field_onewidgetfield][type]', array('test_field_widget', 'hidden'));
   }
 
   /**
@@ -280,7 +321,18 @@ class ManageDisplayTest extends FieldUiTestBase {
   }
 
   /**
-   * Tests that field instances with no explicit display settings do not break.
+   * Tests the local tasks are displayed correctly for view modes.
+   */
+  public function testViewModeLocalTasks() {
+    $manage_display = 'admin/structure/types/manage/' . $this->type . '/display';
+    $this->drupalGet($manage_display);
+    $this->assertNoLink('Full content');
+    $this->drupalGet($manage_display . '/teaser');
+    $this->assertNoLink('Full content');
+  }
+
+  /**
+   * Tests that fields with no explicit display settings do not break.
    */
   function testNonInitializedFields() {
     // Create a test field.
@@ -403,4 +455,57 @@ class ManageDisplayTest extends FieldUiTestBase {
 
     return $return;
   }
+
+  /**
+   * Checks if a select element contains the specified options.
+   *
+   * @param string $name
+   *   The field name.
+   * @param array $expected_options
+   *   An array of expected options.
+   *
+   * @return bool
+   *   TRUE if the assertion succeeded, FALSE otherwise.
+   */
+  protected function assertFieldSelectOptions($name, array $expected_options) {
+    $xpath = $this->buildXPathQuery('//select[@name=:name]', array(':name' => $name));
+    $fields = $this->xpath($xpath);
+    if ($fields) {
+      $field = $fields[0];
+      $options = $this->getAllOptionsList($field);
+
+      sort($options);
+      sort($expected_options);
+
+      return $this->assertIdentical($options, $expected_options);
+    }
+    else {
+      return $this->fail('Unable to find field ' . $name);
+    }
+  }
+
+  /**
+   * Extracts all options from a select element.
+   *
+   * @param \SimpleXMLElement $element
+   *   The select element field information.
+   *
+   * @return array
+   *   An array of option values as strings.
+   */
+  protected function getAllOptionsList(\SimpleXMLElement $element) {
+    $options = array();
+    // Add all options items.
+    foreach ($element->option as $option) {
+      $options[] = (string) $option['value'];
+    }
+
+    // Loops trough all the option groups
+    foreach ($element->optgroup as $optgroup) {
+      $options = array_merge($this->getAllOptionsList($optgroup), $options);
+    }
+
+    return $options;
+  }
+
 }

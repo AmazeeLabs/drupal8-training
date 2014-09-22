@@ -43,7 +43,7 @@ abstract class ToolkitTestBase extends WebTestBase {
    */
   protected $image;
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Set the image factory service.
@@ -68,7 +68,7 @@ abstract class ToolkitTestBase extends WebTestBase {
    */
   protected function getImage() {
     $image = $this->imageFactory->get($this->file, 'test');
-    $this->assertTrue($image->isExisting(), 'Image was loaded.');
+    $this->assertTrue($image->isValid(), 'Image file was parsed.');
     return $image;
   }
 
@@ -81,6 +81,21 @@ abstract class ToolkitTestBase extends WebTestBase {
    *   'save', 'crop', etc.
    */
   function assertToolkitOperationsCalled(array $expected) {
+    // If one of the image operations is expected, apply should be expected as
+    // well.
+    $operations = array(
+      'resize',
+      'rotate',
+      'crop',
+      'desaturate',
+      'scale',
+      'scale_and_crop',
+      'my_operation',
+    );
+    if (count(array_intersect($expected, $operations)) > 0 && !in_array('apply', $expected)) {
+      $expected[] = 'apply';
+    }
+
     // Determine which operations were called.
     $actual = array_keys(array_filter($this->imageTestGetAllCalls()));
 
@@ -94,8 +109,10 @@ abstract class ToolkitTestBase extends WebTestBase {
     }
 
     // Determine if there were any unexpected calls.
+    // If all unexpected calls are operations and apply was expected, we do not
+    // count it as an error.
     $unexpected = array_diff($actual, $expected);
-    if (count($unexpected)) {
+    if (count($unexpected) && (!in_array('apply', $expected) || count(array_intersect($unexpected, $operations)) !== count($unexpected))) {
       $this->assertTrue(FALSE, String::format('Unexpected operations were called: %unexpected.', array('%unexpected' => implode(', ', $unexpected))));
     }
     else {
@@ -109,13 +126,16 @@ abstract class ToolkitTestBase extends WebTestBase {
   function imageTestReset() {
     // Keep track of calls to these operations
     $results = array(
-      'load' => array(),
+      'parseFile' => array(),
       'save' => array(),
       'settings' => array(),
+      'apply' => array(),
       'resize' => array(),
       'rotate' => array(),
       'crop' => array(),
       'desaturate' => array(),
+      'scale' => array(),
+      'scale_and_crop' => array(),
     );
     \Drupal::state()->set('image_test.results', $results);
   }
@@ -124,9 +144,9 @@ abstract class ToolkitTestBase extends WebTestBase {
    * Gets an array of calls to the test toolkit.
    *
    * @return array
-   *   An array keyed by operation name ('load', 'save', 'settings', 'resize',
-   *   'rotate', 'crop', 'desaturate') with values being arrays of parameters
-   *   passed to each call.
+   *   An array keyed by operation name ('parseFile', 'save', 'settings',
+   *   'resize', 'rotate', 'crop', 'desaturate') with values being arrays of
+   *   parameters passed to each call.
    */
   function imageTestGetAllCalls() {
     return \Drupal::state()->get('image_test.results') ?: array();

@@ -10,7 +10,9 @@ namespace Drupal\statistics\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the statistics administration screen.
+ * Tests the statistics admin.
+ *
+ * @group statistics
  */
 class StatisticsAdminTest extends WebTestBase {
 
@@ -44,15 +46,7 @@ class StatisticsAdminTest extends WebTestBase {
    */
   protected $client;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Test statistics admin.',
-      'description' => 'Tests the statistics admin.',
-      'group' => 'Statistics'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create Basic page node type.

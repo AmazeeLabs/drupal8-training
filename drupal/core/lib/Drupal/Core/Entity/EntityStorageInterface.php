@@ -8,15 +8,15 @@
 namespace Drupal\Core\Entity;
 
 /**
- * Defines a common interface for entity storage classes.
+ * Defines the interface for entity storage classes.
  *
- * All entity controller classes specified via the "controllers['storage']" key
- * returned by \Drupal\Core\Entity\EntityManagerInterface or
- * hook_entity_type_alter() have to implement this interface.
+ * For common default implementations, see
+ * \Drupal\Core\Entity\Sql\SqlContentEntityStorage for content entities and
+ * \Drupal\Core\Config\Entity\ConfigEntityStorage for config entities. Those
+ * implementations are used by default when the @ContentEntityType or
+ * @ConfigEntityType annotations are used.
  *
- * Most simple, SQL-based entity controllers will do better by extending
- * Drupal\Core\Entity\ContentEntityDatabaseStorage instead of implementing this
- * interface directly.
+ * @ingroup entity_api
  */
 interface EntityStorageInterface {
 
@@ -45,8 +45,9 @@ interface EntityStorageInterface {
    * @param $ids
    *   An array of entity IDs, or NULL to load all entities.
    *
-   * @return
-   *   An array of entity objects indexed by their ids.
+   * @return array
+   *   An array of entity objects indexed by their IDs. Returns an empty array
+   *   if no matching entities found.
    */
   public function loadMultiple(array $ids = NULL);
 
@@ -56,8 +57,8 @@ interface EntityStorageInterface {
    * @param mixed $id
    *   The ID of the entity to load.
    *
-   * @return \Drupal\Core\Entity\EntityInterface
-   *   An entity object.
+   * @return \Drupal\Core\Entity\EntityInterface|null
+   *   An entity object. NULL if no matching entity is found.
    */
   public function load($id);
 
@@ -67,8 +68,8 @@ interface EntityStorageInterface {
    * @param mixed $id
    *   The ID of the entity to load.
    *
-   * @return \Drupal\Core\Entity\EntityInterface
-   *   The unchanged entity, or FALSE if the entity cannot be loaded.
+   * @return \Drupal\Core\Entity\EntityInterface|null
+   *   The unchanged entity, or NULL if the entity cannot be loaded.
    *
    * @todo Remove this method once we have a reliable way to retrieve the
    *   unchanged entity from the entity object.

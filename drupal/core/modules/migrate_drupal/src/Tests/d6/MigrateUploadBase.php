@@ -22,7 +22,7 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Create new file entities.
     for ($i = 1; $i <= 3; $i++) {
@@ -49,7 +49,7 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
     $node_type->save();
 
     // Add a file field.
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => 'upload',
       'entity_type' => 'node',
       'type' => 'file',
@@ -58,7 +58,7 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
         'display_field' => TRUE,
       ),
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => 'upload',
       'entity_type' => 'node',
       'bundle' => 'story',
@@ -67,7 +67,7 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
       array(array(1), array(1)),
       array(array(2), array(2)),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
     $vids = array(1, 2, 3);
     for ($i = 1; $i <= 2; $i++) {
       $node = entity_create('node', array(

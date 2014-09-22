@@ -7,12 +7,13 @@
 
 namespace Drupal\locale\Tests;
 
-use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
-use Drupal\locale\LocaleTypedConfig;
+use Drupal\core\language\languageInterface;
 
 /**
- * Tests Metadata for configuration objects.
+ * Tests translation of configuration strings.
+ *
+ * @group locale
  */
 class LocaleConfigTranslationTest extends WebTestBase {
 
@@ -23,15 +24,10 @@ class LocaleConfigTranslationTest extends WebTestBase {
    */
   public static $modules = array('locale', 'contact');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Configuration translation',
-      'description' => 'Tests translation of configuration strings.',
-      'group' => 'Locale',
-    );
-  }
-
-  public function setUp() {
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
     parent::setUp();
     // Add a default locale storage for all these tests.
     $this->storage = $this->container->get('locale.storage');
@@ -46,21 +42,21 @@ class LocaleConfigTranslationTest extends WebTestBase {
   /**
    * Tests basic configuration translation.
    */
-  function testConfigTranslation() {
+  public function testConfigTranslation() {
     // Add custom language.
     $langcode = 'xx';
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'translate interface', 'administer modules', 'access site-wide contact form', 'administer contact forms'));
     $this->drupalLogin($admin_user);
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     // Set path prefix.
-    $edit = array( "prefix[$langcode]" => $langcode );
+    $edit = array("prefix[$langcode]" => $langcode);
     $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
 
     // Check site name string exists and create translation for it.
@@ -68,7 +64,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
     $this->assertTrue($string, 'Configuration strings have been created upon installation.');
 
     // Translate using the UI so configuration is refreshed.
-    $site_name = $this->randomName(20);
+    $site_name = $this->randomMachineName(20);
     $search = array(
       'string' => $string->source,
       'langcode' => $langcode,
@@ -95,7 +91,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
     $this->assertText($site_name, 'The translated site name is displayed after translations refreshed.');
 
     // Check default medium date format exists and create a translation for it.
-    $string = $this->storage->findString(array('source' => 'D, m/d/Y - H:i', 'context' => '', 'type' => 'configuration'));
+    $string = $this->storage->findString(array('source' => 'D, m/d/Y - H:i', 'context' => 'PHP date format', 'type' => 'configuration'));
     $this->assertTrue($string, 'Configuration date formats have been created upon installation.');
 
     // Translate using the UI so configuration is refreshed.
@@ -113,11 +109,11 @@ class LocaleConfigTranslationTest extends WebTestBase {
     );
     $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
-    $wrapper = $this->container->get('locale.config.typed')->get('system.date_format.medium');
+    $wrapper = $this->container->get('locale.config.typed')->get('core.date_format.medium');
 
     // Get translation and check we've only got the site name.
     $translation = $wrapper->getTranslation($langcode);
-    $format = $translation->get('pattern')->get('php')->getValue();
+    $format = $translation->get('pattern')->getValue();
     $this->assertEqual($format, 'D', 'Got the right date format pattern after translation.');
 
     // Formatting the date 8 / 27 / 1985 @ 13:37 EST with pattern D should
@@ -144,7 +140,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
     $this->assertTrue(count($translations) == 1 && $translation->source == $string->source && empty($translation->translation), 'Got only one string for image configuration and has no translation.');
 
     // Translate using the UI so configuration is refreshed.
-    $image_style_label = $this->randomName(20);
+    $image_style_label = $this->randomMachineName(20);
     $search = array(
       'string' => $string->source,
       'langcode' => $langcode,
@@ -183,7 +179,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
     $this->assertTrue($override->isNew(), 'Translated configuration for image module removed.');
 
     // Translate default category using the UI so configuration is refreshed.
-    $category_label = $this->randomName(20);
+    $category_label = $this->randomMachineName(20);
     $search = array(
       'string' => 'Website feedback',
       'langcode' => $langcode,

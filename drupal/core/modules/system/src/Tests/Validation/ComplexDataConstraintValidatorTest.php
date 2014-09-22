@@ -12,7 +12,10 @@ use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests the ComplexData validation constraint validator.
+ * Tests ComplexData validation constraint with both valid and invalid values
+ * for a key.
+ *
+ * @group Validation
  */
 class ComplexDataConstraintValidatorTest extends DrupalUnitTestBase {
 
@@ -23,15 +26,7 @@ class ComplexDataConstraintValidatorTest extends DrupalUnitTestBase {
    */
   protected $typedData;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Complex data constraint',
-      'description' => 'Tests ComplexData validation constraint with both valid and invalid values for a key',
-      'group' => 'Validation',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->typedData = $this->container->get('typed_data_manager');
   }

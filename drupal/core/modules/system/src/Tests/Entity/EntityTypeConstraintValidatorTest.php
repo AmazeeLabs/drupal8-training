@@ -13,6 +13,8 @@ use Drupal\Core\TypedData\DataDefinition;
 
 /**
  * Tests validation constraints for EntityTypeConstraintValidator.
+ *
+ * @group Entity
  */
 class EntityTypeConstraintValidatorTest extends EntityUnitTestBase {
 
@@ -25,15 +27,7 @@ class EntityTypeConstraintValidatorTest extends EntityUnitTestBase {
 
   public static $modules = array('node', 'field', 'user');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity type constraint',
-      'description' => 'Tests validation constraints for EntityTypeConstraintValidator.',
-      'group' => 'Validation',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->typedData = $this->container->get('typed_data_manager');
   }

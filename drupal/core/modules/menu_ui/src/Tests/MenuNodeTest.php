@@ -2,15 +2,18 @@
 
 /**
  * @file
- * Definition of Drupal\menu_ui\Tests\MenuNodeTest.
+ * Contains \Drupal\menu_ui\Tests\MenuNodeTest.
  */
 
 namespace Drupal\menu_ui\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\menu_link_content\Entity\MenuLinkContent;
 
 /**
- * Test menu settings for nodes.
+ * Add, edit, and delete a node with menu link.
+ *
+ * @group menu_ui
  */
 class MenuNodeTest extends WebTestBase {
 
@@ -21,15 +24,7 @@ class MenuNodeTest extends WebTestBase {
    */
   public static $modules = array('menu_ui', 'test_page_test', 'node');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Menu settings for nodes',
-      'description' => 'Add, edit, and delete a node with menu link.',
-      'group' => 'Menu',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
 
@@ -58,7 +53,7 @@ class MenuNodeTest extends WebTestBase {
     $this->drupalGet('node/add/page');
     $this->assertText(t('Create Basic page'));
     $this->assertNoText(t('Menu settings'));
-    $node_title = $this->randomName();
+    $node_title = $this->randomMachineName();
     $edit = array(
       'title[0][value]' => $node_title,
       'body[0][value]' => $this->randomString(),
@@ -67,16 +62,27 @@ class MenuNodeTest extends WebTestBase {
     $node = $this->drupalGetNodeByTitle($node_title);
     $this->assertEqual($node->getTitle(), $edit['title[0][value]']);
 
+    // Test that we cannot set a menu item from a menu that is not set as
+    // available.
+    $edit = array(
+      'menu_options[tools]' => 1,
+      'menu_parent' => 'main:',
+    );
+    $this->drupalPostForm('admin/structure/types/manage/page', $edit, t('Save content type'));
+    $this->assertText(t('The selected menu item is not under one of the selected menus.'));
+    $this->assertNoRaw(t('The content type %name has been updated.', array('%name' => 'Basic page')));
+
     // Enable Tools menu as available menu.
     $edit = array(
       'menu_options[main]' => 1,
       'menu_options[tools]' => 1,
-      'menu_parent' => 'main:0',
+      'menu_parent' => 'main:',
     );
     $this->drupalPostForm('admin/structure/types/manage/page', $edit, t('Save content type'));
+    $this->assertRaw(t('The content type %name has been updated.', array('%name' => 'Basic page')));
 
     // Create a node.
-    $node_title = $this->randomName();
+    $node_title = $this->randomMachineName();
     $edit = array(
       'title[0][value]' => $node_title,
       'body[0][value]' => $this->randomString(),
@@ -99,7 +105,7 @@ class MenuNodeTest extends WebTestBase {
     // Edit the node and create a menu link.
     $edit = array(
       'menu[enabled]' => 1,
-      'menu[link_title]' => $node_title,
+      'menu[title]' => $node_title,
       'menu[weight]' => 17,
     );
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
@@ -108,7 +114,7 @@ class MenuNodeTest extends WebTestBase {
     $this->assertLink($node_title);
 
     $this->drupalGet('node/' . $node->id() . '/edit');
-    $this->assertOptionSelected('edit-menu-weight', 17, 'Menu weight correct in edit form');
+    $this->assertFieldById('edit-menu-weight', 17, 'Menu weight correct in edit form');
 
     // Edit the node and remove the menu link.
     $edit = array(
@@ -120,10 +126,12 @@ class MenuNodeTest extends WebTestBase {
     $this->assertNoLink($node_title);
 
     // Add a menu link to the Administration menu.
-    $item = entity_create('menu_link', array(
-      'link_path' => 'node/' . $node->id(),
-      'link_title' => $this->randomName(16),
+    $item = entity_create('menu_link_content', array(
+      'route_name' => 'entity.node.canonical',
+      'route_parameters' => array('node' => $node->id()),
+      'title' => $this->randomMachineName(16),
       'menu_name' => 'admin',
+      'bundle' => 'menu_link_content',
     ));
     $item->save();
 
@@ -133,27 +141,30 @@ class MenuNodeTest extends WebTestBase {
     $this->assertText('Provide a menu link', 'Link in not allowed menu not shown in node edit form');
     // Assert that the link is still in the Administration menu after save.
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
-    $link = menu_link_load($item['mlid']);
+    $link = MenuLinkContent::load($item->id());
     $this->assertTrue($link, 'Link in not allowed menu still exists after saving node');
 
     // Move the menu link back to the Tools menu.
-    $item['menu_name'] = 'tools';
-    menu_link_save($item);
+    $item->menu_name->value = 'tools';
+    $item->save();
     // Create a second node.
     $child_node = $this->drupalCreateNode(array('type' => 'article'));
     // Assign a menu link to the second node, being a child of the first one.
-    $child_item = entity_create('menu_link', array(
-      'link_path' => 'node/'. $child_node->id(),
-      'link_title' => $this->randomName(16),
-      'plid' => $item['mlid'],
+    $child_item = entity_create('menu_link_content', array(
+      'route_name' => 'entity.node.canonical',
+      'route_parameters' => array('node' => $child_node->id()),
+      'title' => $this->randomMachineName(16),
+      'parent' => $item->getPluginId(),
+      'menu_name' => $item->getMenuName(),
+      'bundle' => 'menu_link_content',
     ));
     $child_item->save();
     // Edit the first node.
     $this->drupalGet('node/'. $node->id() .'/edit');
     // Assert that it is not possible to set the parent of the first node to itself or the second node.
-    $this->assertNoOption('edit-menu-parent', 'tools:'. $item['mlid']);
-    $this->assertNoOption('edit-menu-parent', 'tools:'. $child_item['mlid']);
+    $this->assertNoOption('edit-menu-menu-parent', 'tools:'. $item->getPluginId());
+    $this->assertNoOption('edit-menu-menu-parent', 'tools:'. $child_item->getPluginId());
     // Assert that unallowed Administration menu is not available in options.
-    $this->assertNoOption('edit-menu-parent', 'admin:0');
+    $this->assertNoOption('edit-menu-menu-parent', 'admin:');
   }
 }

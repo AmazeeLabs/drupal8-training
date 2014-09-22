@@ -7,8 +7,11 @@
 
 namespace Drupal\link\Plugin\Field\FieldType;
 
+use Drupal\Component\Utility\Random;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\link\LinkItemInterface;
@@ -30,11 +33,11 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
   /**
    * {@inheritdoc}
    */
-  public static function defaultInstanceSettings() {
+  public static function defaultFieldSettings() {
     return array(
       'title' => DRUPAL_OPTIONAL,
       'link_type' => LinkItemInterface::LINK_GENERIC
-    ) + parent::defaultInstanceSettings();
+    ) + parent::defaultFieldSettings();
   }
 
   /**
@@ -104,7 +107,7 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
   /**
    * {@inheritdoc}
    */
-  public function instanceSettingsForm(array $form, array &$form_state) {
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     $element = array();
 
     $element['link_type'] = array(
@@ -135,6 +138,32 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
   /**
    * {@inheritdoc}
    */
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    // Set of possible top-level domains.
+    $tlds = array('com', 'net', 'gov', 'org', 'edu', 'biz', 'info');
+    // Set random length for the domain name.
+    $domain_length = mt_rand(7, 15);
+    $random = new Random();
+
+    switch ($field_definition->getSetting('title')) {
+      case DRUPAL_DISABLED:
+        $values['title'] = '';
+        break;
+      case DRUPAL_REQUIRED:
+        $values['title'] = $random->sentences(4);
+        break;
+      case DRUPAL_OPTIONAL:
+        // In case of optional title, randomize its generation.
+        $values['title'] = mt_rand(0,1) ? $random->sentences(4) : '';
+        break;
+    }
+    $values['url'] = 'http://www.' . $random->word($domain_length) . '.' . $tlds[mt_rand(0, (sizeof($tlds)-1))];
+    return $values;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function isEmpty() {
     $value = $this->get('url')->getValue();
     return $value === NULL || $value === '';
@@ -146,5 +175,12 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
   public function isExternal() {
     // External links don't have a route_name value.
     return empty($this->route_name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function mainPropertyName() {
+    return 'url';
   }
 }

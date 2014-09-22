@@ -8,11 +8,13 @@
 namespace Drupal\Core\Utility;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Link;
 use Drupal\Core\Path\AliasManagerInterface;
-use Drupal\Core\Template\Attribute;
 use Drupal\Core\Routing\UrlGeneratorInterface;
+use Drupal\Core\Template\Attribute;
 use Drupal\Core\Url;
 
 /**
@@ -45,6 +47,13 @@ class LinkGenerator implements LinkGeneratorInterface {
   public function __construct(UrlGeneratorInterface $url_generator, ModuleHandlerInterface $module_handler) {
     $this->urlGenerator = $url_generator;
     $this->moduleHandler = $module_handler;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function generateFromLink(Link $link) {
+    return $this->generateFromUrl($link->getText(), $link->getUrl());
   }
 
   /**
@@ -98,7 +107,9 @@ class LinkGenerator implements LinkGeneratorInterface {
       // drupal.active-link library know the path in a standardized manner.
       if (!isset($variables['options']['attributes']['data-drupal-link-system-path'])) {
         // @todo System path is deprecated - use the route name and parameters.
-        $variables['options']['attributes']['data-drupal-link-system-path'] = $url->getInternalPath();
+        $system_path = $url->getInternalPath();
+        // Special case for the front page.
+        $variables['options']['attributes']['data-drupal-link-system-path'] = $system_path == '' ? '<front>' : $system_path;
       }
     }
 
@@ -122,8 +133,7 @@ class LinkGenerator implements LinkGeneratorInterface {
 
     // Sanitize the link text if necessary.
     $text = $variables['options']['html'] ? $variables['text'] : String::checkPlain($variables['text']);
-
-    return '<a href="' . $url . '"' . $attributes . '>' . $text . '</a>';
+    return SafeMarkup::set('<a href="' . $url . '"' . $attributes . '>' . $text . '</a>');
   }
 
   /**

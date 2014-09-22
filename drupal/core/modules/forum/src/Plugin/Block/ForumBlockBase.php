@@ -7,7 +7,8 @@
 
 namespace Drupal\forum\Plugin\Block;
 
-use Drupal\block\BlockBase;
+use Drupal\Core\Block\BlockBase;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Cache\Cache;
 
@@ -25,9 +26,9 @@ abstract class ForumBlockBase extends BlockBase {
     if ($node_title_list = node_title_list($result)) {
       $elements['forum_list'] = $node_title_list;
       $elements['forum_more'] = array(
-        '#theme' => 'more_link',
-        '#url' => 'forum',
-        '#title' => t('Read the latest forum topics.')
+        '#type' => 'more_link',
+        '#href' => 'forum',
+        '#attributes' => array('title' => $this->t('Read the latest forum topics.')),
       );
     }
     return $elements;
@@ -56,14 +57,14 @@ abstract class ForumBlockBase extends BlockBase {
   /**
    * {@inheritdoc}
    */
-  public function access(AccountInterface $account) {
+  protected function blockAccess(AccountInterface $account) {
     return $account->hasPermission('access content');
   }
 
   /**
-   * Overrides \Drupal\block\BlockBase::blockForm().
+   * {@inheritdoc}
    */
-  public function blockForm($form, &$form_state) {
+  public function blockForm($form, FormStateInterface $form_state) {
     $range = range(2, 20);
     $form['block_count'] = array(
       '#type' => 'select',
@@ -75,10 +76,10 @@ abstract class ForumBlockBase extends BlockBase {
   }
 
   /**
-   * Overrides \Drupal\block\BlockBase::blockSubmit().
+   * {@inheritdoc}
    */
-  public function blockSubmit($form, &$form_state) {
-    $this->configuration['block_count'] = $form_state['values']['block_count'];
+  public function blockSubmit($form, FormStateInterface $form_state) {
+    $this->configuration['block_count'] = $form_state->getValue('block_count');
   }
 
   /**

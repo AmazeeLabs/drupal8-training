@@ -10,17 +10,12 @@ namespace Drupal\system\Tests\Installer;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests translation release version fallback.
+ * Tests the translation version fallback used during site installation to
+ * determine available translation files.
+ *
+ * @group Installer
  */
 class InstallerTranslationVersionUnitTest extends DrupalUnitTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Installer translation version fallback',
-      'description' => 'Tests the translation version fallback used during site installation to determine available translation files.',
-      'group' => 'Installer',
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -80,7 +75,7 @@ class InstallerTranslationVersionUnitTest extends DrupalUnitTestBase {
     $this->assertVersionFallback($version, $fallback);
 
     $version = '8.0-dev';
-    $fallback = array('8.0-rc1', '8.0-beta1', '8.0-alpha2', '7.0');
+    $fallback = array('8.0-rc1', '8.0-beta1', '8.0-alpha12', '7.0');
     $this->assertVersionFallback($version, $fallback);
 
     $version = '8.9-dev';

@@ -11,6 +11,8 @@ use Drupal\views\Views;
 
 /**
  * Tests core view token replacement.
+ *
+ * @group views
  */
 class TokenReplaceTest extends ViewUnitTestBase {
 
@@ -23,15 +25,7 @@ class TokenReplaceTest extends ViewUnitTestBase {
    */
   public static $testViews = array('test_tokens');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'View core token replacement',
-      'description' => 'Checks view core token replacements.',
-      'group' => 'Views',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->installSchema('system', 'url_alias');
   }

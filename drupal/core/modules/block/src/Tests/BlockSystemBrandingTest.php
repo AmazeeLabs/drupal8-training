@@ -8,7 +8,9 @@
 namespace Drupal\block\Tests;
 
 /**
- * Provides testing for the branding block functionality.
+ * Tests branding block display.
+ *
+ * @group block
  */
 class BlockSystemBrandingTest extends BlockTestBase {
 
@@ -22,18 +24,7 @@ class BlockSystemBrandingTest extends BlockTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'System Branding Block',
-      'description' => 'Tests branding block display.',
-      'group' => 'Block',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Set a site slogan.
     \Drupal::config('system.site')

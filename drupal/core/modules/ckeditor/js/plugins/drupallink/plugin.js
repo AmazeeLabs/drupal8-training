@@ -52,7 +52,7 @@
 
               // Use link URL as text with a collapsed cursor.
               if (range.collapsed) {
-                // Shorten mailto URLs to just the e-mail address.
+                // Shorten mailto URLs to just the email address.
                 var text = new CKEDITOR.dom.text(returnValues.attributes.href.replace(/^mailto:/, ''), editor.document);
                 range.insertNode(text);
                 range.selectNodeContents(text);
@@ -191,7 +191,6 @@
       }
     }
   });
-
 
   /**
    * Get the surrounding link element of current selection.

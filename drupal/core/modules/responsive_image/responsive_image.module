@@ -5,14 +5,19 @@
  * Responsive image display formatter for image fields.
  */
 
-use Drupal\breakpoint\Entity\Breakpoint;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Routing\RouteMatchInterface;
 use \Drupal\Core\Template\Attribute;
-use Symfony\Component\HttpFoundation\Request;
+
+/**
+ * The machine name for the empty image breakpoint image style option.
+ */
+const RESPONSIVE_IMAGE_EMPTY_IMAGE = '_empty image_';
 
 /**
  * Implements hook_help().
  */
-function responsive_image_help($route_name, Request $request) {
+function responsive_image_help($route_name, RouteMatchInterface $route_match) {
   $output = '';
   switch ($route_name) {
     case 'help.page.responsive_image':
@@ -36,17 +41,6 @@ function responsive_image_help($route_name, Request $request) {
 }
 
 /**
- * Implements hook_permission().
- */
-function responsive_image_permission() {
-  return array(
-    'administer responsive images' => array(
-      'title' => t('Administer responsive images'),
-    ),
-  );
-}
-
-/**
  * Implements hook_menu().
  */
 function responsive_image_menu() {
@@ -60,11 +54,11 @@ function responsive_image_menu() {
   );
   $items['admin/config/media/responsive-image-mapping/%responsive_image_mapping'] = array(
     'title' => 'Edit responsive image mapping',
-    'route_name' => 'responsive_image.mapping_page_edit',
+    'route_name' => 'entity.responsive_image_mapping.edit_form',
   );
   $items['admin/config/media/responsive-image-mapping/%responsive_image_mapping/duplicate'] = array(
     'title' => 'Duplicate responsive image mapping',
-    'route_name' => 'responsive_image.mapping_page_duplicate',
+    'route_name' => 'entity.responsive_image_mapping.duplicate_form',
   );
 
   return $items;
@@ -84,7 +78,7 @@ function responsive_image_theme() {
         'alt' => '',
         'title' => NULL,
         'attributes' => array(),
-        'breakpoints' => array(),
+        'mapping_id' => array(),
       ),
     ),
     'responsive_image_formatter' => array(
@@ -92,7 +86,7 @@ function responsive_image_theme() {
         'item' => NULL,
         'path' => NULL,
         'image_style' => NULL,
-        'breakpoints' => array(),
+        'mapping_id' => array(),
       ),
     ),
     'responsive_image_source' => array(
@@ -114,13 +108,13 @@ function responsive_image_theme() {
  *   - item: An ImageItem object.
  *   - image_style: An optional image style.
  *   - path: An optional array containing the link 'path' and link 'options'.
- *   - breakpoints: An array containing breakpoints.
+ *   - mapping_id: The ID of the responsive image mapping.
  *
  * @ingroup themeable
  */
 function theme_responsive_image_formatter($variables) {
   $item = $variables['item'];
-  if (!isset($variables['breakpoints']) || empty($variables['breakpoints'])) {
+  if (!isset($variables['mapping_id']) || empty($variables['mapping_id'])) {
     $image_formatter = array(
       '#theme' => 'image_formatter',
       '#item' => $item,
@@ -135,7 +129,7 @@ function theme_responsive_image_formatter($variables) {
     '#width' => $item->width,
     '#height' => $item->height,
     '#style_name' => $variables['image_style'],
-    '#breakpoints' => $variables['breakpoints'],
+    '#mapping_id' => $variables['mapping_id'],
   );
   if (isset($item->uri)) {
     $responsive_image['#uri'] = $item->uri;
@@ -172,7 +166,7 @@ function theme_responsive_image_formatter($variables) {
  *   - title: The title text is displayed when the image is hovered in some
  *     popular browsers.
  *   - style_name: The name of the style to be used as a fallback image.
- *   - breakpoints: An array containing breakpoints.
+ *   - mapping_id: The ID of the responsive image mapping.
  *
  * @ingroup themeable
  */
@@ -190,18 +184,18 @@ function theme_responsive_image($variables) {
   }
 
   $sources = array();
-  $output = array();
 
   // Fallback image, output as source with media query.
   $sources[] = array(
-    'src' => entity_load('image_style', $variables['style_name'])->buildUrl($variables['uri']),
+    'src' => _responsive_image_image_style_url($variables['style_name'], $variables['uri']),
     'dimensions' => responsive_image_get_image_dimensions($variables),
   );
-
+  $responsive_image_mapping = entity_load('responsive_image_mapping', $variables['mapping_id']);
   // All breakpoints and multipliers.
-  foreach ($variables['breakpoints'] as $breakpoint_name => $multipliers) {
-    $breakpoint = Breakpoint::load($breakpoint_name);
-    if ($breakpoint) {
+  $breakpoints = \Drupal::service('breakpoint.manager')->getBreakpointsByGroup($responsive_image_mapping->getBreakpointGroup());
+  foreach ($responsive_image_mapping->getKeyedMappings() as $breakpoint_id => $multipliers) {
+    if (isset($breakpoints[$breakpoint_id])) {
+      $breakpoint = $breakpoints[$breakpoint_id];
       $new_sources = array();
       foreach ($multipliers as $multiplier => $image_style) {
         $new_source = $variables;
@@ -213,27 +207,28 @@ function theme_responsive_image($variables) {
       // Only one image, use src.
       if (count($new_sources) == 1) {
         $sources[] = array(
-          'src' => entity_load('image_style', $new_sources[0]['style_name'])->buildUrl($new_sources[0]['uri']),
+          'src' => _responsive_image_image_style_url($new_sources[0]['style_name'], $new_sources[0]['uri']),
           'dimensions' => responsive_image_get_image_dimensions($new_sources[0]),
-          'media' => $breakpoint->mediaQuery,
+          'media' => $breakpoint->getMediaQuery(),
         );
       }
       else {
         // Multiple images, use srcset.
         $srcset = array();
         foreach ($new_sources as $new_source) {
-          $srcset[] = entity_load('image_style', $new_source['style_name'])->buildUrl($new_source['uri']) . ' ' . $new_source['#multiplier'];
+          $srcset[] = _responsive_image_image_style_url($new_source['style_name'], $new_source['uri']) . ' ' . $new_source['#multiplier'];
         }
         $sources[] = array(
           'srcset' => implode(', ', $srcset),
           'dimensions' => responsive_image_get_image_dimensions($new_sources[0]),
-          'media' => $breakpoint->mediaQuery,
+          'media' => $breakpoint->getMediaQuery(),
         );
       }
     }
   }
 
   if (!empty($sources)) {
+    $output = array();
     $output[] = '<picture>';
 
     // Add source tags to the output.
@@ -253,14 +248,14 @@ function theme_responsive_image($variables) {
     }
 
     $output[] = '</picture>';
-    return implode("\n", $output);
+    return SafeMarkup::set(implode("\n", $output));
   }
 }
 
 /**
  * Returns HTML for a source tag.
  *
- * @param type $variables
+ * @param array $variables
  *   An associative array containing:
  *   - media: The media query to use.
  *   - srcset: The srcset containing the the path of the image file or a full
@@ -310,7 +305,27 @@ function responsive_image_get_image_dimensions($variables) {
     'height' => $variables['height'],
   );
 
-  entity_load('image_style', $variables['style_name'])->transformDimensions($dimensions);
+  if ($variables['style_name'] == RESPONSIVE_IMAGE_EMPTY_IMAGE) {
+    $dimensions = array(
+      'width' => 1,
+      'height' => 1,
+    );
+  }
+  else {
+    entity_load('image_style', $variables['style_name'])->transformDimensions($dimensions);
+  }
 
   return $dimensions;
 }
+
+/**
+ * Wrapper around image_style_url() so we can return an empty image.
+ */
+function _responsive_image_image_style_url($style_name, $path) {
+  if ($style_name == RESPONSIVE_IMAGE_EMPTY_IMAGE) {
+    // The smallest data URI for a 1px square transparent GIF image.
+    return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  }
+  return entity_load('image_style', $style_name)->buildUrl($path);
+}
+

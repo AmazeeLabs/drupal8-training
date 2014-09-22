@@ -10,20 +10,11 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\migrate\MigrateExecutable;
 
 /**
- * Test node revisions migration from Drupal 6 to 8.
+ * Node content revisions migration.
+ *
+ * @group migrate_drupal
  */
 class MigrateNodeRevisionTest extends MigrateNodeTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate nodes',
-      'description'  => 'Node content revisions migration',
-      'group' => 'Migrate Drupal',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -35,7 +26,7 @@ class MigrateNodeRevisionTest extends MigrateNodeTestBase {
         array(array(1), array(1)),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
 
     $dumps = array(
       $this->getDumpDirectory() . '/Drupal6NodeRevision.php',

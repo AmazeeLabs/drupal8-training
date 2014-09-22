@@ -1,5 +1,5 @@
-template "/home/vagrant/public_html/drupal/sites/default/settings.php" do
-  source "settings.php.erb"
+template "/home/vagrant/public_html/drupal/sites/default/settings.local.php" do
+  source "settings.local.php.erb"
   variables({
      :database => 'drupal',
      :username => 'root',

@@ -7,8 +7,6 @@
 
 namespace Drupal\Core\TypedData;
 
-use Drupal\Core\Language\LanguageManager;
-
 /**
  * Interface for translatable data.
  */
@@ -17,7 +15,7 @@ interface TranslatableInterface {
   /**
    * Returns the default language.
    *
-   * @return \Drupal\Core\Language\Language
+   * @return \Drupal\Core\Language\LanguageInterface
    *   The language object.
    */
   public function language();
@@ -42,7 +40,8 @@ interface TranslatableInterface {
    * instantiated.
    *
    * @param $langcode
-   *   The language code of the translation to get or Language::LANGCODE_DEFAULT
+   *   The language code of the translation to get or
+   *   LanguageInterface::LANGCODE_DEFAULT
    *   to get the data in default language.
    *
    * @return \Drupal\Core\TypedData\TypedDataInterface
@@ -62,7 +61,7 @@ interface TranslatableInterface {
    * Returns TRUE there is a translation for the given language code.
    *
    * @param string $langcode
-   *   The language code identifiying the translation.
+   *   The language code identifying the translation.
    *
    * @return bool
    *   TRUE if the translation exists, FALSE otherwise.

@@ -2,23 +2,29 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\sort\SortPluginBase.
+ * Contains \Drupal\views\Plugin\views\sort\SortPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\sort;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\HandlerBase;
 
 /**
- * @defgroup views_sort_handlers Views sort handlers
+ * @defgroup views_sort_handlers Views sort handler plugins
  * @{
- * Handlers to tell Views how to sort queries.
+ * Plugins that handle sorting for Views.
+ *
+ * Sort handlers extend \Drupal\views\Plugin\views\sort:SortPluginBase. They
+ * must be annotated with \Drupal\views\Annotation\ViewsSort annotation, and
+ * they must be in plugin directory Plugin\views\sort.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
  * Base sort handler that has no options and performs a simple sort.
- *
- * @ingroup views_sort_handlers
  */
 abstract class SortPluginBase extends HandlerBase {
 
@@ -72,7 +78,7 @@ abstract class SortPluginBase extends HandlerBase {
   /**
    * Basic options for all sort criteria
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     if ($this->canExpose()) {
       $this->showExposeButton($form, $form_state);
@@ -88,7 +94,7 @@ abstract class SortPluginBase extends HandlerBase {
   /**
    * Shortcut to display the expose/hide button.
    */
-  public function showExposeButton(&$form, &$form_state) {
+  public function showExposeButton(&$form, FormStateInterface $form_state) {
     $form['expose_button'] = array(
       '#prefix' => '<div class="views-expose clearfix">',
       '#suffix' => '</div>',
@@ -139,7 +145,7 @@ abstract class SortPluginBase extends HandlerBase {
   /**
    * Simple validate handler
    */
-  public function validateOptionsForm(&$form, &$form_state) {
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) {
     $this->sortValidate($form, $form_state);
     if (!empty($this->options['exposed'])) {
       $this->validateExposeForm($form, $form_state);
@@ -150,8 +156,10 @@ abstract class SortPluginBase extends HandlerBase {
   /**
    * Simple submit handler
    */
-  public function submitOptionsForm(&$form, &$form_state) {
-    unset($form_state['values']['expose_button']); // don't store this.
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
+    // Do not store this values.
+    $form_state->unsetValue('expose_button');
+
     $this->sortSubmit($form, $form_state);
     if (!empty($this->options['exposed'])) {
       $this->submitExposeForm($form, $form_state);
@@ -161,7 +169,7 @@ abstract class SortPluginBase extends HandlerBase {
   /**
    * Shortcut to display the value form.
    */
-  protected function showSortForm(&$form, &$form_state) {
+  protected function showSortForm(&$form, FormStateInterface $form_state) {
     $options = $this->sortOptions();
     if (!empty($options)) {
       $form['order'] = array(
@@ -173,9 +181,9 @@ abstract class SortPluginBase extends HandlerBase {
     }
   }
 
-  protected function sortValidate(&$form, &$form_state) { }
+  protected function sortValidate(&$form, FormStateInterface $form_state) { }
 
-  public function sortSubmit(&$form, &$form_state) { }
+  public function sortSubmit(&$form, FormStateInterface $form_state) { }
 
   /**
    * Provide a list of options for the default sort form.
@@ -188,7 +196,7 @@ abstract class SortPluginBase extends HandlerBase {
     );
   }
 
-  public function buildExposeForm(&$form, &$form_state) {
+  public function buildExposeForm(&$form, FormStateInterface $form_state) {
     // #flatten will move everything from $form['expose'][$key] to $form[$key]
     // prior to rendering. That's why the preRender for it needs to run first,
     // so that when the next preRender (the one for fieldsets) runs, it gets

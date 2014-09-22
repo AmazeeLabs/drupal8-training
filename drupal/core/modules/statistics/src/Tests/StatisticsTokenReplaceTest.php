@@ -7,20 +7,13 @@
 
 namespace Drupal\statistics\Tests;
 
-use Drupal\Core\Language\Language;
-
 /**
- * Tests statistics token replacement in strings.
+ * Generates text using placeholders for dummy content to check statistics token
+ * replacement.
+ *
+ * @group statistics
  */
 class StatisticsTokenReplaceTest extends StatisticsTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Statistics token replacement',
-      'description' => 'Generates text using placeholders for dummy content to check statistics token replacement.',
-      'group' => 'Statistics',
-    );
-  }
-
   /**
    * Creates a node, then tests the statistics tokens generated from it.
    */

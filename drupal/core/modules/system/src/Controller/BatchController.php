@@ -11,7 +11,6 @@ use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Page\DefaultHtmlFragmentRenderer;
 use Drupal\Core\Page\HtmlPage;
-use Symfony\Cmf\Component\Routing\RouteObjectInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -99,8 +98,7 @@ class BatchController implements ContainerInjectionInterface {
    */
   public function render(array $output, $status_code = 200) {
     if (!isset($output['#title'])) {
-      $request = \Drupal::request();
-      $output['#title'] = $this->titleResolver->getTitle($request, $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
+      $output['#title'] = $this->titleResolver->getTitle(\Drupal::request(), \Drupal::routeMatch()->getRouteObject());
     }
     $page = new HtmlPage('', isset($output['#cache']) ? $output['#cache'] : array(), $output['#title']);
 
@@ -111,6 +109,14 @@ class BatchController implements ContainerInjectionInterface {
     $page->setBodyTop(drupal_render($page_array['page_top']));
     $page->setBodyBottom(drupal_render($page_array['page_bottom']));
     $page->setContent(drupal_render($page_array));
+
+    drupal_process_attached($page_array);
+    if (isset($page_array['page_top'])) {
+      drupal_process_attached($page_array['page_top']);
+    }
+    if (isset($page_array['page_bottom'])) {
+      drupal_process_attached($page_array['page_bottom']);
+    }
 
     $page->setStatusCode($status_code);
 

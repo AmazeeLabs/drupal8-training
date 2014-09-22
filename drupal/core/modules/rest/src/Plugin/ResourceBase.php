@@ -7,14 +7,23 @@
 
 namespace Drupal\rest\Plugin;
 
+use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\PluginBase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
  * Common base class for resource plugins.
+ *
+ * @see \Drupal\rest\Annotation\RestResource
+ * @see \Drupal\rest\Plugin\Type\ResourcePluginManager
+ * @see \Drupal\rest\Plugin\ResourceInterface
+ * @see plugin_api
+ *
+ * @ingroup third_party
  */
 abstract class ResourceBase extends PluginBase implements ContainerFactoryPluginInterface, ResourceInterface {
 
@@ -24,6 +33,13 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
    * @var array
    */
   protected $serializerFormats = array();
+
+  /**
+   * A logger instance.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
 
   /**
    * Constructs a Drupal\rest\Plugin\ResourceBase object.
@@ -36,10 +52,13 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
    *   The plugin implementation definition.
    * @param array $serializer_formats
    *   The available serialization formats.
+   * @param \Psr\Log\LoggerInterface $logger
+   *   A logger instance.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, array $serializer_formats) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, array $serializer_formats, LoggerInterface $logger) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->serializerFormats = $serializer_formats;
+    $this->logger = $logger;
   }
 
   /**
@@ -50,7 +69,8 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
       $configuration,
       $plugin_id,
       $plugin_definition,
-      $container->getParameter('serializer.formats')
+      $container->getParameter('serializer.formats'),
+      $container->get('logger.factory')->get('rest')
     );
   }
 
@@ -87,18 +107,7 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
 
     $methods = $this->availableMethods();
     foreach ($methods as $method) {
-      $lower_method = strtolower($method);
-      $route = new Route($canonical_path, array(
-        '_controller' => 'Drupal\rest\RequestHandler::handle',
-        // Pass the resource plugin ID along as default property.
-        '_plugin' => $this->pluginId,
-      ), array(
-        // The HTTP method is a requirement for this route.
-        '_method' => $method,
-        '_permission' => "restful $lower_method $this->pluginId",
-      ), array(
-        '_access_mode' => 'ANY',
-      ));
+      $route = $this->getBaseRoute($canonical_path, $method);
 
       switch ($method) {
         case 'POST':
@@ -173,6 +182,34 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
       }
     }
     return $available;
+  }
+
+  /**
+   * Setups the base route for all HTTP methods.
+   *
+   * @param string $canonical_path
+   *   The canonical path for the resource.
+   * @param string $method
+   *   The HTTP method to be used for the route.
+   *
+   * @return \Symfony\Component\Routing\Route
+   *   The created base route.
+   */
+  protected function getBaseRoute($canonical_path, $method) {
+    $lower_method = strtolower($method);
+
+    $route = new Route($canonical_path, array(
+      '_controller' => 'Drupal\rest\RequestHandler::handle',
+      // Pass the resource plugin ID along as default property.
+      '_plugin' => $this->pluginId,
+    ), array(
+      // The HTTP method is a requirement for this route.
+      '_method' => $method,
+      '_permission' => "restful $lower_method $this->pluginId",
+    ), array(
+      '_access_mode' => AccessManagerInterface::ACCESS_MODE_ANY,
+    ));
+    return $route;
   }
 
 }

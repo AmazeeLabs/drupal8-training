@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests confirmation forms.
+ *
+ * @group Form
  */
 class ConfirmFormTest extends WebTestBase {
 
@@ -20,14 +22,6 @@ class ConfirmFormTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('form_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Confirmation forms',
-      'description' => 'Tests confirmation forms.',
-      'group' => 'Form API',
-    );
-  }
 
   function testConfirmForm() {
     // Test the building of the form.
@@ -39,7 +33,7 @@ class ConfirmFormTest extends WebTestBase {
 
     // Test canelling the form.
     $this->clickLink(t('ConfirmFormTestForm::getCancelText().'));
-    $this->assertUrl('admin', array(), "The form's cancel link was followed.");
+    $this->assertUrl('form-test/autocomplete', array(), "The form's cancel link was followed.");
 
     // Test submitting the form.
     $this->drupalPostForm('form-test/confirm-form', NULL, t('ConfirmFormTestForm::getConfirmText().'));
@@ -53,7 +47,7 @@ class ConfirmFormTest extends WebTestBase {
     // Test cancelling the form with a complex destination.
     $this->drupalGet('form-test/confirm-form-array-path');
     $this->clickLink(t('ConfirmFormArrayPathTestForm::getCancelText().'));
-    $this->assertUrl('admin', array('query' => array('destination' => 'admin/config')), "The form's complex cancel link was followed.");
+    $this->assertUrl('form-test/confirm-form', array('query' => array('destination' => 'admin/config')), "The form's complex cancel link was followed.");
   }
 
 }

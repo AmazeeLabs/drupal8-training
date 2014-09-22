@@ -2,24 +2,30 @@
 
 /**
  * @file
- * Contains \Drupal\migrate\MigraterPluginManager.
+ * Contains \Drupal\migrate\Plugin\MigratePluginManager.
  */
 
 namespace Drupal\migrate\Plugin;
 
 use Drupal\Component\Plugin\Factory\DefaultFactory;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\migrate\Entity\MigrationInterface;
-use Drupal\migrate\MigrateException;
 
 /**
  * Manages migrate plugins.
  *
  * @see hook_migrate_info_alter()
+ * @see \Drupal\migrate\Annotation\MigrateSource
+ * @see \Drupal\migrate\Plugin\MigrateSourceInterface
+ * @see \Drupal\migrate\Plugin\migrate\source\SourcePluginBase
+ * @see \Drupal\migrate\Annotation\MigrateProcessPlugin
+ * @see \Drupal\migrate\Plugin\MigrateProcessInterface
+ * @see \Drupal\migrate\Plugin\migrate\process\ProcessPluginBase
+ * @see plugin_api
+ *
+ * @ingroup migration
  */
 class MigratePluginManager extends DefaultPluginManager {
 
@@ -34,17 +40,23 @@ class MigratePluginManager extends DefaultPluginManager {
    *   keyed by the corresponding namespace to look for plugin implementations.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache_backend
    *   Cache backend instance to use.
-   * @param \Drupal\Core\Language\LanguageManager $language_manager
-   *   The language manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler to invoke the alter hook with.
    * @param string $annotation
    *   The annotation class name.
    */
-  public function __construct($type, \Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ModuleHandlerInterface $module_handler, $annotation = 'Drupal\Component\Annotation\PluginID') {
-    parent::__construct("Plugin/migrate/$type", $namespaces, $module_handler, $annotation);
+  public function __construct($type, \Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler, $annotation = 'Drupal\Component\Annotation\PluginID') {
+    $plugin_interface_map = array(
+      'destination' => 'Drupal\migrate\Plugin\MigrateDestinationInterface',
+      'process' => 'Drupal\migrate\Plugin\MigrateProcessInterface',
+      'source' => 'Drupal\migrate\Plugin\MigrateSourceInterface',
+      'id_map' => 'Drupal\migrate\Plugin\MigrateIdMapInterface',
+      'entity_field' => 'Drupal\migrate\Plugin\MigrateEntityDestinationFieldInterface',
+    );
+    $plugin_interface = isset($plugin_interface_map[$type]) ? $plugin_interface_map[$type] : NULL;
+    parent::__construct("Plugin/migrate/$type", $namespaces, $module_handler, $plugin_interface, $annotation);
     $this->alterInfo('migrate_' . $type . '_info');
-    $this->setCacheBackend($cache_backend, $language_manager, 'migrate_plugins_' . $type);
+    $this->setCacheBackend($cache_backend, 'migrate_plugins_' . $type);
   }
 
   /**

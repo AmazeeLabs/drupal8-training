@@ -5,13 +5,13 @@
  * Provides integration with the CKEditor WYSIWYG editor.
  */
 
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\editor\Entity\Editor;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Implements hook_help().
  */
-function ckeditor_help($route_name, Request $request) {
+function ckeditor_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.ckeditor':
       $output = '';
@@ -58,6 +58,12 @@ function ckeditor_ckeditor_css_alter(array &$css, Editor $editor) {
   // CKEditor DrupalImageCaption plugin.
   if ($editor->getFilterFormat()->filters('filter_caption')->status) {
     $css[] = drupal_get_path('module', 'filter') . '/css/filter.caption.css';
+  }
+
+  // Add the filter caption CSS if the text format associated with this text
+  // editor uses the filter_align filter. This is used by the included
+  // CKEditor DrupalImageCaption plugin.
+  if ($editor->getFilterFormat()->filters('filter_align')->status) {
     $css[] = drupal_get_path('module', 'ckeditor') . '/css/plugins/drupalimagecaption/ckeditor.drupalimagecaption.css';
   }
 }

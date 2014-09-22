@@ -7,7 +7,8 @@
 
 namespace Drupal\views;
 
-use Drupal\Core\DependencyInjection\DependencySerialization;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
+use Drupal\Core\Form\FormState;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\views\Plugin\views\query\QueryPluginBase;
 use Drupal\views\ViewStorageInterface;
@@ -16,17 +17,13 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * @defgroup views_objects Objects that represent a View or part of a view
- * @{
- * These objects are the core of Views do the bulk of the direction and
- * storing of data. All database activity is in these objects.
- */
-
-/**
+ * Represents a view as a whole.
+ *
  * An object to contain all of the data to generate a view, plus the member
  * functions to build the view query, execute the query and render the output.
  */
-class ViewExecutable extends DependencySerialization {
+class ViewExecutable {
+  use DependencySerializationTrait;
 
   /**
    * The config entity in which the view is stored.
@@ -130,7 +127,7 @@ class ViewExecutable extends DependencySerialization {
   // Exposed widget input
 
   /**
-   * All the form data from $form_state['values'].
+   * All the form data from $form_state->getValues().
    *
    * @var array
    */
@@ -144,7 +141,7 @@ class ViewExecutable extends DependencySerialization {
   public $exposed_input = array();
 
   /**
-   * Exposed widget input directly from the $form_state['values'].
+   * Exposed widget input directly from the $form_state->getValues().
    *
    * @var array
    */
@@ -1077,7 +1074,7 @@ class ViewExecutable extends DependencySerialization {
     if ($this->display_handler->usesExposed()) {
       $exposed_form = $this->display_handler->getPlugin('exposed_form');
       $this->exposed_widgets = $exposed_form->renderExposedForm();
-      if (\Drupal::formBuilder()->getAnyErrors() || !empty($this->build_info['abort'])) {
+      if (FormState::hasAnyErrors() || !empty($this->build_info['abort'])) {
         $this->built = TRUE;
         // Don't execute the query, $form_state, but rendering will still be executed to display the empty text.
         $this->executed = TRUE;
@@ -1303,6 +1300,12 @@ class ViewExecutable extends DependencySerialization {
 
     $module_handler = \Drupal::moduleHandler();
 
+    // @TODO on the longrun it would be great to execute a view without
+    //   the theme system at all, see https://drupal.org/node/2322623.
+    $active_theme = \Drupal::theme()->getActiveTheme();
+    $themes = array_keys($active_theme->getBaseThemes());
+    $themes[] = $active_theme->getName();
+
     // Check for already-cached output.
     if (!empty($this->live_preview)) {
       $cache = FALSE;
@@ -1311,6 +1314,7 @@ class ViewExecutable extends DependencySerialization {
       $cache = $this->display_handler->getPlugin('cache');
     }
 
+    /** @var \Drupal\views\Plugin\views\cache\CachePluginBase $cache */
     if ($cache && $cache->cacheGet('output')) {
     }
     else {
@@ -1359,12 +1363,11 @@ class ViewExecutable extends DependencySerialization {
       $module_handler->invokeAll('views_pre_render', array($this));
 
       // Let the themes play too, because pre render is a very themey thing.
-      if (isset($GLOBALS['base_theme_info']) && isset($GLOBALS['theme'])) {
-        foreach ($GLOBALS['base_theme_info'] as $base) {
-          $module_handler->invoke($base->getName(), 'views_pre_render', array($this));
+      foreach ($themes as $theme_name) {
+        $function = $theme_name . '_views_pre_render';
+        if (function_exists($function)) {
+          $function($this);
         }
-
-        $module_handler->invoke($GLOBALS['theme'], 'views_pre_render', array($this));
       }
 
       $this->display_handler->output = $this->display_handler->render();
@@ -1383,12 +1386,11 @@ class ViewExecutable extends DependencySerialization {
     $module_handler->invokeAll('views_post_render', array($this, &$this->display_handler->output, $cache));
 
     // Let the themes play too, because post render is a very themey thing.
-    if (isset($GLOBALS['base_theme_info']) && isset($GLOBALS['theme'])) {
-      foreach ($GLOBALS['base_theme_info'] as $base) {
-        $module_handler->invoke($base->getName(), 'views_post_render', array($this));
+    foreach ($themes as $theme_name) {
+      $function = $theme_name . '_views_post_render';
+      if (function_exists($function)) {
+        $function($this);
       }
-
-      $module_handler->invoke($GLOBALS['theme'], 'views_post_render', array($this));
     }
 
     return $this->display_handler->output;
@@ -1507,23 +1509,22 @@ class ViewExecutable extends DependencySerialization {
       // Create a clone for the attachments to manipulate. 'static' refers to the current class name.
       $cloned_view = new static($this->storage, $this->user);
       $cloned_view->setRequest($this->getRequest());
-      $this->displayHandlers->get($id)->attachTo($cloned_view, $this->current_display);
+      $this->displayHandlers->get($id)->attachTo($cloned_view, $this->current_display, $this->element);
     }
     $this->is_attachment = FALSE;
   }
 
   /**
-   * Returns default menu links from the view and the named display handler.
+   * Returns menu links from the view and the named display handler.
    *
    * @param string $display_id
    *   A display ID.
-   * @param array $links
-   *   An array of default menu link items passed from
-   *   views_menu_link_defaults_alter().
    *
    * @return array|bool
+   *   The generated menu links for this view and display, FALSE if the call
+   *   to ::setDisplay failed.
    */
-  public function executeHookMenuLinkDefaults($display_id = NULL, &$links = array()) {
+  public function getMenuLinks($display_id = NULL) {
     // Prepare the view with the information we have. This was probably already
     // called, but it's good to be safe.
     if (!$this->setDisplay($display_id)) {
@@ -1532,7 +1533,7 @@ class ViewExecutable extends DependencySerialization {
 
     // Execute the hook.
     if (isset($this->display_handler)) {
-      return $this->display_handler->executeHookMenuLinkDefaults($links);
+      return $this->display_handler->getMenuLinks();
     }
   }
 

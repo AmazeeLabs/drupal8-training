@@ -8,27 +8,19 @@
 namespace Drupal\field;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Provides an interface defining a field entity.
  */
-interface FieldConfigInterface extends ConfigEntityInterface, FieldStorageDefinitionInterface {
+interface FieldConfigInterface extends ConfigEntityInterface, FieldDefinitionInterface {
 
   /**
-   * Returns the list of bundles where the field has instances.
-   *
-   * @return array
-   *   An array of bundle names.
-   */
-  public function getBundles();
-
-  /**
-   * Returns whether the field is locked or not.
+   * Gets the deleted flag of the field.
    *
    * @return bool
-   *   TRUE if the field is locked.
+   *   Returns TRUE if the field is deleted.
    */
-  public function isLocked();
+  public function isDeleted();
 
 }

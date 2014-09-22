@@ -7,13 +7,16 @@
 
 namespace Drupal\locale\Tests;
 
-use Drupal\Core\Cache\Cache;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Component\Utility\String;
 
 /**
- * Functional test for string translation and validation.
+ * Adds a new locale and translates its name. Checks the validation of
+ * translation strings and search results.
+ *
+ * @group locale
  */
 class LocaleTranslationUiTest extends WebTestBase {
 
@@ -24,18 +27,10 @@ class LocaleTranslationUiTest extends WebTestBase {
    */
   public static $modules = array('locale');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'String translate, search and validate',
-      'description' => 'Adds a new locale and translates its name. Checks the validation of translation strings and search results.',
-      'group' => 'Locale',
-    );
-  }
-
   /**
-   *  Enable interface translation to English
+   * Enable interface translation to English.
    */
-  function testEnglishTranslation() {
+  public function testEnglishTranslation() {
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
     $this->drupalLogin($admin_user);
 
@@ -46,7 +41,7 @@ class LocaleTranslationUiTest extends WebTestBase {
   /**
    * Adds a language and tests string translation by users with the appropriate permissions.
    */
-  function testStringTranslation() {
+  public function testStringTranslation() {
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
     // User to translate and delete string.
@@ -54,25 +49,25 @@ class LocaleTranslationUiTest extends WebTestBase {
     // Code for the language.
     $langcode = 'xx';
     // The English name for the language. This will be translated.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     // This will be the translation of $name.
-    $translation = $this->randomName(16);
-    $translation_to_en = $this->randomName(16);
+    $translation = $this->randomMachineName(16);
+    $translation_to_en = $this->randomMachineName(16);
 
     // Add custom language.
     $this->drupalLogin($admin_user);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     // Add string.
     t($name, array(), array('langcode' => $langcode));
     // Reset locale cache.
     $this->container->get('string_translation')->reset();
-    $this->assertRaw('"edit-languages-' . $langcode .'-weight"', 'Language code found.');
+    $this->assertRaw('"edit-languages-' . $langcode . '-weight"', 'Language code found.');
     $this->assertText(t($name), 'Test language added.');
     $this->drupalLogout();
 
@@ -120,7 +115,6 @@ class LocaleTranslationUiTest extends WebTestBase {
     $this->drupalPostForm('admin/config/regional/translate', $search, t('Filter'));
     $this->assertRaw($translation, 'Non-English translation properly saved.');
 
-
     $search = array(
       'string' => $name,
       'langcode' => 'en',
@@ -152,7 +146,7 @@ class LocaleTranslationUiTest extends WebTestBase {
     $this->container->get('string_translation')->reset();
     // Now we should get the proper fresh translation from t().
     $this->assertTrue($name != $translation_to_en && t($name, array(), array('langcode' => 'en')) == $translation_to_en, 't() works for English.');
-    $this->assertTrue(t($name, array(), array('langcode' => Language::LANGCODE_SYSTEM)) == $name, 't() works for Language::LANGCODE_SYSTEM.');
+    $this->assertTrue(t($name, array(), array('langcode' => LanguageInterface::LANGCODE_SYSTEM)) == $name, 't() works for LanguageInterface::LANGCODE_SYSTEM.');
 
     $search = array(
       'string' => $name,
@@ -208,21 +202,21 @@ class LocaleTranslationUiTest extends WebTestBase {
    * Adds a language and checks that the JavaScript translation files are
    * properly created and rebuilt on deletion.
    */
-  function testJavaScriptTranslation() {
+  public function testJavaScriptTranslation() {
     $user = $this->drupalCreateUser(array('translate interface', 'administer languages', 'access administration pages'));
     $this->drupalLogin($user);
     $config = \Drupal::config('locale.settings');
 
     $langcode = 'xx';
     // The English name for the language. This will be translated.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
 
     // Add custom language.
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     $this->container->get('language_manager')->reset();
@@ -248,7 +242,7 @@ class LocaleTranslationUiTest extends WebTestBase {
     $textarea = current($this->xpath('//textarea'));
     $lid = (string) $textarea[0]['name'];
     $edit = array(
-      $lid => $this->randomName(),
+      $lid => $this->randomMachineName(),
     );
     $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
@@ -262,7 +256,6 @@ class LocaleTranslationUiTest extends WebTestBase {
     // Test JavaScript translation rebuilding.
     file_unmanaged_delete($js_file);
     $this->assertTrue($result = !file_exists($js_file), String::format('JavaScript file deleted: %file', array('%file' => $result ? $js_file : 'found')));
-    Cache::invalidateTags(array('content' => TRUE));
     _locale_rebuild_js($langcode);
     $this->assertTrue($result = file_exists($js_file), String::format('JavaScript file rebuilt: %file', array('%file' => $result ? $js_file : 'not found')));
   }
@@ -270,30 +263,30 @@ class LocaleTranslationUiTest extends WebTestBase {
   /**
    * Tests the validation of the translation input.
    */
-  function testStringValidation() {
+  public function testStringValidation() {
     // User to add language and strings.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'translate interface'));
     $this->drupalLogin($admin_user);
     $langcode = 'xx';
     // The English name for the language. This will be translated.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
 
     // These will be the invalid translations of $name.
-    $key = $this->randomName(16);
+    $key = $this->randomMachineName(16);
     $bad_translations[$key] = "<script>alert('xss');</script>" . $key;
-    $key = $this->randomName(16);
+    $key = $this->randomMachineName(16);
     $bad_translations[$key] = '<img SRC="javascript:alert(\'xss\');">' . $key;
-    $key = $this->randomName(16);
+    $key = $this->randomMachineName(16);
     $bad_translations[$key] = '<<SCRIPT>alert("xss");//<</SCRIPT>' . $key;
-    $key = $this->randomName(16);
-    $bad_translations[$key] ="<BODY ONLOAD=alert('xss')>" . $key;
+    $key = $this->randomMachineName(16);
+    $bad_translations[$key] = "<BODY ONLOAD=alert('xss')>" . $key;
 
     // Add custom language.
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     // Add string.
@@ -324,7 +317,7 @@ class LocaleTranslationUiTest extends WebTestBase {
   /**
    * Tests translation search form.
    */
-  function testStringSearch() {
+  public function testStringSearch() {
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
     // User to translate and delete string.
@@ -333,25 +326,25 @@ class LocaleTranslationUiTest extends WebTestBase {
     // Code for the language.
     $langcode = 'xx';
     // The English name for the language. This will be translated.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     // This will be the translation of $name.
-    $translation = $this->randomName(16);
+    $translation = $this->randomMachineName(16);
 
     // Add custom language.
     $this->drupalLogin($admin_user);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
 
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => 'yy',
-      'name' => $this->randomName(16),
-      'direction' => '0',
+      'label' => $this->randomMachineName(16),
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
 
@@ -453,7 +446,7 @@ class LocaleTranslationUiTest extends WebTestBase {
     $this->assertText(t('No strings available.'), "Search didn't find the translation.");
 
     // Search for a string that isn't in the system.
-    $unavailable_string = $this->randomName(16);
+    $unavailable_string = $this->randomMachineName(16);
     $search = array(
       'string' => $unavailable_string,
       'langcode' => $langcode,
@@ -466,30 +459,30 @@ class LocaleTranslationUiTest extends WebTestBase {
   /**
    * Tests that only changed strings are saved customized when edited.
    */
-  function testUICustomizedStrings(){
+  public function testUICustomizedStrings() {
     $user = $this->drupalCreateUser(array('translate interface', 'administer languages', 'access administration pages'));
     $this->drupalLogin($user);
-    $language = new Language(array('id' => 'de'));
-    language_save($language);
+    ConfigurableLanguage::createFromLangcode('de')->save();
 
-    // Create test source string
+    // Create test source string.
     $string = $this->container->get('locale.storage')->createString(array(
-      'source' => $this->randomName(100),
-      'context' => $this->randomName(20),
+      'source' => $this->randomMachineName(100),
+      'context' => $this->randomMachineName(20),
     ))->save();
 
     // Create translation for new string and save it as non-customized.
     $translation = $this->container->get('locale.storage')->createTranslation(array(
       'lid' => $string->lid,
       'language' => 'de',
-      'translation' => $this->randomName(100),
+      'translation' => $this->randomMachineName(100),
       'customized' => 0,
     ))->save();
 
     // Reset locale cache.
     $this->container->get('string_translation')->reset();
 
-    // Ensure non-customized translation string does appear if searching Non-customized translation.
+    // Ensure non-customized translation string does appear if searching
+    // non-customized translation.
     $search = array(
       'string' => $string->getString(),
       'langcode' => 'de',
@@ -508,7 +501,8 @@ class LocaleTranslationUiTest extends WebTestBase {
     );
     $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
-    // Ensure unchanged translation string does appear if searching non-customized translation.
+    // Ensure unchanged translation string does appear if searching
+    // non-customized translation.
     $search = array(
       'string' => $string->getString(),
       'langcode' => 'de',
@@ -522,11 +516,12 @@ class LocaleTranslationUiTest extends WebTestBase {
     $textarea = current($this->xpath('//textarea'));
     $lid = (string) $textarea[0]['name'];
     $edit = array(
-      $lid => $this->randomName(100),
+      $lid => $this->randomMachineName(100),
     );
     $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
-    // Ensure changed translation string does appear if searching customized translation.
+    // Ensure changed translation string does appear if searching customized
+    // translation.
     $search = array(
       'string' => $string->getString(),
       'langcode' => 'de',

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\locale\Tests\LocaleUpdateTest.
+ * Contains Drupal\locale\Tests\LocaleUpdateBase.
  */
 
 namespace Drupal\locale\Tests;
@@ -21,35 +21,44 @@ abstract class LocaleUpdateBase extends WebTestBase {
    *
    * @var integer
    */
-  protected $timestamp_old;
+  protected $timestampOld;
 
   /**
    * Timestamp for a medium aged translation.
    *
    * @var integer
    */
-  protected $timestamp_medium;
+  protected $timestampMedium;
 
   /**
    * Timestamp for a new translation.
    *
    * @var integer
    */
-  protected $timestamp_new;
+  protected $timestampNew;
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('update', 'locale', 'locale_test');
+  public static $modules = array('update', 'update_test', 'locale', 'locale_test');
 
-  function setUp() {
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
     parent::setUp();
+
+    // Update module should not go out to d.o to check for updates. We override
+    // the url to the default update_test xml path. But without providing
+    // a mock xml file, no update data will be found.
+    \Drupal::config('update.settings')->set('fetch.url', url('update-test', array('absolute' => TRUE)))->save();
+
     // Setup timestamps to identify old and new translation sources.
-    $this->timestamp_old = REQUEST_TIME - 300;
-    $this->timestamp_medium = REQUEST_TIME - 200;
-    $this->timestamp_new = REQUEST_TIME - 100;
+    $this->timestampOld = REQUEST_TIME - 300;
+    $this->timestampMedium = REQUEST_TIME - 200;
+    $this->timestampNew = REQUEST_TIME - 100;
     $this->timestamp_now = REQUEST_TIME;
 
     // Enable import of translations. By default this is disabled for automated
@@ -91,7 +100,7 @@ abstract class LocaleUpdateBase extends WebTestBase {
    *   Path of the file relative to the public file path.
    * @param string $filename
    *   Name of the file to create.
-   * @param integer $timestamp
+   * @param int $timestamp
    *   Timestamp to set the file to. Defaults to current time.
    * @param array $translations
    *   Array of source/target value translation strings. Only singular strings
@@ -116,8 +125,8 @@ EOF;
     // Convert array of translations to Gettext source and translation strings.
     if ($translations) {
       foreach ($translations as $source => $target) {
-        $text .= 'msgid "'. $source . '"' . "\n";
-        $text .= 'msgstr "'. $target . '"' . "\n";
+        $text .= 'msgid "' . $source . '"' . "\n";
+        $text .= 'msgstr "' . $target . '"' . "\n";
       }
     }
 
@@ -177,23 +186,23 @@ EOF;
 
     // Setting up sets of translations for the translation files.
     $translations_one = array('January' => 'Januar_1', 'February' => 'Februar_1', 'March' => 'Marz_1');
-    $translations_two = array( 'February' => 'Februar_2', 'March' => 'Marz_2', 'April' => 'April_2');
+    $translations_two = array('February' => 'Februar_2', 'March' => 'Marz_2', 'April' => 'April_2');
     $translations_three = array('April' => 'April_3', 'May' => 'Mai_3', 'June' => 'Juni_3');
 
     // Add a number of files to the local file system to serve as remote
     // translation server and match the project definitions set in
     // locale_test_locale_translation_projects_alter().
-    $this->makePoFile('remote/8.x/contrib_module_one', 'contrib_module_one-8.x-1.1.de._po', $this->timestamp_new, $translations_one);
-    $this->makePoFile('remote/8.x/contrib_module_two', 'contrib_module_two-8.x-2.0-beta4.de._po', $this->timestamp_old, $translations_two);
-    $this->makePoFile('remote/8.x/contrib_module_three', 'contrib_module_three-8.x-1.0.de._po', $this->timestamp_old, $translations_three);
+    $this->makePoFile('remote/8.x/contrib_module_one', 'contrib_module_one-8.x-1.1.de._po', $this->timestampNew, $translations_one);
+    $this->makePoFile('remote/8.x/contrib_module_two', 'contrib_module_two-8.x-2.0-beta4.de._po', $this->timestampOld, $translations_two);
+    $this->makePoFile('remote/8.x/contrib_module_three', 'contrib_module_three-8.x-1.0.de._po', $this->timestampOld, $translations_three);
 
     // Add a number of files to the local file system to serve as local
     // translation files and match the project definitions set in
     // locale_test_locale_translation_projects_alter().
-    $this->makePoFile('local', 'contrib_module_one-8.x-1.1.de._po', $this->timestamp_old, $translations_one);
-    $this->makePoFile('local', 'contrib_module_two-8.x-2.0-beta4.de._po', $this->timestamp_new, $translations_two);
-    $this->makePoFile('local', 'contrib_module_three-8.x-1.0.de._po', $this->timestamp_old, $translations_three);
-    $this->makePoFile('local', 'custom_module_one.de.po', $this->timestamp_new);
+    $this->makePoFile('local', 'contrib_module_one-8.x-1.1.de._po', $this->timestampOld, $translations_one);
+    $this->makePoFile('local', 'contrib_module_two-8.x-2.0-beta4.de._po', $this->timestampNew, $translations_two);
+    $this->makePoFile('local', 'contrib_module_three-8.x-1.0.de._po', $this->timestampOld, $translations_three);
+    $this->makePoFile('local', 'custom_module_one.de.po', $this->timestampNew);
   }
 
   /**
@@ -246,8 +255,8 @@ EOF;
     $default = array(
       'langcode' => $langcode,
       'uri' => '',
-      'timestamp' => $this->timestamp_medium,
-      'last_checked' => $this->timestamp_medium,
+      'timestamp' => $this->timestampMedium,
+      'last_checked' => $this->timestampMedium,
     );
     $data[] = array(
       'project' => 'contrib_module_one',
@@ -279,7 +288,7 @@ EOF;
    * Checks the translation of a string.
    *
    * @param string $source
-   *   Translation source string
+   *   Translation source string.
    * @param string $translation
    *   Translation to check. Use empty string to check for a not existing
    *   translation.

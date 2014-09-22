@@ -7,6 +7,9 @@
 
 namespace Drupal\field\Plugin\views\argument;
 
+use Drupal\Component\Utility\String as UtilityString;
+use Drupal\Core\Field\AllowedTagsXssTrait;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\argument\String;
@@ -20,6 +23,8 @@ use Drupal\views\Plugin\views\argument\String;
  * @ViewsArgument("field_list_string")
  */
 class ListString extends String {
+
+  use AllowedTagsXssTrait;
 
   /**
    * Stores the allowed values of this field.
@@ -35,8 +40,8 @@ class ListString extends String {
     parent::init($view, $display, $options);
 
     $field_storage_definitions = \Drupal::entityManager()->getFieldStorageDefinitions($this->definition['entity_type']);
-    $field = $field_storage_definitions[$this->definition['field_name']];
-    $this->allowed_values = options_allowed_values($field);
+    $field_storage = $field_storage_definitions[$this->definition['field_name']];
+    $this->allowed_values = options_allowed_values($field_storage);
   }
 
   protected function defineOptions() {
@@ -47,7 +52,7 @@ class ListString extends String {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['summary']['human'] = array(
@@ -67,11 +72,11 @@ class ListString extends String {
     $value = $data->{$this->name_alias};
     // If the list element has a human readable name show it,
     if (isset($this->allowed_values[$value]) && !empty($this->options['summary']['human'])) {
-      return $this->caseTransform(field_filter_xss($this->allowed_values[$value]), $this->options['case']);
+      return $this->caseTransform($this->fieldfilterXss($this->allowed_values[$value]), $this->options['case']);
     }
     // else fallback to the key.
     else {
-      return $this->caseTransform(check_plain($value), $this->options['case']);
+      return $this->caseTransform(UtilityString::checkPlain($value), $this->options['case']);
     }
   }
 

@@ -20,11 +20,11 @@ use Drupal\Core\ImageToolkit\ImageToolkitInterface;
 class Image implements ImageInterface {
 
   /**
-   * String specifying the path of the image file.
+   * Path of the image file.
    *
    * @var string
    */
-  protected $source;
+  protected $source = '';
 
   /**
    * An image toolkit object.
@@ -34,25 +34,11 @@ class Image implements ImageInterface {
   protected $toolkit;
 
   /**
-   * Image type represented by a PHP IMAGETYPE_* constant (e.g. IMAGETYPE_JPEG).
-   *
-   * @var int
-   */
-  protected $type;
-
-  /**
    * File size in bytes.
    *
    * @var int
    */
-  protected $fileSize = 0;
-
-  /**
-   * If this image file has been processed.
-   *
-   * @var bool
-   */
-  protected $processed = FALSE;
+  protected $fileSize;
 
   /**
    * Constructs a new Image object.
@@ -65,73 +51,49 @@ class Image implements ImageInterface {
    */
   public function __construct(ImageToolkitInterface $toolkit, $source = NULL) {
     $this->toolkit = $toolkit;
+    $this->getToolkit()->setImage($this);
     if ($source) {
       $this->source = $source;
-      $this->processInfo();
+      // Defer image file validity check to the toolkit.
+      if ($this->getToolkit()->parseFile()) {
+        $this->fileSize = filesize($this->source);
+      }
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function isSupported() {
-    return in_array($this->getType(), $this->toolkit->supportedTypes());
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function isExisting() {
-    $this->processInfo();
-    return $this->processed;
+  public function isValid() {
+    return $this->getToolkit()->isValid();
   }
 
   /**
    * {@inheritdoc}
    */
   public function getHeight() {
-    $this->processInfo();
-    return $this->toolkit->getHeight($this);
+    return $this->getToolkit()->getHeight();
   }
 
   /**
    * {@inheritdoc}
    */
   public function getWidth() {
-    $this->processInfo();
-    return $this->toolkit->getWidth($this);
+    return $this->getToolkit()->getWidth();
   }
 
   /**
    * {@inheritdoc}
    */
   public function getFileSize() {
-    $this->processInfo();
     return $this->fileSize;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getType() {
-    $this->processInfo();
-    return $this->type;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getMimeType() {
-    $this->processInfo();
-    return $this->type ? image_type_to_mime_type($this->type) : '';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setSource($source) {
-    $this->source = $source;
-    return $this;
+    return $this->getToolkit()->getMimeType();
   }
 
   /**
@@ -145,14 +107,13 @@ class Image implements ImageInterface {
    * {@inheritdoc}
    */
   public function getToolkitId() {
-    return $this->toolkit->getPluginId();
+    return $this->getToolkit()->getPluginId();
   }
 
   /**
    * {@inheritdoc}
    */
   public function getToolkit() {
-    $this->processInfo();
     return $this->toolkit;
   }
 
@@ -160,14 +121,17 @@ class Image implements ImageInterface {
    * {@inheritdoc}
    */
   public function save($destination = NULL) {
-    if (empty($destination)) {
-      $destination = $this->getSource();
+    // Return immediately if the image is not valid.
+    if (!$this->isValid()) {
+      return FALSE;
     }
-    if ($return = $this->toolkit->save($this, $destination)) {
+
+    $destination = $destination ?: $this->getSource();
+    if ($return = $this->getToolkit()->save($destination)) {
       // Clear the cached file size and refresh the image information.
       clearstatcache(TRUE, $destination);
-      $this->setSource($destination);
-      $this->processInfo();
+      $this->fileSize = filesize($destination);
+      $this->source = $destination;
 
       // @todo Use File utility when https://drupal.org/node/2050759 is in.
       if ($this->chmod($destination)) {
@@ -178,71 +142,52 @@ class Image implements ImageInterface {
   }
 
   /**
-   * Prepares the image information.
-   *
-   * Drupal supports GIF, JPG and PNG file formats when used with the GD
-   * toolkit, and may support others, depending on which toolkits are
-   * installed.
-   *
-   * @return bool
-   *   FALSE, if the file could not be found or is not an image. Otherwise, the
-   *   image information is populated.
+   * {@inheritdoc}
    */
-  protected function processInfo() {
-    if ($this->processed) {
-      return TRUE;
-    }
-
-    $destination = $this->getSource();
-    if (!is_file($destination) && !is_uploaded_file($destination)) {
-      return FALSE;
-    }
-
-    if ($details = $this->toolkit->getInfo($this)) {
-      $this->type = $details['type'];
-      $this->fileSize = filesize($destination);
-
-      $this->processed = TRUE;
-    }
-    return TRUE;
+  public function apply($operation, array $arguments = array()) {
+    return $this->getToolkit()->apply($operation, $arguments);
   }
 
   /**
-   * Passes through calls that represent image toolkit operations onto the
-   * image toolkit.
-   *
-   * This is a temporary solution to keep patches reviewable. The __call()
-   * method will be replaced in https://drupal.org/node/2110499 with a new
-   * interface method ImageInterface::apply(). An image operation will be
-   * performed as in the next example:
-   * @code
-   * $image = new Image($toolkit, $path);
-   * $image->apply('scale', array('width' => 50, 'height' => 100));
-   * @endcode
-   * Also in https://drupal.org/node/2110499 operation arguments sent to toolkit
-   * will be moved to a keyed array, unifying the interface of toolkit
-   * operations.
-   *
-   * @todo Drop this in https://drupal.org/node/2110499 in favor of new apply().
+   * {@inheritdoc}
    */
-  public function __call($method, $arguments) {
-    // @todo Temporary to avoid that legacy GD setResource(), getResource(),
-    //  hasResource() methods moved to GD toolkit in #2103621, and setWidth(),
-    //  setHeight() methods moved to ImageToolkitInterface in #2196067 get
-    //  invoked from this class anyway through the magic __call. Will be
-    //  removed through https://drupal.org/node/2110499, when
-    //  call_user_func_array() will be replaced by
-    //  $this->toolkit->apply($name, $this, $arguments).
-    if (in_array($method, array('setResource', 'getResource', 'hasResource', 'setWidth', 'setHeight'))) {
-      throw new \BadMethodCallException();
-    }
-    if (is_callable(array($this->toolkit, $method))) {
-      // @todo In https://drupal.org/node/2110499, call_user_func_array() will
-      //   be replaced by $this->toolkit->apply($name, $this, $arguments).
-      array_unshift($arguments, $this);
-      return call_user_func_array(array($this->toolkit, $method), $arguments);
-    }
-    throw new \BadMethodCallException();
+  public function crop($x, $y, $width, $height = NULL) {
+    return $this->apply('crop', array('x' => $x, 'y' => $y, 'width' => $width, 'height' => $height));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function desaturate() {
+    return $this->apply('desaturate', array());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function resize($width, $height) {
+    return $this->apply('resize', array('width' => $width, 'height' => $height));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function rotate($degrees, $background = NULL) {
+    return $this->apply('rotate', array('degrees' => $degrees, 'background' => $background));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function scaleAndCrop($width, $height) {
+    return $this->apply('scale_and_crop', array('width' => $width, 'height' => $height));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function scale($width, $height = NULL, $upscale = FALSE) {
+    return $this->apply('scale', array('width' => $width, 'height' => $height, 'upscale' => $upscale));
   }
 
   /**

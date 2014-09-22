@@ -10,25 +10,16 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\migrate\MigrateExecutable;
 
 /**
- * Test upload migration from Drupal 6 to Drupal 8.
+ * Migrate association data between nodes and files.
+ *
+ * @group migrate_drupal
  */
 class MigrateUploadTest extends MigrateUploadBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate upload',
-      'description'  => 'Migrate association data between nodes and files.',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     /** @var \Drupal\migrate\entity\Migration $migration */
     $migration = entity_load('migration', 'd6_upload');

@@ -10,6 +10,7 @@ namespace Drupal\views\Plugin\views\row;
 use Drupal\Component\Utility\String;
 use Drupal\Core\DependencyInjection\Container;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
@@ -20,7 +21,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsRow(
  *   id = "entity",
- *   derivative = "Drupal\views\Plugin\Derivative\ViewsEntityRow"
+ *   deriver = "Drupal\views\Plugin\Derivative\ViewsEntityRow"
  * )
  */
 class EntityRow extends RowPluginBase {
@@ -125,7 +126,7 @@ class EntityRow extends RowPluginBase {
   /**
    * Overrides Drupal\views\Plugin\views\row\RowPluginBase::buildOptionsForm().
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['view_mode'] = array(

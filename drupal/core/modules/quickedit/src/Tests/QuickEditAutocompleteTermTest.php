@@ -8,12 +8,14 @@
 namespace Drupal\quickedit\Tests;
 
 use Drupal\Component\Serialization\Json;
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests using in-place editing for an autocomplete entity reference widget.
+ * Tests in-place editing of autocomplete tags.
+ *
+ * @group quickedit
  */
 class QuickEditAutocompleteTermTest extends WebTestBase {
 
@@ -59,14 +61,6 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
    */
   protected $field_name;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'In-place editing of autocomplete tags',
-      'description' => 'Tests in-place editing of autocomplete tags.',
-      'group' => 'Quick Edit',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
 
@@ -80,12 +74,12 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
     ));
     $this->vocabulary->save();
     $this->field_name = 'field_' . $this->vocabulary->id();
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       // Set cardinality to unlimited for tagging.
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -95,7 +89,7 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
         ),
       ),
     ))->save();
-    $instance = entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $this->field_name,
       'entity_type' => 'node',
       'label' => 'Tags',
@@ -140,7 +134,7 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
   public function testAutocompleteQuickEdit() {
     $this->drupalLogin($this->editor_user);
 
-    $quickedit_uri = 'quickedit/form/node/'. $this->node->id() . '/' . $this->field_name . '/und/full';
+    $quickedit_uri = 'quickedit/form/node/'. $this->node->id() . '/' . $this->field_name . '/' . $this->node->language()->getId() . '/full';
     $post = array('nocssjs' => 'true') + $this->getAjaxPageStatePostData();
     $response = $this->drupalPost($quickedit_uri, 'application/vnd.drupal-ajax', $post);
     $ajax_commands = Json::decode($response);
@@ -170,7 +164,7 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
       $this->assertNoLink('new term');
 
       // Load the form again, which should now get it back from TempStore.
-      $quickedit_uri = 'quickedit/form/node/'. $this->node->id() . '/' . $this->field_name . '/und/full';
+      $quickedit_uri = 'quickedit/form/node/'. $this->node->id() . '/' . $this->field_name . '/' . $this->node->language()->getId() . '/full';
       $post = array('nocssjs' => 'true') + $this->getAjaxPageStatePostData();
       $response = $this->drupalPost($quickedit_uri, 'application/vnd.drupal-ajax', $post);
       $ajax_commands = Json::decode($response);
@@ -206,12 +200,12 @@ class QuickEditAutocompleteTermTest extends WebTestBase {
     $filter_formats = filter_formats();
     $format = array_pop($filter_formats);
     $term = entity_create('taxonomy_term', array(
-      'name' => $this->randomName(),
-      'description' => $this->randomName(),
+      'name' => $this->randomMachineName(),
+      'description' => $this->randomMachineName(),
       // Use the first available text format.
       'format' => $format->format,
       'vid' => $this->vocabulary->id(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $term->save();
     return $term;

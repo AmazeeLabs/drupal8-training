@@ -8,6 +8,7 @@
 namespace Drupal\taxonomy\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
+use Drupal\Core\Config\Entity\ThirdPartySettingsTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\taxonomy\VocabularyInterface;
 
@@ -17,7 +18,7 @@ use Drupal\taxonomy\VocabularyInterface;
  * @ConfigEntityType(
  *   id = "taxonomy_vocabulary",
  *   label = @Translation("Taxonomy vocabulary"),
- *   controllers = {
+ *   handlers = {
  *     "storage" = "Drupal\taxonomy\VocabularyStorage",
  *     "list_builder" = "Drupal\taxonomy\VocabularyListBuilder",
  *     "form" = {
@@ -35,15 +36,16 @@ use Drupal\taxonomy\VocabularyInterface;
  *     "weight" = "weight"
  *   },
  *   links = {
- *     "add-form" = "taxonomy.term_add",
- *     "delete-form" = "taxonomy.vocabulary_delete",
- *     "reset" = "taxonomy.vocabulary_reset",
- *     "overview-form" = "taxonomy.overview_terms",
- *     "edit-form" = "taxonomy.vocabulary_edit"
+ *     "add-form" = "entity.taxonomy_term.add_form",
+ *     "delete-form" = "entity.taxonomy_vocabulary.delete_form",
+ *     "reset-form" = "entity.taxonomy_vocabulary.reset_form",
+ *     "overview-form" = "entity.taxonomy_vocabulary.overview_form",
+ *     "edit-form" = "entity.taxonomy_vocabulary.edit_form"
  *   }
  * )
  */
 class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
+  use ThirdPartySettingsTrait;
 
   /**
    * The taxonomy vocabulary ID.
@@ -102,16 +104,14 @@ class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
       // Reflect machine name changes in the definitions of existing 'taxonomy'
       // fields.
       $field_ids = array();
-      $field_map = \Drupal::entityManager()->getFieldMap();
+      $field_map = \Drupal::entityManager()->getFieldMapByFieldType('taxonomy_term_reference');
       foreach ($field_map as $entity_type => $fields) {
         foreach ($fields as $field => $info) {
-          if ($info['type'] == 'taxonomy_term_reference') {
-            $field_ids[] = $entity_type . '.' . $field;
-          }
+          $field_ids[] = $entity_type . '.' . $field;
         }
       }
 
-      $fields = \Drupal::entityManager()->getStorage('field_config')->loadMultiple($field_ids);
+      $fields = \Drupal::entityManager()->getStorage('field_storage_config')->loadMultiple($field_ids);
 
       foreach ($fields as $field) {
         $update_field = FALSE;
@@ -160,7 +160,7 @@ class Vocabulary extends ConfigEntityBundleBase implements VocabularyInterface {
     }
     // Load all Taxonomy module fields and delete those which use only this
     // vocabulary.
-    $taxonomy_fields = entity_load_multiple_by_properties('field_config', array('module' => 'taxonomy'));
+    $taxonomy_fields = entity_load_multiple_by_properties('field_storage_config', array('module' => 'taxonomy'));
     foreach ($taxonomy_fields as $taxonomy_field) {
       $modified_field = FALSE;
       // Term reference fields may reference terms from more than one

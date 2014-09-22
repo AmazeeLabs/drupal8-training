@@ -7,22 +7,19 @@
 
 namespace Drupal\standard\Tests;
 
+use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests Standard installation profile expectations.
+ *
+ * @group standard
  */
 class StandardTest extends WebTestBase {
 
-  protected $profile = 'standard';
+  use SchemaCheckTestTrait;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Standard installation profile',
-      'description' => 'Tests Standard installation profile expectations.',
-      'group' => 'Standard',
-    );
-  }
+  protected $profile = 'standard';
 
   /**
    * Tests Standard installation profile.
@@ -34,7 +31,11 @@ class StandardTest extends WebTestBase {
     $this->assertResponse(200);
 
     // Test anonymous user can access 'Main navigation' block.
-    $admin = $this->drupalCreateUser(array('administer blocks'));
+    $admin = $this->drupalCreateUser(array(
+      'administer blocks',
+      'post comments',
+      'skip comment approval',
+    ));
     $this->drupalLogin($admin);
     // Configure the block.
     $this->drupalGet('admin/structure/block/add/system_menu_block:main/bartik');
@@ -67,6 +68,38 @@ class StandardTest extends WebTestBase {
     $this->drupalLogout();
     $this->assertText('Main navigation');
 
+    // Ensure comments don't show in the front page RSS feed.
+    // Create an article.
+    $node = $this->drupalCreateNode(array(
+      'type' => 'article',
+      'title' => 'Foobar',
+      'promote' => 1,
+      'status' => 1,
+    ));
+
+    // Add a comment.
+    $this->drupalLogin($admin);
+    $this->drupalGet('node/1');
+    $this->drupalPostForm(NULL, array(
+      'subject[0][value]' => 'Barfoo',
+      'comment_body[0][value]' => 'Then she picked out two somebodies, Sally and me',
+    ), t('Save'));
+    // Fetch the feed.
+    $this->drupalGet('rss.xml');
+    $this->assertText('Foobar');
+    $this->assertNoText('Then she picked out two somebodies, Sally and me');
+
+    // Now we have all configuration imported, test all of them for schema
+    // conformance. Ensures all imported default configuration is valid when
+    // standard profile modules are enabled.
+    $names = $this->container->get('config.storage')->listAll();
+    $factory = $this->container->get('config.factory');
+    /** @var \Drupal\Core\Config\TypedConfigManagerInterface $typed_config */
+    $typed_config = $this->container->get('config.typed');
+    foreach ($names as $name) {
+      $config = $factory->get($name);
+      $this->assertConfigSchema($typed_config, $name, $config->get());
+    }
   }
 
 }

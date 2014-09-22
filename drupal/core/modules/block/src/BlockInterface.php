@@ -27,9 +27,17 @@ interface BlockInterface extends ConfigEntityInterface {
   /**
    * Returns the plugin instance.
    *
-   * @return \Drupal\block\BlockPluginInterface
+   * @return \Drupal\Core\Block\BlockPluginInterface
    *   The plugin instance for this block.
    */
   public function getPlugin();
+
+  /**
+   * Returns an array of visibility condition configurations.
+   *
+   * @return array
+   *   An array of visibility condition configuration keyed by the condition ID.
+   */
+  public function getVisibility();
 
 }

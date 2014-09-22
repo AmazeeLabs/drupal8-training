@@ -8,7 +8,6 @@
 namespace Drupal\aggregator\Tests;
 
 use Drupal\aggregator\Entity\Feed;
-use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 use Drupal\aggregator\FeedInterface;
 
@@ -24,7 +23,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    */
   public static $modules = array('node', 'aggregator', 'aggregator_test', 'views');
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create an Article node type.
@@ -86,7 +85,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    *   A feed array.
    */
   function getFeedEditArray($feed_url = NULL, array $edit = array()) {
-    $feed_name = $this->randomName(10);
+    $feed_name = $this->randomMachineName(10);
     if (!$feed_url) {
       $feed_url = url('rss.xml', array(
         'query' => array('feed' => $feed_name),
@@ -114,7 +113,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    *   A feed object.
    */
   function getFeedEditObject($feed_url = NULL, array $values = array()) {
-    $feed_name = $this->randomName(10);
+    $feed_name = $this->randomMachineName(10);
     if (!$feed_url) {
       $feed_url = url('rss.xml', array(
         'query' => array('feed' => $feed_name),
@@ -327,8 +326,8 @@ EOF;
     // Post $count article nodes.
     for ($i = 0; $i < $count; $i++) {
       $edit = array();
-      $edit['title[0][value]'] = $this->randomName();
-      $edit['body[0][value]'] = $this->randomName();
+      $edit['title[0][value]'] = $this->randomMachineName();
+      $edit['body[0][value]'] = $this->randomMachineName();
       $this->drupalPostForm('node/add/article', $edit, t('Save'));
     }
   }

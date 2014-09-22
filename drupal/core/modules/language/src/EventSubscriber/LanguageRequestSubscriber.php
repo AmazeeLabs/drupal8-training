@@ -38,7 +38,7 @@ class LanguageRequestSubscriber implements EventSubscriberInterface {
   /**
    * The translation service.
    *
-   * @var \Drupal\Core\Translation\Translator\TranslatorInterface
+   * @var \Drupal\Core\StringTranslation\Translator\TranslatorInterface;
    */
   protected $translation;
 
@@ -56,7 +56,7 @@ class LanguageRequestSubscriber implements EventSubscriberInterface {
    *   The language manager service.
    * @param \Drupal\language\LanguageNegotiatorInterface
    *   The language negotiator.
-   * @param \Drupal\Core\Translation\Translator\TranslatorInterface $translation
+   * @param \Drupal\Core\StringTranslation\Translator\TranslatorInterface $translation;
    *   The translation service.
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current active user.
@@ -78,10 +78,9 @@ class LanguageRequestSubscriber implements EventSubscriberInterface {
     if ($event->getRequestType() == HttpKernelInterface::MASTER_REQUEST) {
       $request = $event->getRequest();
       $this->negotiator->setCurrentUser($this->currentUser);
-      $this->negotiator->setRequest($request);
+      $this->negotiator->reset();
       if ($this->languageManager instanceof ConfigurableLanguageManagerInterface) {
         $this->languageManager->setNegotiator($this->negotiator);
-        $this->languageManager->setRequest($request);
         $this->languageManager->setConfigOverrideLanguage($this->languageManager->getCurrentLanguage());
       }
       // After the language manager has initialized, set the default langcode

@@ -10,11 +10,13 @@ namespace Drupal\Core\Config;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\SchemaObjectExistsException;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 
 /**
  * Defines the Database storage.
  */
 class DatabaseStorage implements StorageInterface {
+  use DependencySerializationTrait;
 
   /**
    * The database connection.
@@ -219,7 +221,7 @@ class DatabaseStorage implements StorageInterface {
    *
    * @throws PDOException
    *
-   * @todo Ignore slave targets for data manipulation operations.
+   * @todo Ignore replica targets for data manipulation operations.
    */
   public function delete($name) {
     $options = array('return' => Database::RETURN_AFFECTED) + $this->options;

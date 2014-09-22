@@ -359,7 +359,8 @@
               text: Drupal.t('Save'),
               click: function () {
                 closeDiscardDialog('save');
-              }
+              },
+              primary: true
             },
             {
               text: Drupal.t('Discard changes'),

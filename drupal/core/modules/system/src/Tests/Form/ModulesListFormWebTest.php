@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests \Drupal\system\Form\ModulesListForm.
+ *
+ * @group Form
  */
 class ModulesListFormWebTest extends WebTestBase {
 
@@ -22,18 +24,7 @@ class ModulesListFormWebTest extends WebTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'description' => 'Tests \Drupal\system\Form\ModulesListForm.',
-      'name' => '\Drupal\system\Form\ModulesListForm web test',
-      'group' => 'Module',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     \Drupal::state()->set('system_test.module_hidden', FALSE);
   }
@@ -47,6 +38,6 @@ class ModulesListFormWebTest extends WebTestBase {
     $this->assertResponse('200');
 
     // Check that system_test's configure link was rendered correctly.
-    $this->assertLinkByHref('configure/bar');
+    $this->assertFieldByXPath("//a[contains(@href, '/system-test/configure/bar') and @title='Bar.bar']");
   }
 }

@@ -14,8 +14,9 @@ dependencies:
   - comment
   - contextual
   - contact
+  - menu_link_content
   - datetime
-  - custom_block
+  - block_content
   - quickedit
   - editor
   - entity_reference

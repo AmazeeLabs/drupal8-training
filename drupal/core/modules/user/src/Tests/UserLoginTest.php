@@ -11,17 +11,11 @@ use Drupal\simpletest\WebTestBase;
 use Drupal\Core\Password\PhpassHashedPassword;
 
 /**
- * Functional tests for user logins, including rate limiting of login attempts.
+ * Ensure that login works as expected.
+ *
+ * @group user
  */
 class UserLoginTest extends WebTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'User login',
-      'description' => 'Ensure that login works as expected.',
-      'group' => 'User',
-    );
-  }
-
   /**
    * Tests login with destination.
    */
@@ -135,6 +129,7 @@ class UserLoginTest extends WebTestBase {
     // users password gets rehashed during the login.
     $overridden_count_log2 = 19;
     \Drupal::moduleHandler()->install(array('user_custom_phpass_params_test'));
+    $this->resetAll();
 
     $account->pass_raw = $password;
     $this->drupalLogin($account);

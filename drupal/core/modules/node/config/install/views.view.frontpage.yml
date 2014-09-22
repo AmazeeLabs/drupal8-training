@@ -1,8 +1,16 @@
-base_field: nid
-base_table: node
-core: 8.x
-description: 'All content promoted to the front page.'
+langcode: en
 status: true
+dependencies:
+  module:
+    - node
+id: frontpage
+label: Frontpage
+module: node
+description: 'All content promoted to the front page.'
+tag: default
+base_table: node
+base_field: nid
+core: 8.x
 display:
   default:
     display_options:
@@ -110,6 +118,48 @@ display:
           value: true
           plugin_id: boolean
           provider: views
+        langcode:
+          id: langcode
+          table: node_field_data
+          field: langcode
+          relationship: none
+          group_type: group
+          admin_label: ''
+          dependencies:
+            module:
+              - views
+          operator: in
+          value:
+            '***LANGUAGE_language_content***': '***LANGUAGE_language_content***'
+          group: 1
+          exposed: false
+          expose:
+            operator_id: ''
+            label: ''
+            description: ''
+            use_operator: false
+            operator: ''
+            identifier: ''
+            required: false
+            remember: false
+            multiple: false
+            remember_roles:
+              authenticated: authenticated
+            reduce: false
+          is_grouped: false
+          group_info:
+            label: ''
+            description: ''
+            identifier: ''
+            optional: true
+            widget: select
+            multiple: false
+            remember: false
+            default_group: All
+            default_group_multiple: {  }
+            group_items: {  }
+          plugin_id: language
+          provider: views
       pager:
         type: full
         options:
@@ -120,7 +170,7 @@ display:
           expose:
             items_per_page: false
             items_per_page_label: 'Items per page'
-            items_per_page_options: '5, 10, 20, 40, 60'
+            items_per_page_options: '5, 10, 25, 50'
             items_per_page_options_all: false
             items_per_page_options_all_label: '- All -'
             offset: false
@@ -137,7 +187,7 @@ display:
         options:
           disable_sql_rewrite: false
           distinct: false
-          slave: false
+          replica: false
           query_comment: false
           query_tags: {  }
         provider: views
@@ -146,7 +196,6 @@ display:
         options:
           build_mode: teaser
           comments: false
-          links: true
           view_mode: teaser
         provider: views
       sorts:
@@ -190,6 +239,8 @@ display:
       relationships: {  }
       fields: {  }
       arguments: {  }
+      field_langcode: '***LANGUAGE_language_content***'
+      field_langcode_add_to_query: null
     display_plugin: default
     display_title: Master
     id: default
@@ -197,6 +248,8 @@ display:
   page_1:
     display_options:
       path: node
+      field_langcode: '***LANGUAGE_language_content***'
+      field_langcode_add_to_query: null
     display_plugin: page
     display_title: Page
     id: page_1
@@ -229,14 +282,7 @@ display:
         type: node_rss
         options:
           relationship: none
-          item_length: default
-          links: false
+          view_mode: rss
         provider: views
-label: Frontpage
-module: node
-id: frontpage
-tag: default
-langcode: en
-dependencies:
-  module:
-    - node
+      field_langcode: '***LANGUAGE_language_content***'
+      field_langcode_add_to_query: null

@@ -7,6 +7,8 @@
 
 namespace Drupal\user\Plugin\views\access;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\access\AccessPluginBase;
 use Symfony\Component\Routing\Route;
 use Drupal\Core\Session\AccountInterface;
@@ -56,7 +58,7 @@ class Role extends AccessPluginBase {
     else {
       $rids = user_role_names();
       $rid = reset($this->options['role']);
-      return check_plain($rids[$rid]);
+      return String::checkPlain($rids[$rid]);
     }
   }
 
@@ -68,7 +70,7 @@ class Role extends AccessPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $form['role'] = array(
       '#type' => 'checkboxes',
@@ -79,15 +81,15 @@ class Role extends AccessPluginBase {
     );
   }
 
-  public function validateOptionsForm(&$form, &$form_state) {
-    if (!array_filter($form_state['values']['access_options']['role'])) {
-      form_error($form['role'], $form_state, t('You must select at least one role if type is "by role"'));
-    }
-  }
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) {
+    $role = $form_state->getValue(array('access_options', 'role'));
+    $role = array_filter($role);
 
-  public function submitOptionsForm(&$form, &$form_state) {
-    // I hate checkboxes.
-    $form_state['values']['access_options']['role'] = array_filter($form_state['values']['access_options']['role']);
+    if (!$role) {
+      $form_state->setError($form['role'], t('You must select at least one role if type is "by role"'));
+    }
+
+    $form_state->setValue(array('access_options', 'role'), $role);
   }
 
 }

@@ -5,16 +5,15 @@
  * Contains \Drupal\Tests\Core\Session\UserSessionTest.
  */
 
-namespace Drupal\Tests\Core\Session;
+namespace Drupal\Tests\Core\Session {
 
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Session\UserSession;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the user session object.
- *
- * @see \Drupal\Core\Session\UserSession
+ * @coversDefaultClass \Drupal\Core\Session\UserSession
+ * @group Session
  */
 class UserSessionTest extends UnitTestCase {
 
@@ -24,14 +23,6 @@ class UserSessionTest extends UnitTestCase {
    * @var \Drupal\Core\Session\AccountInterface[]
    */
   protected $users = array();
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User session object',
-      'description' => 'Tests the user session object.',
-      'group' => 'Session',
-    );
-  }
 
   /**
    * Provides test data for getHasPermission().
@@ -146,12 +137,32 @@ class UserSessionTest extends UnitTestCase {
   /**
    * Tests the method getRoles exclude or include locked roles based in param.
    *
-   * @see \Drupal\Core\Session\UserSession::getRoles()
+   * @covers ::getRoles
    * @todo Move roles constants to a class/interface
    */
   public function testUserGetRoles() {
-    $this->assertEquals(array('role_two', 'authenticated'), $this->users['user_three']->getRoles());
+    $this->assertEquals(array('role_two', DRUPAL_AUTHENTICATED_RID), $this->users['user_three']->getRoles());
     $this->assertEquals(array('role_two'), $this->users['user_three']->getRoles(TRUE));
+  }
+
+}
+
+
+}
+
+namespace {
+
+  if (!defined('DRUPAL_ANONYMOUS_RID')) {
+    /**
+     * Stub Role ID for anonymous users since bootstrap.inc isn't available.
+     */
+    define('DRUPAL_ANONYMOUS_RID', 'anonymous');
+  }
+  if (!defined('DRUPAL_AUTHENTICATED_RID')) {
+    /**
+     * Stub Role ID for authenticated users since bootstrap.inc isn't available.
+     */
+    define('DRUPAL_AUTHENTICATED_RID', 'authenticated');
   }
 
 }

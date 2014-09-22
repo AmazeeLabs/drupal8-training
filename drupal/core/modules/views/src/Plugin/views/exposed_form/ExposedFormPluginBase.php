@@ -2,12 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase.
+ * Contains \Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\exposed_form;
 
 use Drupal\Component\Utility\String;
+use Drupal\Core\Form\FormState;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Form\ViewsExposedForm;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -16,13 +18,21 @@ use Drupal\views\Plugin\views\PluginBase;
 /**
  * @defgroup views_exposed_form_plugins Views exposed form plugins
  * @{
- * Plugins that handle the validation/submission and rendering of exposed forms.
+ * Plugins that handle validation, submission, and rendering of exposed forms.
  *
- * If needed, it is possible to use them to add additional form elements.
+ * Exposed forms are used for filters, sorts, and pager settings that are
+ * exposed to site visitors. Exposed form plugins handle the rendering,
+ * validation, and submission of exposed forms, and may add additional form
+ * elements.
+ *
+ * Exposed form plugins extend
+ * \Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase. They must be
+ * annotated with \Drupal\views\Annotation\ViewsExposedForm annotation,
+ * and they must be in namespace directory Plugin\views\exposed_form.
  */
 
 /**
- * The base plugin to handle exposed filter forms.
+ * Base class for Views exposed filter form plugins.
  */
 abstract class ExposedFormPluginBase extends PluginBase {
 
@@ -43,7 +53,7 @@ abstract class ExposedFormPluginBase extends PluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $form['submit_button'] = array(
       '#type' => 'textfield',
@@ -54,7 +64,7 @@ abstract class ExposedFormPluginBase extends PluginBase {
 
     $form['reset_button'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Include reset button (resets all applied exposed filters).'),
+      '#title' => t('Include reset button (resets all applied exposed filters)'),
       '#default_value' => $this->options['reset_button'],
     );
 
@@ -119,27 +129,28 @@ abstract class ExposedFormPluginBase extends PluginBase {
    */
   public function renderExposedForm($block = FALSE) {
     // Deal with any exposed filters we may have, before building.
-    $form_state = array(
-      'view' => &$this->view,
-      'display' => &$this->view->display_handler->display,
-      'method' => 'get',
-      'rerender' => TRUE,
-      'no_redirect' => TRUE,
-      'always_process' => TRUE,
-    );
+    $form_state = (new FormState())
+      ->setStorage([
+        'view' => $this->view,
+        'display' => &$this->view->display_handler->display,
+        'rerender' => TRUE,
+      ])
+      ->setMethod('get')
+      ->setAlwaysProcess()
+      ->disableRedirect();
 
     // Some types of displays (eg. attachments) may wish to use the exposed
     // filters of their parent displays instead of showing an additional
     // exposed filter form for the attachment as well as that for the parent.
     if (!$this->view->display_handler->displaysExposed() || (!$block && $this->view->display_handler->getOption('exposed_block'))) {
-      unset($form_state['rerender']);
+      $form_state->set('rerender', NULL);
     }
 
     if (!empty($this->ajax)) {
-      $form_state['ajax'] = TRUE;
+      $form_state->set('ajax', TRUE);
     }
 
-    $form_state['exposed_form_plugin'] = $this;
+    $form_state->set('exposed_form_plugin', $this);
     $form = \Drupal::formBuilder()->buildForm('\Drupal\views\Form\ViewsExposedForm', $form_state);
 
     if (!$this->view->display_handler->displaysExposed() || (!$block && $this->view->display_handler->getOption('exposed_block'))) {
@@ -191,7 +202,7 @@ abstract class ExposedFormPluginBase extends PluginBase {
    * @param $form_state
    *   The form state. Passed by reference.
    */
-  public function exposedFormAlter(&$form, &$form_state) {
+  public function exposedFormAlter(&$form, FormStateInterface $form_state) {
     if (!empty($this->options['submit_button'])) {
       $form['actions']['submit']['#value'] = $this->options['submit_button'];
     }
@@ -214,17 +225,19 @@ abstract class ExposedFormPluginBase extends PluginBase {
         'ASC' => $this->options['sort_asc_label'],
         'DESC' => $this->options['sort_desc_label'],
       );
-      if (isset($form_state['input']['sort_by']) && isset($this->view->sort[$form_state['input']['sort_by']])) {
-        $default_sort_order = $this->view->sort[$form_state['input']['sort_by']]->options['order'];
+      $user_input = $form_state->getUserInput();
+      if (isset($user_input['sort_by']) && isset($this->view->sort[$user_input['sort_by']])) {
+        $default_sort_order = $this->view->sort[$user_input['sort_by']]->options['order'];
       }
       else {
         $first_sort = reset($this->view->sort);
         $default_sort_order = $first_sort->options['order'];
       }
 
-      if (!isset($form_state['input']['sort_by'])) {
+      if (!isset($user_input['sort_by'])) {
         $keys = array_keys($exposed_sorts);
-        $form_state['input']['sort_by'] = array_shift($keys);
+        $user_input['sort_by'] = array_shift($keys);
+        $form_state->setUserInput($user_input);
       }
 
       if ($this->options['expose_sort_order']) {
@@ -262,13 +275,13 @@ abstract class ExposedFormPluginBase extends PluginBase {
     $pager = $this->view->display_handler->getPlugin('pager');
     if ($pager) {
       $pager->exposedFormAlter($form, $form_state);
-      $form_state['pager_plugin'] = $pager;
+      $form_state->set('pager_plugin', $pager);
     }
   }
 
-  public function exposedFormValidate(&$form, &$form_state) {
-    if (isset($form_state['pager_plugin'])) {
-      $form_state['pager_plugin']->exposedFormValidate($form, $form_state);
+  public function exposedFormValidate(&$form, FormStateInterface $form_state) {
+    if ($pager_plugin = $form_state->get('pager_plugin')) {
+      $pager_plugin->exposedFormValidate($form, $form_state);
     }
   }
 
@@ -278,22 +291,22 @@ abstract class ExposedFormPluginBase extends PluginBase {
    * @param $form
    *   Nested array of form elements that comprise the form.
    * @param $form_state
-   *   A keyed array containing the current state of the form.
+   *   The current state of the form.
    * @param $exclude
    *   Nested array of keys to exclude of insert into
    *   $view->exposed_raw_input
    */
-  public function exposedFormSubmit(&$form, &$form_state, &$exclude) {
-    if (!empty($form_state['values']['op']) && $form_state['values']['op'] == $this->options['reset_button_label']) {
+  public function exposedFormSubmit(&$form, FormStateInterface $form_state, &$exclude) {
+    if (!$form_state->isValueEmpty('op') && $form_state->getValue('op') == $this->options['reset_button_label']) {
       $this->resetForm($form, $form_state);
     }
-    if (isset($form_state['pager_plugin'])) {
-      $form_state['pager_plugin']->exposedFormSubmit($form, $form_state, $exclude);
+    if ($pager_plugin = $form_state->get('pager_plugin')) {
+      $pager_plugin->exposedFormSubmit($form, $form_state, $exclude);
       $exclude[] = 'pager_plugin';
     }
   }
 
-  public function resetForm(&$form, &$form_state) {
+  public function resetForm(&$form, FormStateInterface $form_state) {
     // _SESSION is not defined for users who are not logged in.
 
     // If filters are not overridden, store the 'remember' settings on the
@@ -308,15 +321,12 @@ abstract class ExposedFormPluginBase extends PluginBase {
 
     // Set the form to allow redirect.
     if (empty($this->view->live_preview)) {
-      $form_state['no_redirect'] = FALSE;
+      $form_state->disableRedirect(FALSE);
     }
     else {
-      $form_state['rebuild'] = TRUE;
+      $form_state->setRebuild();
       $this->view->exposed_data = array();
     }
-
-    $form_state['redirect'] = current_path();
-    $form_state['values'] = array();
   }
 
 }

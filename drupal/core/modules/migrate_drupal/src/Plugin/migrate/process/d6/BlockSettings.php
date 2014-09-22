@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Plugin\migrate\Process\d6\BlockSettings.
+ * Contains \Drupal\migrate_drupal\Plugin\migrate\process\d6\BlockSettings.
  */
 
-namespace Drupal\migrate_drupal\Plugin\migrate\Process\d6;
+namespace Drupal\migrate_drupal\Plugin\migrate\process\d6;
 
 use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate\ProcessPluginBase;
@@ -24,8 +24,9 @@ class BlockSettings extends ProcessPluginBase {
    * Set the block configuration.
    */
   public function transform($value, MigrateExecutable $migrate_executable, Row $row, $destination_property) {
-    list($plugin, $delta, $old_settings) = $value;
+    list($plugin, $delta, $old_settings, $visibility) = $value;
     $settings = array();
+    $settings['visibility']['request_path']['negate'] = !$visibility;
     switch ($plugin) {
       case 'aggregator_feed_block':
         list(, $id) = explode('-', $delta);

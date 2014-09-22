@@ -8,10 +8,13 @@
 namespace Drupal\search\Tests;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
-use Drupal\field\Entity\FieldInstanceConfig;
+use Drupal\Component\Utility\String;
+use Drupal\field\Entity\FieldConfig;
 
 /**
- * Test integration searching comments.
+ * Tests integration searching comments.
+ *
+ * @group search
  */
 class SearchCommentTest extends SearchTestBase {
 
@@ -24,15 +27,7 @@ class SearchCommentTest extends SearchTestBase {
 
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Comment Search tests',
-      'description' => 'Test integration searching comments.',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $full_html_format = entity_create('filter_format', array(
@@ -79,9 +74,9 @@ class SearchCommentTest extends SearchTestBase {
     $comment_body = 'Test comment body';
 
     // Make preview optional.
-    $instance = FieldInstanceConfig::loadByName('node', 'article', 'comment');
-    $instance->settings['preview'] = DRUPAL_OPTIONAL;
-    $instance->save();
+    $field = FieldConfig::loadByName('node', 'article', 'comment');
+    $field->settings['preview'] = DRUPAL_OPTIONAL;
+    $field->save();
 
     // Allow anonymous users to search content.
     $edit = array(
@@ -95,7 +90,7 @@ class SearchCommentTest extends SearchTestBase {
     $node = $this->drupalCreateNode(array('type' => 'article'));
     // Post a comment using 'Full HTML' text format.
     $edit_comment = array();
-    $edit_comment['subject'] = 'Test comment subject';
+    $edit_comment['subject[0][value]'] = 'Test comment subject';
     $edit_comment['comment_body[0][value]'] = '<h1>' . $comment_body . '</h1>';
     $full_html_format_id = 'full_html';
     $edit_comment['comment_body[0][format]'] = $full_html_format_id;
@@ -107,12 +102,12 @@ class SearchCommentTest extends SearchTestBase {
 
     // Search for the comment subject.
     $edit = array(
-      'keys' => "'" . $edit_comment['subject'] . "'",
+      'keys' => "'" . $edit_comment['subject[0][value]'] . "'",
     );
     $this->drupalPostForm('search/node', $edit, t('Search'));
     $node2 = node_load($node->id(), TRUE);
     $this->assertText($node2->label(), 'Node found in search results.');
-    $this->assertText($edit_comment['subject'], 'Comment subject found in search results.');
+    $this->assertText($edit_comment['subject[0][value]'], 'Comment subject found in search results.');
 
     // Search for the comment body.
     $edit = array(
@@ -124,7 +119,7 @@ class SearchCommentTest extends SearchTestBase {
     // Verify that comment is rendered using proper format.
     $this->assertText($comment_body, 'Comment body text found in search results.');
     $this->assertNoRaw(t('n/a'), 'HTML in comment body is not hidden.');
-    $this->assertNoRaw(check_plain($edit_comment['comment_body[0][value]']), 'HTML in comment body is not escaped.');
+    $this->assertNoRaw(String::checkPlain($edit_comment['comment_body[0][value]']), 'HTML in comment body is not escaped.');
 
     // Hide comments.
     $this->drupalLogin($this->admin_user);
@@ -151,14 +146,14 @@ class SearchCommentTest extends SearchTestBase {
 
     // Create a node.
     // Make preview optional.
-    $instance = FieldInstanceConfig::loadByName('node', 'article', 'comment');
-    $instance->settings['preview'] = DRUPAL_OPTIONAL;
-    $instance->save();
+    $field = FieldConfig::loadByName('node', 'article', 'comment');
+    $field->settings['preview'] = DRUPAL_OPTIONAL;
+    $field->save();
     $this->node = $this->drupalCreateNode(array('type' => 'article'));
 
     // Post a comment using 'Full HTML' text format.
     $edit_comment = array();
-    $edit_comment['subject'] = $this->comment_subject;
+    $edit_comment['subject[0][value]'] = $this->comment_subject;
     $edit_comment['comment_body[0][value]'] = '<h1>' . $comment_body . '</h1>';
     $this->drupalPostForm('comment/reply/node/' . $this->node->id() . '/comment', $edit_comment, t('Save'));
 

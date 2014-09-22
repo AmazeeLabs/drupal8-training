@@ -7,7 +7,8 @@
 
 namespace Drupal\views\Plugin\views\display;
 
-use Drupal\Core\Form\FormErrorInterface;
+use Drupal\Core\Access\AccessManagerInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Routing\RouteCompiler;
 use Drupal\Core\Routing\RouteProviderInterface;
@@ -41,13 +42,6 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   protected $state;
 
   /**
-   * The form error helper.
-   *
-   * @var \Drupal\Core\Form\FormErrorInterface
-   */
-  protected $formError;
-
-  /**
    * Constructs a PathPluginBase object.
    *
    * @param array $configuration
@@ -60,15 +54,12 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
    *   The route provider.
    * @param \Drupal\Core\State\StateInterface $state
    *   The state key value store.
-   * @param \Drupal\Core\Form\FormErrorInterface $form_error
-   *   The form error helper.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, FormErrorInterface $form_error) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
     $this->routeProvider = $route_provider;
     $this->state = $state;
-    $this->formError = $form_error;
   }
 
   /**
@@ -80,8 +71,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $plugin_id,
       $plugin_definition,
       $container->get('router.route_provider'),
-      $container->get('state'),
-      $container->get('form_validator')
+      $container->get('state')
     );
   }
 
@@ -206,7 +196,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     $access_plugin->alterRouteDefinition($route);
     // @todo Figure out whether _access_mode ANY is the proper one. This is
     //   particular important for altering routes.
-    $route->setOption('_access_mode', 'ANY');
+    $route->setOption('_access_mode', AccessManagerInterface::ACCESS_MODE_ANY);
 
     // Set the argument map, in order to support named parameters.
     $route->setOption('_view_argument_map', $argument_map);
@@ -249,6 +239,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         // requirements).
 
         // Replace the existing route with a new one based on views.
+        $original_route = $collection->get($name);
         $collection->remove($name);
 
         $view_id = $this->view->storage->id();
@@ -261,9 +252,13 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         // We assume that the numeric ids of the parameters match the one from
         // the view argument handlers.
         foreach ($parameters as $position => $parameter_name) {
-          $path = str_replace('arg_' . $position, $parameter_name, $path);
+          $path = str_replace('{arg_' . $position . '}', '{' . $parameter_name . '}', $path);
           $argument_map['arg_' . $position] = $parameter_name;
         }
+        // Copy the original options from the route, so for example we ensure
+        // that parameter conversion options is carried over.
+        $route->setOptions($route->getOptions() + $original_route->getOptions());
+
         // Set the corrected path and the mapping to the route object.
         $route->setOption('_view_argument_map', $argument_map);
         $route->setPath($path);
@@ -279,7 +274,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   /**
    * {@inheritdoc}
    */
-  public function executeHookMenuLinkDefaults(array &$existing_links) {
+  public function getMenuLinks() {
     $links = array();
 
     // Replace % with the link to our standard views argument loader
@@ -299,7 +294,10 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     $view_route_names = $this->state->get('views.view_route_names') ?: array();
 
     $path = implode('/', $bits);
-    $menu_link_id = 'views.' . str_replace('/', '.', $path);
+    $view_id = $this->view->storage->id();
+    $display_id = $this->display['id'];
+    $view_id_display =  "{$view_id}.{$display_id}";
+    $menu_link_id = 'views.' . str_replace('/', '.', $view_id_display);
 
     if ($path) {
       $menu = $this->getOption('menu');
@@ -307,22 +305,27 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         $links[$menu_link_id] = array();
         // Some views might override existing paths, so we have to set the route
         // name based upon the altering.
-        $view_id_display =  "{$this->view->storage->id()}.{$this->display['id']}";
         $links[$menu_link_id] = array(
           'route_name' => isset($view_route_names[$view_id_display]) ? $view_route_names[$view_id_display] : "view.$view_id_display",
           // Identify URL embedded arguments and correlate them to a handler.
           'load arguments'  => array($this->view->storage->id(), $this->display['id'], '%index'),
-          'machine_name' => $menu_link_id,
+          'id' => $menu_link_id,
         );
         $links[$menu_link_id]['title'] = $menu['title'];
         $links[$menu_link_id]['description'] = $menu['description'];
+        $links[$menu_link_id]['parent'] = $menu['parent'];
 
         if (isset($menu['weight'])) {
           $links[$menu_link_id]['weight'] = intval($menu['weight']);
         }
 
         // Insert item into the proper menu.
-        $links[$menu_link_id]['menu_name'] = $menu['name'];
+        $links[$menu_link_id]['menu_name'] = $menu['menu_name'];
+        // Keep track of where we came from.
+        $links[$menu_link_id]['metadata'] = array(
+          'view_id' => $view_id,
+          'display_id' => $display_id,
+        );
       }
     }
 
@@ -379,10 +382,10 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   /**
    * Overrides \Drupal\views\Plugin\views\display\DisplayPluginBase::buildOptionsForm().
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
-    switch ($form_state['section']) {
+    switch ($form_state->get('section')) {
       case 'path':
         $form['#title'] .= t('The menu path or URL of this view');
         $form['path'] = array(
@@ -403,28 +406,28 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   /**
    * Overrides \Drupal\views\Plugin\views\display\DisplayPluginBase::validateOptionsForm().
    */
-  public function validateOptionsForm(&$form, &$form_state) {
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) {
     parent::validateOptionsForm($form, $form_state);
 
-    if ($form_state['section'] == 'path') {
-      $errors = $this->validatePath($form_state['values']['path']);
+    if ($form_state->get('section') == 'path') {
+      $errors = $this->validatePath($form_state->getValue('path'));
       foreach ($errors as $error) {
-        $this->formError->setError($form['path'], $form_state, $error);
+        $form_state->setError($form['path'], $error);
       }
 
       // Automatically remove '/' and trailing whitespace from path.
-      $form_state['values']['path'] = trim($form_state['values']['path'], '/ ');
+      $form_state->setValue('path', trim($form_state->getValue('path'), '/ '));
     }
   }
 
   /**
    * Overrides \Drupal\views\Plugin\views\display\DisplayPluginBase::submitOptionsForm().
    */
-  public function submitOptionsForm(&$form, &$form_state) {
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
     parent::submitOptionsForm($form, $form_state);
 
-    if ($form_state['section'] == 'path') {
-      $this->setOption('path', $form_state['values']['path']);
+    if ($form_state->get('section') == 'path') {
+      $this->setOption('path', $form_state->getValue('path'));
     }
   }
 

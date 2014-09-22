@@ -7,10 +7,10 @@
 
 namespace Drupal\path\Tests;
 
-use Drupal\field\Entity\FieldConfig;
-
 /**
- * Tests URL aliases for translated nodes.
+ * Confirm that paths work with translated nodes.
+ *
+ * @group path
  */
 class PathLanguageTest extends PathTestBase {
 
@@ -21,15 +21,7 @@ class PathLanguageTest extends PathTestBase {
    */
   public static $modules = array('path', 'locale', 'content_translation');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Path aliases with translated nodes',
-      'description' => 'Confirm that paths work with translated nodes',
-      'group' => 'Path',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $permissions = array(
@@ -61,9 +53,6 @@ class PathLanguageTest extends PathTestBase {
     // Enable translation for page node.
     $edit = array(
       'entity_types[node]' => 1,
-      'settings[node][article][translatable]' => 1,
-      'settings[node][article][fields][path]' => 1,
-      'settings[node][article][fields][body]' => 1,
       'settings[node][page][translatable]' => 1,
       'settings[node][page][fields][path]' => 1,
       'settings[node][page][fields][body]' => 1,
@@ -71,8 +60,9 @@ class PathLanguageTest extends PathTestBase {
     );
     $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save'));
 
-    $field = FieldConfig::loadByName('node', 'body');
-    $this->assertTrue($field->isTranslatable(), 'Node body is translatable.');
+    $definitions = \Drupal::entityManager()->getFieldDefinitions('node', 'page');
+    $this->assertTrue($definitions['path']->isTranslatable(), 'Node path is translatable.');
+    $this->assertTrue($definitions['body']->isTranslatable(), 'Node body is translatable.');
   }
 
   /**
@@ -80,8 +70,7 @@ class PathLanguageTest extends PathTestBase {
    */
   function testAliasTranslation() {
     $english_node = $this->drupalCreateNode(array('type' => 'page', 'langcode' => 'en'));
-    $english_alias = $this->randomName();
-    $translatable = !$english_node->isNew() && $english_node->isTranslatable() && count($english_node->getTranslationLanguages()) > 1 && ($field = $english_node->getFieldDefinition('status')) && $field->isTranslatable();
+    $english_alias = $this->randomMachineName();
 
     // Edit the node to set language and path.
     $edit = array();
@@ -97,11 +86,11 @@ class PathLanguageTest extends PathTestBase {
     $this->clickLink(t('Add'));
 
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName();
-    $edit['body[0][value]'] = $this->randomName();
-    $french_alias = $this->randomName();
+    $edit['title[0][value]'] = $this->randomMachineName();
+    $edit['body[0][value]'] = $this->randomMachineName();
+    $french_alias = $this->randomMachineName();
     $edit['path[0][alias]'] = $french_alias;
-    $this->drupalPostForm(NULL, $edit, t('Save') . ' ' . ($translatable ? t('(this translation)') : t('(all translations)')));
+    $this->drupalPostForm(NULL, $edit, t('Save (this translation)'));
 
     // Clear the path lookup cache.
     $this->container->get('path.alias_manager')->cacheClear();

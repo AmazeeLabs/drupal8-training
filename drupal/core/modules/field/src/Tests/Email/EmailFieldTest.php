@@ -10,7 +10,9 @@ namespace Drupal\field\Tests\Email;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests e-mail field functionality.
+ * Tests email field functionality.
+ *
+ * @group field
  */
 class EmailFieldTest extends WebTestBase {
 
@@ -22,28 +24,20 @@ class EmailFieldTest extends WebTestBase {
   public static $modules = array('node', 'entity_test', 'field_ui');
 
   /**
-   * A field to use in this test class.
+   * A field storage to use in this test class.
+   *
+   * @var \Drupal\field\Entity\FieldStorageConfig
+   */
+  protected $fieldStorage;
+
+  /**
+   * The field used in this test class.
    *
    * @var \Drupal\field\Entity\FieldConfig
    */
   protected $field;
 
-  /**
-   * The instance used in this test class.
-   *
-   * @var \Drupal\field\Entity\FieldInstanceConfig
-   */
-  protected $instance;
-
-  public static function getInfo() {
-    return array(
-      'name'  => 'E-mail field',
-      'description'  => 'Tests e-mail field functionality.',
-      'group' => 'Field types',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->web_user = $this->drupalCreateUser(array(
@@ -55,23 +49,22 @@ class EmailFieldTest extends WebTestBase {
   }
 
   /**
-   * Tests e-mail field.
+   * Tests email field.
    */
   function testEmailField() {
     // Create a field with settings to validate.
-    $field_name = drupal_strtolower($this->randomName());
-    $this->field = entity_create('field_config', array(
+    $field_name = drupal_strtolower($this->randomMachineName());
+    $this->fieldStorage = entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'email',
     ));
-    $this->field->save();
-    $this->instance = entity_create('field_instance_config', array(
-      'field_name' => $field_name,
-      'entity_type' => 'entity_test',
+    $this->fieldStorage->save();
+    $this->field = entity_create('field_config', array(
+      'field_storage' => $this->fieldStorage,
       'bundle' => 'entity_test',
     ));
-    $this->instance->save();
+    $this->field->save();
 
     // Create a form display for the default form mode.
     entity_get_form_display('entity_test', 'entity_test', 'default')
@@ -94,11 +87,9 @@ class EmailFieldTest extends WebTestBase {
     $this->assertFieldByName("{$field_name}[0][value]", '', 'Widget found.');
     $this->assertRaw('placeholder="example@example.com"');
 
-    // Submit a valid e-mail address and ensure it is accepted.
+    // Submit a valid email address and ensure it is accepted.
     $value = 'test@example.com';
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $value,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));

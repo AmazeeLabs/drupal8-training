@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\views\argument;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ManyToOneHelper;
@@ -62,7 +63,7 @@ class ManyToOne extends ArgumentPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     // allow + for or, , for and
@@ -119,12 +120,8 @@ class ManyToOne extends ArgumentPluginBase {
     }
 
     if (!empty($this->options['break_phrase'])) {
-      if (!empty($this->definition['numeric'])) {
-        $this->breakPhrase($this->argument, $this);
-      }
-      else {
-        $this->breakPhraseString($this->argument, $this);
-      }
+      $force_int = !empty($this->definition['numeric']);
+      $this->unpackArgumentValue($force_int);
     }
     else {
       $this->value = array($this->argument);
@@ -140,7 +137,8 @@ class ManyToOne extends ArgumentPluginBase {
     }
 
     if (!empty($this->options['break_phrase'])) {
-      $this->breakPhrase($this->argument, $this);
+      $force_int = !empty($this->definition['numeric']);
+      $this->unpackArgumentValue($force_int);
     }
     else {
       $this->value = array($this->argument);

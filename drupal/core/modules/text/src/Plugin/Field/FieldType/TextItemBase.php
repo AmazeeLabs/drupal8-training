@@ -7,24 +7,16 @@
 
 namespace Drupal\text\Plugin\Field\FieldType;
 
+use Drupal\Component\Utility\Random;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Field\PrepareCacheInterface;
 use Drupal\Core\TypedData\DataDefinition;
 
 /**
  * Base class for 'text' configurable field types.
  */
-abstract class TextItemBase extends FieldItemBase implements PrepareCacheInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function defaultInstanceSettings() {
-    $settings = parent::defaultInstanceSettings();
-    $settings['text_processing'] = 0;
-    return $settings;
-  }
+abstract class TextItemBase extends FieldItemBase {
 
   /**
    * {@inheritdoc}
@@ -50,7 +42,7 @@ abstract class TextItemBase extends FieldItemBase implements PrepareCacheInterfa
    * {@inheritdoc}
    */
   public function applyDefaultValue($notify = TRUE) {
-    // Default to a simple check_plain().
+    // Default to a simple \Drupal\Component\Utility\String::checkPlain().
     // @todo: Add in the filter default format here.
     $this->setValue(array('format' => NULL), $notify);
     return $this;
@@ -62,26 +54,6 @@ abstract class TextItemBase extends FieldItemBase implements PrepareCacheInterfa
   public function isEmpty() {
     $value = $this->get('value')->getValue();
     return $value === NULL || $value === '';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getCacheData() {
-    $data = $this->getValue();
-    // Where possible, generate the processed (sanitized) version of each
-    // textual property (e.g., 'value', 'summary') within this field item early
-    // so that it is cached in the field cache. This avoids the need to look up
-    // the sanitized value in the filter cache separately.
-    $text_processing = $this->getSetting('text_processing');
-    if (!$text_processing || filter_format_allowcache($this->get('format')->getValue())) {
-      foreach ($this->definition->getPropertyDefinitions() as $property => $definition) {
-        if ($definition->getClass() == '\Drupal\text\TextProcessed') {
-          $data[$property] = $this->get($property)->getValue();
-        }
-      }
-    }
-    return $data;
   }
 
   /**
@@ -101,6 +73,30 @@ abstract class TextItemBase extends FieldItemBase implements PrepareCacheInterfa
         }
       }
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    $random = new Random();
+    $settings = $field_definition->getSettings();
+
+    if (empty($settings['max_length'])) {
+      // Textarea handling
+      $value = $random->paragraphs();
+    }
+    else {
+      // Textfield handling.
+      $value = substr($random->sentences(mt_rand(1, $settings['max_length'] / 3), FALSE), 0, $settings['max_length']);
+    }
+
+    $values = array(
+      'value' => $value,
+      'summary' => $value,
+      'format' => filter_fallback_format(),
+    );
+    return $values;
   }
 
 }

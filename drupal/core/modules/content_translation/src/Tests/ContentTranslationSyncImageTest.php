@@ -8,10 +8,11 @@
 namespace Drupal\content_translation\Tests;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Language\Language;
 
 /**
- * Tests the Content Translation image field synchronization capability.
+ * Tests the field synchronization behavior for the image field.
+ *
+ * @group content_translation
  */
 class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
 
@@ -36,15 +37,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
    */
   public static $modules = array('language', 'content_translation', 'entity_test', 'image', 'field_ui');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Image field synchronization',
-      'description' => 'Tests the field synchronization behavior for the image field.',
-      'group' => 'Content Translation UI',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->files = $this->drupalGetTestFiles('image');
   }
@@ -56,7 +49,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
     $this->fieldName = 'field_test_et_ui_image';
     $this->cardinality = 3;
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $this->fieldName,
       'entity_type' => $this->entityTypeId,
       'type' => 'image',
@@ -64,16 +57,18 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
       'translatable' => TRUE,
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'entity_type' => $this->entityTypeId,
       'field_name' => $this->fieldName,
       'bundle' => $this->entityTypeId,
       'label' => 'Test translatable image field',
-      'settings' => array(
-        'translation_sync' => array(
-          'file' => FALSE,
-          'alt' => 'alt',
-          'title' => 'title',
+      'third_party_settings' => array(
+        'content_translation' => array(
+          'translation_sync' => array(
+            'file' => FALSE,
+            'alt' => 'alt',
+            'title' => 'title',
+          ),
         ),
       ),
     ))->save();
@@ -94,11 +89,11 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
     // Check that the alt and title fields are enabled for the image field.
     $this->drupalLogin($this->editor);
     $this->drupalGet('entity_test_mul/structure/' . $this->entityTypeId . '/fields/' . $this->entityTypeId . '.' . $this->entityTypeId . '.' . $this->fieldName);
-    $this->assertFieldChecked('edit-instance-settings-translation-sync-alt');
-    $this->assertFieldChecked('edit-instance-settings-translation-sync-title');
+    $this->assertFieldChecked('edit-field-third-party-settings-content-translation-translation-sync-alt');
+    $this->assertFieldChecked('edit-field-third-party-settings-content-translation-translation-sync-title');
     $edit = array(
-      'instance[settings][translation_sync][alt]' => FALSE,
-      'instance[settings][translation_sync][title]' => FALSE,
+      'field[third_party_settings][content_translation][translation_sync][alt]' => FALSE,
+      'field[third_party_settings][content_translation][translation_sync][title]' => FALSE,
     );
     $this->drupalPostForm(NULL, $edit, t('Save settings'));
 
@@ -123,12 +118,12 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
     $langcode = $this->langcodes[1];
 
     // Populate the required contextual values.
-    $attributes = $this->container->get('request')->attributes;
+    $attributes = \Drupal::request()->attributes;
     $attributes->set('source_langcode', $default_langcode);
 
     // Populate the test entity with some random initial values.
     $values = array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'user_id' => mt_rand(1, 128),
       'langcode' => $default_langcode,
     );
@@ -156,8 +151,8 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
       // the entity.
       $item = array(
         'target_id' => $fid,
-        'alt' => $default_langcode . '_' . $fid . '_' . $this->randomName(),
-        'title' => $default_langcode . '_' . $fid . '_' . $this->randomName(),
+        'alt' => $default_langcode . '_' . $fid . '_' . $this->randomMachineName(),
+        'title' => $default_langcode . '_' . $fid . '_' . $this->randomMachineName(),
       );
       $entity->{$this->fieldName}->get($delta)->setValue($item);
 
@@ -182,8 +177,8 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
       $fid = $this->files[$index]->fid;
       $item = array(
         'target_id' => $fid,
-        'alt' => $langcode . '_' . $fid . '_' . $this->randomName(),
-        'title' => $langcode . '_' . $fid . '_' . $this->randomName(),
+        'alt' => $langcode . '_' . $fid . '_' . $this->randomMachineName(),
+        'title' => $langcode . '_' . $fid . '_' . $this->randomMachineName(),
       );
       $translation->{$this->fieldName}->get($delta)->setValue($item);
 
@@ -218,8 +213,8 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
     // Add back an item for the dropped value and perform synchronization again.
     $values[$langcode][$removed_fid] = array(
       'target_id' => $removed_fid,
-      'alt' => $langcode . '_' . $removed_fid . '_' . $this->randomName(),
-      'title' => $langcode . '_' . $removed_fid . '_' . $this->randomName(),
+      'alt' => $langcode . '_' . $removed_fid . '_' . $this->randomMachineName(),
+      'title' => $langcode . '_' . $removed_fid . '_' . $this->randomMachineName(),
     );
     $translation->{$this->fieldName}->setValue(array_values($values[$langcode]));
     // When updating an entity we do not have a source language defined.

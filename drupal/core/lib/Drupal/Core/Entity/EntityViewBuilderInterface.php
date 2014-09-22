@@ -11,7 +11,9 @@ use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
 /**
- * Defines a common interface for entity view controller classes.
+ * Defines an interface for entity view builders.
+ *
+ * @ingroup entity_api
  */
 interface EntityViewBuilderInterface {
 
@@ -96,8 +98,6 @@ interface EntityViewBuilderInterface {
    * isolated field.
    * - Do not use inside node (or any other entity) templates; use
    *   render($content[FIELD_NAME]) instead.
-   * - Do not use to display all fields in an entity; use
-   *   field_attach_prepare_view() and field_attach_view() instead.
    * - The FieldItemInterface::view() method can be used to output a single
    *   formatted field value, without label or wrapping field markup.
    *
@@ -109,7 +109,7 @@ interface EntityViewBuilderInterface {
    * @param array $display_options
    *  Can be either:
    *   - The name of a view mode. The field will be displayed according to the
-   *     display settings specified for this view mode in the $instance
+   *     display settings specified for this view mode in the $field
    *     definition for the field in the entity's bundle. If no display settings
    *     are found for the view mode, the settings for the 'default' view mode
    *     will be used.

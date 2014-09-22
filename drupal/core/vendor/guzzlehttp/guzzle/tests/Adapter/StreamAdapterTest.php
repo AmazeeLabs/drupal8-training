@@ -34,7 +34,7 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
         $sent = Server::received(true)[0];
         $this->assertEquals('GET', $sent->getMethod());
         $this->assertEquals('/', $sent->getResource());
-        $this->assertEquals('127.0.0.1:8124', $sent->getHeader('host'));
+        $this->assertEquals('127.0.0.1:8125', $sent->getHeader('host'));
         $this->assertEquals('Bar', $sent->getHeader('foo'));
         $this->assertTrue($sent->hasHeader('user-agent'));
     }
@@ -122,6 +122,9 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('OK', $response->getReasonPhrase());
         $this->assertEquals('8', $response->getHeader('Content-Length'));
         $body = $response->getBody();
+        if (defined('HHVM_VERSION')) {
+            $this->markTestIncomplete('HHVM has not implemented this?');
+        }
         $this->assertEquals('http', $body->getMetadata()['wrapper_type']);
         $this->assertEquals(8, $body->getMetadata()['unread_bytes']);
         $this->assertEquals(Server::$url . 'foo', $body->getMetadata()['uri']);
@@ -131,7 +134,7 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
         $sent = Server::received(true)[0];
         $this->assertEquals('PUT', $sent->getMethod());
         $this->assertEquals('/foo', $sent->getResource());
-        $this->assertEquals('127.0.0.1:8124', $sent->getHeader('host'));
+        $this->assertEquals('127.0.0.1:8125', $sent->getHeader('host'));
         $this->assertEquals('Bar', $sent->getHeader('foo'));
         $this->assertTrue($sent->hasHeader('user-agent'));
     }
@@ -198,7 +201,7 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
             'stream' => true
         ]);
         $body = $response->getBody();
-        $this->assertEquals('compress.zlib://http://127.0.0.1:8124/', $body->getMetadata()['uri']);
+        $this->assertEquals('compress.zlib://http://127.0.0.1:8125/', $body->getMetadata()['uri']);
     }
 
     protected function getStreamFromBody(Stream $body)
@@ -219,9 +222,10 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
 
     public function testAddsProxy()
     {
-        $body = $this->getSendResult(['stream' => true, 'proxy' => '127.0.0.1:8124'])->getBody();
+        $body = $this->getSendResult(['stream' => true, 'proxy' => '127.0.0.1:8125'])->getBody();
         $opts = stream_context_get_options($this->getStreamFromBody($body));
-        $this->assertEquals('127.0.0.1:8124', $opts['http']['proxy']);
+        $this->assertEquals('127.0.0.1:8125', $opts['http']['proxy']);
+        $this->assertTrue($opts['http']['request_fulluri']);
     }
 
     public function testAddsTimeout()
@@ -289,6 +293,10 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
 
     public function testDebugAttributeWritesStreamInfoToTempBufferByDefault()
     {
+        if (defined('HHVM_VERSION')) {
+            $this->markTestSkipped('HHVM has not implemented this?');
+            return;
+        }
 
         Server::flush();
         Server::enqueue("HTTP/1.1 200 OK\r\nFoo: Bar\r\nContent-Length: 8\r\n\r\nhi there");
@@ -299,13 +307,18 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
         ob_start();
         $client->get('/', ['debug' => true]);
         $contents = ob_get_clean();
-        $this->assertContains('<http://127.0.0.1:8124/> [CONNECT]', $contents);
-        $this->assertContains('<http://127.0.0.1:8124/> [FILE_SIZE_IS]', $contents);
-        $this->assertContains('<http://127.0.0.1:8124/> [PROGRESS]', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [CONNECT]', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [FILE_SIZE_IS]', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [PROGRESS]', $contents);
     }
 
     public function testDebugAttributeWritesStreamInfoToBuffer()
     {
+        if (defined('HHVM_VERSION')) {
+            $this->markTestSkipped('HHVM has not implemented this?');
+            return;
+        }
+
         $buffer = fopen('php://temp', 'r+');
         Server::flush();
         Server::enqueue("HTTP/1.1 200 OK\r\nContent-Length: 8\r\nContent-Type: text/plain\r\n\r\nhi there");
@@ -316,10 +329,10 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
         $client->get('/', ['debug' => $buffer]);
         fseek($buffer, 0);
         $contents = stream_get_contents($buffer);
-        $this->assertContains('<http://127.0.0.1:8124/> [CONNECT]', $contents);
-        $this->assertContains('<http://127.0.0.1:8124/> [FILE_SIZE_IS] message: "Content-Length: 8"', $contents);
-        $this->assertContains('<http://127.0.0.1:8124/> [PROGRESS] bytes_max: "8"', $contents);
-        $this->assertContains('<http://127.0.0.1:8124/> [MIME_TYPE_IS] message: "text/plain"', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [CONNECT]', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [FILE_SIZE_IS] message: "Content-Length: 8"', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [PROGRESS] bytes_max: "8"', $contents);
+        $this->assertContains('<http://127.0.0.1:8125/> [MIME_TYPE_IS] message: "text/plain"', $contents);
     }
 
     public function testAddsProxyByProtocol()
@@ -367,5 +380,23 @@ class StreamAdapterTest extends \PHPUnit_Framework_TestCase
             'stream' => true,
             'config' => ['stream_context' => 'foo']
         ]);
+    }
+
+    /**
+     * @ticket https://github.com/guzzle/guzzle/issues/725
+     */
+    public function testHandlesMultipleHeadersOfSameName()
+    {
+        $a = new StreamAdapter(new MessageFactory());
+        $ref = new \ReflectionMethod($a, 'headersFromLines');
+        $ref->setAccessible(true);
+        $this->assertEquals([
+            'foo' => ['bar', 'bam'],
+            'abc' => ['123']
+        ], $ref->invoke($a, [
+            'foo: bar',
+            'foo: bam',
+            'abc: 123'
+        ]));
     }
 }

@@ -15,13 +15,6 @@ use Symfony\Component\HttpFoundation\Session\Storage\SessionStorageInterface;
 interface SessionManagerInterface extends SessionStorageInterface {
 
   /**
-   * Initializes the session handler, starting a session if needed.
-   *
-   * @return $this
-   */
-  public function initialize();
-
-  /**
    * Ends a specific user's session(s).
    *
    * @param int $uid

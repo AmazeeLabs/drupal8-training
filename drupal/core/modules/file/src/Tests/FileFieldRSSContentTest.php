@@ -7,10 +7,10 @@
 
 namespace Drupal\file\Tests;
 
-use Drupal\Core\Language\Language;
-
 /**
- * Tests that formatters are working properly.
+ * Ensure that files added to nodes appear correctly in RSS feeds.
+ *
+ * @group file
  */
 class FileFieldRSSContentTest extends FileFieldTestBase {
 
@@ -21,29 +21,21 @@ class FileFieldRSSContentTest extends FileFieldTestBase {
    */
   public static $modules = array('node', 'views');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'File field RSS content',
-      'description' => 'Ensure that files added to nodes appear correctly in RSS feeds.',
-      'group' => 'File',
-    );
-  }
-
   /**
    * Tests RSS enclosure formatter display for RSS feeds.
    */
   function testFileFieldRSSContent() {
-    $field_name = strtolower($this->randomName());
+    $field_name = strtolower($this->randomMachineName());
     $type_name = 'article';
     $field_settings = array(
       'display_field' => '1',
       'display_default' => '1',
     );
-    $instance_settings = array(
+    $field_settings = array(
       'description_field' => '1',
     );
     $widget_settings = array();
-    $this->createFileField($field_name, 'node', $type_name, $field_settings, $instance_settings, $widget_settings);
+    $this->createFileField($field_name, 'node', $type_name, $field_settings, $field_settings, $widget_settings);
 
     // RSS display must be added manually.
     $this->drupalGet("admin/structure/types/manage/$type_name/display");

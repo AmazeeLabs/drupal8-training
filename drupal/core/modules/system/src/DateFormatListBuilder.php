@@ -8,7 +8,7 @@
 namespace Drupal\system;
 
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
-use Drupal\Core\Datetime\Date;
+use Drupal\Core\Datetime\DateFormatter;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -22,11 +22,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class DateFormatListBuilder extends ConfigEntityListBuilder {
 
   /**
-   * The date service.
+   * The date formatter service.
    *
-   * @var \Drupal\Core\Datetime\Date
+   * @var \Drupal\Core\Datetime\DateFormatter
    */
-  protected $dateService;
+  protected $dateFormatter;
 
   /**
    * Constructs a new DateFormatListBuilder object.
@@ -35,13 +35,13 @@ class DateFormatListBuilder extends ConfigEntityListBuilder {
    *   The entity type definition.
    * @param \Drupal\Core\Entity\EntityStorageInterface $storage
    *   The entity storage class.
-   * @param \Drupal\Core\Datetime\Date $date_service
-   *   The date service.
+   * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
+   *   The date formatter service.
    */
-  public function __construct(EntityTypeInterface $entity_type, EntityStorageInterface $storage, Date $date_service) {
+  public function __construct(EntityTypeInterface $entity_type, EntityStorageInterface $storage, DateFormatter $date_formatter) {
     parent::__construct($entity_type, $storage);
 
-    $this->dateService = $date_service;
+    $this->dateFormatter = $date_formatter;
   }
 
   /**
@@ -51,17 +51,8 @@ class DateFormatListBuilder extends ConfigEntityListBuilder {
     return new static(
       $entity_type,
       $container->get('entity.manager')->getStorage($entity_type->id()),
-      $container->get('date')
+      $container->get('date.formatter')
     );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function load() {
-    return array_filter(parent::load(), function ($entity) {
-      return !$entity->isLocked();
-    });
   }
 
   /**
@@ -78,9 +69,14 @@ class DateFormatListBuilder extends ConfigEntityListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
-    $row['id'] = $entity->id();
+    if ($entity->isLocked()) {
+      $row['id'] =  $this->t('@entity_id (locked)', array('@entity_id' => $entity->id()));
+    }
+    else {
+      $row['id'] = $entity->id();
+    }
     $row['label'] = $this->getLabel($entity);
-    $row['pattern'] = $this->dateService->format(REQUEST_TIME, $entity->id());
+    $row['pattern'] = $this->dateFormatter->format(REQUEST_TIME, $entity->id());
     return $row + parent::buildRow($entity);
   }
 

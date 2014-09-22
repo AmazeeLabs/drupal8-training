@@ -8,6 +8,7 @@
 namespace Drupal\image\Plugin\ImageEffect;
 
 use Drupal\Component\Utility\Image;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Image\ImageInterface;
 
 /**
@@ -26,7 +27,7 @@ class ScaleImageEffect extends ResizeImageEffect {
    */
   public function applyEffect(ImageInterface $image) {
     if (!$image->scale($this->configuration['width'], $this->configuration['height'], $this->configuration['upscale'])) {
-      watchdog('image', 'Image scale failed using the %toolkit toolkit on %path (%mimetype, %dimensions)', array('%toolkit' => $image->getToolkitId(), '%path' => $image->getSource(), '%mimetype' => $image->getMimeType(), '%dimensions' => $image->getWidth() . 'x' . $image->getHeight()), WATCHDOG_ERROR);
+      $this->logger->error('Image scale failed using the %toolkit toolkit on %path (%mimetype, %dimensions)', array('%toolkit' => $image->getToolkitId(), '%path' => $image->getSource(), '%mimetype' => $image->getMimeType(), '%dimensions' => $image->getWidth() . 'x' . $image->getHeight()));
       return FALSE;
     }
     return TRUE;
@@ -45,10 +46,13 @@ class ScaleImageEffect extends ResizeImageEffect {
    * {@inheritdoc}
    */
   public function getSummary() {
-    return array(
+    $summary = array(
       '#theme' => 'image_scale_summary',
       '#data' => $this->configuration,
     );
+    $summary += parent::getSummary();
+
+    return $summary;
   }
 
   /**
@@ -63,9 +67,8 @@ class ScaleImageEffect extends ResizeImageEffect {
   /**
    * {@inheritdoc}
    */
-  public function getForm() {
-    $form = parent::getForm();
-    $form['#element_validate'] = array(array($this, 'validateScaleEffect'));
+  public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
+    $form = parent::buildConfigurationForm($form, $form_state);
     $form['width']['#required'] = FALSE;
     $form['height']['#required'] = FALSE;
     $form['upscale'] = array(
@@ -78,12 +81,22 @@ class ScaleImageEffect extends ResizeImageEffect {
   }
 
   /**
-   * Validates to ensure that either a height or a width is specified.
+   * {@inheritdoc}
    */
-  public function validateScaleEffect(array $element, array &$form_state) {
-    if (empty($element['width']['#value']) && empty($element['height']['#value'])) {
-      form_error($element, $form_state, t('Width and height can not both be blank.'));
+  public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
+    parent::validateConfigurationForm($form, $form_state);
+    if ($form_state->isValueEmpty('width') && $form_state->isValueEmpty('height')) {
+      $form_state->setErrorByName('data', $this->t('Width and height can not both be blank.'));
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
+    parent::submitConfigurationForm($form, $form_state);
+
+    $this->configuration['upscale'] = $form_state->getValue('upscale');
   }
 
 }

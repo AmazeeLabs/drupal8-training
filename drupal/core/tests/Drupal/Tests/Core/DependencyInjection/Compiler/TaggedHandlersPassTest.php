@@ -13,25 +13,10 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
- * Tests the tagged handler compiler pass.
- *
- * @group Drupal
- * @group DependencyInjection
- *
  * @coversDefaultClass \Drupal\Core\DependencyInjection\Compiler\TaggedHandlersPass
+ * @group DependencyInjection
  */
 class TaggedHandlersPassTest extends UnitTestCase {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Tests \Drupal\Core\DependencyInjection\Compiler\TaggedHandlersPass',
-      'description' => '',
-      'group' => 'Dependency injection',
-    );
-  }
 
   protected function buildContainer($environment = 'dev') {
     $container = new ContainerBuilder();
@@ -163,6 +148,41 @@ class TaggedHandlersPassTest extends UnitTestCase {
   }
 
   /**
+   * Tests consumer method with an ID parameter.
+   *
+   * @covers ::process
+   */
+  public function testProcessWithIdParameter() {
+    $container = $this->buildContainer();
+    $container
+      ->register('consumer_id', __NAMESPACE__ . '\ValidConsumer')
+      ->addTag('service_collector', array(
+        'call' => 'addWithId',
+      ));
+
+    $container
+      ->register('handler1', __NAMESPACE__ . '\ValidHandler')
+      ->addTag('consumer_id');
+    $container
+      ->register('handler2', __NAMESPACE__ . '\ValidHandler')
+      ->addTag('consumer_id', array(
+        'priority' => 10,
+      ));
+
+    $handler_pass = new TaggedHandlersPass();
+    $handler_pass->process($container);
+
+    $method_calls = $container->getDefinition('consumer_id')->getMethodCalls();
+    $this->assertCount(2, $method_calls);
+    $this->assertEquals(new Reference('handler2'), $method_calls[0][1][0]);
+    $this->assertEquals('handler2', $method_calls[0][1][1]);
+    $this->assertEquals(10, $method_calls[0][1][2]);
+    $this->assertEquals(new Reference('handler1'), $method_calls[1][1][0]);
+    $this->assertEquals('handler1', $method_calls[1][1][1]);
+    $this->assertEquals(0, $method_calls[1][1][2]);
+  }
+
+  /**
    * Tests interface validation in non-production environment.
    *
    * @expectedException \Symfony\Component\DependencyInjection\Exception\LogicException
@@ -195,6 +215,8 @@ class ValidConsumer {
   public function addHandler(HandlerInterface $instance, $priority = 0) {
   }
   public function addNoPriority(HandlerInterface $instance) {
+  }
+  public function addWithId(HandlerInterface $instance, $id, $priority = 0) {
   }
 }
 class InvalidConsumer {

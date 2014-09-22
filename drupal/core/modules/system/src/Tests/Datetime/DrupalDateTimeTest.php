@@ -12,19 +12,10 @@ use Drupal\Core\Datetime\DrupalDateTime;
 
 /**
  * Tests DrupalDateTime functionality.
+ *
+ * @group Datetime
  */
 class DrupalDateTimeTest extends WebTestBase {
-
-  /**
-   * Test information.
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'DrupalDateTime',
-      'description' => 'Test DrupalDateTime functionality.',
-      'group' => 'Datetime',
-    );
-  }
 
   /**
    * Set up required modules.
@@ -34,7 +25,7 @@ class DrupalDateTimeTest extends WebTestBase {
   /**
    * Test setup.
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
   }

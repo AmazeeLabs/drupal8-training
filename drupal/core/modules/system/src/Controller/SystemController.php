@@ -12,6 +12,8 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Menu\MenuLinkTreeInterface;
+use Drupal\Core\Menu\MenuTreeParameters;
 use Drupal\Core\Theme\ThemeAccessCheck;
 use Drupal\system\SystemManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -57,6 +59,13 @@ class SystemController extends ControllerBase {
   protected $themeHandler;
 
   /**
+   * The menu link tree service.
+   *
+   * @var \Drupal\Core\Menu\MenuLinkTreeInterface
+   */
+  protected $menuLinkTree;
+
+  /**
    * Constructs a new SystemController.
    *
    * @param \Drupal\system\SystemManager $systemManager
@@ -69,13 +78,16 @@ class SystemController extends ControllerBase {
    *   The form builder.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $theme_handler
    *   The theme handler.
+   * @param \Drupal\Core\Menu\MenuLinkTreeInterface
+   *   The menu link tree service.
    */
-  public function __construct(SystemManager $systemManager, QueryFactory $queryFactory, ThemeAccessCheck $theme_access, FormBuilderInterface $form_builder, ThemeHandlerInterface $theme_handler) {
+  public function __construct(SystemManager $systemManager, QueryFactory $queryFactory, ThemeAccessCheck $theme_access, FormBuilderInterface $form_builder, ThemeHandlerInterface $theme_handler, MenuLinkTreeInterface $menu_link_tree) {
     $this->systemManager = $systemManager;
     $this->queryFactory = $queryFactory;
     $this->themeAccess = $theme_access;
     $this->formBuilder = $form_builder;
     $this->themeHandler = $theme_handler;
+    $this->menuLinkTree = $menu_link_tree;
   }
 
   /**
@@ -87,63 +99,49 @@ class SystemController extends ControllerBase {
       $container->get('entity.query'),
       $container->get('access_check.theme'),
       $container->get('form_builder'),
-      $container->get('theme_handler')
+      $container->get('theme_handler'),
+      $container->get('menu.link_tree')
     );
   }
 
   /**
    * Provide the administration overview page.
    *
+   * @param string $link_id
+   *   The ID of the administrative path link for which to display child links.
+   *
    * @return array
    *   A renderable array of the administration overview page.
    */
-  public function overview() {
+  public function overview($link_id) {
     // Check for status report errors.
     if ($this->systemManager->checkRequirements() && $this->currentUser()->hasPermission('administer site configuration')) {
       drupal_set_message($this->t('One or more problems were detected with your Drupal installation. Check the <a href="@status">status report</a> for more information.', array('@status' => url('admin/reports/status'))), 'error');
     }
+    // Load all menu links below it.
+    $parameters = new MenuTreeParameters();
+    $parameters->setRoot($link_id)->excludeRoot()->setTopLevelOnly()->onlyEnabledLinks();
+    $tree = $this->menuLinkTree->load(NULL, $parameters);
+    $manipulators = array(
+      array('callable' => 'menu.default_tree_manipulators:checkAccess'),
+      array('callable' => 'menu.default_tree_manipulators:generateIndexAndSort'),
+    );
+    $tree = $this->menuLinkTree->transform($tree, $manipulators);
     $blocks = array();
-    // Load all links on admin/config and menu links below it.
-    $query = $this->queryFactory->get('menu_link')
-      ->condition('link_path', 'admin/config')
-      ->condition('module', 'system');
-    $result = $query->execute();
-    $menu_link_storage = $this->entityManager()->getStorage('menu_link');
-    if ($system_link = $menu_link_storage->loadMultiple($result)) {
-      $system_link = reset($system_link);
-      $query = $this->queryFactory->get('menu_link')
-        ->condition('link_path', 'admin/help', '<>')
-        ->condition('menu_name', $system_link->menu_name)
-        ->condition('plid', $system_link->id())
-        ->condition('hidden', 0);
-      $result = $query->execute();
-      if (!empty($result)) {
-        $menu_links = $menu_link_storage->loadMultiple($result);
-        foreach ($menu_links as $item) {
-          _menu_link_translate($item);
-          if (!$item['access']) {
-            continue;
-          }
-          // The link description, either derived from 'description' in hook_menu()
-          // or customized via Menu UI module is used as title attribute.
-          if (!empty($item['localized_options']['attributes']['title'])) {
-            $item['description'] = $item['localized_options']['attributes']['title'];
-            unset($item['localized_options']['attributes']['title']);
-          }
-          $block = $item;
-          $block['content'] = array(
-            '#theme' => 'admin_block_content',
-            '#content' => $this->systemManager->getAdminBlock($item),
-          );
+    foreach ($tree as $key => $element) {
+      $link = $element->link;
+      $block['title'] = $link->getTitle();
+      $block['description'] = $link->getDescription();
+      $block['content'] = array(
+        '#theme' => 'admin_block_content',
+        '#content' => $this->systemManager->getAdminBlock($link),
+      );
 
-          if (!empty($block['content']['#content'])) {
-            // Prepare for sorting as in function _menu_tree_check_access().
-            // The weight is offset so it is always positive, with a uniform 5-digits.
-            $blocks[(50000 + $item['weight']) . ' ' . $item['title'] . ' ' . $item['mlid']] = $block;
-          }
-        }
+      if (!empty($block['content']['#content'])) {
+        $blocks[$key] = $block;
       }
     }
+
     if ($blocks) {
       ksort($blocks);
       return array(
@@ -193,7 +191,7 @@ class SystemController extends ControllerBase {
     uasort($themes, 'system_sort_modules_by_info_name');
 
     $theme_default = $config->get('default');
-    $theme_groups  = array('enabled' => array(), 'disabled' => array());
+    $theme_groups  = array('installed' => array(), 'uninstalled' => array());
     $admin_theme = $config->get('admin');
     $admin_theme_options = array();
 
@@ -253,10 +251,10 @@ class SystemController extends ControllerBase {
           if (!$theme->is_default) {
             if ($theme->getName() != $admin_theme) {
               $theme->operations[] = array(
-                'title' => $this->t('Disable'),
-                'route_name' => 'system.theme_disable',
+                'title' => $this->t('Uninstall'),
+                'route_name' => 'system.theme_uninstall',
                 'query' => $query,
-                'attributes' => array('title' => $this->t('Disable !theme theme', array('!theme' => $theme->info['name']))),
+                'attributes' => array('title' => $this->t('Uninstall !theme theme', array('!theme' => $theme->info['name']))),
               );
             }
             $theme->operations[] = array(
@@ -270,16 +268,16 @@ class SystemController extends ControllerBase {
         }
         else {
           $theme->operations[] = array(
-            'title' => $this->t('Enable'),
-            'route_name' => 'system.theme_enable',
+            'title' => $this->t('Install'),
+            'route_name' => 'system.theme_install',
             'query' => $query,
-            'attributes' => array('title' => $this->t('Enable !theme theme', array('!theme' => $theme->info['name']))),
+            'attributes' => array('title' => $this->t('Install !theme theme', array('!theme' => $theme->info['name']))),
           );
           $theme->operations[] = array(
-            'title' => $this->t('Enable and set as default'),
+            'title' => $this->t('Install and set as default'),
             'route_name' => 'system.theme_set_default',
             'query' => $query,
-            'attributes' => array('title' => $this->t('Enable !theme as default theme', array('!theme' => $theme->info['name']))),
+            'attributes' => array('title' => $this->t('Install !theme as default theme', array('!theme' => $theme->info['name']))),
           );
         }
       }
@@ -296,19 +294,19 @@ class SystemController extends ControllerBase {
         $theme->notes[] = $this->t('admin theme');
       }
 
-      // Sort enabled and disabled themes into their own groups.
-      $theme_groups[$theme->status ? 'enabled' : 'disabled'][] = $theme;
+      // Sort installed and uninstalled themes into their own groups.
+      $theme_groups[$theme->status ? 'installed' : 'uninstalled'][] = $theme;
     }
 
     // There are two possible theme groups.
     $theme_group_titles = array(
-      'enabled' => $this->formatPlural(count($theme_groups['enabled']), 'Enabled theme', 'Enabled themes'),
+      'installed' => $this->formatPlural(count($theme_groups['installed']), 'Installed theme', 'Installed themes'),
     );
-    if (!empty($theme_groups['disabled'])) {
-      $theme_group_titles['disabled'] = $this->formatPlural(count($theme_groups['disabled']), 'Disabled theme', 'Disabled themes');
+    if (!empty($theme_groups['uninstalled'])) {
+      $theme_group_titles['uninstalled'] = $this->formatPlural(count($theme_groups['uninstalled']), 'Uninstalled theme', 'Uninstalled themes');
     }
 
-    uasort($theme_groups['enabled'], 'system_sort_themes');
+    uasort($theme_groups['installed'], 'system_sort_themes');
     $this->moduleHandler()->alter('system_themes_page', $theme_groups);
 
     $build = array();

@@ -7,12 +7,12 @@
 
 namespace Drupal\file;
 
-use Drupal\Core\Entity\ContentEntityDatabaseStorage;
+use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
 
 /**
  * File storage for files.
  */
-class FileStorage extends ContentEntityDatabaseStorage implements FileStorageInterface {
+class FileStorage extends SqlContentEntityStorage implements FileStorageInterface {
 
   /**
    * {@inheritdoc}
@@ -27,15 +27,4 @@ class FileStorage extends ContentEntityDatabaseStorage implements FileStorageInt
     return $query->execute()->fetchField();
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function retrieveTemporaryFiles() {
-    // Use separate placeholders for the status to avoid a bug in some versions
-    // of PHP. See http://drupal.org/node/352956.
-    return $this->database->query('SELECT fid FROM {' . $this->entityType->getBaseTable() . '} WHERE status <> :permanent AND changed < :changed', array(
-      ':permanent' => FILE_STATUS_PERMANENT,
-      ':changed' => REQUEST_TIME - DRUPAL_MAXIMUM_TEMP_FILE_AGE
-    ));
-  }
 }

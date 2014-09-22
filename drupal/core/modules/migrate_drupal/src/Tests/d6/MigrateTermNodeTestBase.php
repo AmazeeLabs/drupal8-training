@@ -31,7 +31,7 @@ abstract class MigrateTermNodeTestBase extends MigrateDrupalTestBase {
     $node_type = entity_create('node_type', array('type' => 'story'));
     $node_type->save();
     foreach (array('vocabulary_1_i_0_', 'vocabulary_2_i_1_', 'vocabulary_3_i_2_') as $name) {
-      entity_create('field_config', array(
+      entity_create('field_storage_config', array(
         'name' => $name,
         'entity_type' => 'node',
         'type' => 'taxonomy_term_reference',
@@ -45,7 +45,7 @@ abstract class MigrateTermNodeTestBase extends MigrateDrupalTestBase {
           ),
         ),
       ))->save();
-      entity_create('field_instance_config', array(
+      entity_create('field_config', array(
         'field_name' => $name,
         'entity_type' => 'node',
         'bundle' => 'story',
@@ -67,7 +67,7 @@ abstract class MigrateTermNodeTestBase extends MigrateDrupalTestBase {
         array(array(2), array(2)),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
 
     $vids = array(1, 2, 3);
     for ($i = 1; $i <= 2; $i++) {

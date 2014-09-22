@@ -32,6 +32,7 @@ display:
     display_title: Block
     id: block_1
     position: 2
+    provider: views
   default:
     display_options:
       access:

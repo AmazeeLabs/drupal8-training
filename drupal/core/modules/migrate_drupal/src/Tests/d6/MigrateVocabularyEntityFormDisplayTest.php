@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests the Drupal 6 vocabulary-node type association to Drupal 8 migration.
+ * Vocabulary entity form display migration.
+ *
+ * @group migrate_drupal
  */
 class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
 
@@ -25,21 +27,10 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Vocabulary entity form display migration',
-      'description'  => 'Vocabulary entity form display migration',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'entity_type' => 'node',
       'name' => 'tags',
       'type' => 'taxonomy_term_reference',
@@ -47,7 +38,7 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
 
     foreach (array('page', 'article', 'story') as $type) {
       entity_create('node_type', array('type' => $type))->save();
-      entity_create('field_instance_config', array(
+      entity_create('field_config', array(
         'label' => 'Tags',
         'description' => '',
         'field_name' => 'tags',
@@ -66,7 +57,7 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
         array(array(4, 'page'), array('node', 'page', 'tags')),
       )
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
 
     $migration = entity_load('migration', 'd6_vocabulary_entity_form_display');
     $dumps = array(

@@ -8,8 +8,11 @@
 namespace Drupal\node;
 
 use Drupal\Core\Entity\EntityForm;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form controller for node type forms.
@@ -17,23 +20,54 @@ use Drupal\Core\Entity\EntityTypeInterface;
 class NodeTypeForm extends EntityForm {
 
   /**
+   * The entity manager.
+   *
+   * @var \Drupal\Core\Entity\EntityManagerInterface
+   */
+  protected $entityManager;
+
+  /**
+   * Constructs the NodeTypeForm object.
+   *
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager
+   */
+  public function __construct(EntityManagerInterface $entity_manager) {
+    $this->entityManager = $entity_manager;
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('entity.manager')
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
 
     $type = $this->entity;
     if ($this->operation == 'add') {
       $form['#title'] = String::checkPlain($this->t('Add content type'));
+      $fields = $this->entityManager->getBaseFieldDefinitions('node');
+      // Create a node with a fake bundle using the type's UUID so that we can
+      // get the default values for workflow settings.
+      // @todo Make it possible to get default values without an entity.
+      //   https://www.drupal.org/node/2318187
+      $node = $this->entityManager->getStorage('node')->create(array('type' => $type->uuid()));
     }
-    elseif ($this->operation == 'edit') {
+    else {
       $form['#title'] = $this->t('Edit %label content type', array('%label' => $type->label()));
+      $fields = $this->entityManager->getFieldDefinitions('node', $type->id());
+      // Create a node to get the current values for workflow settings fields.
+      $node = $this->entityManager->getStorage('node')->create(array('type' => $type->id()));
     }
 
-    $node_settings = $type->getModuleSettings('node');
-    // Prepare node options to be used for 'checkboxes' form element.
-    $keys = array_keys(array_filter($node_settings['options']));
-    $node_settings['options'] = array_combine($keys, $keys);
     $form['name'] = array(
       '#title' => t('Name'),
       '#type' => 'textfield',
@@ -80,21 +114,13 @@ class NodeTypeForm extends EntityForm {
     $form['submission']['title_label'] = array(
       '#title' => t('Title field label'),
       '#type' => 'textfield',
-      '#default_value' => $type->title_label,
+      '#default_value' => $fields['title']->getLabel(),
       '#required' => TRUE,
     );
-    if (!$type->has_title) {
-      // Avoid overwriting a content type that intentionally does not have a
-      // title field.
-      $form['submission']['title_label']['#attributes'] = array('disabled' => 'disabled');
-      $form['submission']['title_label']['#description'] = t('This content type does not have a title field.');
-      $form['submission']['title_label']['#required'] = FALSE;
-    }
-    $form['submission']['preview'] = array(
+    $form['submission']['preview_mode'] = array(
       '#type' => 'radios',
       '#title' => t('Preview before submitting'),
-      '#parents' => array('settings', 'node', 'preview'),
-      '#default_value' => $node_settings['preview'],
+      '#default_value' => $type->getPreviewMode(),
       '#options' => array(
         DRUPAL_DISABLED => t('Disabled'),
         DRUPAL_OPTIONAL => t('Optional'),
@@ -112,10 +138,18 @@ class NodeTypeForm extends EntityForm {
       '#title' => t('Publishing options'),
       '#group' => 'additional_settings',
     );
+    $workflow_options = array(
+      'status' => $node->status->value,
+      'promote' => $node->promote->value,
+      'sticky' => $node->sticky->value,
+      'revision' => $type->isNewRevision(),
+    );
+    // Prepare workflow options to be used for 'checkboxes' form element.
+    $keys = array_keys(array_filter($workflow_options));
+    $workflow_options = array_combine($keys, $keys);
     $form['workflow']['options'] = array('#type' => 'checkboxes',
       '#title' => t('Default options'),
-      '#parents' => array('settings', 'node', 'options'),
-      '#default_value' => $node_settings['options'],
+      '#default_value' => $workflow_options,
       '#options' => array(
         'status' => t('Published'),
         'promote' => t('Promoted to front page'),
@@ -146,11 +180,10 @@ class NodeTypeForm extends EntityForm {
       '#title' => t('Display settings'),
       '#group' => 'additional_settings',
     );
-    $form['display']['submitted'] = array(
+    $form['display']['display_submitted'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Display author and date information.'),
-      '#parents' => array('settings', 'node', 'submitted'),
-      '#default_value' => $node_settings['submitted'],
+      '#title' => t('Display author and date information'),
+      '#default_value' => $type->displaySubmitted(),
       '#description' => t('Author username and publish date will be displayed.'),
     );
     return $form;
@@ -159,7 +192,7 @@ class NodeTypeForm extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  protected function actions(array $form, array &$form_state) {
+  protected function actions(array $form, FormStateInterface $form_state) {
     $actions = parent::actions($form, $form_state);
     $actions['submit']['#value'] = t('Save content type');
     $actions['delete']['#value'] = t('Delete content type');
@@ -169,27 +202,24 @@ class NodeTypeForm extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
-    $id = trim($form_state['values']['type']);
+    $id = trim($form_state->getValue('type'));
     // '0' is invalid, since elsewhere we check it using empty().
     if ($id == '0') {
-      $this->setFormError('type', $form_state, $this->t("Invalid machine-readable name. Enter a name other than %invalid.", array('%invalid' => $id)));
+      $form_state->setErrorByName('type', $this->t("Invalid machine-readable name. Enter a name other than %invalid.", array('%invalid' => $id)));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function save(array $form, array &$form_state) {
+  public function save(array $form, FormStateInterface $form_state) {
     $type = $this->entity;
+    $type->setNewRevision($form_state->getValue(array('options', 'revision')));
     $type->type = trim($type->id());
     $type->name = trim($type->name);
-
-    // title_label is required in core; has_title will always be TRUE, unless a
-    // module alters the title field.
-    $type->has_title = ($type->title_label != '');
 
     $status = $type->save();
 
@@ -200,10 +230,30 @@ class NodeTypeForm extends EntityForm {
     }
     elseif ($status == SAVED_NEW) {
       drupal_set_message(t('The content type %name has been added.', $t_args));
-      watchdog('node', 'Added content type %name.', $t_args, WATCHDOG_NOTICE, l(t('View'), 'admin/structure/types'));
+      $context = array_merge($t_args, array('link' => l(t('View'), 'admin/structure/types')));
+      $this->logger('node')->notice('Added content type %name.', $context);
     }
 
-    $form_state['redirect_route']['route_name'] = 'node.overview_types';
+    $fields = $this->entityManager->getFieldDefinitions('node', $type->id());
+    // Update title field definition.
+    $title_field = $fields['title'];
+    $title_label = $form_state->getValue('title_label');
+    if ($title_field->getLabel() != $title_label) {
+      $title_field->getConfig($type->id())->setLabel($title_label)->save();
+    }
+    // Update workflow options.
+    // @todo Make it possible to get default values without an entity.
+    //   https://www.drupal.org/node/2318187
+    $node = $this->entityManager->getStorage('node')->create(array('type' => $type->id()));
+    foreach (array('status', 'promote', 'sticky')  as $field_name) {
+      $value = (bool) $form_state->getValue(['options', $field_name]);
+      if ($node->$field_name->value != $value) {
+        $fields[$field_name]->getConfig($type->id())->setDefaultValue($value)->save();
+      }
+    }
+
+    $this->entityManager->clearCachedFieldDefinitions();
+    $form_state->setRedirect('node.overview_types');
   }
 
 }

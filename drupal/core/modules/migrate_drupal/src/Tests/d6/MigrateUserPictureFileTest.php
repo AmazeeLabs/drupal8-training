@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests the Drupal 6 user pictures to Drupal 8 migration.
+ * User pictures migration.
+ *
+ * @group migrate_drupal
  */
 class MigrateUserPictureFileTest extends MigrateDrupalTestBase {
 
@@ -25,18 +27,7 @@ class MigrateUserPictureFileTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Migrate user pictures',
-      'description' => 'User pictures migration',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $dumps = array(
       $this->getDumpDirectory() . '/Drupal6User.php',

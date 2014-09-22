@@ -33,27 +33,6 @@ function _update_fetch_data() {
 }
 
 /**
- * Processes a task to fetch available update data for a single project.
- *
- * Once the release history XML data is downloaded, it is parsed and saved in an
- * entry just for that project.
- *
- * @param $project
- *   Associative array of information about the project to fetch data for.
- *
- * @return
- *   TRUE if we fetched parsable XML, otherwise FALSE.
- *
- * @see \Drupal\update\UpdateFetcher::processFetchTask()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
- *   Use \Drupal::service('update.processor')->processFetchTask().
- */
-function _update_process_fetch_task($project) {
-  return \Drupal::service('update.processor')->processFetchTask($project);
-}
-
-/**
  * Clears out all the available update data and initiates re-fetching.
  *
  * @see \Drupal\update\UpdateManager::refreshUpdateData()
@@ -89,7 +68,7 @@ function _update_create_fetch_task($project) {
  * Performs any notifications that should be done once cron fetches new data.
  *
  * This method checks the status of the site using the new data and, depending
- * on the configuration of the site, notifies administrators via e-mail if there
+ * on the configuration of the site, notifies administrators via email if there
  * are new releases or missing security updates.
  *
  * @see update_requirements()
@@ -120,7 +99,7 @@ function _update_cron_notify() {
         }
         $message = drupal_mail('update', 'status_notify', $target, $target_langcode, $params);
         // Track when the last mail was successfully sent to avoid sending
-        // too many e-mails.
+        // too many emails.
         if ($message['result']) {
           \Drupal::state()->set('update.last_email_notification', REQUEST_TIME);
         }

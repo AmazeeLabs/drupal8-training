@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsDisplay.
+ * Contains \Drupal\views\Annotation\ViewsDisplay.
  */
 
 namespace Drupal\views\Annotation;
@@ -12,9 +12,11 @@ use Drupal\views\Annotation\ViewsPluginAnnotationBase;
 /**
  * Defines a Plugin annotation object for views display plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\display\DisplayPluginBase
+ *
+ * @ingroup views_display_plugins
+ *
+ * @Annotation
  */
 class ViewsDisplay extends ViewsPluginAnnotationBase {
 
@@ -69,7 +71,7 @@ class ViewsDisplay extends ViewsPluginAnnotationBase {
    *
    * @var bool
    */
-  public $uses_hook_menu;
+  public $uses_menu_links;
 
   /**
    * Does the display plugin registers routes to the route.

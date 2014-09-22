@@ -12,7 +12,10 @@ use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * File transfer tests.
+ * Tests that the jail is respected and that protocols using recursive file move
+ * operations work.
+ *
+ * @group FileTransfer
  */
 class FileTransferTest extends WebTestBase {
   protected $hostname = 'localhost';
@@ -20,15 +23,7 @@ class FileTransferTest extends WebTestBase {
   protected $password = 'password';
   protected $port = '42';
 
-  public static function getInfo() {
-    return array(
-      'name' => 'FileTransfer unit tests',
-      'description' => 'Test that the jail is respected and that protocols using recursive file move operations work.',
-      'group' => 'System'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->testConnection = TestFileTransfer::factory(DRUPAL_ROOT, array('hostname' => $this->hostname, 'username' => $this->username, 'password' => $this->password, 'port' => $this->port));
   }

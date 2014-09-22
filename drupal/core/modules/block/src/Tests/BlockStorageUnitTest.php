@@ -16,6 +16,8 @@ use Drupal\block\BlockInterface;
 
 /**
  * Tests the storage of blocks.
+ *
+ * @group block
  */
 class BlockStorageUnitTest extends DrupalUnitTestBase {
 
@@ -32,14 +34,6 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
    * @var \Drupal\Core\Config\Entity\ConfigEntityStorageInterface.
    */
   protected $controller;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Block storage',
-      'description' => 'Tests the storage of blocks.',
-      'group' => 'Block'
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -90,15 +84,17 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
 
     // Ensure that default values are filled in.
     $expected_properties = array(
-      'id' => 'test_block',
-      'weight' => NULL,
-      'status' => TRUE,
       'langcode' => \Drupal::languageManager()->getDefaultLanguage()->id,
+      'status' => TRUE,
       'dependencies' => array('module' => array('block_test'), 'theme' => array('stark')),
+      'id' => 'test_block',
       'theme' => 'stark',
       'region' => '-1',
+      'weight' => NULL,
+      'provider' => NULL,
       'plugin' => 'test_html',
       'settings' => array(
+        'visibility' => array(),
         'id' => 'test_html',
         'label' => '',
         'provider' => 'block_test',
@@ -108,8 +104,8 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
           'contexts' => array(),
         ),
       ),
-      'visibility' => NULL,
     );
+
     $this->assertIdentical($actual_properties, $expected_properties);
 
     $this->assertTrue($entity->getPlugin() instanceof TestHtmlBlock, 'The entity has an instance of the correct block plugin.');

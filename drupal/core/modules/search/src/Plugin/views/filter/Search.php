@@ -7,6 +7,7 @@
 
 namespace Drupal\search\Plugin\views\filter;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\filter\FilterPluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
@@ -70,7 +71,7 @@ class Search extends FilterPluginBase {
   /**
    * {@inheritdoc}
    */
-  protected function operatorForm(&$form, &$form_state) {
+  protected function operatorForm(&$form, FormStateInterface $form_state) {
     $form['operator'] = array(
       '#type' => 'radios',
       '#title' => t('On empty input'),
@@ -85,29 +86,29 @@ class Search extends FilterPluginBase {
   /**
    * {@inheritdoc}
    */
-  protected function valueForm(&$form, &$form_state) {
+  protected function valueForm(&$form, FormStateInterface $form_state) {
     $form['value'] = array(
       '#type' => 'textfield',
       '#size' => 15,
       '#default_value' => $this->value,
       '#attributes' => array('title' => $this->t('Search keywords')),
-      '#title' => empty($form_state['exposed']) ? $this->t('Keywords') : '',
+      '#title' => !$form_state->get('exposed') ? $this->t('Keywords') : '',
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function validateExposed(&$form, &$form_state) {
+  public function validateExposed(&$form, FormStateInterface $form_state) {
     if (!isset($this->options['expose']['identifier'])) {
       return;
     }
 
     $key = $this->options['expose']['identifier'];
-    if (!empty($form_state['values'][$key])) {
-      $this->queryParseSearchExpression($form_state['values'][$key]);
+    if (!$form_state->isValueEmpty($key)) {
+      $this->queryParseSearchExpression($form_state->getValue($key));
       if (count($this->searchQuery->words()) == 0) {
-        form_set_error($key, $form_state, format_plural(\Drupal::config('search.settings')->get('index.minimum_word_size'), 'You must include at least one positive keyword with 1 character or more.', 'You must include at least one positive keyword with @count characters or more.'));
+        $form_state->setErrorByName($key, format_plural(\Drupal::config('search.settings')->get('index.minimum_word_size'), 'You must include at least one positive keyword with 1 character or more.', 'You must include at least one positive keyword with @count characters or more.'));
       }
     }
   }
@@ -121,7 +122,7 @@ class Search extends FilterPluginBase {
   protected function queryParseSearchExpression($input) {
     if (!isset($this->searchQuery)) {
       $this->parsed = TRUE;
-      $this->searchQuery = db_select('search_index', 'i', array('target' => 'slave'))->extend('Drupal\search\ViewsSearchQuery');
+      $this->searchQuery = db_select('search_index', 'i', array('target' => 'replica'))->extend('Drupal\search\ViewsSearchQuery');
       $this->searchQuery->searchExpression($input, $this->searchType);
       $this->searchQuery->publicParseSearchExpression();
     }

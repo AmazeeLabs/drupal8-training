@@ -11,24 +11,12 @@ use Drupal\Tests\UnitTestCase;
 use Drupal\Component\Utility\Unicode;
 
 /**
- * Test unicode handling features implemented in Unicode component.
- *
- * @see \Drupal\Component\Utility\Unicode
- *
- * @group Drupal
- * @group Unicode
+ * @coversDefaultClass \Drupal\Component\Utility\Unicode
+ * @group Utility
  */
 class UnicodeTest extends UnitTestCase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Unicode handling',
-      'description' => 'Tests Drupal Unicode handling.',
-      'group' => 'System',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     // Initialize unicode component.
     Unicode::check();
   }
@@ -505,7 +493,7 @@ class UnicodeTest extends UnitTestCase {
    * Provides data to self::testConvertToUtf8().
    *
    * @return array
-   *   An array of arrays, each containg the parameters to
+   *   An array of arrays, each containing the parameters to
    *   self::testConvertUtf8().  }
    */
   public function providerTestConvertToUtf8() {

@@ -10,7 +10,9 @@ namespace Drupal\simpletest\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests missing requirements to run test.
+ * Tests a test case with missing requirements.
+ *
+ * @group simpletest
  */
 class MissingCheckedRequirementsTest extends WebTestBase {
 
@@ -21,15 +23,7 @@ class MissingCheckedRequirementsTest extends WebTestBase {
    */
   public static $modules = array('simpletest');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Broken requirements test',
-      'description' => 'Tests a test case with missing requirements.',
-      'group' => 'SimpleTest',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $admin_user = $this->drupalCreateUser(array('administer unit tests'));
     $this->drupalLogin($admin_user);

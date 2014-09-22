@@ -14,6 +14,9 @@ use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldTypePluginManager;
+use Drupal\Core\Field\FormatterInterface;
+use Drupal\Core\Field\PluginSettingsInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -75,7 +78,7 @@ class DisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, $entity_type_id = NULL, $bundle = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, $entity_type_id = NULL, $bundle = NULL) {
     if ($this->getRequest()->attributes->has('view_mode_name')) {
       $this->mode = $this->getRequest()->attributes->get('view_mode_name');
     }
@@ -86,7 +89,7 @@ class DisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  protected function buildFieldRow(FieldDefinitionInterface $field_definition, EntityDisplayInterface $entity_display, array $form, array &$form_state) {
+  protected function buildFieldRow(FieldDefinitionInterface $field_definition, EntityDisplayInterface $entity_display, array $form, FormStateInterface $form_state) {
     $field_row = parent::buildFieldRow($field_definition, $entity_display, $form, $form_state);
 
     $field_name = $field_definition->getName();
@@ -161,8 +164,8 @@ class DisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  protected function getPluginOptions($field_type) {
-    return parent::getPluginOptions($field_type) + array('hidden' => '- ' . $this->t('Hidden') . ' -');
+  protected function getPluginOptions(FieldDefinitionInterface $field_definition) {
+    return parent::getPluginOptions($field_definition) + array('hidden' => '- ' . $this->t('Hidden') . ' -');
   }
 
   /**
@@ -224,26 +227,33 @@ class DisplayOverview extends DisplayOverviewBase {
       'above' => $this->t('Above'),
       'inline' => $this->t('Inline'),
       'hidden' => '- ' . $this->t('Hidden') . ' -',
+      'visually_hidden' => '- ' . $this->t('Visually Hidden') . ' -',
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function alterSettingsForm(array &$settings_form, $plugin, FieldDefinitionInterface $field_definition, array $form, array &$form_state) {
-    $context = array(
-      'formatter' => $plugin,
-      'field_definition' => $field_definition,
-      'view_mode' => $this->mode,
-      'form' => $form,
-    );
-    $this->moduleHandler->alter('field_formatter_settings_form', $settings_form, $form_state, $context);
+  protected function thirdPartySettingsForm(PluginSettingsInterface $plugin, FieldDefinitionInterface $field_definition, array $form, FormStateInterface $form_state) {
+    $settings_form = array();
+    // Invoke hook_field_formatter_third_party_settings_form(), keying resulting
+    // subforms by module name.
+    foreach ($this->moduleHandler->getImplementations('field_formatter_third_party_settings_form') as $module) {
+      $settings_form[$module] = $this->moduleHandler->invoke($module, 'field_formatter_third_party_settings_form', array(
+        $plugin,
+        $field_definition,
+        $this->mode,
+        $form,
+        $form_state,
+      ));
+    }
+    return $settings_form;
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function alterSettingsSummary(array &$summary, $plugin, FieldDefinitionInterface $field_definition) {
+  protected function alterSettingsSummary(array &$summary, PluginSettingsInterface $plugin, FieldDefinitionInterface $field_definition) {
     $context = array(
       'formatter' => $plugin,
       'field_definition' => $field_definition,

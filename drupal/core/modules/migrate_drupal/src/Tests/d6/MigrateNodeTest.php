@@ -11,25 +11,16 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\Core\Database\Database;
 
 /**
- * Test node migration from Drupal 6 to 8.
+ * Node content migration.
+ *
+ * @group migrate_drupal
  */
 class MigrateNodeTest extends MigrateNodeTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate nodes',
-      'description'  => 'Node content migration',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     /** @var \Drupal\migrate\entity\Migration $migration */
     $migration = entity_load('migration', 'd6_node');
@@ -54,7 +45,7 @@ class MigrateNodeTest extends MigrateNodeTestBase {
     $this->assertEqual($node->getCreatedTime(), 1388271197, 'Node has the correct created time.');
     $this->assertEqual($node->isSticky(), FALSE);
     $this->assertEqual($node->getOwnerId(), 1);
-    //$this->assertEqual($node->getRevisionCreationTime(), 1390095701, 'Node has the correct revision timestamp.');
+    $this->assertEqual($node->getRevisionCreationTime(), 1390095701, 'Node has the correct revision timestamp.');
 
     // It is pointless to run the second half from MigrateDrupal6Test.
     if (empty($this->standalone)) {

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsPager.
+ * Contains \Drupal\views\Annotation\ViewsPager.
  */
 
 namespace Drupal\views\Annotation;
@@ -12,9 +12,11 @@ use Drupal\views\Annotation\ViewsPluginAnnotationBase;
 /**
  * Defines a Plugin annotation object for views pager plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\pager\PagerPluginBase
+ *
+ * @ingroup views_pager_plugins
+ *
+ * @Annotation
  */
 class ViewsPager extends ViewsPluginAnnotationBase {
 

@@ -8,21 +8,14 @@
 namespace Drupal\aggregator\Tests;
 
 /**
- * Tests feed fetching in the Aggregator module.
+ * Tests the fetcher plugins functionality and discoverability.
  *
+ * @group aggregator
  * @see \Drupal\aggregator_test\Plugin\aggregator\fetcher\TestFetcher.
  */
 class FeedFetcherPluginTest extends AggregatorTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Feed fetcher plugins',
-      'description' => 'Test the fetcher plugins functionality and discoverability.',
-      'group' => 'Aggregator',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Enable test plugins.
     $this->enableTestPlugins();

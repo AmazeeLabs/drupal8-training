@@ -7,12 +7,10 @@
 
 namespace Drupal\block;
 
-use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
-use Drupal\Core\Language\Language;
-use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\Core\Form\FormState;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -35,23 +33,13 @@ class BlockForm extends EntityForm {
   protected $storage;
 
   /**
-   * The language manager.
-   *
-   * @var \Drupal\Core\Language\LanguageManagerInterface
-   */
-  protected $languageManager;
-
-  /**
    * Constructs a BlockForm object.
    *
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
-   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
-   *   The language manager.
    */
-  public function __construct(EntityManagerInterface $entity_manager, LanguageManagerInterface $language_manager) {
+  public function __construct(EntityManagerInterface $entity_manager) {
     $this->storage = $entity_manager->getStorage('block');
-    $this->languageManager = $language_manager;
   }
 
   /**
@@ -59,22 +47,21 @@ class BlockForm extends EntityForm {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity.manager'),
-      $container->get('language_manager')
+      $container->get('entity.manager')
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     $entity = $this->entity;
 
     // Store theme settings in $form_state for use below.
     if (!$theme = $entity->get('theme')) {
       $theme = $this->config('system.theme')->get('default');
     }
-    $form_state['block_theme'] = $theme;
+    $form_state->set('block_theme', $theme);
 
     $form['#tree'] = TRUE;
     $form['settings'] = $entity->getPlugin()->buildConfigurationForm(array(), $form_state);
@@ -92,122 +79,6 @@ class BlockForm extends EntityForm {
       ),
       '#required' => TRUE,
       '#disabled' => !$entity->isNew(),
-    );
-
-    // Visibility settings.
-    $form['visibility'] = array(
-      '#type' => 'vertical_tabs',
-      '#title' => $this->t('Visibility settings'),
-      '#attached' => array(
-        'library' => array(
-          'block/drupal.block',
-        ),
-      ),
-      '#tree' => TRUE,
-      '#weight' => 10,
-      '#parents' => array('visibility'),
-    );
-
-    // Per-path visibility.
-    $form['visibility']['path'] = array(
-      '#type' => 'details',
-      '#title' => $this->t('Pages'),
-      '#group' => 'visibility',
-      '#weight' => 0,
-    );
-
-    // @todo remove this access check and inject it in some other way. In fact
-    //   this entire visibility settings section probably needs a separate user
-    //   interface in the near future.
-    $visibility = $entity->get('visibility');
-    $access = $this->currentUser()->hasPermission('use PHP for settings');
-    if (!empty($visibility['path']['visibility']) && $visibility['path']['visibility'] == BLOCK_VISIBILITY_PHP && !$access) {
-      $form['visibility']['path']['visibility'] = array(
-        '#type' => 'value',
-        '#value' => BLOCK_VISIBILITY_PHP,
-      );
-      $form['visibility']['path']['pages'] = array(
-        '#type' => 'value',
-        '#value' => !empty($visibility['path']['pages']) ? $visibility['path']['pages'] : '',
-      );
-    }
-    else {
-      $options = array(
-        BLOCK_VISIBILITY_NOTLISTED => $this->t('All pages except those listed'),
-        BLOCK_VISIBILITY_LISTED => $this->t('Only the listed pages'),
-      );
-      $description = $this->t("Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %user for the current user's page and %user-wildcard for every user page. %front is the front page.", array('%user' => 'user', '%user-wildcard' => 'user/*', '%front' => '<front>'));
-
-      $form['visibility']['path']['visibility'] = array(
-        '#type' => 'radios',
-        '#title' => $this->t('Show block on specific pages'),
-        '#options' => $options,
-        '#default_value' => !empty($visibility['path']['visibility']) ? $visibility['path']['visibility'] : BLOCK_VISIBILITY_NOTLISTED,
-      );
-      $form['visibility']['path']['pages'] = array(
-        '#type' => 'textarea',
-        '#title' => '<span class="visually-hidden">' . $this->t('Pages') . '</span>',
-        '#default_value' => !empty($visibility['path']['pages']) ? $visibility['path']['pages'] : '',
-        '#description' => $description,
-      );
-    }
-
-    // Configure the block visibility per language.
-    if ($this->languageManager->isMultilingual() && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
-      $language_types = $this->languageManager->getLanguageTypes();
-
-      // Fetch languages.
-      $languages = $this->languageManager->getLanguages(Language::STATE_ALL);
-      $langcodes_options = array();
-      foreach ($languages as $language) {
-        // @todo $language->name is not wrapped with t(), it should be replaced
-        //   by CMI translation implementation.
-        $langcodes_options[$language->id] = $language->name;
-      }
-      $form['visibility']['language'] = array(
-        '#type' => 'details',
-        '#title' => $this->t('Languages'),
-        '#group' => 'visibility',
-        '#weight' => 5,
-      );
-      // If there are multiple configurable language types, let the user pick
-      // which one should be applied to this visibility setting. This way users
-      // can limit blocks by interface language or content language for example.
-      $info = $this->languageManager->getDefinedLanguageTypesInfo();
-      $language_type_options = array();
-      foreach ($language_types as $type_key) {
-        $language_type_options[$type_key] = $info[$type_key]['name'];
-      }
-      $form['visibility']['language']['language_type'] = array(
-        '#type' => 'radios',
-        '#title' => $this->t('Language type'),
-        '#options' => $language_type_options,
-        '#default_value' => !empty($visibility['language']['language_type']) ? $visibility['language']['language_type'] : reset($language_types),
-        '#access' => count($language_type_options) > 1,
-      );
-      $form['visibility']['language']['langcodes'] = array(
-        '#type' => 'checkboxes',
-        '#title' => $this->t('Show this block only for specific languages'),
-        '#default_value' => !empty($visibility['language']['langcodes']) ? $visibility['language']['langcodes'] : array(),
-        '#options' => $langcodes_options,
-        '#description' => $this->t('Show this block only for the selected language(s). If you select no languages, the block will be visible in all languages.'),
-      );
-    }
-
-    // Per-role visibility.
-    $role_options = array_map('check_plain', user_role_names());
-    $form['visibility']['role'] = array(
-      '#type' => 'details',
-      '#title' => $this->t('Roles'),
-      '#group' => 'visibility',
-      '#weight' => 10,
-    );
-    $form['visibility']['role']['roles'] = array(
-      '#type' => 'checkboxes',
-      '#title' => $this->t('Show block for specific roles'),
-      '#default_value' => !empty($visibility['role']['roles']) ? $visibility['role']['roles'] : array(),
-      '#options' => $role_options,
-      '#description' => $this->t('Show this block only for the selected role(s). If you select no roles, the block will be visible to all users.'),
     );
 
     // Theme settings.
@@ -230,7 +101,7 @@ class BlockForm extends EntityForm {
         '#title' => t('Theme'),
         '#default_value' => $theme,
         '#ajax' => array(
-          'callback' => array($this, 'themeSwitch'),
+          'callback' => '::themeSwitch',
           'wrapper' => 'edit-block-region-wrapper',
         ),
       );
@@ -256,15 +127,15 @@ class BlockForm extends EntityForm {
   /**
    * Handles switching the available regions based on the selected theme.
    */
-  public function themeSwitch($form, &$form_state) {
-    $form['region']['#options'] = system_region_list($form_state['values']['theme'], REGIONS_VISIBLE);
+  public function themeSwitch($form, FormStateInterface $form_state) {
+    $form['region']['#options'] = system_region_list($form_state->getValue('theme'), REGIONS_VISIBLE);
     return $form['region'];
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function actions(array $form, array &$form_state) {
+  protected function actions(array $form, FormStateInterface $form_state) {
     $actions = parent::actions($form, $form_state);
     $actions['submit']['#value'] = $this->t('Save block');
     return $actions;
@@ -273,69 +144,46 @@ class BlockForm extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
-    // Remove empty lines from the role visibility list.
-    $form_state['values']['visibility']['role']['roles'] = array_filter($form_state['values']['visibility']['role']['roles']);
     // The Block Entity form puts all block plugin form elements in the
     // settings form element, so just pass that to the block for validation.
-    $settings = array(
-      'values' => &$form_state['values']['settings']
-    );
+    $settings = (new FormState())->setValues($form_state->getValue('settings'));
     // Call the plugin validate handler.
     $this->entity->getPlugin()->validateConfigurationForm($form, $settings);
+    // Update the original form values.
+    $form_state->setValue('settings', $settings->getValues());
   }
 
   /**
    * {@inheritdoc}
    */
-  public function submit(array $form, array &$form_state) {
-    parent::submit($form, $form_state);
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    parent::submitForm($form, $form_state);
 
     $entity = $this->entity;
     // The Block Entity form puts all block plugin form elements in the
     // settings form element, so just pass that to the block for submission.
     // @todo Find a way to avoid this manipulation.
-    $settings = array(
-      'values' => &$form_state['values']['settings'],
-      'errors' => $form_state['errors'],
-    );
+    $settings = (new FormState())->setValues($form_state->getValue('settings'));
 
     // Call the plugin submit handler.
     $entity->getPlugin()->submitConfigurationForm($form, $settings);
+    // Update the original form values.
+    $form_state->setValue('settings', $settings->getValues());
 
     // Save the settings of the plugin.
     $entity->save();
 
     drupal_set_message($this->t('The block configuration has been saved.'));
-    // Invalidate the content cache and redirect to the block listing,
-    // because we need to remove cached block contents for each cache backend.
-    Cache::invalidateTags(array('content' => TRUE));
-    $form_state['redirect_route'] = array(
-      'route_name' => 'block.admin_display_theme',
-      'route_parameters' => array(
-        'theme' => $form_state['values']['theme'],
+    $form_state->setRedirect(
+      'block.admin_display_theme',
+      array(
+        'theme' => $form_state->getValue('theme'),
       ),
-      'options' => array(
-        'query' => array('block-placement' => drupal_html_class($this->entity->id()))
-      ),
+      array('query' => array('block-placement' => drupal_html_class($this->entity->id())))
     );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function buildEntity(array $form, array &$form_state) {
-    $entity = parent::buildEntity($form, $form_state);
-
-    // visibility__active_tab is Form API state and not configuration.
-    // @todo Fix vertical tabs.
-    $visibility = $entity->get('visibility');
-    unset($visibility['visibility__active_tab']);
-    $entity->set('visibility', $visibility);
-
-    return $entity;
   }
 
   /**

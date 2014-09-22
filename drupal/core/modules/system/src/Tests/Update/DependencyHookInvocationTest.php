@@ -10,7 +10,10 @@ namespace Drupal\system\Tests\Update;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the invocation of hook_update_dependencies().
+ * Tests that the hook invocation for determining update dependencies works
+ * correctly.
+ *
+ * @group Update
  */
 class DependencyHookInvocationTest extends WebTestBase {
 
@@ -21,15 +24,7 @@ class DependencyHookInvocationTest extends WebTestBase {
    */
   public static $modules = array('update_test_0', 'update_test_1', 'update_test_2');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Update dependency hook invocation',
-      'description' => 'Test that the hook invocation for determining update dependencies works correctly.',
-      'group' => 'Update API',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     require_once DRUPAL_ROOT . '/core/includes/update.inc';
   }

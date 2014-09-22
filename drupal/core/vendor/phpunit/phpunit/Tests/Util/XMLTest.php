@@ -2,7 +2,7 @@
 /**
  * PHPUnit
  *
- * Copyright (c) 2001-2013, Sebastian Bergmann <sebastian@phpunit.de>.
+ * Copyright (c) 2001-2014, Sebastian Bergmann <sebastian@phpunit.de>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@
  * @author     Mike Naberezny <mike@maintainable.com>
  * @author     Derek DeVries <derek@maintainable.com>
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2001-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2001-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://www.phpunit.de/
  * @since      File available since Release 3.3.0
@@ -51,10 +51,11 @@
  * @author     Mike Naberezny <mike@maintainable.com>
  * @author     Derek DeVries <derek@maintainable.com>
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2001-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2001-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://www.phpunit.de/
  * @since      Class available since Release 3.3.0
+ * @covers     PHPUnit_Util_XML
  */
 class Util_XMLTest extends PHPUnit_Framework_TestCase
 {
@@ -72,7 +73,7 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
     {
         $options   = array('testA' => 1, 'testB' => 2);
         $valid     = array('testA', 'testB', 'testC');
-        $expected  = array('testA' => 1, 'testB' => 2, 'testC' => NULL);
+        $expected  = array('testA' => 1, 'testB' => 2, 'testC' => null);
         $validated = PHPUnit_Util_XML::assertValidKeys($options, $valid);
 
         $this->assertEquals($expected, $validated);
@@ -130,7 +131,7 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
 
     public function testConvertAssertSelect()
     {
-        $selector  = 'div#folder.open a[href="http://www.xerox.com"][title="xerox"].selected.big > span';
+        $selector  = 'div#folder.open a[href="http://www.xerox.com"][title="xerox"].selected.big > span + h1';
         $converted = PHPUnit_Util_XML::convertSelectToTag($selector);
         $tag       = array('tag'   => 'div',
                            'id'    => 'folder',
@@ -139,7 +140,8 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
                                                  'class'      => 'selected big',
                                                  'attributes' => array('href'  => 'http://www.xerox.com',
                                                                        'title' => 'xerox'),
-                                                 'child'      => array('tag' => 'span')));
+                                                 'child'      => array('tag' => 'span',
+                                                                       'adjacent-sibling' => array('tag' => 'h1'))));
          $this->assertEquals($tag, $converted);
     }
 
@@ -262,6 +264,15 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($tag, $converted);
     }
 
+    public function testConvertAssertSelectEltAdjacentSibling()
+    {
+        $selector  = 'div + a';
+        $converted = PHPUnit_Util_XML::convertSelectToTag($selector);
+        $tag       = array('tag' => 'div', 'adjacent-sibling' => array('tag' => 'a'));
+
+        $this->assertEquals($tag, $converted);
+    }
+
     public function testConvertAssertSelectEltDescendant()
     {
         $selector  = 'div a';
@@ -284,7 +295,7 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
     public function testConvertAssertSelectTrue()
     {
         $selector  = '#foo';
-        $content   = TRUE;
+        $content   = true;
         $converted = PHPUnit_Util_XML::convertSelectToTag($selector, $content);
         $tag       = array('id' => 'foo');
 
@@ -294,7 +305,7 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
     public function testConvertAssertSelectFalse()
     {
         $selector  = '#foo';
-        $content   = FALSE;
+        $content   = false;
         $converted = PHPUnit_Util_XML::convertSelectToTag($selector, $content);
         $tag       = array('id' => 'foo');
 
@@ -321,8 +332,38 @@ class Util_XMLTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($tag, $converted);
     }
 
-    public function testPrepareStringEscapesChars()
+    /**
+     * @dataProvider charProvider
+     */
+    public function testPrepareString($char)
     {
-        $this->assertEquals('&#x1b;', PHPUnit_Util_XML::prepareString("\033"));
+        $e = null;
+
+        $escapedString = PHPUnit_Util_XML::prepareString($char);
+        $xml = "<?xml version='1.0' encoding='UTF-8' ?><tag>$escapedString</tag>";
+        $dom = new DomDocument('1.0', 'UTF-8');
+
+        try {
+            $dom->loadXML($xml);
+        }
+
+        catch (Exception $e) {
+        }
+
+        $this->assertNull($e, sprintf(
+          'PHPUnit_Util_XML::prepareString("\x%02x") should not crash DomDocument',
+          ord($char)
+        ));
+    }
+
+    public function charProvider()
+    {
+        $data = array();
+
+        for ($i = 0; $i < 256; $i++) {
+            $data[] = array(chr($i));
+        }
+
+        return $data;
     }
 }

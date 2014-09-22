@@ -7,7 +7,7 @@
 
 namespace Drupal\Tests\Core\PathProcessor;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\PathProcessor\PathProcessorAlias;
 use Drupal\Core\PathProcessor\PathProcessorDecode;
 use Drupal\Core\PathProcessor\PathProcessorFront;
@@ -20,24 +20,16 @@ use Symfony\Component\HttpFoundation\Request;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests path processor functionality.
+ * Tests processing of the inbound path.
  *
- * @group PathApi
+ * @group PathProcessor
  */
 class PathProcessorTest extends UnitTestCase {
 
   protected $languages;
   protected $languageManager;
 
-  public static function getInfo() {
-    return array(
-      'name' => t('Path Processor Unit Tests'),
-      'description' => t('Tests processing of the inbound path.'),
-      'group' => t('Path API'),
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
 
     // Set up some languages to be used by the language-based path processor.
     $languages = array();
@@ -78,7 +70,7 @@ class PathProcessorTest extends UnitTestCase {
       ->will($this->returnValue($this->languages));
     $language_manager->expects($this->any())
       ->method('getLanguageTypes')
-      ->will($this->returnValue(array(Language::TYPE_INTERFACE)));
+      ->will($this->returnValue(array(LanguageInterface::TYPE_INTERFACE)));
     $language_manager->expects($this->any())
       ->method('getNegotiationMethods')
       ->will($this->returnValue($method_definitions));

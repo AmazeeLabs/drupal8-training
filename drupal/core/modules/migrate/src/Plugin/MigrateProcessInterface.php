@@ -12,7 +12,14 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate\Row;
 
 /**
- * An interface for migrate processes.
+ * An interface for migrate process plugins.
+ *
+ * @see \Drupal\migrate\Plugin\MigratePluginManager
+ * @see \Drupal\migrate\ProcessPluginBase
+ * @see \Drupal\migrate\Annotation\MigrateProcessPlugin
+ * @see plugin_api
+ *
+ * @ingroup migration
  */
 interface MigrateProcessInterface extends PluginInspectionInterface {
 
@@ -30,6 +37,9 @@ interface MigrateProcessInterface extends PluginInspectionInterface {
    * @param string $destination_property
    *   The destination property currently worked on. This is only used
    *   together with the $row above.
+   *
+   * @return string|array
+   *   The newly transformed value.
    */
   public function transform($value, MigrateExecutable $migrate_executable, Row $row, $destination_property);
 
@@ -42,4 +52,5 @@ interface MigrateProcessInterface extends PluginInspectionInterface {
    *   is an array.
    */
   public function multiple();
+
 }

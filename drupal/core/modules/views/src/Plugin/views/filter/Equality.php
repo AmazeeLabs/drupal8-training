@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Plugin\views\filter;
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Simple filter to handle equal to / not equal to filters
  *
@@ -32,7 +34,7 @@ class Equality extends FilterPluginBase {
   /**
    * Provide a simple textfield for equality
    */
-  protected function valueForm(&$form, &$form_state) {
+  protected function valueForm(&$form, FormStateInterface $form_state) {
     $form['value'] = array(
       '#type' => 'textfield',
       '#title' => t('Value'),
@@ -40,10 +42,12 @@ class Equality extends FilterPluginBase {
       '#default_value' => $this->value,
     );
 
-    if (!empty($form_state['exposed'])) {
+    if ($exposed = $form_state->get('exposed')) {
       $identifier = $this->options['expose']['identifier'];
-      if (!isset($form_state['input'][$identifier])) {
-        $form_state['input'][$identifier] = $this->value;
+      $user_input = $form_state->getUserInput();
+      if (!isset($user_input[$identifier])) {
+        $user_input[$identifier] = $this->value;
+        $form_state->setUserInput($user_input);
       }
     }
   }

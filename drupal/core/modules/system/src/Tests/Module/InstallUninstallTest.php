@@ -8,19 +8,13 @@
 namespace Drupal\system\Tests\Module;
 
 /**
- * Tests functionality for installing and uninstalling modules.
+ * Install/uninstall core module and confirm table creation/deletion.
+ *
+ * @group Module
  */
 class InstallUninstallTest extends ModuleTestBase {
 
   public static $modules = array('system_test', 'dblog');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Install/uninstall modules',
-      'description' => 'Install/uninstall core module and confirm table creation/deletion.',
-      'group' => 'Module',
-    );
-  }
 
   /**
    * Tests that a fixed set of modules can be installed and uninstalled.
@@ -36,6 +30,7 @@ class InstallUninstallTest extends ModuleTestBase {
     $this->assertEqual($this->container->get('state')->get('system_test_preinstall_module'), 'module_test');
     $this->container->get('module_handler')->uninstall(array('module_test'));
     $this->assertEqual($this->container->get('state')->get('system_test_preuninstall_module'), 'module_test');
+    $this->resetAll();
 
     // Try to install and uninstall book, toolbar modules and its dependencies.
     $all_modules = system_rebuild_module_data();

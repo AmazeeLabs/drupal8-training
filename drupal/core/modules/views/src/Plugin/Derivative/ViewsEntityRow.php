@@ -8,7 +8,7 @@
 namespace Drupal\views\Plugin\Derivative;
 
 use Drupal\Core\Entity\EntityManagerInterface;
-use Drupal\Core\Plugin\Discovery\ContainerDerivativeInterface;
+use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\views\ViewsData;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @see \Drupal\views\Plugin\views\row\EntityRow
  */
-class ViewsEntityRow implements ContainerDerivativeInterface {
+class ViewsEntityRow implements ContainerDeriverInterface {
 
   /**
    * Stores all entity row plugin information.
@@ -93,7 +93,7 @@ class ViewsEntityRow implements ContainerDerivativeInterface {
   public function getDerivativeDefinitions($base_plugin_definition) {
     foreach ($this->entityManager->getDefinitions() as $entity_type_id => $entity_type) {
       // Just add support for entity types which have a views integration.
-      if (($base_table = $entity_type->getBaseTable()) && $this->viewsData->get($base_table) && $this->entityManager->hasController($entity_type_id, 'view_builder')) {
+      if (($base_table = $entity_type->getBaseTable()) && $this->viewsData->get($base_table) && $this->entityManager->hasHandler($entity_type_id, 'view_builder')) {
         $this->derivatives[$entity_type_id] = array(
           'id' => 'entity:' . $entity_type_id,
           'provider' => 'views',

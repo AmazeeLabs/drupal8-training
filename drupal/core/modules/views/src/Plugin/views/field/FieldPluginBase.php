@@ -2,39 +2,53 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\field\FieldPluginBase.
+ * Contains \Drupal\views\Plugin\views\field\FieldPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\field;
 
 use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\HandlerBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
 
 /**
- * @defgroup views_field_handlers Views field handlers
+ * @defgroup views_field_handlers Views field handler plugins
  * @{
- * Handlers to tell Views how to build and display fields.
+ * Handler plugins for Views fields.
  *
+ * Field handlers handle both querying and display of fields in views.
+ *
+ * Field handler plugins extend
+ * \Drupal\views\Plugin\views\field\FieldPluginBase. They must be
+ * annotated with \Drupal\views\Annotation\ViewsField annotation, and they
+ * must be in namespace directory Plugin\views\field.
+ *
+ * The following items can go into a hook_views_data() implementation in a
+ * field section to affect how the field handler will behave:
+ * - additional fields: An array of fields that should be added to the query.
+ *   The array is in one of these forms:
+ *   @code
+ *   // Simple form, for fields within the same table.
+ *   array('identifier' => fieldname)
+ *   // Form for fields in a different table.
+ *   array('identifier' => array('table' => tablename, 'field' => fieldname))
+ *   @endcode
+ *   As many fields as are necessary may be in this array.
+ * - click sortable: If TRUE (default), this field may be click sorted.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
  * Base field handler that has no options and renders an unformatted field.
- *
- * Definition terms:
- * - additional fields: An array of fields that should be added to the query
- *                      for some purpose. The array is in the form of:
- *                      array('identifier' => array('table' => tablename,
- *                      'field' => fieldname); as many fields as are necessary
- *                      may be in this array.
- * - click sortable: If TRUE, this field may be click sorted.
- *
- * @ingroup views_field_handlers
  */
 abstract class FieldPluginBase extends HandlerBase {
 
@@ -147,7 +161,7 @@ abstract class FieldPluginBase extends HandlerBase {
           }
 
           if (empty($table_alias)) {
-            debug(t('Handler @handler tried to add additional_field @identifier but @table could not be added!', array('@handler' => $this->definition['handler'], '@identifier' => $identifier, '@table' => $info['table'])));
+            debug(t('Handler @handler tried to add additional_field @identifier but @table could not be added!', array('@handler' => $this->definition['id'], '@identifier' => $identifier, '@table' => $info['table'])));
             $this->aliases[$identifier] = 'broken';
             continue;
           }
@@ -414,7 +428,13 @@ abstract class FieldPluginBase extends HandlerBase {
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['label'] = array('default' => $this->definition['title'], 'translatable' => TRUE);
+    $options['label'] = array('default' => '', 'translatable' => TRUE);
+    // Some styles (for example table) should have labels enabled by default.
+    $style = $this->view->getStyle();
+    if (isset($style) && $style->defaultFieldLabels()) {
+      $options['label']['default'] = $this->definition['title'];
+    }
+
     $options['exclude'] = array('default' => FALSE, 'bool' => TRUE);
     $options['alter'] = array(
       'contains' => array(
@@ -469,8 +489,8 @@ abstract class FieldPluginBase extends HandlerBase {
   /**
    * Performs some cleanup tasks on the options array before saving it.
    */
-  public function submitOptionsForm(&$form, &$form_state) {
-    $options = &$form_state['values']['options'];
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
+    $options = &$form_state->getValue('options');
     $types = array('element_type', 'element_label_type', 'element_wrapper_type');
     $classes = array_combine(array('element_class', 'element_label_class', 'element_wrapper_class'), $types);
 
@@ -496,7 +516,7 @@ abstract class FieldPluginBase extends HandlerBase {
    * Default options form that provides the label widget that all fields
    * should have.
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $label = $this->label();
@@ -850,10 +870,10 @@ abstract class FieldPluginBase extends HandlerBase {
       // Setup the tokens for fields.
       $previous = $this->getPreviousFieldLabels();
       foreach ($previous as $id => $label) {
-        $options[t('Fields')]["[$id]"] = $label;
+        $options[t('Fields')]["[$id]"] = substr(strrchr($label, ":"), 2 );
       }
       // Add the field to the list of options.
-      $options[t('Fields')]["[{$this->options['id']}]"] = $this->label();
+      $options[t('Fields')]["[{$this->options['id']}]"] = substr(strrchr($this->adminLabel(), ":"), 2 );
 
       $count = 0; // This lets us prepare the key as we want it printed.
       foreach ($this->view->display_handler->getHandlers('argument') as $arg => $handler) {
@@ -890,7 +910,7 @@ abstract class FieldPluginBase extends HandlerBase {
       $form['alter']['help'] = array(
         '#type' => 'details',
         '#title' => t('Replacement patterns'),
-        '#value' => $output,
+        '#value' => SafeMarkup::set($output),
         '#states' => array(
           'visible' => array(
             array(
@@ -937,7 +957,7 @@ abstract class FieldPluginBase extends HandlerBase {
 
       $form['alter']['ellipsis'] = array(
         '#type' => 'checkbox',
-        '#title' => t('Add "..." at the end of trimmed text'),
+        '#title' => t('Add "…" at the end of trimmed text'),
         '#default_value' => $this->options['alter']['ellipsis'],
         '#states' => array(
           'visible' => array(
@@ -948,7 +968,7 @@ abstract class FieldPluginBase extends HandlerBase {
 
       $form['alter']['more_link'] = array(
         '#type' => 'checkbox',
-        '#title' => t('Add a read-more link if output is trimmed.'),
+        '#title' => t('Add a read-more link if output is trimmed'),
         '#default_value' => $this->options['alter']['more_link'],
         '#states' => array(
           'visible' => array(
@@ -1172,6 +1192,9 @@ abstract class FieldPluginBase extends HandlerBase {
         $this->last_render = $this->renderText($alter);
       }
     }
+    // @todo Fix this in https://www.drupal.org/node/2280961
+    $this->last_render = SafeMarkup::set($this->last_render);
+
 
     return $this->last_render;
   }
@@ -1342,7 +1365,7 @@ abstract class FieldPluginBase extends HandlerBase {
     }
 
     // Parse the URL and move any query and fragment parameters out of the path.
-    $url = parse_url($path);
+    $url = UrlHelper::parse($path);
 
     // Seriously malformed URLs may return FALSE or empty arrays.
     if (empty($url)) {
@@ -1356,6 +1379,10 @@ abstract class FieldPluginBase extends HandlerBase {
       return $text;
     }
 
+    // If we get to here we have a path from the url parsing. So assign that to
+    // $path now so we don't get query strings or fragments in the path.
+    $path = $url['path'];
+
     // If no scheme is provided in the $path, assign the default 'http://'.
     // This allows a url of 'www.example.com' to be converted to 'http://www.example.com'.
     // Only do this on for external URLs.
@@ -1364,23 +1391,28 @@ abstract class FieldPluginBase extends HandlerBase {
         // There is no scheme, add the default 'http://' to the $path.
         $path = "http://$path";
         // Reset the $url array to include the new scheme.
-        $url = parse_url($path);
+        $url = UrlHelper::parse($path);
       }
     }
 
     if (isset($url['query'])) {
-      $path = strtr($path, array('?' . $url['query'] => ''));
-      $query = array();
-      parse_str($url['query'], $query);
       // Remove query parameters that were assigned a query string replacement
       // token for which there is no value available.
-      foreach ($query as $param => $val) {
+      foreach ($url['query'] as $param => $val) {
         if ($val == '%' . $param) {
-          unset($query[$param]);
+          unset($url['query'][$param]);
+        }
+        // Replace any empty query params from URL parsing with NULL. So the
+        // query will get built correctly with only the param key.
+        // @see \Drupal\Component\Utility\UrlHelper::buildQuery().
+        if ($val === '') {
+          $url['query'][$param] = NULL;
         }
       }
-      $options['query'] = $query;
+
+      $options['query'] = $url['query'];
     }
+
     if (isset($url['fragment'])) {
       $path = strtr($path, array('#' . $url['fragment'] => ''));
       // If the path is empty we want to have a fragment for the current site.
@@ -1646,7 +1678,7 @@ abstract class FieldPluginBase extends HandlerBase {
    *   The alter array of options to use.
    *     - max_length: Maximum length of the string, the rest gets truncated.
    *     - word_boundary: Trim only on a word boundary.
-   *     - ellipsis: Show an ellipsis (...) at the end of the trimmed string.
+   *     - ellipsis: Show an ellipsis (…) at the end of the trimmed string.
    *     - html: Make sure that the html is correct.
    *
    * @param string $value
@@ -1675,8 +1707,7 @@ abstract class FieldPluginBase extends HandlerBase {
       $value = rtrim(preg_replace('/(?:<(?!.+>)|&(?!.+;)).*$/us', '', $value));
 
       if (!empty($alter['ellipsis'])) {
-        // @todo: What about changing this to a real ellipsis?
-        $value .= t('...');
+        $value .= t('…');
       }
     }
     if (!empty($alter['html'])) {

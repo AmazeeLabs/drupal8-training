@@ -187,7 +187,7 @@ system.image_toolkit_settings:
     _form: 'Drupal\system\Form\ImageToolkitForm'
     _title: 'Image toolkit'
   requirements:
-    _permission: 'access administration pages'
+    _permission: 'administer site configuration'
 
 system.site_maintenance_mode:
   path: '/admin/config/development/maintenance'
@@ -220,7 +220,7 @@ system.date_format_add:
   requirements:
     _permission: 'administer site configuration'
 
-system.date_format_edit:
+entity.date_format.edit_form:
   path: '/admin/config/regional/date-time/formats/manage/{date_format}'
   defaults:
     _entity_form: 'date_format.edit'
@@ -228,7 +228,7 @@ system.date_format_edit:
   requirements:
     _entity_access: 'date_format.update'
 
-system.date_format_delete:
+entity.date_format.delete_form:
   path: '/admin/config/regional/date-time/formats/manage/{date_format}/delete'
   defaults:
     _entity_form: 'date_format.delete'
@@ -253,18 +253,18 @@ system.modules_list_confirm:
   requirements:
     _permission: 'administer modules'
 
-system.theme_disable:
-  path: '/admin/appearance/disable'
+system.theme_uninstall:
+  path: '/admin/appearance/uninstall'
   defaults:
-    _controller: 'Drupal\system\Controller\ThemeController::disable'
+    _controller: 'Drupal\system\Controller\ThemeController::uninstall'
   requirements:
     _permission: 'administer themes'
     _csrf_token: 'TRUE'
 
-system.theme_enable:
-  path: '/admin/appearance/enable'
+system.theme_install:
+  path: '/admin/appearance/install'
   defaults:
-    _controller: 'Drupal\system\Controller\ThemeController::enable'
+    _controller: 'Drupal\system\Controller\ThemeController::install'
   requirements:
     _permission: 'administer themes'
     _csrf_token: 'TRUE'
@@ -382,6 +382,7 @@ system.admin_config:
   path: '/admin/config'
   defaults:
     _content: '\Drupal\system\Controller\SystemController::overview'
+    link_id: 'system.admin_config'
     _title: 'Configuration'
   requirements:
     _permission: 'access administration pages'
@@ -406,5 +407,20 @@ system.batch_page.json:
   options:
     _admin_route: TRUE
 
-system.update:
-  path: '/core/update.php'
+system.db_update:
+  path: '/update.php/{op}'
+  defaults:
+    _title: 'Drupal database update'
+    _controller: '\Drupal\system\Controller\DbUpdateController::handle'
+    op: 'info'
+  requirements:
+    _access_system_update: 'TRUE'
+
+system.admin_content:
+  path: '/admin/content'
+  defaults:
+    _content: '\Drupal\system\Controller\SystemController::overview'
+    link_id: 'system.admin_content'
+    _title: 'Content'
+  requirements:
+    _permission: 'access administration pages'

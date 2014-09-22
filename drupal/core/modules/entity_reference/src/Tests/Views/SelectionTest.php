@@ -11,18 +11,12 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests entity reference selection handler.
+ *
+ * @group entity_reference
  */
 class SelectionTest extends WebTestBase {
 
   public static $modules = array('node', 'views', 'entity_reference', 'entity_reference_test', 'entity_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Reference: Selection handler',
-      'description' => 'Tests entity reference selection handler provided by Views.',
-      'group' => 'Views module integration',
-    );
-  }
 
   /**
    * Tests the selection handler.
@@ -39,8 +33,8 @@ class SelectionTest extends WebTestBase {
       $nodes[$node->getType()][$node->id()] = $node->label();
     }
 
-    // Create a field and instance.
-    $field = entity_create('field_config', array(
+    // Create a field.
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'entity_test',
       'translatable' => FALSE,
@@ -50,10 +44,9 @@ class SelectionTest extends WebTestBase {
       'type' => 'entity_reference',
       'cardinality' => '1',
     ));
-    $field->save();
-    $instance = entity_create('field_instance_config', array(
-      'field_name' => 'test_field',
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $field = entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'test_bundle',
       'settings' => array(
         'handler' => 'views',
@@ -67,10 +60,10 @@ class SelectionTest extends WebTestBase {
         ),
       ),
     ));
-    $instance->save();
+    $field->save();
 
     // Get values from selection handler.
-    $handler = $this->container->get('plugin.manager.entity_reference.selection')->getSelectionHandler($instance);
+    $handler = $this->container->get('plugin.manager.entity_reference.selection')->getSelectionHandler($field);
     $result = $handler->getReferenceableEntities();
 
     $success = FALSE;

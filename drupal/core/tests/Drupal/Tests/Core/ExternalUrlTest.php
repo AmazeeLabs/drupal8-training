@@ -14,12 +14,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 
 /**
- * Tests the \Drupal\Core\Url class for external paths.
- *
- * @group Drupal
- * @group Url
- *
  * @coversDefaultClass \Drupal\Core\Url
+ * @group ExternalUrlTest
  */
 class ExternalUrlTest extends UnitTestCase {
 
@@ -47,17 +43,6 @@ class ExternalUrlTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Url object (external)',
-      'description' => 'Tests the \Drupal\Core\Url class with external paths.',
-      'group' => 'Routing',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
 
@@ -68,7 +53,7 @@ class ExternalUrlTest extends UnitTestCase {
 
     $this->router = $this->getMock('Drupal\Tests\Core\Routing\TestRouterInterface');
     $container = new ContainerBuilder();
-    $container->set('router', $this->router);
+    $container->set('router.no_access_checks', $this->router);
     $container->set('url_generator', $this->urlGenerator);
     \Drupal::setContainer($container);
   }
@@ -91,15 +76,10 @@ class ExternalUrlTest extends UnitTestCase {
    *
    * @covers ::createFromRequest()
    *
-   * @expectedException \Drupal\Core\Routing\MatchingRouteNotFoundException
-   * @expectedExceptionMessage No matching route could be found for the request: request_as_a_string
+   * @expectedException \Symfony\Component\Routing\Exception\ResourceNotFoundException
    */
   public function testCreateFromRequest() {
-    // Mock the request in order to override the __toString() method.
-    $request = $this->getMock('Symfony\Component\HttpFoundation\Request');
-    $request->expects($this->once())
-      ->method('__toString')
-      ->will($this->returnValue('request_as_a_string'));
+    $request = Request::create('/test-path');
 
     $this->router->expects($this->once())
       ->method('matchRequest')

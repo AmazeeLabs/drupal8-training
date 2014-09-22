@@ -8,21 +8,15 @@
 namespace Drupal\node\Tests;
 
 /**
- * Tests the node edit functionality.
+ * Create a node and test node edit functionality.
+ *
+ * @group node
  */
 class PageEditTest extends NodeTestBase {
   protected $web_user;
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node edit',
-      'description' => 'Create a node and test node edit functionality.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->web_user = $this->drupalCreateUser(array('edit own page content', 'create page content'));
@@ -39,8 +33,8 @@ class PageEditTest extends NodeTestBase {
     $body_key = 'body[0][value]';
     // Create node to edit.
     $edit = array();
-    $edit[$title_key] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit[$title_key] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
 
     // Check that the node exists in the database.
@@ -62,8 +56,8 @@ class PageEditTest extends NodeTestBase {
 
     // Edit the content of the node.
     $edit = array();
-    $edit[$title_key] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit[$title_key] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     // Stay on the current page, without reloading.
     $this->drupalPostForm(NULL, $edit, t('Save'));
 
@@ -77,8 +71,8 @@ class PageEditTest extends NodeTestBase {
     // Edit the same node, creating a new revision.
     $this->drupalGet("node/" . $node->id() . "/edit");
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit['title[0][value]'] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     $edit['revision'] = TRUE;
     $this->drupalPostForm(NULL, $edit, t('Save and keep published'));
 
@@ -104,8 +98,8 @@ class PageEditTest extends NodeTestBase {
     // Create node to edit.
     $body_key = 'body[0][value]';
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit['title[0][value]'] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     $this->drupalPostForm('node/add/page', $edit, t('Save and publish'));
 
     // Check that the node was authored by the currently logged in user.
@@ -114,21 +108,20 @@ class PageEditTest extends NodeTestBase {
 
     // Try to change the 'authored by' field to an invalid user name.
     $edit = array(
-      'uid' => 'invalid-name',
+      'uid[0][target_id]' => 'invalid-name',
     );
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save and keep published'));
-    $this->assertText('The username invalid-name does not exist.');
+    $this->assertRaw(t('There are no entities matching "%name".', array('%name' => 'invalid-name')));
 
-    // Change the authored by field to an empty string, which should assign
-    // authorship to the anonymous user (uid 0).
-    $edit['uid'] = '';
+    // Change the authored by field to the anonymous user (uid 0).
+    $edit['uid[0][target_id]'] = 'Anonymous (0)';
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save and keep published'));
     $node = node_load($node->id(), TRUE);
     $this->assertIdentical($node->getOwnerId(), '0', 'Node authored by anonymous user.');
 
     // Change the authored by field to another user's name (that is not
     // logged in).
-    $edit['uid'] = $this->web_user->getUsername();
+    $edit['uid[0][target_id]'] = $this->web_user->getUsername();
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save and keep published'));
     $node = node_load($node->id(), TRUE);
     $this->assertIdentical($node->getOwnerId(), $this->web_user->id(), 'Node authored by normal user.');
@@ -136,6 +129,6 @@ class PageEditTest extends NodeTestBase {
     // Check that normal users cannot change the authored by information.
     $this->drupalLogin($this->web_user);
     $this->drupalGet('node/' . $node->id() . '/edit');
-    $this->assertNoFieldByName('uid');
+    $this->assertNoFieldByName('uid[0][target_id]');
   }
 }

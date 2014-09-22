@@ -8,6 +8,7 @@
 namespace Drupal\Core\Entity\Display;
 
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Provides a common interface for entity form displays.
@@ -23,14 +24,15 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    * larger form.
    *
    * By default, submitted field values appear at the top-level of
-   * $form_state['values']. A different location within $form_state['values']
-   * can be specified by setting the '#parents' property on the incoming $form
-   * parameter. Because of name clashes, two instances of the same field cannot
-   * appear within the same $form element, or within the same '#parents' space.
+   * $form_state->getValues(). A different location within
+   * $form_state->getValues() can be specified by setting the '#parents'
+   * property on the incoming $form parameter. Because of name clashes, two
+   * instances of the same field cannot appear within the same $form element, or
+   * within the same '#parents' space.
    *
    * Sample resulting structure in $form:
    * @code
-   *   '#parents' => The location of field values in $form_state['values'],
+   *   '#parents' => The location of field values in $form_state->getValues(),
    *   '#entity_type' => The name of the entity type,
    *   '#bundle' => The name of the bundle,
    *   // One sub-array per field appearing in the entity, keyed by field name.
@@ -44,43 +46,35 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    *       FALSE if not.
    *     'widget' => array(
    *       '#field_name' => The name of the field,
-   *       '#language' => $langcode,
+   *       '#title' => The label of the field,
+   *       '#description' => The description text for the field,
+   *       '#required' => Whether or not the field is required,
    *       '#field_parents' => The 'parents' space for the field in the form,
    *          equal to the #parents property of the $form parameter received by
    *          this method,
-   *       '#required' => Whether or not the field is required,
-   *       '#title' => The label of the field instance,
-   *       '#description' => The description text for the field instance,
    *
-   *       // Only for 'single' widgets:
+   *       // For 'multiple-value' widgets, the remaining elements in the
+   *       // sub-array depend on the widget.
+   *
+   *       // For 'single-value' widgets:
    *       '#theme' => 'field_multiple_value_form',
    *       '#cardinality' => The field cardinality,
    *       '#cardinality_multiple => TRUE if the field can contain multiple
    *         items, FALSE otherwise.
    *       // One sub-array per copy of the widget, keyed by delta.
    *       0 => array(
-   *         '#entity_type' => The name of the entity type,
-   *         '#bundle' => The name of the bundle,
-   *         '#field_name' => The name of the field,
-   *         '#field_parents' => The 'parents' space for the field in the form,
-   *            equal to the #parents property of the $form parameter,
    *         '#title' => The title to be displayed by the widget,
-   *         '#default_value' => The field value for delta 0,
+   *         '#description' => The description text for the field,
    *         '#required' => Whether the widget should be marked required,
    *         '#delta' => 0,
+   *         '#weight' => 0,
+   *         '#field_parents' => Same as above,
    *         // The remaining elements in the sub-array depend on the widget.
-   *         '#type' => The type of the widget,
    *         ...
    *       ),
    *       1 => array(
    *         ...
    *       ),
-   *
-   *       // Only for multiple widgets:
-   *       '#entity_type' => The name of the entity type,
-   *       '#bundle' => $instance['bundle'],
-   *       // The remaining elements in the sub-array depend on the widget.
-   *       '#type' => The type of the widget,
    *       ...
    *     ),
    *     ...
@@ -89,7 +83,8 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    * @endcode
    *
    * Additionally, some processing data is placed in $form_state, and can be
-   * accessed by field_form_get_state() and field_form_set_state().
+   * accessed by \Drupal\Core\Field\WidgetBaseInterface::getWidgetState() and
+   * \Drupal\Core\Field\WidgetBaseInterface::setWidgetState().
    *
    * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity.
@@ -97,13 +92,13 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    *   The form structure to fill in. This can be a full form structure, or a
    *   sub-element of a larger form. The #parents property can be set to
    *   control the location of submitted field values within
-   *   $form_state['values']. If not specified, $form['#parents'] is set to an
-   *   empty array, which results in field values located at the top-level of
-   *   $form_state['values'].
-   * @param array $form_state
+   *   $form_state->getValues(). If not specified, $form['#parents'] is set to
+   *   an empty array, which results in field values located at the top-level of
+   *   $form_state->getValues().
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The form state.
    */
-  public function buildForm(ContentEntityInterface $entity, array &$form, array &$form_state);
+  public function buildForm(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state);
 
   /**
    * Validates submitted widget values and sets the corresponding form errors.
@@ -129,10 +124,10 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    * @param array $form
    *   The form structure where field elements are attached to. This might be a
    *   full form structure, or a sub-element of a larger form.
-   * @param array $form_state
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The form state.
    */
-  public function validateFormValues(ContentEntityInterface $entity, array &$form, array &$form_state);
+  public function validateFormValues(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state);
 
   /**
    * Extracts field values from the submitted widget values into the entity.
@@ -145,15 +140,15 @@ interface EntityFormDisplayInterface extends EntityDisplayInterface {
    * @param array $form
    *   The form structure where field elements are attached to. This might be a
    *   full form structure, or a sub-element of a larger form.
-   * @param array $form_state
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The form state.
    *
    * @return array
    *   An array whose keys and values are the keys of the top-level entries in
-   *   $form_state['values'] that have been processed. The remaining entries, if
-   *   any, do not correspond to widgets and should be extracted manually by
+   *   $form_state->getValues() that have been processed. The remaining entries,
+   *   if any, do not correspond to widgets and should be extracted manually by
    *   the caller if needed.
    */
-  public function extractFormValues(ContentEntityInterface $entity, array &$form, array &$form_state);
+  public function extractFormValues(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state);
 
 }

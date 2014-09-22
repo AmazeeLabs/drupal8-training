@@ -1,7 +1,9 @@
 services:
   forum_manager:
     class: Drupal\forum\ForumManager
-    arguments: ['@config.factory', '@entity.manager', '@database', '@string_translation']
+    arguments: ['@config.factory', '@entity.manager', '@database', '@string_translation', '@comment.manager']
+    tags:
+      - { name: backend_overridable }
   forum.breadcrumb.node:
     class: Drupal\forum\Breadcrumb\ForumNodeBreadcrumbBuilder
     arguments: ['@entity.manager', '@config.factory', '@forum_manager']
@@ -12,3 +14,8 @@ services:
     arguments: ['@entity.manager', '@config.factory', '@forum_manager']
     tags:
       - { name: breadcrumb_builder, priority: 1001 }
+  forum.index_storage:
+    class: Drupal\forum\ForumIndexStorage
+    arguments: ['@database', '@forum_manager']
+    tags:
+      - { name: backend_overridable }

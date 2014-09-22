@@ -8,20 +8,14 @@
 namespace Drupal\system\Tests\System;
 
 use Drupal\Core\Site\Settings;
-use Drupal\simpletest\UnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests the drupal_rewrite_settings() function.
+ *
+ * @group system
  */
-class SettingsRewriteTest extends UnitTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'drupal_rewrite_settings()',
-      'description' => 'Tests the drupal_rewrite_settings() function.',
-      'group' => 'System',
-    );
-  }
-
+class SettingsRewriteTest extends KernelTestBase {
   /**
    * Tests the drupal_rewrite_settings() function.
    */

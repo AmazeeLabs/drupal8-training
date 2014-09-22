@@ -4,7 +4,11 @@
  * @file
  * Install, update, and uninstall functions for the Forum module.
  */
+
+use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\comment\CommentManagerInterface;
 
 /**
  * Implements hook_install().
@@ -21,8 +25,8 @@ function forum_install() {
     // Create the 'taxonomy_forums' field if it doesn't already exist. If forum
     // is being enabled at the same time as taxonomy after both modules have been
     // enabled, the field might exist but still be marked inactive.
-    if (!FieldConfig::loadByName('node', 'taxonomy_forums')) {
-      entity_create('field_config', array(
+    if (!FieldStorageConfig::loadByName('node', 'taxonomy_forums')) {
+      entity_create('field_storage_config', array(
         'name' => 'taxonomy_forums',
         'entity_type' => 'node',
         'type' => 'taxonomy_term_reference',
@@ -47,7 +51,7 @@ function forum_install() {
       $term->save();
 
       // Create the instance on the bundle.
-      entity_create('field_instance_config', array(
+      entity_create('field_config', array(
         'field_name' => 'taxonomy_forums',
         'entity_type' => 'node',
         'label' => 'Forums',
@@ -78,13 +82,27 @@ function forum_install() {
         ->save();
     }
     // Add the comment field to the forum node type.
-    $fields = entity_load_multiple_by_properties('field_config', array(
+    $field_storages = entity_load_multiple_by_properties('field_storage_config', array(
       'type' => 'comment',
       'name' => 'comment_forum',
       'include_deleted' => FALSE,
     ));
-    if (empty($fields)) {
-      Drupal::service('comment.manager')->addDefaultField('node', 'forum', 'comment_forum');
+    if (empty($field_storages)) {
+      Drupal::service('comment.manager')->addDefaultField('node', 'forum', 'comment_forum', CommentItemInterface::OPEN, 'comment_forum');
+
+      // Add here because we don't have param in addDefaultField function.
+      $field = FieldConfig::loadByName('node', 'forum', 'comment_forum');
+      $field->settings['default_mode'] = CommentManagerInterface::COMMENT_MODE_FLAT;
+      $field->save();
+
+      // Hide label for comment field.
+      entity_get_display('node', 'forum', 'default')
+        ->setComponent('comment_forum', array(
+          'label' => 'hidden',
+          'type' => 'comment_default',
+          'weight' => 20,
+        ))
+        ->save();
     }
   }
 }
@@ -93,23 +111,20 @@ function forum_install() {
  * Implements hook_uninstall().
  */
 function forum_uninstall() {
-  if ($field = FieldConfig::loadByName('node', 'taxonomy_forums')) {
-    $field->delete();
+  if ($field_storage = FieldStorageConfig::loadByName('node', 'taxonomy_forums')) {
+    $field_storage->delete();
   }
 
-  if ($field = FieldConfig::loadByName('node', 'comment_forum')) {
-    $field->delete();
+  if ($field_storage = FieldStorageConfig::loadByName('node', 'comment_forum')) {
+    $field_storage->delete();
   }
 
-  if ($field = FieldConfig::loadByName('taxonomy_term', 'forum_container')) {
-    $field->delete();
+  if ($field_storage = FieldStorageConfig::loadByName('taxonomy_term', 'forum_container')) {
+    $field_storage->delete();
   }
 
   // Purge field data now to allow taxonomy and options module to be uninstalled
-  // if this is the only field remaining. We need to run it twice because
-  // field_purge_batch() will not remove the instance and the field in the same
-  // pass.
-  field_purge_batch(10);
+  // if this is the only field remaining.
   field_purge_batch(10);
   // Allow to delete a forum's node type.
   $locked = \Drupal::state()->get('node.type.locked');

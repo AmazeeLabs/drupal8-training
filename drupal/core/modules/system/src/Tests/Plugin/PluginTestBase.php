@@ -7,7 +7,8 @@
 
 namespace Drupal\system\Tests\Plugin;
 
-use Drupal\simpletest\UnitTestBase;
+use Drupal\Core\Plugin\Context\ContextDefinition;
+use Drupal\simpletest\KernelTestBase;
 use Drupal\plugin_test\Plugin\TestPluginManager;
 use Drupal\plugin_test\Plugin\MockBlockManager;
 use Drupal\plugin_test\Plugin\DefaultsTestPluginManager;
@@ -17,7 +18,15 @@ use Drupal\Core\Extension\ModuleHandler;
 /**
  * Base class for Plugin API unit tests.
  */
-abstract class PluginTestBase extends UnitTestBase {
+abstract class PluginTestBase extends KernelTestBase {
+
+  /**
+   * Modules to enable.
+   *
+   * @var array
+   */
+  public static $modules = array('plugin_test');
+
   protected $testPluginManager;
   protected $testPluginExpectedDefinitions;
   protected $mockBlockManager;
@@ -25,7 +34,7 @@ abstract class PluginTestBase extends UnitTestBase {
   protected $defaultsTestPluginManager;
   protected $defaultsTestPluginExpectedDefinitions;
 
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Real modules implementing plugin types may expose a module-specific API
@@ -82,22 +91,26 @@ abstract class PluginTestBase extends UnitTestBase {
         'label' => 'User name',
         'class' => 'Drupal\plugin_test\Plugin\plugin_test\mock_block\MockUserNameBlock',
         'context' => array(
-          'user' => array('class' => 'Drupal\user\UserInterface')
+          'user' => new ContextDefinition('entity:user', 'User'),
+        ),
+      ),
+      'user_name_optional' => array(
+        'label' => 'User name optional',
+        'class' => 'Drupal\plugin_test\Plugin\plugin_test\mock_block\MockUserNameBlock',
+        'context' => array(
+          'user' => new ContextDefinition('entity:user', 'User', FALSE),
         ),
       ),
       'string_context' => array(
         'label' => 'String typed data',
         'class' => 'Drupal\plugin_test\Plugin\plugin_test\mock_block\TypedDataStringBlock',
-        'context' => array(
-          'string' => array('type' => 'string'),
-        ),
       ),
       'complex_context' => array(
         'label' => 'Complex context',
         'class' => 'Drupal\plugin_test\Plugin\plugin_test\mock_block\MockComplexContextBlock',
         'context' => array(
-          'user' => array('class' => 'Drupal\user\UserInterface'),
-          'node' => array('class' => 'Drupal\node\NodeInterface'),
+          'user' => new ContextDefinition('entity:user', 'User'),
+          'node' => new ContextDefinition('entity:node', 'Node'),
         ),
       ),
     );

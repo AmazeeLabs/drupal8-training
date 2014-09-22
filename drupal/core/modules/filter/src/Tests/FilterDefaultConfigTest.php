@@ -11,26 +11,21 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests text format default configuration.
+ *
+ * @group filter
  */
 class FilterDefaultConfigTest extends DrupalUnitTestBase {
 
   public static $modules = array('system', 'user', 'filter', 'filter_test', 'entity');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Default configuration',
-      'description' => 'Tests text format default configuration.',
-      'group' => 'Filter',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    // filter_permission() calls into url() to output a link in the description.
+    // Drupal\filter\FilterPermissions::permissions() calls into url() to output
+    // a link in the description.
     $this->installSchema('system', 'url_alias');
 
-    $this->installSchema('user', array('users_roles'));
+    $this->installEntitySchema('user');
 
     // Install filter_test module, which ships with custom default format.
     $this->installConfig(array('user', 'filter_test'));
@@ -49,7 +44,6 @@ class FilterDefaultConfigTest extends DrupalUnitTestBase {
 
     // Verify that format default property values have been added/injected.
     $this->assertTrue($format->uuid());
-    $this->assertEqual($format->get('cache'), 1);
 
     // Verify that the loaded format does not contain any roles.
     $this->assertEqual($format->get('roles'), NULL);

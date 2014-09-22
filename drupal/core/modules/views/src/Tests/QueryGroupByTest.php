@@ -11,6 +11,8 @@ use Drupal\views\Views;
 
 /**
  * Tests aggregate functionality of views, for example count.
+ *
+ * @group views
  */
 class QueryGroupByTest extends ViewUnitTestBase {
 
@@ -31,17 +33,9 @@ class QueryGroupByTest extends ViewUnitTestBase {
   /**
    * The storage for the test entity type.
    *
-   * @var \Drupal\Core\Entity\ContentEntityDatabaseStorage
+   * @var \Drupal\Core\Entity\Sql\SqlContentEntityStorage
    */
   public $storage;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Groupby',
-      'description' => 'Tests aggregate functionality of views, for example count.',
-      'group' => 'Views',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -49,7 +43,8 @@ class QueryGroupByTest extends ViewUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('entity_test', array('entity_test'));
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('entity_test');
 
     $this->storage = $this->container->get('entity.manager')->getStorage('entity_test');
   }

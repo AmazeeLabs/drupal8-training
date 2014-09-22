@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\Path;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Provides a class for CRUD operations on path aliases.
@@ -33,8 +33,10 @@ interface AliasStorageInterface {
    *   - alias (string): The URL alias.
    *   - pid (int): Unique path alias identifier.
    *   - langcode (string): The language code of the alias.
+   *   - original: For updates, an array with source, alias and langcode with
+   *     the previous values.
    */
-  public function save($source, $alias, $langcode = Language::LANGCODE_NOT_SPECIFIED, $pid = NULL);
+  public function save($source, $alias, $langcode = LanguageInterface::LANGCODE_NOT_SPECIFIED, $pid = NULL);
 
   /**
    * Fetches a specific URL alias from the database.

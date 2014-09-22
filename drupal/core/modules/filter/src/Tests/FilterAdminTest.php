@@ -7,11 +7,13 @@
 
 namespace Drupal\filter\Tests;
 
+use Drupal\Component\Utility\String;
 use Drupal\simpletest\WebTestBase;
-use Drupal\filter\Plugin\FilterInterface;
 
 /**
- * Tests the administrative functionality of the Filter module.
+ * Thoroughly test the administrative interface of the filter module.
+ *
+ * @group filter
  */
 class FilterAdminTest extends WebTestBase {
 
@@ -23,18 +25,7 @@ class FilterAdminTest extends WebTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Filter administration functionality',
-      'description' => 'Thoroughly test the administrative interface of the filter module.',
-      'group' => 'Filter',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
@@ -107,8 +98,8 @@ class FilterAdminTest extends WebTestBase {
     // Add text format.
     $this->drupalGet('admin/config/content/formats');
     $this->clickLink('Add text format');
-    $format_id = drupal_strtolower($this->randomName());
-    $name = $this->randomName();
+    $format_id = drupal_strtolower($this->randomMachineName());
+    $name = $this->randomMachineName();
     $edit = array(
       'format' => $format_id,
       'name' => $name,
@@ -240,8 +231,8 @@ class FilterAdminTest extends WebTestBase {
 
     // Add format.
     $edit = array();
-    $edit['format'] = drupal_strtolower($this->randomName());
-    $edit['name'] = $this->randomName();
+    $edit['format'] = drupal_strtolower($this->randomMachineName());
+    $edit['name'] = $this->randomMachineName();
     $edit['roles[' . DRUPAL_AUTHENTICATED_RID . ']'] = 1;
     $edit['filters[' . $second_filter . '][status]'] = TRUE;
     $edit['filters[' . $first_filter . '][status]'] = TRUE;
@@ -278,12 +269,12 @@ class FilterAdminTest extends WebTestBase {
     $this->assertRaw('<option value="' . $full . '">Full HTML</option>', 'Full HTML filter accessible.');
 
     // Use basic HTML and see if it removes tags that are not allowed.
-    $body = '<em>' . $this->randomName() . '</em>';
+    $body = '<em>' . $this->randomMachineName() . '</em>';
     $extra_text = 'text';
     $text = $body . '<random>' . $extra_text . '</random>';
 
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName();
+    $edit['title[0][value]'] = $this->randomMachineName();
     $edit['body[0][value]'] = $text;
     $edit['body[0][format]'] = $basic;
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
@@ -305,7 +296,7 @@ class FilterAdminTest extends WebTestBase {
     $edit['body[0][format]'] = $plain;
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
     $this->drupalGet('node/' . $node->id());
-    $this->assertText(check_plain($text), 'The "Plain text" text format escapes all HTML tags.');
+    $this->assertText(String::checkPlain($text), 'The "Plain text" text format escapes all HTML tags.');
     \Drupal::config('filter.settings')
       ->set('always_show_fallback_choice', FALSE)
       ->save();
@@ -348,79 +339,10 @@ class FilterAdminTest extends WebTestBase {
   function testUrlFilterAdmin() {
     // The form does not save with an invalid filter URL length.
     $edit = array(
-      'filters[filter_url][settings][filter_url_length]' => $this->randomName(4),
+      'filters[filter_url][settings][filter_url_length]' => $this->randomMachineName(4),
     );
     $this->drupalPostForm('admin/config/content/formats/manage/basic_html', $edit, t('Save configuration'));
     $this->assertNoRaw(t('The text format %format has been updated.', array('%format' => 'Basic HTML')));
-  }
-
-  /**
-   * Tests that changing filter properties clears the filter cache.
-   */
-  public function testFilterAdminClearsFilterCache() {
-    $restricted = 'restricted_html';
-    $original_markup = '<h4>Small headers</h4> small headers are <em>allowed</em> in restricted html by default';
-
-    // Check that the filter cache is empty for the test markup.
-    $cid = $this->computeFilterCacheId($original_markup, $restricted, '', TRUE);
-    $this->assertFalse(\Drupal::cache('filter')->get($cid));
-
-    // Check that the filter cache gets populated when check_markup is called.
-    $actual_markup = check_markup($original_markup, $restricted, '', TRUE);
-    $this->assertTrue(\Drupal::cache('filter')->get($cid));
-    $this->assertIdentical(strpos($actual_markup, '<h4>'), 0, 'The h4 tag is present in the resulting markup');
-
-    // Edit the restricted filter format.
-    $edit = array();
-    $edit['filters[filter_html][settings][allowed_html]'] = '<a> <em> <strong> <cite> <code>';
-    $this->drupalPostForm('admin/config/content/formats/manage/' . $restricted, $edit, t('Save configuration'));
-    $this->assertUrl('admin/config/content/formats');
-    $this->drupalGet('admin/config/content/formats/manage/' . $restricted);
-    $this->assertFieldByName('filters[filter_html][settings][allowed_html]', $edit['filters[filter_html][settings][allowed_html]'], 'Allowed HTML tag added.');
-
-    // Check that the filter cache is empty after the format was changed.
-    $this->assertFalse(\Drupal::cache('filter')->get($cid));
-
-    // Check that after changind the filter, the changes are reflected in the
-    // filtered markup.
-    $actual_markup = check_markup($original_markup, $restricted, '', TRUE);
-    $this->assertIdentical(strpos($actual_markup, '<h4>'), FALSE, 'The h4 tag is not present in the resulting markup');
-  }
-
-
-  /**
-   * Computes the cache-key for the given text just like check_markup().
-   *
-   * Note that this is copied over from check_markup().
-   *
-   * @return string|NULL
-   *   The cache-key used to store the text in the filter cache.
-   */
-  protected function computeFilterCacheId($text, $format_id = NULL, $langcode = '', $cache = FALSE, $filter_types_to_skip = array()) {
-    if (!isset($format_id)) {
-      $format_id = filter_fallback_format();
-    }
-    // If the requested text format does not exist, the text cannot be filtered.
-    if (!$format = entity_load('filter_format', $format_id)) {
-      return;
-    }
-
-    // Prevent FilterInterface::TYPE_HTML_RESTRICTOR from being skipped.
-    if (in_array(FilterInterface::TYPE_HTML_RESTRICTOR, $filter_types_to_skip)) {
-      $filter_types_to_skip = array_diff($filter_types_to_skip, array(FilterInterface::TYPE_HTML_RESTRICTOR));
-    }
-
-    // When certain filters should be skipped, don't perform caching.
-    if ($filter_types_to_skip) {
-      $cache = FALSE;
-    }
-
-    // Compute the cache key if the text is cacheable.
-    $cache = $cache && !empty($format->cache);
-    $cache_id = '';
-    if ($cache) {
-      return $format->format . ':' . $langcode . ':' . hash('sha256', $text);
-    }
   }
 
 }

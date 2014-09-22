@@ -7,13 +7,14 @@
 
 namespace Drupal\user\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\simpletest\DrupalUnitTestBase;
 use Drupal\user\Entity\User;
 
 /**
  * Tests the user entity class.
  *
+ * @group user
  * @see \Drupal\user\Entity\User
  */
 class UserEntityTest extends DrupalUnitTestBase {
@@ -24,14 +25,6 @@ class UserEntityTest extends DrupalUnitTestBase {
    * @var array
    */
   public static $modules = array('system', 'user', 'field', 'entity');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User entity tests',
-      'description' => 'Tests the user entity class.',
-      'group' => 'User'
-    );
-  }
 
   /**
    * Tests some of the methods.
@@ -46,7 +39,7 @@ class UserEntityTest extends DrupalUnitTestBase {
     $role_storage->create(array('id' => 'test_role_two'))->save();
     $role_storage->create(array('id' => 'test_role_three'))->save();
 
-    $values = array('roles' => array(Language::LANGCODE_DEFAULT => array('test_role_one')));
+    $values = array('roles' => array(LanguageInterface::LANGCODE_DEFAULT => array('test_role_one')));
     $user = new User($values, 'user');
 
     $this->assertTrue($user->hasRole('test_role_one'));

@@ -4,27 +4,27 @@
  * Utilizes jquery.intrinsic.js to calculate if the tabs are larger than their
  * container and toggles the 'is-horizontal' class.
  *
- * This also supports collapsible navigable is the 'is-collasible' class is
+ * This also supports collapsible navigable is the 'is-collapsible' class is
  * added to the main element, and a target element is included.
  */
 (function ($, Drupal) {
 
   "use strict";
 
-  function init (i, tab) {
+  function init(i, tab) {
     var $tab = $(tab);
     var $target = $tab.find('[data-drupal-nav-tabs-target]');
     var isCollapsible = $tab.hasClass('is-collapsible');
 
-    function openMenu (e) {
+    function openMenu(e) {
       $target.toggleClass('is-open');
     }
 
-    function handleResize (e) {
+    function handleResize(e) {
       $tab.addClass('is-horizontal');
       var isHorizontal = $tab.parent().width() > $tab.intrinsic('width');
       $tab.toggleClass('is-horizontal', isHorizontal);
-      if(isCollapsible) {
+      if (isCollapsible) {
         $tab.toggleClass('is-collapse-enabled', !isHorizontal);
       }
       if (isHorizontal) {

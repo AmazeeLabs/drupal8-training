@@ -9,6 +9,7 @@ namespace Drupal\Core\Entity;
 
 use Drupal\Core\Form\ConfirmFormHelper;
 use Drupal\Core\Form\ConfirmFormInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -56,7 +57,7 @@ abstract class EntityConfirmFormBase extends EntityForm implements ConfirmFormIn
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildForm($form, $form_state);
 
     $form['#title'] = $this->getQuestion();
@@ -75,14 +76,41 @@ abstract class EntityConfirmFormBase extends EntityForm implements ConfirmFormIn
   /**
    * {@inheritdoc}
    */
-  protected function actions(array $form, array &$form_state) {
-    $actions = parent::actions($form, $form_state);
-    $actions['submit']['#value'] = $this->getConfirmText();
-    unset($actions['delete']);
-
-    // Prepare cancel link.
-    $actions['cancel'] = ConfirmFormHelper::buildCancelLink($this, $this->getRequest());
-    return $actions;
+  protected function actions(array $form, FormStateInterface $form_state) {
+    return array(
+      'submit' => array(
+        '#type' => 'submit',
+        '#value' => $this->getConfirmText(),
+        '#validate' => array(
+          array($this, 'validate'),
+        ),
+        '#submit' => array(
+          array($this, 'submitForm'),
+        ),
+      ),
+      'cancel' => ConfirmFormHelper::buildCancelLink($this, $this->getRequest()),
+    );
   }
+
+  /**
+   * {@inheritdoc}
+   *
+   * The save() method is not used in EntityConfirmFormBase. This overrides the
+   * default implementation that saves the entity.
+   *
+   * Confirmation forms should override submitForm() instead for their logic.
+   */
+  public function save(array $form, FormStateInterface $form_state) {}
+
+  /**
+   * {@inheritdoc}
+   *
+   * The delete() method is not used in EntityConfirmFormBase. This overrides
+   * the default implementation that redirects to the delete-form confirmation
+   * form.
+   *
+   * Confirmation forms should override submitForm() instead for their logic.
+   */
+  public function delete(array $form, FormStateInterface $form_state) {}
 
 }

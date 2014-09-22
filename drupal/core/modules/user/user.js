@@ -25,7 +25,7 @@
 
         // If the password strength indicator is enabled, add its markup.
         if (settings.password.showStrengthIndicator) {
-          var passwordMeter = '<div class="password-strength"><div class="password-strength-text" aria-live="assertive"></div><div class="password-strength-title">' + translate.strengthTitle + '</div><div class="password-indicator"><div class="indicator"></div></div></div>';
+          var passwordMeter = '<div class="password-strength"><div class="password-strength__meter"><div class="password-strength__indicator"></div></div><div class="password-strength__title">' + translate.strengthTitle + ' </div><div class="password-strength__text" aria-live="assertive"></div></div>';
           confirmInput.parent().after('<div class="password-suggestions description"></div>');
           innerWrapper.append(passwordMeter);
           var passwordDescription = outerWrapper.find('div.password-suggestions').hide();
@@ -56,12 +56,13 @@
             passwordDescription.toggle(result.strength !== 100);
 
             // Adjust the length of the strength indicator.
-            innerWrapper.find('.indicator')
+            innerWrapper.find('.password-strength__indicator')
               .css('width', result.strength + '%')
-              .css('background-color', result.indicatorColor);
+              .removeClass('is-weak is-fair is-good is-strong')
+              .addClass(result.indicatorClass);
 
             // Update the strength indication text.
-            innerWrapper.find('.password-strength-text').html(result.indicatorText);
+            innerWrapper.find('.password-strength__text').html(result.indicatorText);
           }
 
           // Check the value in the confirm input and show results.
@@ -87,7 +88,7 @@
    * Returns the estimated strength and the relevant output message.
    */
   Drupal.evaluatePasswordStrength = function (password, translate) {
-    var indicatorText, indicatorColor, weaknesses = 0, strength = 100, msg = [];
+    var indicatorText, indicatorClass, weaknesses = 0, strength = 100, msg = [];
 
     var hasLowercase = /[a-z]+/.test(password);
     var hasUppercase = /[A-Z]+/.test(password);
@@ -152,43 +153,25 @@
     // Based on the strength, work out what text should be shown by the password strength meter.
     if (strength < 60) {
       indicatorText = translate.weak;
-      indicatorColor = '#bb5555';
-    } else if (strength < 70) {
+      indicatorClass = 'is-weak';
+    }
+    else if (strength < 70) {
       indicatorText = translate.fair;
-      indicatorColor = '#bbbb55';
-    } else if (strength < 80) {
+      indicatorClass = 'is-fair';
+    }
+    else if (strength < 80) {
       indicatorText = translate.good;
-      indicatorColor = '#4863a0';
-    } else if (strength <= 100) {
+      indicatorClass = 'is-good';
+    }
+    else if (strength <= 100) {
       indicatorText = translate.strong;
-      indicatorColor = '#47c965';
+      indicatorClass = 'is-strong';
     }
 
     // Assemble the final message.
     msg = translate.hasWeaknesses + '<ul><li>' + msg.join('</li><li>') + '</li></ul>';
-    return { strength: strength, message: msg, indicatorText: indicatorText, indicatorColor: indicatorColor };
+    return { strength: strength, message: msg, indicatorText: indicatorText, indicatorClass: indicatorClass };
 
-  };
-
-  /**
-   * Field instance settings screen: force the 'Display on registration form'
-   * checkbox checked whenever 'Required' is checked.
-   */
-  Drupal.behaviors.fieldUserRegistration = {
-    attach: function (context, settings) {
-      var $checkbox = $('form#field-ui-field-edit-form input#edit-instance-settings-user-register-form');
-
-      if ($checkbox.length) {
-        $(context).find('input#edit-instance-required').once('user-register-form-checkbox', function () {
-          $(this).on('change', function (e) {
-            if ($(this).prop('checked')) {
-              $checkbox.prop('checked', true);
-            }
-          });
-        });
-
-      }
-    }
   };
 
 })(jQuery);

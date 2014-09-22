@@ -8,7 +8,9 @@
 namespace Drupal\system\Tests\Ajax;
 
 /**
- * Tests use of dialogs as wrappers for Ajax responses.
+ * Performs tests on opening and manipulating dialogs via AJAX commands.
+ *
+ * @group Ajax
  */
 class DialogTest extends AjaxTestBase {
 
@@ -18,17 +20,6 @@ class DialogTest extends AjaxTestBase {
    * @var array
    */
   public static $modules = array('ajax_test', 'ajax_forms_test', 'contact');
-
-  /**
-   * Declares test info.
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'AJAX dialogs commands',
-      'description' => 'Performs tests on opening and manipulating dialogs via AJAX commands.',
-      'group' => 'AJAX',
-    );
-  }
 
   /**
    * Test sending non-JS and AJAX requests to open and manipulate modals.
@@ -66,7 +57,7 @@ class DialogTest extends AjaxTestBase {
       'settings' => NULL,
       'dialogOptions' => array(
         'modal' => TRUE,
-        'title' => 'Add category',
+        'title' => 'Add contact form',
       ),
     );
     $normal_expected_response = array(
@@ -145,7 +136,7 @@ class DialogTest extends AjaxTestBase {
     // Check that CSS and JavaScript are "added" to the page dynamically.
     $this->assertTrue(in_array('jquery.ui.dialog.css', array_keys($ajax_result[0]['settings']['ajaxPageState']['css'])), 'jQuery UI dialog CSS added to the page.');
     $this->assertTrue(in_array('core/assets/vendor/jquery.ui/ui/jquery.ui.dialog.js', array_keys($ajax_result[0]['settings']['ajaxPageState']['js'])), 'jQuery UI dialog JS added to the page.');
-    $this->assertTrue(in_array('core/misc/dialog.ajax.js', array_keys($ajax_result[0]['settings']['ajaxPageState']['js'])), 'Drupal dialog JS added to the page.');
+    $this->assertTrue(in_array('core/misc/dialog/dialog.ajax.js', array_keys($ajax_result[0]['settings']['ajaxPageState']['js'])), 'Drupal dialog JS added to the page.');
 
     // Check that the response matches the expected value.
     $this->assertEqual($modal_expected_response, $ajax_result[3], 'POST request modal dialog JSON response matches.');
@@ -174,7 +165,7 @@ class DialogTest extends AjaxTestBase {
     $this->drupalGet('admin/structure/contact/add');
     // Check we get a chunk of the code, we can't test the whole form as form
     // build id and token with be different.
-    $form = $this->xpath("//form[@id='contact-category-add-form']");
+    $form = $this->xpath("//form[@id='contact-form-add-form']");
     $this->assertTrue(!empty($form), 'Non-JS entity form page present.');
 
     // Emulate going to the JS version of the form and check the JSON response.
@@ -182,7 +173,7 @@ class DialogTest extends AjaxTestBase {
     $this->drupalSetContent($ajax_result[1]['data']);
     // Remove the data, the form build id and token will never match.
     unset($ajax_result[1]['data']);
-    $form = $this->xpath("//form[@id='contact-category-add-form']");
+    $form = $this->xpath("//form[@id='contact-form-add-form']");
     $this->assertTrue(!empty($form), 'Modal dialog JSON contains entity form.');
     $this->assertEqual($entity_form_expected_response, $ajax_result[1]);
   }

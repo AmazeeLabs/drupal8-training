@@ -11,6 +11,8 @@ use Drupal\Core\Database\Connection;
 
 /**
  * Default queue implementation.
+ *
+ * @ingroup queue
  */
 class DatabaseQueue implements ReliableQueueInterface {
 
@@ -29,7 +31,7 @@ class DatabaseQueue implements ReliableQueueInterface {
   protected $connection;
 
   /**
-   * Constructs this factory object.
+   * Constructs a \Drupal\Core\Queue\DatabaseQueue object.
    *
    * @param string $name
    *   The name of the queue.

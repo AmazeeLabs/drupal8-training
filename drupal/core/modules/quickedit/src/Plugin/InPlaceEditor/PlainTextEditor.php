@@ -21,19 +21,16 @@ class PlainTextEditor extends InPlaceEditorBase {
 
   /**
    * {@inheritdoc}
-   *
-   * @todo The processed text logic is too coupled to text fields. Figure out
-   *   how to generalize to other textual field types.
    */
   public function isCompatible(FieldItemListInterface $items) {
     $field_definition = $items->getFieldDefinition();
 
     // This editor is incompatible with multivalued fields.
-    if ($field_definition->getCardinality() != 1) {
+    if ($field_definition->getFieldStorageDefinition()->getCardinality() != 1) {
       return FALSE;
     }
-    // This editor is incompatible with processed ("rich") text fields.
-    elseif ($field_definition->getSetting('text_processing')) {
+    // This editor is incompatible with formatted ("rich") text fields.
+    elseif (in_array($field_definition->getType(), array('text', 'text_long', 'text_with_summary'), TRUE)) {
       return FALSE;
     }
     else {

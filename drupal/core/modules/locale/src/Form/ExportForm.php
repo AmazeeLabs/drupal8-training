@@ -9,7 +9,8 @@ namespace Drupal\locale\Form;
 
 use Drupal\Component\Gettext\PoStreamWriter;
 use Drupal\Core\Form\FormBase;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\locale\PoDatabaseReader;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -56,7 +57,7 @@ class ExportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $languages = $this->languageManager->getLanguages();
     $language_options = array();
     foreach ($languages as $langcode => $language) {
@@ -69,7 +70,7 @@ class ExportForm extends FormBase {
     if (empty($language_options)) {
       $form['langcode'] = array(
         '#type' => 'value',
-        '#value' => Language::LANGCODE_SYSTEM,
+        '#value' => LanguageInterface::LANGCODE_SYSTEM,
       );
       $form['langcode_text'] = array(
         '#type' => 'item',
@@ -84,7 +85,7 @@ class ExportForm extends FormBase {
         '#options' => $language_options,
         '#default_value' => $language_default->id,
         '#empty_option' => $this->t('Source text only, no translations'),
-        '#empty_value' => Language::LANGCODE_SYSTEM,
+        '#empty_value' => LanguageInterface::LANGCODE_SYSTEM,
       );
       $form['content_options'] = array(
         '#type' => 'details',
@@ -93,7 +94,7 @@ class ExportForm extends FormBase {
         '#tree' => TRUE,
         '#states' => array(
           'invisible' => array(
-            ':input[name="langcode"]' => array('value' => Language::LANGCODE_SYSTEM),
+            ':input[name="langcode"]' => array('value' => LanguageInterface::LANGCODE_SYSTEM),
           ),
         ),
       );
@@ -115,11 +116,11 @@ class ExportForm extends FormBase {
     }
 
     $form['actions'] = array(
-      '#type' => 'actions'
+      '#type' => 'actions',
     );
     $form['actions']['submit'] = array(
       '#type' => 'submit',
-      '#value' => $this->t('Export')
+      '#value' => $this->t('Export'),
     );
     return $form;
   }
@@ -127,23 +128,23 @@ class ExportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     // If template is required, language code is not given.
-    if ($form_state['values']['langcode'] != Language::LANGCODE_SYSTEM) {
-      $language = $this->languageManager->getLanguage($form_state['values']['langcode']);
+    if ($form_state->getValue('langcode') != LanguageInterface::LANGCODE_SYSTEM) {
+      $language = $this->languageManager->getLanguage($form_state->getValue('langcode'));
     }
     else {
       $language = NULL;
     }
-    $content_options = isset($form_state['values']['content_options']) ? $form_state['values']['content_options'] : array();
+    $content_options = $form_state->getValue('content_options', array());
     $reader = new PoDatabaseReader();
-    $languageName = '';
+    $language_name = '';
     if ($language != NULL) {
       $reader->setLangcode($language->id);
       $reader->setOptions($content_options);
       $languages = $this->languageManager->getLanguages();
-      $languageName = isset($languages[$language->id]) ? $languages[$language->id]->name : '';
-      $filename = $language->id .'.po';
+      $language_name = isset($languages[$language->id]) ? $languages[$language->id]->name : '';
+      $filename = $language->id . '.po';
     }
     else {
       // Template required.
@@ -155,9 +156,9 @@ class ExportForm extends FormBase {
       $uri = tempnam('temporary://', 'po_');
       $header = $reader->getHeader();
       $header->setProjectName($this->config('system.site')->get('name'));
-      $header->setLanguageName($languageName);
+      $header->setLanguageName($language_name);
 
-      $writer = new PoStreamWriter;
+      $writer = new PoStreamWriter();
       $writer->setUri($uri);
       $writer->setHeader($header);
 
@@ -168,7 +169,7 @@ class ExportForm extends FormBase {
 
       $response = new BinaryFileResponse($uri);
       $response->setContentDisposition('attachment', $filename);
-      $form_state['response'] = $response;
+      $form_state->setResponse($response);
     }
     else {
       drupal_set_message($this->t('Nothing to export.'));

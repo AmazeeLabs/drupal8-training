@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Contains \Drupal\Tests\Core\Logger\LoggerChannelFactoryTest
+ * Contains \Drupal\Tests\Core\Logger\LoggerChannelFactoryTest.
  */
 
-namespace Drupal\Tests\Logger;
+namespace Drupal\Tests\Core\Logger;
 
 use Drupal\Core\Logger\LoggerChannelFactory;
 use Drupal\Core\Session\AccountInterface;
@@ -31,23 +31,10 @@ if (!defined('WATCHDOG_ERROR')) {
 }
 
 /**
- * Tests the logger channel factory.
- *
- * @see \Drupal\Core\Logger\LoggerChannelFactory
  * @coversDefaultClass \Drupal\Core\Logger\LoggerChannelFactory
- *
- * @group Drupal
  * @group Logger
  */
 class LoggerChannelFactoryTest extends UnitTestCase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Logger channel factory',
-      'description' => 'Unit tests for the logger channel factory object.',
-      'group' => 'Logger',
-    );
-  }
 
   /**
    * Tests LoggerChannelFactory::get().
@@ -60,7 +47,7 @@ class LoggerChannelFactoryTest extends UnitTestCase {
 
     // Ensure that when called with the same argument, always the same instance
     // will be returned.
-    $this->assertEquals($factory->get('test'), $factory->get('test'));
+    $this->assertSame($factory->get('test'), $factory->get('test'));
   }
 
 }

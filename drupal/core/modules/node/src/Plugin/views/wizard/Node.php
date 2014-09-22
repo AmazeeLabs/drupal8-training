@@ -7,6 +7,7 @@
 
 namespace Drupal\node\Plugin\views\wizard;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\wizard\WizardPluginBase;
 
 /**
@@ -86,12 +87,12 @@ class Node extends WizardPluginBase {
    *
    * @param array $form
    *   The full wizard form array.
-   * @param array $form_state
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The current state of the wizard form.
    * @param string $type
    *   The display ID (e.g. 'page' or 'block').
    */
-  protected function buildFormStyle(array &$form, array &$form_state, $type) {
+  protected function buildFormStyle(array &$form, FormStateInterface $form_state, $type) {
     parent::buildFormStyle($form, $form_state, $type);
     $style_form =& $form['displays'][$type]['options']['style'];
     // Some style plugins don't support row plugins so stop here if that's the
@@ -156,20 +157,21 @@ class Node extends WizardPluginBase {
   /**
    * Overrides Drupal\views\Plugin\views\wizard\WizardPluginBase::defaultDisplayFiltersUser().
    */
-  protected function defaultDisplayFiltersUser(array $form, array &$form_state) {
+  protected function defaultDisplayFiltersUser(array $form, FormStateInterface $form_state) {
     $filters = parent::defaultDisplayFiltersUser($form, $form_state);
 
-    if (!empty($form_state['values']['show']['tagged_with']['tids'])) {
+    $tids = $form_state->getValue(array('show', 'tagged_with', 'tids'));
+    if (!empty($tids)) {
       $filters['tid'] = array(
         'id' => 'tid',
         'table' => 'taxonomy_index',
         'field' => 'tid',
-        'value' => $form_state['values']['show']['tagged_with']['tids'],
-        'vocabulary' => $form_state['values']['show']['tagged_with']['vocabulary'],
+        'value' => $tids,
+        'vocabulary' => $form_state->getValue(array('show', 'tagged_with', 'vocabulary')),
       );
       // If the user entered more than one valid term in the autocomplete
       // field, they probably intended both of them to be applied.
-      if (count($form_state['values']['show']['tagged_with']['tids']) > 1) {
+      if (count($tids) > 1) {
         $filters['tid']['operator'] = 'and';
         // Sort the terms so the filter will be displayed as it normally would
         // on the edit screen.
@@ -183,10 +185,10 @@ class Node extends WizardPluginBase {
   /**
    * {@inheritdoc}
    */
-  protected function pageDisplayOptions(array $form, array &$form_state) {
+  protected function pageDisplayOptions(array $form, FormStateInterface $form_state) {
     $display_options = parent::pageDisplayOptions($form, $form_state);
-    $row_plugin = isset($form_state['values']['page']['style']['row_plugin']) ? $form_state['values']['page']['style']['row_plugin'] : NULL;
-    $row_options = isset($form_state['values']['page']['style']['row_options']) ? $form_state['values']['page']['style']['row_options'] : array();
+    $row_plugin = $form_state->getValue(array('page', 'style', 'row_plugin'));
+    $row_options = $form_state->getValue(array('page', 'style', 'row_options'), array());
     $this->display_options_row($display_options, $row_plugin, $row_options);
     return $display_options;
   }
@@ -194,10 +196,10 @@ class Node extends WizardPluginBase {
   /**
    * {@inheritdoc}
    */
-  protected function blockDisplayOptions(array $form, array &$form_state) {
+  protected function blockDisplayOptions(array $form, FormStateInterface $form_state) {
     $display_options = parent::blockDisplayOptions($form, $form_state);
-    $row_plugin = isset($form_state['values']['block']['style']['row_plugin']) ? $form_state['values']['block']['style']['row_plugin'] : NULL;
-    $row_options = isset($form_state['values']['block']['style']['row_options']) ? $form_state['values']['block']['style']['row_options'] : array();
+    $row_plugin = $form_state->getValue(array('block', 'style', 'row_plugin'));
+    $row_options = $form_state->getValue(array('block', 'style', 'row_options'), array());
     $this->display_options_row($display_options, $row_plugin, $row_options);
     return $display_options;
   }
@@ -233,7 +235,7 @@ class Node extends WizardPluginBase {
    *
    * Add some options for filter by taxonomy terms.
    */
-  protected function buildFilters(&$form, &$form_state) {
+  protected function buildFilters(&$form, FormStateInterface $form_state) {
     parent::buildFilters($form, $form_state);
 
     $selected_bundle = static::getSelected($form_state, array('show', 'type'), 'all', $form['displays']['show']['type']);
@@ -241,11 +243,12 @@ class Node extends WizardPluginBase {
     // Add the "tagged with" filter to the view.
 
     // We construct this filter using taxonomy_index.tid (which limits the
-    // filtering to a specific vocabulary) rather than taxonomy_term_data.name
-    // (which matches terms in any vocabulary). This is because it is a more
-    // commonly-used filter that works better with the autocomplete UI, and
-    // also to avoid confusion with other vocabularies on the site that may
-    // have terms with the same name but are not used for free tagging.
+    // filtering to a specific vocabulary) rather than
+    // taxonomy_term_field_data.name (which matches terms in any vocabulary).
+    // This is because it is a more commonly-used filter that works better with
+    // the autocomplete UI, and also to avoid confusion with other vocabularies
+    // on the site that may have terms with the same name but are not used for
+    // free tagging.
 
     // The downside is that if there *is* more than one vocabulary on the site
     // that is used for free tagging, the wizard will only be able to make the
@@ -268,7 +271,7 @@ class Node extends WizardPluginBase {
       $taxonomy_fields = array_filter(\Drupal::entityManager()->getFieldDefinitions($this->entityTypeId, $bundle), function ($field_definition) {
         return $field_definition->getType() == 'taxonomy_term_reference';
       });
-      foreach ($taxonomy_fields as $field_name => $instance) {
+      foreach ($taxonomy_fields as $field_name => $field) {
         $widget = $display->getComponent($field_name);
         // We define "tag-like" taxonomy fields as ones that use the
         // "Autocomplete term widget (tagging)" widget.

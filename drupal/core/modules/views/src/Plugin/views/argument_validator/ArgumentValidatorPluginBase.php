@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\argument_validator\ArgumentValidatorPluginBase.
+ * Contains \Drupal\views\Plugin\views\argument_validator\ArgumentValidatorPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\argument_validator;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\argument\ArgumentPluginBase;
 use Drupal\views\Plugin\views\PluginBase;
@@ -14,7 +15,23 @@ use Drupal\views\Plugin\views\PluginBase;
 /**
  * @defgroup views_argument_validate_plugins Views argument validate plugins
  * @{
- * Allow specialized methods of validating arguments.
+ * Plugins for validating views contextual filters.
+ *
+ * Views argument validator plugins validate arguments (contextual filters) on
+ * views. They can ensure arguments are valid, and even do transformations on
+ * the arguments. They can also provide replacement patterns for the view title.
+ * For example, the 'content' validator verifies verifies that the argument
+ * value corresponds to a node, loads that node, and provides the node title
+ * as a replacement pattern for the view title.
+ *
+ * Argument validator plugins extend
+ * \Drupal\views\Plugin\views\argument_validator\ArgumentValidatorPluginBase.
+ * They must be annotated with
+ * \Drupal\views\Annotation\ViewsArgumentValidator annotation, and they
+ * must be in namespace directory Plugin\views\argument_validator.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
@@ -48,17 +65,17 @@ abstract class ArgumentValidatorPluginBase extends PluginBase {
   /**
    * Provide the default form for setting options.
    */
-  public function buildOptionsForm(&$form, &$form_state) { }
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * Provide the default form form for validating options
    */
-  public function validateOptionsForm(&$form, &$form_state) { }
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * Provide the default form form for submitting options
    */
-  public function submitOptionsForm(&$form, &$form_state, &$options = array()) { }
+  public function submitOptionsForm(&$form, FormStateInterface $form_state, &$options = array()) { }
 
   /**
    * Determine if the administrator has the privileges to use this plugin

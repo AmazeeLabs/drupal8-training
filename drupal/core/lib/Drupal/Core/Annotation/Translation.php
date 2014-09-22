@@ -8,12 +8,13 @@
 namespace Drupal\Core\Annotation;
 
 use Drupal\Component\Annotation\AnnotationBase;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslationWrapper;
 
 /**
- * @defgroup plugin_translatable Translatable plugin metadata
- *
+ * @defgroup plugin_translatable Annotation for translatable text
  * @{
+ * Describes how to put translatable UI text into annotations.
+ *
  * When providing plugin annotation, properties whose values are displayed in
  * the user interface should be made translatable. Much the same as how user
  * interface text elsewhere is wrapped in t() to make it translatable, in plugin
@@ -36,6 +37,9 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
  * @endcode
  * Other t() arguments like language code are not valid to pass in. Only
  * context is supported.
+ *
+ * @see i18n
+ * @see annotation
  * @}
  */
 
@@ -47,17 +51,16 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
  * specified, a context for that string. The string (with optional context)
  * is passed into t().
  *
- * @Annotation
- *
  * @ingroup plugin_translatable
+ *
+ * @Annotation
  */
 class Translation extends AnnotationBase {
-  use StringTranslationTrait;
 
   /**
-   * The translation of the value passed to the constructor of the class.
+   * The string translation object.
    *
-   * @var string
+   * @var \Drupal\Core\StringTranslation\TranslationWrapper
    */
   protected $translation;
 
@@ -83,11 +86,11 @@ class Translation extends AnnotationBase {
         'context' => $values['context'],
       );
     }
-    $this->translation = $this->t($string, $arguments, $options);
+    $this->translation = new TranslationWrapper($string, $arguments, $options);
   }
 
   /**
-   * Implements Drupal\Core\Annotation\AnnotationInterface::get().
+   * {@inheritdoc}
    */
   public function get() {
     return $this->translation;

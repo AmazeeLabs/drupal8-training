@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\System;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests custom access denied functionality.
+ * Tests page access denied functionality, including custom 403 pages.
+ *
+ * @group system
  */
 class AccessDeniedTest extends WebTestBase {
 
@@ -23,15 +25,7 @@ class AccessDeniedTest extends WebTestBase {
 
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => '403 functionality',
-      'description' => 'Tests page access denied functionality, including custom 403 pages.',
-      'group' => 'System'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create an administrative user.

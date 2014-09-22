@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsArgumentValidator.
+ * Contains \Drupal\views\Annotation\ViewsArgumentValidator.
  */
 
 namespace Drupal\views\Annotation;
@@ -12,9 +12,11 @@ use Drupal\views\Annotation\ViewsPluginAnnotationBase;
 /**
  * Defines a Plugin annotation object for views argument default plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\argument_validator\ArgumentValidatorPluginBase
+ *
+ * @ingroup views_argument_validate_plugins
+ *
+ * @Annotation
  */
 class ViewsArgumentValidator extends ViewsPluginAnnotationBase {
 

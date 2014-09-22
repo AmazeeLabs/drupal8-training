@@ -34,11 +34,11 @@ services:
       - { name: encoder, format: xml }
   serializer.entity_resolver:
     class: Drupal\serialization\EntityResolver\ChainEntityResolver
-    arguments: [{  }]
   serializer.entity_resolver.uuid:
     class: Drupal\serialization\EntityResolver\UuidResolver
     tags:
       - { name: entity_resolver}
+    arguments: ['@entity.manager']
   serialization.entity_resolver.target_id:
     class: Drupal\serialization\EntityResolver\TargetIdResolver
     tags:

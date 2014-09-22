@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\argument;
 
 use Drupal\Component\Utility\String as UtilityString;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -17,12 +18,23 @@ use Drupal\views\Views;
 
 /**
  * @defgroup views_argument_handlers Views argument handlers
- * Handlers to tell Views how to contextually filter queries.
  * @{
+ * Handler plugins for Views contextual filters.
+ *
+ * Handler plugins help build the view query object. Views argument handlers
+ * are for contextual filtering.
+ *
+ * Views argument handlers extend
+ * \Drupal\views\Plugin\views\argument\ArgumentPluginBase. They must be
+ * annotated with \Drupal\views\Annotation\ViewsArgument annotation, and they
+ * must be in namespace directory Plugin\views\argument.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
- * Base class for arguments.
+ * Base class for argument (contextual filter) handler plugins.
  *
  * The basic argument works for very simple arguments such as nid and uid
  *
@@ -42,8 +54,6 @@ use Drupal\views\Views;
  *                  and may disappear or change.
  * - numeric: If set to TRUE this field is numeric and will use %d instead of
  *            %s in queries.
- *
- * @ingroup views_argument_handlers
  */
 abstract class ArgumentPluginBase extends HandlerBase {
 
@@ -141,7 +151,7 @@ abstract class ArgumentPluginBase extends HandlerBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $argument_text = $this->view->display_handler->getArgumentText();
@@ -334,75 +344,76 @@ abstract class ArgumentPluginBase extends HandlerBase {
     );
   }
 
-  public function validateOptionsForm(&$form, &$form_state) {
-    if (empty($form_state['values']['options'])) {
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) {
+    $option_values = &$form_state->getValue('options');
+    if (empty($option_values)) {
       return;
     }
 
     // Let the plugins do validation.
-    $default_id = $form_state['values']['options']['default_argument_type'];
+    $default_id = $option_values['default_argument_type'];
     $plugin = $this->getPlugin('argument_default', $default_id);
     if ($plugin) {
-      $plugin->validateOptionsForm($form['argument_default'][$default_id], $form_state, $form_state['values']['options']['argument_default'][$default_id]);
+      $plugin->validateOptionsForm($form['argument_default'][$default_id], $form_state, $option_values['argument_default'][$default_id]);
     }
 
     // summary plugin
-    $summary_id = $form_state['values']['options']['summary']['format'];
+    $summary_id = $option_values['summary']['format'];
     $plugin = $this->getPlugin('style', $summary_id);
     if ($plugin) {
-      $plugin->validateOptionsForm($form['summary']['options'][$summary_id], $form_state, $form_state['values']['options']['summary']['options'][$summary_id]);
+      $plugin->validateOptionsForm($form['summary']['options'][$summary_id], $form_state, $option_values['summary']['options'][$summary_id]);
     }
 
-    $sanitized_id = $form_state['values']['options']['validate']['type'];
+    $sanitized_id = $option_values['validate']['type'];
     // Correct ID for js sanitized version.
     $validate_id = static::decodeValidatorId($sanitized_id);
     $plugin = $this->getPlugin('argument_validator', $validate_id);
     if ($plugin) {
-      $plugin->validateOptionsForm($form['validate']['options'][$default_id], $form_state, $form_state['values']['options']['validate']['options'][$sanitized_id]);
+      $plugin->validateOptionsForm($form['validate']['options'][$default_id], $form_state, $option_values['validate']['options'][$sanitized_id]);
     }
 
   }
 
-  public function submitOptionsForm(&$form, &$form_state) {
-    if (empty($form_state['values']['options'])) {
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
+    $option_values = &$form_state->getValue('options');
+    if (empty($option_values)) {
       return;
     }
 
     // Let the plugins make submit modifications if necessary.
-    $default_id = $form_state['values']['options']['default_argument_type'];
+    $default_id = $option_values['default_argument_type'];
     $plugin = $this->getPlugin('argument_default', $default_id);
     if ($plugin) {
-      $options = &$form_state['values']['options']['argument_default'][$default_id];
+      $options = &$option_values['argument_default'][$default_id];
       $plugin->submitOptionsForm($form['argument_default'][$default_id], $form_state, $options);
       // Copy the now submitted options to their final resting place so they get saved.
-      $form_state['values']['options']['default_argument_options'] = $options;
+      $option_values['default_argument_options'] = $options;
     }
 
     // summary plugin
-    $summary_id = $form_state['values']['options']['summary']['format'];
+    $summary_id = $option_values['summary']['format'];
     $plugin = $this->getPlugin('style', $summary_id);
     if ($plugin) {
-      $options = &$form_state['values']['options']['summary']['options'][$summary_id];
+      $options = &$option_values['summary']['options'][$summary_id];
       $plugin->submitOptionsForm($form['summary']['options'][$summary_id], $form_state, $options);
       // Copy the now submitted options to their final resting place so they get saved.
-      $form_state['values']['options']['summary_options'] = $options;
+      $option_values['summary_options'] = $options;
     }
 
-    $sanitized_id = $form_state['values']['options']['validate']['type'];
+    $sanitized_id = $option_values['validate']['type'];
     // Correct ID for js sanitized version.
-    $form_state['values']['options']['validate']['type'] = $validate_id = static::decodeValidatorId($sanitized_id);
+    $option_values['validate']['type'] = $validate_id = static::decodeValidatorId($sanitized_id);
     $plugin = $this->getPlugin('argument_validator', $validate_id);
     if ($plugin) {
-      $options = &$form_state['values']['options']['validate']['options'][$sanitized_id];
+      $options = &$option_values['validate']['options'][$sanitized_id];
       $plugin->submitOptionsForm($form['validate']['options'][$sanitized_id], $form_state, $options);
       // Copy the now submitted options to their final resting place so they get saved.
-      $form_state['values']['options']['validate_options'] = $options;
+      $option_values['validate_options'] = $options;
     }
 
     // Clear out the content of title if it's not enabled.
-    $options = &$form_state['values']['options'];
-    if (empty($options['title_enable'])) {
-      $options['title'] = '';
+    if (empty($option_values['title_enable'])) {
+      $option_values['title'] = '';
     }
   }
 
@@ -464,7 +475,7 @@ abstract class ArgumentPluginBase extends HandlerBase {
    * Provide a form for selecting the default argument when the
    * default action is set to provide default argument.
    */
-  public function defaultArgumentForm(&$form, &$form_state) {
+  public function defaultArgumentForm(&$form, FormStateInterface $form_state) {
     $plugins = Views::pluginManager('argument_default')->getDefinitions();
     $options = array();
 
@@ -529,7 +540,7 @@ abstract class ArgumentPluginBase extends HandlerBase {
    * Provide a form for selecting further summary options when the
    * default action is set to display one.
    */
-  public function defaultSummaryForm(&$form, &$form_state) {
+  public function defaultSummaryForm(&$form, FormStateInterface $form_state) {
     $style_plugins = Views::pluginManager('style')->getDefinitions();
     $summary_plugins = array();
     $format_options = array();
@@ -1053,7 +1064,7 @@ abstract class ArgumentPluginBase extends HandlerBase {
    * array as index. While doing that, create a container element underneath
    * each option, which contains the settings related to that option.
    *
-   * @see form_process_radios()
+   * @see \Drupal\Core\Render\Element\Radios::processRadios()
    */
   public static function processContainerRadios($element) {
     if (count($element['#options']) > 0) {
@@ -1139,6 +1150,18 @@ abstract class ArgumentPluginBase extends HandlerBase {
    */
   public static function decodeValidatorId($id) {
     return str_replace('---', ':', $id);
+  }
+
+  /**
+   * Splits an argument into value and operator properties on this instance.
+   *
+   * @param bool $force_int
+   *   Enforce that values should be numeric.
+   */
+  protected function unpackArgumentValue($force_int = FALSE) {
+    $break = static::breakString($this->argument, $force_int);
+    $this->value = $break->value;
+    $this->operator = $break->operator;
   }
 }
 

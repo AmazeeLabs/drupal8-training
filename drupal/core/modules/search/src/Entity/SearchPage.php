@@ -22,8 +22,8 @@ use Drupal\search\SearchPageInterface;
  * @ConfigEntityType(
  *   id = "search_page",
  *   label = @Translation("Search page"),
- *   controllers = {
- *     "access" = "Drupal\search\SearchPageAccessController",
+ *   handlers = {
+ *     "access" = "Drupal\search\SearchPageAccessControlHandler",
  *     "storage" = "Drupal\Core\Config\Entity\ConfigEntityStorage",
  *     "list_builder" = "Drupal\search\SearchPageListBuilder",
  *     "form" = {
@@ -35,11 +35,11 @@ use Drupal\search\SearchPageInterface;
  *   },
  *   admin_permission = "administer search",
  *   links = {
- *     "edit-form" = "search.edit",
- *     "delete-form" = "search.delete",
- *     "enable" = "search.enable",
- *     "disable" = "search.disable",
- *     "set-default" = "search.set_default"
+ *     "edit-form" = "entity.search_page.edit_form",
+ *     "delete-form" = "entity.search_page.delete_form",
+ *     "enable" = "entity.search_page.enable",
+ *     "disable" = "entity.search_page.disable",
+ *     "set-default" = "entity.search_page.set_default"
  *   },
  *   config_prefix = "page",
  *   entity_keys = {
@@ -164,23 +164,6 @@ class SearchPage extends ConfigEntityBase implements SearchPageInterface, Entity
    */
   public function getWeight() {
     return $this->weight;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function toArray() {
-    $properties = parent::toArray();
-    $names = array(
-      'path',
-      'weight',
-      'plugin',
-      'configuration',
-    );
-    foreach ($names as $name) {
-      $properties[$name] = $this->get($name);
-    }
-    return $properties;
   }
 
   /**

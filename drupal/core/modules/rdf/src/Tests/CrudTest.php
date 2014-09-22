@@ -11,6 +11,8 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests the RDF mapping CRUD functions.
+ *
+ * @group rdf
  */
 class CrudTest extends DrupalUnitTestBase {
 
@@ -21,15 +23,22 @@ class CrudTest extends DrupalUnitTestBase {
    */
   public static $modules = array('entity_test', 'rdf', 'system');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'RDF mapping CRUD functions',
-      'description' => 'Test the RDF mapping CRUD functions.',
-      'group' => 'RDF',
-    );
-  }
+  /**
+   * @var string
+   */
+  protected $prefix;
 
-  public function setUp() {
+  /**
+   * @var string
+   */
+  protected $entity_type;
+
+  /**
+   * @var string
+   */
+  protected $bundle;
+
+  protected function setUp() {
     parent::setUp();
     $this->prefix = 'rdf.mapping';
     $this->entity_type = $this->bundle = 'entity_test';
@@ -81,7 +90,7 @@ class CrudTest extends DrupalUnitTestBase {
     $mapping = array(
       'properties' => array('dc:created'),
       'datatype' => 'xsd:dateTime',
-      'datatype_callback' => array('callable' => 'date_iso8601'),
+      'datatype_callback' => array('callable' => 'Drupal\rdf\CommonDataConverter::dateIso8601Value'),
     );
     rdf_get_mapping($this->entity_type, $this->bundle)
       ->setFieldMapping($field_name, $mapping)
@@ -94,7 +103,7 @@ class CrudTest extends DrupalUnitTestBase {
     $mapping = array(
       'properties' => array('dc:date'),
       'datatype' => 'foo:bar',
-      'datatype_callback' => array('callable' => 'date_iso8601'),
+      'datatype_callback' => array('callable' => 'Drupal\rdf\CommonDataConverter::dateIso8601Value'),
     );
     rdf_get_mapping($this->entity_type, $this->bundle)
       ->setFieldMapping($field_name, $mapping)

@@ -8,11 +8,13 @@
 namespace Drupal\system\Tests\Entity;
 
 use Drupal\Core\Entity\EntityStorageInterface;
-use Drupal\Core\Language\Language;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Tests the basic Entity API.
+ * Tests Entity Query functionality.
+ *
+ * @group Entity
  */
 class EntityQueryTest extends EntityUnitTestBase {
 
@@ -47,44 +49,37 @@ class EntityQueryTest extends EntityUnitTestBase {
    */
   public $figures;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Query',
-      'description' => 'Tests Entity Query functionality.',
-      'group' => 'Entity API',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('entity_test', array('entity_test_mulrev', 'entity_test_mulrev_revision', 'entity_test_mulrev_property_data', 'entity_test_mulrev_property_revision'));
+
+    $this->installEntitySchema('entity_test_mulrev');
+
     $this->installConfig(array('language'));
 
-    $figures = drupal_strtolower($this->randomName());
-    $greetings = drupal_strtolower($this->randomName());
+    $figures = drupal_strtolower($this->randomMachineName());
+    $greetings = drupal_strtolower($this->randomMachineName());
     foreach (array($figures => 'shape', $greetings => 'text') as $field_name => $field_type) {
-      $field = entity_create('field_config', array(
+      $field_storage = entity_create('field_storage_config', array(
         'name' => $field_name,
         'entity_type' => 'entity_test_mulrev',
         'type' => $field_type,
         'cardinality' => 2,
         'translatable' => TRUE,
       ));
-      $field->save();
-      $fields[] = $field;
+      $field_storage->save();
+      $field_storages[] = $field_storage;
     }
     $bundles = array();
     for ($i = 0; $i < 2; $i++) {
       // For the sake of tablesort, make sure the second bundle is higher than
       // the first one. Beware: MySQL is not case sensitive.
       do {
-        $bundle = $this->randomName();
+        $bundle = $this->randomMachineName();
       } while ($bundles && strtolower($bundles[0]) >= strtolower($bundle));
       entity_test_create_bundle($bundle);
-      foreach ($fields as $field) {
-        entity_create('field_instance_config', array(
-          'field_name' => $field->name,
-          'entity_type' => 'entity_test_mulrev',
+      foreach ($field_storages as $field_storage) {
+        entity_create('field_config', array(
+          'field_storage' => $field_storage,
           'bundle' => $bundle,
         ))->save();
       }
@@ -110,21 +105,8 @@ class EntityQueryTest extends EntityUnitTestBase {
       'format' => 'format-pl'
     ));
     // Make these languages available to the greetings field.
-    $langcode = new Language(array(
-      'id' => 'en',
-      'name' => $this->randomString(),
-    ));
-    language_save($langcode);
-    $langcode = new Language(array(
-      'id' => 'tr',
-      'name' => $this->randomString(),
-    ));
-    language_save($langcode);
-    $langcode = new Language(array(
-      'id' => 'pl',
-      'name' => $this->randomString(),
-    ));
-    language_save($langcode);
+    ConfigurableLanguage::createFromLangcode('tr')->save();
+    ConfigurableLanguage::createFromLangcode('pl')->save();
     // Calculate the cartesian product of the unit array by looking at the
     // bits of $i and add the unit at the bits that are 1. For example,
     // decimal 13 is binary 1101 so unit 3,2 and 0 will be added to the
@@ -132,12 +114,12 @@ class EntityQueryTest extends EntityUnitTestBase {
     for ($i = 1; $i <= 15; $i++) {
       $entity = entity_create('entity_test_mulrev', array(
         'type' => $bundles[$i & 1],
-        'name' => $this->randomName(),
+        'name' => $this->randomMachineName(),
         'langcode' => 'en',
       ));
       // Make sure the name is set for every language that we might create.
       foreach (array('tr', 'pl') as $langcode) {
-        $entity->getTranslation($langcode)->name = $this->randomName();
+        $entity->getTranslation($langcode)->name = $this->randomMachineName();
       }
       foreach (array_reverse(str_split(decbin($i))) as $key => $bit) {
         if ($bit) {
@@ -355,7 +337,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $request->query->replace(array(
       'page' => '0,2',
     ));
-    \Drupal::getContainer()->set('request', $request);
+    \Drupal::getContainer()->get('request_stack')->push($request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->sort("$figures.color")
       ->sort("$greetings.format")
@@ -378,7 +360,7 @@ class EntityQueryTest extends EntityUnitTestBase {
   /**
    * Test tablesort().
    */
-  protected function testTableSort() {
+  public function testTableSort() {
     // While ordering on bundles do not give us a definite order, we can still
     // assert that all entities from one bundle are after the other as the
     // order dictates.
@@ -387,7 +369,7 @@ class EntityQueryTest extends EntityUnitTestBase {
       'sort' => 'asc',
       'order' => 'Type',
     ));
-    \Drupal::getContainer()->set('request', $request);
+    \Drupal::getContainer()->get('request_stack')->push($request);
 
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
@@ -402,7 +384,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $request->query->add(array(
       'sort' => 'desc',
     ));
-    \Drupal::getContainer()->set('request', $request);
+    \Drupal::getContainer()->get('request_stack')->push($request);
 
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
@@ -417,7 +399,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $request->query->add(array(
       'order' => 'Id',
     ));
-    \Drupal::getContainer()->set('request', $request);
+    \Drupal::getContainer()->get('request_stack')->push($request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->tableSort($header)
       ->execute();
@@ -427,21 +409,20 @@ class EntityQueryTest extends EntityUnitTestBase {
   /**
    * Test that count queries are separated across entity types.
    */
-  protected function testCount() {
+  public function testCount() {
     // Create a field with the same name in a different entity type.
     $field_name = $this->figures;
-    $field = entity_create('field_config', array(
+    $field_storage = entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'shape',
       'cardinality' => 2,
       'translatable' => TRUE,
     ));
-    $field->save();
-    $bundle = $this->randomName();
-    entity_create('field_instance_config', array(
-      'field_name' => $field_name,
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $bundle = $this->randomMachineName();
+    entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => $bundle,
     ))->save();
 

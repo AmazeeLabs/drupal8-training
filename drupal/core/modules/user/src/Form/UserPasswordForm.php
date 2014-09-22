@@ -9,8 +9,9 @@ namespace Drupal\user\Form;
 
 use Drupal\Core\Field\Plugin\Field\FieldType\EmailItem;
 use Drupal\Core\Form\FormBase;
-use Drupal\Core\Language\Language;
-use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Render\Element\Email;
 use Drupal\user\UserStorageInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -30,7 +31,7 @@ class UserPasswordForm extends FormBase {
   /**
    * The language manager.
    *
-   * @var \Drupal\Core\Language\LanguageManager
+   * @var \Drupal\Core\Language\LanguageManagerInterface
    */
   protected $languageManager;
 
@@ -39,10 +40,10 @@ class UserPasswordForm extends FormBase {
    *
    * @param \Drupal\user\UserStorageInterface $user_storage
    *   The user storage.
-   * @param \Drupal\Core\Language\LanguageManager $language_manager
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
    */
-  public function __construct(UserStorageInterface $user_storage, LanguageManager $language_manager) {
+  public function __construct(UserStorageInterface $user_storage, LanguageManagerInterface $language_manager) {
     $this->userStorage = $user_storage;
     $this->languageManager = $language_manager;
   }
@@ -70,12 +71,12 @@ class UserPasswordForm extends FormBase {
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $form['name'] = array(
       '#type' => 'textfield',
-      '#title' => $this->t('Username or e-mail address'),
+      '#title' => $this->t('Username or email address'),
       '#size' => 60,
-      '#maxlength' => max(USERNAME_MAX_LENGTH, EMAIL_MAX_LENGTH),
+      '#maxlength' => max(USERNAME_MAX_LENGTH, Email::EMAIL_MAX_LENGTH),
       '#required' => TRUE,
       '#attributes' => array(
         'autocorrect' => 'off',
@@ -91,7 +92,7 @@ class UserPasswordForm extends FormBase {
       $form['name']['#value'] = $user->getEmail();
       $form['mail'] = array(
         '#prefix' => '<p>',
-        '#markup' =>  $this->t('Password reset instructions will be mailed to %email. You must log out to use the password reset link in the e-mail.', array('%email' => $user->getEmail())),
+        '#markup' =>  $this->t('Password reset instructions will be mailed to %email. You must log out to use the password reset link in the email.', array('%email' => $user->getEmail())),
         '#suffix' => '</p>',
       );
     }
@@ -99,7 +100,7 @@ class UserPasswordForm extends FormBase {
       $form['name']['#default_value'] = $this->getRequest()->query->get('name');
     }
     $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array('#type' => 'submit', '#value' => $this->t('E-mail new password'));
+    $form['actions']['submit'] = array('#type' => 'submit', '#value' => $this->t('Email new password'));
 
     return $form;
   }
@@ -107,8 +108,8 @@ class UserPasswordForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
-    $name = trim($form_state['values']['name']);
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    $name = trim($form_state->getValue('name'));
     // Try to load by email.
     $users = $this->userStorage->loadByProperties(array('mail' => $name, 'status' => '1'));
     if (empty($users)) {
@@ -120,25 +121,25 @@ class UserPasswordForm extends FormBase {
       form_set_value(array('#parents' => array('account')), $account, $form_state);
     }
     else {
-      $this->setFormError('name', $form_state, $this->t('Sorry, %name is not recognized as a username or an e-mail address.', array('%name' => $name)));
+      $form_state->setErrorByName('name', $this->t('Sorry, %name is not recognized as a username or an email address.', array('%name' => $name)));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $langcode = $this->languageManager->getCurrentLanguage()->id;
 
-    $account = $form_state['values']['account'];
+    $account = $form_state->getValue('account');
     // Mail one time login URL and instructions using current language.
     $mail = _user_mail_notify('password_reset', $account, $langcode);
     if (!empty($mail)) {
-      watchdog('user', 'Password reset instructions mailed to %name at %email.', array('%name' => $account->getUsername(), '%email' => $account->getEmail()));
-      drupal_set_message($this->t('Further instructions have been sent to your e-mail address.'));
+      $this->logger('user')->notice('Password reset instructions mailed to %name at %email.', array('%name' => $account->getUsername(), '%email' => $account->getEmail()));
+      drupal_set_message($this->t('Further instructions have been sent to your email address.'));
     }
 
-    $form_state['redirect_route']['route_name'] = 'user.page';
+    $form_state->setRedirect('user.page');
   }
 
 }

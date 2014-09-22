@@ -10,19 +10,13 @@ namespace Drupal\system\Tests\Plugin\Discovery;
 use Drupal\Component\Plugin\Discovery\StaticDiscovery;
 
 /**
- * Tests that plugins are correctly discovered.
+ * Tests that plugins using static discovery are correctly discovered.
+ *
+ * @group Plugin
  */
 class StaticDiscoveryTest extends DiscoveryTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Static discovery',
-      'description' => 'Tests that plugins using static discovery are correctly discovered.',
-      'group' => 'Plugin API',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->expectedDefinitions = array(
       'apple' => array(

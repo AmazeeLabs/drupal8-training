@@ -10,7 +10,9 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\migrate\MigrateExecutable;
 
 /**
- * Test cck field revision migration from Drupal 6 to 8.
+ * CCK field revision migration.
+ *
+ * @group migrate_drupal
  */
 class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
 
@@ -24,36 +26,25 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate CCK field revisions',
-      'description'  => 'CCK field revision migration',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'entity_type' => 'node',
       'name' => 'field_test',
       'type' => 'text',
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'entity_type' => 'node',
       'field_name' => 'field_test',
       'bundle' => 'story',
     ))->save();
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'entity_type' => 'node',
       'name' => 'field_test_two',
       'type' => 'integer',
       'cardinality' => -1,
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'entity_type' => 'node',
       'field_name' => 'field_test_two',
       'bundle' => 'story',
@@ -72,7 +63,7 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
         array(array(1), array(1)),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
     $dumps = array(
       $this->getDumpDirectory() . '/Drupal6NodeRevision.php',
     );

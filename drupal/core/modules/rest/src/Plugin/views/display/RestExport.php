@@ -7,7 +7,7 @@
 
 namespace Drupal\rest\Plugin\views\display;
 
-use Drupal\Core\Form\FormErrorInterface;
+use Drupal\Component\Utility\String;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\ContentNegotiation;
@@ -91,13 +91,11 @@ class RestExport extends PathPluginBase {
    *   The route provider
    * @param \Drupal\Core\State\StateInterface $state
    *   The state key value store.
-   * @param \Drupal\Core\Form\FormErrorInterface $form_error
-   *   The form error helper.
    * @param \Drupal\Core\ContentNegotiation $content_negotiation
    *   The content negotiation library.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, FormErrorInterface $form_error, ContentNegotiation $content_negotiation) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition, $route_provider, $state, $form_error);
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state, ContentNegotiation $content_negotiation) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $route_provider, $state);
     $this->contentNegotiation = $content_negotiation;
   }
 
@@ -111,7 +109,6 @@ class RestExport extends PathPluginBase {
       $plugin_definition,
       $container->get('router.route_provider'),
       $container->get('state'),
-      $container->get('form_validator'),
       $container->get('content_negotiation')
     );
   }
@@ -286,7 +283,7 @@ class RestExport extends PathPluginBase {
     // Wrap the output in a pre tag if this is for a live preview.
     if (!empty($this->view->live_preview)) {
       $build['#prefix'] = '<pre>';
-      $build['#markup'] = check_plain($build['#markup']);
+      $build['#markup'] = String::checkPlain($build['#markup']);
       $build['#suffix'] = '</pre>';
     }
 

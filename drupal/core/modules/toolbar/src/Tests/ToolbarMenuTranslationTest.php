@@ -10,7 +10,9 @@ namespace Drupal\toolbar\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests maintaining inclusion of icons for translated menu items.
+ * Tests that the toolbar icon class remains for translated menu items.
+ *
+ * @group toolbar
  */
 class ToolbarMenuTranslationTest extends WebTestBase {
 
@@ -21,15 +23,7 @@ class ToolbarMenuTranslationTest extends WebTestBase {
    */
   public static $modules = array('toolbar', 'toolbar_test', 'locale');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Toolbar menu translation',
-      'description' => 'Tests that the toolbar icon class remains for translated menu items.',
-      'group' => 'Toolbar',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create an administrative user and log it in.
@@ -64,11 +58,11 @@ class ToolbarMenuTranslationTest extends WebTestBase {
     $this->assertNoText('No strings available.', 'Search found the menu item as untranslated.');
 
     // Check that the class is on the item before we translate it.
-    $xpath = $this->xpath('//a[contains(@class, "icon-structure")]');
+    $xpath = $this->xpath('//a[contains(@class, "icon-system-admin-structure")]');
     $this->assertEqual(count($xpath), 1, 'The menu item class ok before translation.');
 
     // Translate the menu item.
-    $menu_item_translated = $this->randomName();
+    $menu_item_translated = $this->randomMachineName();
     $textarea = current($this->xpath('//textarea'));
     $lid = (string) $textarea[0]['name'];
     $edit = array(
@@ -93,7 +87,7 @@ class ToolbarMenuTranslationTest extends WebTestBase {
 
     // Toolbar icons are included based on the presence of a specific class on
     // the menu item. Ensure that class also exists for a translated menu item.
-    $xpath = $this->xpath('//a[contains(@class, "icon-structure")]');
+    $xpath = $this->xpath('//a[contains(@class, "icon-system-admin-structure")]');
     $this->assertEqual(count($xpath), 1, 'The menu item class is the same.');
   }
 

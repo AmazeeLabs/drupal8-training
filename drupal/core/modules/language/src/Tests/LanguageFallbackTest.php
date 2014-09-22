@@ -7,20 +7,15 @@
 
 namespace Drupal\language\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
  * Tests the language fallback behavior.
+ *
+ * @group language
  */
 class LanguageFallbackTest extends LanguageTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Language fallback',
-      'description' => 'Tests the language fallback behavior.',
-      'group' => 'Language',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -28,11 +23,11 @@ class LanguageFallbackTest extends LanguageTestBase {
   protected function setUp() {
     parent::setUp();
 
-    for ($i = 0; $i < 3; $i++) {
-      $language = new Language();
-      $language->id = $this->randomName(2);
-      $language->weight = -$i;
-      language_save($language);
+    $i = 0;
+    foreach (array('af', 'am', 'ar') as $langcode) {
+      $language = ConfigurableLanguage::createFromLangcode($langcode);
+      $language->set('weight', $i--);
+      $language->save();
     }
   }
 
@@ -41,7 +36,7 @@ class LanguageFallbackTest extends LanguageTestBase {
    */
   public function testCandidates() {
     $language_list = $this->languageManager->getLanguages();
-    $expected = array_keys($language_list + array(Language::LANGCODE_NOT_SPECIFIED => NULL));
+    $expected = array_keys($language_list + array(LanguageInterface::LANGCODE_NOT_SPECIFIED => NULL));
 
     // Check that language fallback candidates by default are all the available
     // languages sorted by weight.
@@ -57,20 +52,21 @@ class LanguageFallbackTest extends LanguageTestBase {
     // Check that candidates are alterable for specific operations.
     $this->state->set('language_test.fallback_alter.candidates', FALSE);
     $this->state->set('language_test.fallback_operation_alter.candidates', TRUE);
-    $expected[] = Language::LANGCODE_NOT_SPECIFIED;
-    $expected[] = Language::LANGCODE_NOT_APPLICABLE;
-    $candidates = $this->languageManager->getFallbackCandidates(NULL, array('operation' => 'test'));
+    $expected[] = LanguageInterface::LANGCODE_NOT_SPECIFIED;
+    $expected[] = LanguageInterface::LANGCODE_NOT_APPLICABLE;
+    $candidates = $this->languageManager->getFallbackCandidates(array('operation' => 'test'));
     $this->assertEqual(array_values($candidates), $expected, 'Language fallback candidates are alterable for specific operations.');
 
     // Check that when the site is monolingual no language fallback is applied.
-    $default_langcode = $this->languageManager->getDefaultLanguage()->id;
+    $langcodes_to_delete = array();
     foreach ($language_list as $langcode => $language) {
-      if ($langcode != $default_langcode) {
-        language_delete($langcode);
+      if (!$language->isDefault()) {
+        $langcodes_to_delete[] = $langcode;
       }
     }
+    entity_delete_multiple('configurable_language', $langcodes_to_delete);
     $candidates = $this->languageManager->getFallbackCandidates();
-    $this->assertEqual(array_values($candidates), array(Language::LANGCODE_DEFAULT), 'Language fallback is not applied when the Language module is not enabled.');
+    $this->assertEqual(array_values($candidates), array(LanguageInterface::LANGCODE_DEFAULT), 'Language fallback is not applied when the Language module is not enabled.');
   }
 
 }

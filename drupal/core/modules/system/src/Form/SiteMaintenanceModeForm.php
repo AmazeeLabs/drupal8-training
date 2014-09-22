@@ -8,6 +8,7 @@
 namespace Drupal\system\Form;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -56,7 +57,7 @@ class SiteMaintenanceModeForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('system.maintenance');
     $form['maintenance_mode'] = array(
       '#type' => 'checkbox',
@@ -76,12 +77,12 @@ class SiteMaintenanceModeForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->config('system.maintenance')
-      ->set('message', $form_state['values']['maintenance_mode_message'])
+      ->set('message', $form_state->getValue('maintenance_mode_message'))
       ->save();
 
-    $this->state->set('system.maintenance_mode', $form_state['values']['maintenance_mode']);
+    $this->state->set('system.maintenance_mode', $form_state->getValue('maintenance_mode'));
     parent::submitForm($form, $form_state);
   }
 

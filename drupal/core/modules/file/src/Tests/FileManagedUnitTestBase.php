@@ -23,18 +23,19 @@ abstract class FileManagedUnitTestBase extends DrupalUnitTestBase {
    */
   public static $modules = array('file_test', 'file', 'system', 'field', 'user');
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Clear out any hook calls.
     file_test_reset();
 
     $this->installConfig(array('system'));
-    $this->installSchema('file', array('file_managed', 'file_usage'));
-    $this->installSchema('user', array('users', 'users_roles'));
+    $this->installEntitySchema('file');
+    $this->installEntitySchema('user');
+    $this->installSchema('file', array('file_usage'));
 
     // Make sure that a user with uid 1 exists, self::createFile() relies on
     // it.
-    $user = entity_create('user', array('uid' => 1, 'name' => $this->randomName()));
+    $user = entity_create('user', array('uid' => 1, 'name' => $this->randomMachineName()));
     $user->enforceIsNew();
     $user->save();
     \Drupal::currentUser()->setAccount($user);
@@ -196,7 +197,7 @@ abstract class FileManagedUnitTestBase extends DrupalUnitTestBase {
     if (!isset($filepath)) {
       // Prefix with non-latin characters to ensure that all file-related
       // tests work with international filenames.
-      $filepath = 'Файл для тестирования ' . $this->randomName();
+      $filepath = 'Файл для тестирования ' . $this->randomMachineName();
     }
     if (!isset($scheme)) {
       $scheme = file_default_scheme();

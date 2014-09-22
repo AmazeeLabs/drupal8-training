@@ -93,7 +93,7 @@
     /**
      * Makes all elements outside the of the tabbingContext's set untabbable.
      *
-     * Elements made untabble have their original tabindex and autfocus values
+     * Elements made untabbable have their original tabindex and autofocus values
      * stored so that they might be restored later when this tabbingContext
      * is deactivated.
      *
@@ -133,7 +133,7 @@
     /**
      * Restores that tabbable state of a tabbingContext's disabled elements.
      *
-     * Elements that were made untabble have their original tabindex and autfocus
+     * Elements that were made untabbable have their original tabindex and autofocus
      * values restored.
      *
      * @param TabbingContext tabbingContext
@@ -280,13 +280,11 @@
     }
   });
 
-
   // Mark this behavior as processed on the first pass and return if it is
   // already processed.
   if (Drupal.tabbingManager) {
     return;
   }
   Drupal.tabbingManager = new TabbingManager();
-
 
 }(jQuery, Drupal));

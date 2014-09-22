@@ -59,7 +59,7 @@ class ListFloatItem extends ListItemBase {
     $description .= '<br/>' . t('The label is optional: if a line contains a single number, it will be used as key and label.');
     $description .= '<br/>' . t('Lists of labels are also accepted (one label per line), only if the field does not hold any values yet. Numeric keys will be automatically generated from the positions in the list.');
     $description .= '</p>';
-    $description .= '<p>' . t('Allowed HTML tags in labels: @tags', array('@tags' => _field_filter_xss_display_allowed_tags())) . '</p>';
+    $description .= '<p>' . t('Allowed HTML tags in labels: @tags', array('@tags' => $this->displayAllowedTags())) . '</p>';
     return $description;
   }
 
@@ -88,6 +88,25 @@ class ListFloatItem extends ListItemBase {
     if (!is_numeric($option)) {
       return t('Allowed values list: each key must be a valid integer or decimal.');
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function simplifyAllowedValues(array $structured_values) {
+    $values = array();
+    foreach ($structured_values as $item) {
+      // Nested elements are embedded in the label.
+      if (is_array($item['label'])) {
+        $item['label'] = static::simplifyAllowedValues($item['label']);
+      }
+      // Cast the value to a float first so that .5 and 0.5 are the same value
+      // and then cast to a string so that values like 0.5 can be used as array
+      // keys.
+      // @see http://php.net/manual/en/language.types.array.php
+      $values[(string) (float) $item['value']] = $item['label'];
+    }
+    return $values;
   }
 
 }

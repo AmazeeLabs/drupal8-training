@@ -7,13 +7,15 @@
  * The module checks for available updates of Drupal core and any installed
  * contributed modules and themes. It warns site administrators if newer
  * releases are available via the system status report (admin/reports/status),
- * the module and theme pages, and optionally via e-mail. It also provides the
+ * the module and theme pages, and optionally via email. It also provides the
  * ability to install contributed modules and themes via an user interface.
  */
 
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Site\Settings;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 // These are internally used constants for this code, do not modify.
 
@@ -65,7 +67,7 @@ const UPDATE_FETCH_PENDING = -4;
 /**
  * Implements hook_help().
  */
-function update_help($route_name, Request $request) {
+function update_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.update':
       $output = '';
@@ -78,7 +80,7 @@ function update_help($route_name, Request $request) {
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Checking for available updates') . '</dt>';
-      $output .= '<dd>' . t('A report of <a href="@update-report">available updates</a> will alert you when new releases are available for download. You may configure options for the frequency for checking updates (which are performed during <a href="@cron">cron</a> runs) and e-mail notifications at the <a href="@update-settings">Update Manager settings</a>  page.', array('@update-report' => url('admin/reports/updates'), '@cron' => 'http://drupal.org/cron', '@update-settings' => url('admin/reports/updates/settings'))) . '</dd>';
+      $output .= '<dd>' . t('A report of <a href="@update-report">available updates</a> will alert you when new releases are available for download. You may configure options for the frequency for checking updates (which are performed during <a href="@cron">cron</a> runs) and email notifications at the <a href="@update-settings">Update Manager settings</a>  page.', array('@update-report' => url('admin/reports/updates'), '@cron' => 'http://drupal.org/cron', '@update-settings' => url('admin/reports/updates/settings'))) . '</dd>';
       // Only explain the Update manager if it has not been disabled.
       if (update_manager_access()) {
         $output .= '<dt>' . t('Performing updates through the user interface') . '</dt>';
@@ -164,7 +166,7 @@ function update_page_build() {
  * @see update_menu()
  */
 function update_manager_access() {
-  return Settings::get('allow_authorize_operations', TRUE) && user_access('administer software updates');
+  return Settings::get('allow_authorize_operations', TRUE) && \Drupal::currentUser()->hasPermission('administer software updates');
 }
 
 /**
@@ -172,24 +174,26 @@ function update_manager_access() {
  */
 function update_theme() {
   return array(
-    'update_manager_update_form' => array(
-      'render element' => 'form',
-      'file' => 'update.manager.inc',
-    ),
     'update_last_check' => array(
-      'variables' => array('last' => NULL),
+      'variables' => array('last' => 0),
+      'template' => 'update-last-check',
     ),
     'update_report' => array(
       'variables' => array('data' => NULL),
       'file' => 'update.report.inc',
+      'template' => 'update-report',
+    ),
+    'update_project_status' => array(
+      'variables' => array('project' => array(), 'includes_status' => array()),
+      'file' => 'update.report.inc',
+      'template' => 'update-project-status',
     ),
     'update_version' => array(
-      'variables' => array('version' => NULL, 'tag' => NULL, 'class' => array()),
+      'variables' => array('version' => NULL, 'title' => NULL, 'attributes' => array()),
       'file' => 'update.report.inc',
-    ),
-    'update_status_label' => array(
-      'variables' => array('status' => NULL),
-      'file' => 'update.report.inc',
+      // We are using template instead of '#type' => 'table' here to keep markup
+      // out of preprocess and allow for easier changes to markup.
+      'template' => 'update-version',
     ),
   );
 }
@@ -227,21 +231,21 @@ function update_cron() {
 }
 
 /**
- * Implements hook_themes_enabled().
+ * Implements hook_themes_installed().
  *
- * If themes are enabled, we invalidate the information of available updates.
+ * If themes are installed, we invalidate the information of available updates.
  */
-function update_themes_enabled($themes) {
+function update_themes_installed($themes) {
   // Clear all update module data.
   update_storage_clear();
 }
 
 /**
- * Implements hook_themes_disabled().
+ * Implements hook_themes_uninstalled().
  *
- * If themes are disabled, we invalidate the information of available updates.
+ * If themes are uninstalled, we invalidate the information of available updates.
  */
-function update_themes_disabled($themes) {
+function update_themes_uninstalled($themes) {
   // Clear all update module data.
   update_storage_clear();
 }
@@ -254,7 +258,7 @@ function update_themes_disabled($themes) {
  *
  * @see _update_cache_clear()
  */
-function update_form_system_modules_alter(&$form, $form_state) {
+function update_form_system_modules_alter(&$form, FormStateInterface $form_state) {
   $form['#submit'][] = 'update_storage_clear_submit';
 }
 
@@ -263,7 +267,7 @@ function update_form_system_modules_alter(&$form, $form_state) {
  *
  * @see update_form_system_modules_alter()
  */
-function update_storage_clear_submit($form, &$form_state) {
+function update_storage_clear_submit($form, FormStateInterface $form_state) {
   // Clear all update module data.
   update_storage_clear();
 }
@@ -413,7 +417,7 @@ function update_fetch_data_finished($success, $results) {
 /**
  * Implements hook_mail().
  *
- * Constructs the e-mail notification message when the site is out of date.
+ * Constructs the email notification message when the site is out of date.
  *
  * @param $key
  *   Unique key to indicate what message to build, always 'status_notify'.
@@ -454,7 +458,7 @@ function update_mail($key, &$message, $params) {
  *
  * These error messages are shared by both update_requirements() for the
  * site-wide status report at admin/reports/status and in the body of the
- * notification e-mail messages generated by update_cron().
+ * notification email messages generated by update_cron().
  *
  * @param $msg_type
  *   String to indicate what kind of message to generate. Can be either 'core'
@@ -536,7 +540,8 @@ function _update_message_text($msg_type, $msg_reason, $report_link = FALSE, $lan
     }
   }
 
-  return $text;
+  // All strings are t() and empty space concatenated so return SafeMarkup.
+  return SafeMarkup::set($text);
 }
 
 /**
@@ -555,7 +560,9 @@ function _update_project_status_sort($a, $b) {
 }
 
 /**
- * Returns HTML for the last time we checked for update data.
+ * Prepares variables for last time update data was checked templates.
+ *
+ * Default template: update-last-check.html.twig.
  *
  * In addition to properly formatting the given timestamp, this function also
  * provides a "Check manually" link that refreshes the available update and
@@ -566,16 +573,10 @@ function _update_project_status_sort($a, $b) {
  *   - last: The timestamp when the site last checked for available updates.
  *
  * @see theme_update_report()
- * @see theme_update_available_updates_form()
- * @ingroup themeable
  */
-function theme_update_last_check($variables) {
-  $last = $variables['last'];
-  $output = '<div class="update checked">';
-  $output .= $last ? t('Last checked: @time ago', array('@time' => format_interval(REQUEST_TIME - $last))) : t('Last checked: never');
-  $output .= ' <span class="check-manually">(' . l(t('Check manually'), 'admin/reports/updates/check', array('query' => drupal_get_destination())) . ')</span>';
-  $output .= "</div>\n";
-  return $output;
+function template_preprocess_update_last_check(&$variables) {
+  $variables['time'] = \Drupal::service('date.formatter')->formatInterval(REQUEST_TIME - $variables['last']);
+  $variables['link'] = \Drupal::l(t('Check manually'), 'update.manual_status', array(), array('query' => drupal_get_destination()));
 }
 
 /**
@@ -661,7 +662,7 @@ function update_storage_clear() {
 function _update_manager_unique_identifier() {
   $id = &drupal_static(__FUNCTION__, '');
   if (empty($id)) {
-    $id = substr(hash('sha256', drupal_get_hash_salt()), 0, 8);
+    $id = substr(hash('sha256', Settings::getHashSalt()), 0, 8);
   }
   return $id;
 }
@@ -748,7 +749,9 @@ function update_clear_update_disk_cache() {
 function update_delete_file_if_stale($path) {
   if (file_exists($path)) {
     $filectime = filectime($path);
-    if (REQUEST_TIME - $filectime > DRUPAL_MAXIMUM_TEMP_FILE_AGE || (preg_match('/.*-dev\.(tar\.gz|zip)/i', $path) && REQUEST_TIME - $filectime > 300)) {
+    $max_age = \Drupal::config('system.file')->get('temporary_maximum_age');
+
+    if (REQUEST_TIME - $filectime > $max_age || (preg_match('/.*-dev\.(tar\.gz|zip)/i', $path) && REQUEST_TIME - $filectime > 300)) {
       file_unmanaged_delete_recursive($path);
     }
   }

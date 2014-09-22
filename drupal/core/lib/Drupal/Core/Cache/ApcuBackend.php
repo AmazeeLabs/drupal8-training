@@ -109,10 +109,12 @@ class ApcuBackend implements CacheBackendInterface {
 
     $result = apc_fetch(array_keys($map));
     $cache = array();
-    foreach ($result as $key => $item) {
-      $item = $this->prepareItem($item, $allow_invalid);
-      if ($item) {
-        $cache[$map[$key]] = $item;
+    if ($result) {
+      foreach ($result as $key => $item) {
+        $item = $this->prepareItem($item, $allow_invalid);
+        if ($item) {
+          $cache[$map[$key]] = $item;
+        }
       }
     }
     unset($result);
@@ -256,13 +258,6 @@ class ApcuBackend implements CacheBackendInterface {
   /**
    * {@inheritdoc}
    */
-  public function isEmpty() {
-    return $this->getAll()->getTotalCount() === 0;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function invalidate($cid) {
     $this->invalidateMultiple(array($cid));
   }
@@ -365,8 +360,10 @@ class ApcuBackend implements CacheBackendInterface {
     foreach (array('deletions', 'invalidations') as $type) {
       if ($query_tags[$type]) {
         $result = apc_fetch($query_tags[$type]);
-        static::$tagCache[$type] = array_merge(static::$tagCache[$type], $result);
-        $checksum[$type] += array_sum($result);
+        if ($result) {
+          static::$tagCache[$type] = array_merge(static::$tagCache[$type], $result);
+          $checksum[$type] += array_sum($result);
+        }
       }
     }
 

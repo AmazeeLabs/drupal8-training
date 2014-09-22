@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\views\argument_default;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Path\AliasManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -68,7 +69,7 @@ class Raw extends ArgumentDefaultPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $form['index'] = array(
       '#type' => 'select',
@@ -89,6 +90,8 @@ class Raw extends ArgumentDefaultPluginBase {
   }
 
   public function getArgument() {
+    // @todo Remove dependency on the internal _system_path attribute:
+    //   https://www.drupal.org/node/2293581.
     $path = $this->view->getRequest()->attributes->get('_system_path');
     if ($this->options['use_alias']) {
       $path = $this->aliasManager->getAliasByPath($path);

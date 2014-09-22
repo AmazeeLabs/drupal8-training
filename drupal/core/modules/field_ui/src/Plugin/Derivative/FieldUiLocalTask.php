@@ -8,8 +8,8 @@
 namespace Drupal\field_ui\Plugin\Derivative;
 
 use Drupal\Core\Entity\EntityManagerInterface;
-use Drupal\Component\Plugin\Derivative\DerivativeBase;
-use Drupal\Core\Plugin\Discovery\ContainerDerivativeInterface;
+use Drupal\Component\Plugin\Derivative\DeriverBase;
+use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Provides local task definitions for all entity bundles.
  */
-class FieldUiLocalTask extends DerivativeBase implements ContainerDerivativeInterface {
+class FieldUiLocalTask extends DeriverBase implements ContainerDeriverInterface {
   use StringTranslationTrait;
 
   /**
@@ -69,7 +69,7 @@ class FieldUiLocalTask extends DerivativeBase implements ContainerDerivativeInte
     $this->derivatives = array();
 
     foreach ($this->entityManager->getDefinitions() as $entity_type_id => $entity_type) {
-      if ($entity_type->isFieldable() && $entity_type->hasLinkTemplate('admin-form')) {
+      if ($entity_type->isFieldable() && $entity_type->get('field_ui_base_route')) {
         $this->derivatives["overview_$entity_type_id"] = array(
           'route_name' => "field_ui.overview_$entity_type_id",
           'weight' => 1,
@@ -93,18 +93,18 @@ class FieldUiLocalTask extends DerivativeBase implements ContainerDerivativeInte
           'base_route' => "field_ui.overview_$entity_type_id",
         );
 
-        // Field instance edit tab.
-        $this->derivatives["instance_edit_$entity_type_id"] = array(
-          'route_name' => "field_ui.instance_edit_$entity_type_id",
+        // Field edit tab.
+        $this->derivatives["field_edit_$entity_type_id"] = array(
+          'route_name' => "field_ui.field_edit_$entity_type_id",
           'title' => $this->t('Edit'),
-          'base_route' => "field_ui.instance_edit_$entity_type_id",
+          'base_route' => "field_ui.field_edit_$entity_type_id",
         );
 
         // Field settings tab.
         $this->derivatives["field_edit_$entity_type_id"] = array(
-          'route_name' => "field_ui.field_edit_$entity_type_id",
+          'route_name' => "field_ui.storage_edit_$entity_type_id",
           'title' => $this->t('Field settings'),
-          'base_route' => "field_ui.instance_edit_$entity_type_id",
+          'base_route' => "field_ui.field_edit_$entity_type_id",
         );
 
         // View and form modes secondary tabs.
@@ -171,21 +171,20 @@ class FieldUiLocalTask extends DerivativeBase implements ContainerDerivativeInte
    *   An array of local tasks plugin definitions, keyed by plugin ID.
    */
   public function alterLocalTasks(&$local_tasks) {
-    foreach ($this->entityManager->getDefinitions() as $entity_type => $entity_info) {
-      if ($entity_info->isFieldable() && $entity_info->hasLinkTemplate('admin-form')) {
-        $admin_form = $entity_info->getLinkTemplate('admin-form');
-        $local_tasks["field_ui.fields:overview_$entity_type"]['base_route'] = $admin_form;
-        $local_tasks["field_ui.fields:form_display_overview_$entity_type"]['base_route'] = $admin_form;
-        $local_tasks["field_ui.fields:display_overview_$entity_type"]['base_route'] = $admin_form;
-        $local_tasks["field_ui.fields:field_form_display_default_$entity_type"]['base_route'] = $admin_form;
-        $local_tasks["field_ui.fields:field_display_default_$entity_type"]['base_route'] = $admin_form;
+    foreach ($this->entityManager->getDefinitions() as $entity_type_id => $entity_type) {
+      if ($entity_type->isFieldable() && $route_name = $entity_type->get('field_ui_base_route')) {
+        $local_tasks["field_ui.fields:overview_$entity_type_id"]['base_route'] = $route_name;
+        $local_tasks["field_ui.fields:form_display_overview_$entity_type_id"]['base_route'] = $route_name;
+        $local_tasks["field_ui.fields:display_overview_$entity_type_id"]['base_route'] = $route_name;
+        $local_tasks["field_ui.fields:field_form_display_default_$entity_type_id"]['base_route'] = $route_name;
+        $local_tasks["field_ui.fields:field_display_default_$entity_type_id"]['base_route'] = $route_name;
 
-        foreach ($this->entityManager->getFormModes($entity_type) as $form_mode => $form_mode_info) {
-          $local_tasks['field_ui.fields:field_form_display_' . $form_mode . '_' . $entity_type]['base_route'] = $admin_form;
+        foreach ($this->entityManager->getFormModes($entity_type_id) as $form_mode => $form_mode_info) {
+          $local_tasks['field_ui.fields:field_form_display_' . $form_mode . '_' . $entity_type_id]['base_route'] = $route_name;
         }
 
-        foreach ($this->entityManager->getViewModes($entity_type) as $view_mode => $form_mode_info) {
-          $local_tasks['field_ui.fields:field_display_' . $view_mode . '_' . $entity_type]['base_route'] = $admin_form;
+        foreach ($this->entityManager->getViewModes($entity_type_id) as $view_mode => $form_mode_info) {
+          $local_tasks['field_ui.fields:field_display_' . $view_mode . '_' . $entity_type_id]['base_route'] = $route_name;
         }
       }
     }

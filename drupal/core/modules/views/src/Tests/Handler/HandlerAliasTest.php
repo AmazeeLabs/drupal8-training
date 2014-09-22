@@ -11,7 +11,9 @@ use Drupal\views\Tests\ViewUnitTestBase;
 use Drupal\views\Views;
 
 /**
- * Tests abstract handlers of views.
+ * Tests handler table and field aliases.
+ *
+ * @group views
  */
 class HandlerAliasTest extends ViewUnitTestBase {
 
@@ -24,18 +26,10 @@ class HandlerAliasTest extends ViewUnitTestBase {
    */
   public static $testViews = array('test_filter', 'test_alias');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Handler alias tests',
-      'description' => 'Tests handler table and field aliases.',
-      'group' => 'Views Handlers',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('user', 'users');
+    $this->installEntitySchema('user');
   }
 
   /**

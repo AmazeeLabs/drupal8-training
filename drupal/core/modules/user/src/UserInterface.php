@@ -7,13 +7,16 @@
 
 namespace Drupal\user;
 
+use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides an interface defining a user entity.
+ *
+ * @ingroup user_api
  */
-interface UserInterface extends ContentEntityInterface, AccountInterface {
+interface UserInterface extends ContentEntityInterface, EntityChangedInterface, AccountInterface {
 
   /**
    * Whether a user has a certain role.
@@ -73,10 +76,10 @@ interface UserInterface extends ContentEntityInterface, AccountInterface {
   public function setPassword($password);
 
   /**
-   * Sets the e-mail address of the user.
+   * Sets the email address of the user.
    *
    * @param string $mail
-   *   The new e-mail address of the user.
+   *   The new email address of the user.
    *
    * @return \Drupal\user\UserInterface
    *   The called user entity.
@@ -172,10 +175,10 @@ interface UserInterface extends ContentEntityInterface, AccountInterface {
   public function block();
 
   /**
-   * Returns the e-mail that was used when the user was registered.
+   * Returns the email that was used when the user was registered.
    *
    * @return string
-   *   Initial e-mail address of the user.
+   *   Initial email address of the user.
    */
   public function getInitialEmail();
 

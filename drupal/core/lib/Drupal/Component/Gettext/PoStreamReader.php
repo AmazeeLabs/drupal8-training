@@ -71,13 +71,6 @@ class PoStreamReader implements PoStreamInterface, PoReaderInterface {
   private $_langcode = NULL;
 
   /**
-   * Size of the current PO stream.
-   *
-   * @var int
-   */
-  private $_size;
-
-  /**
    * File handle of the current PO stream.
    *
    * @var resource
@@ -167,7 +160,6 @@ class PoStreamReader implements PoStreamInterface, PoReaderInterface {
   public function open() {
     if (!empty($this->_uri)) {
       $this->_fd = fopen($this->_uri, 'rb');
-      $this->_size = ftell($this->_fd);
       $this->readHeader();
     }
     else {
@@ -446,7 +438,7 @@ class PoStreamReader implements PoStreamInterface, PoReaderInterface {
         return;
       }
       elseif (!strncmp("msgstr", $line, 6)) {
-        // A string pair for an msgidid (with optional context).
+        // A string pair for an msgid (with optional context).
 
         if (($this->_context != 'MSGID') && ($this->_context != 'MSGCTXT')) {
           // Strings are only valid within an id or context scope.

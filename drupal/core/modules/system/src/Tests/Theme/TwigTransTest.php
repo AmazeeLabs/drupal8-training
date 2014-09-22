@@ -7,10 +7,14 @@
 
 namespace Drupal\system\Tests\Theme;
 
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests Twig "trans" tags.
+ *
+ * @group Theme
  */
 class TwigTransTest extends WebTestBase {
 
@@ -44,27 +48,13 @@ class TwigTransTest extends WebTestBase {
   );
 
   /**
-   * Defines information about this test.
-   *
-   * @return array
-   *   An associative array of information.
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Twig Translation',
-      'description' => 'Test Twig "trans" tags.',
-      'group' => 'Theme',
-    );
-  }
-
-  /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
 
     // Setup test_theme.
-    theme_enable(array('test_theme'));
+    \Drupal::service('theme_handler')->install(array('test_theme'));
     \Drupal::config('system.theme')->set('default', 'test_theme')->save();
 
     // Create and log in as admin.
@@ -80,9 +70,7 @@ class TwigTransTest extends WebTestBase {
     $this->installLanguages();
 
     // Assign Lolspeak (xx) to be the default language.
-    $language = \Drupal::languageManager()->getLanguage('xx');
-    $language->default = TRUE;
-    language_save($language);
+    \Drupal::config('system.site')->set('langcode', 'xx')->save();
     $this->rebuildContainer();
 
     // Check that lolspeak is the default language for the site.
@@ -173,13 +161,12 @@ class TwigTransTest extends WebTestBase {
    * Test Twig "trans" debug markup.
    */
   public function testTwigTransDebug() {
-    // Enable twig debug and write to the test settings.php file.
-    $this->settingsSet('twig_debug', TRUE);
-    $settings['settings']['twig_debug'] = (object) array(
-      'value' => TRUE,
-      'required' => TRUE,
-    );
-    $this->writeSettings($settings);
+    // Enable debug, rebuild the service container, and clear all caches.
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['debug'] = TRUE;
+    $this->setContainerParameter('twig.config', $parameters);
+    $this->rebuildContainer();
+    $this->resetAll();
 
     // Get page for assertion testing.
     $this->drupalGet('twig-theme-test/trans', array('language' => \Drupal::languageManager()->getLanguage('xx')));
@@ -203,7 +190,7 @@ class TwigTransTest extends WebTestBase {
       '{{ token }}' => '<!-- TRANSLATION: "Escaped: @string" -->',
       '{{ token|passthrough }}' => '<!-- TRANSLATION: "Pass-through: !string" -->',
       '{{ token|placeholder }}' => '<!-- TRANSLATION: "Placeholder: %string" -->',
-      '{{ complex.tokens }}' => '<!-- TRANSLATION: "This @name has a length of: @count. It contains: %numbers and @bad_text. Lets pass the bad text through: !bad_text." -->',
+      '{{ complex.tokens }}' => '<!-- TRANSLATION: "This @token.name has a length of: @count. It contains: %token.numbers and @token.bad_text. Lets pass the bad text through: !token.bad_text." -->',
       '{% trans with {"context": "Lolspeak"} %}I have context.{% endtrans %}' => '<!-- TRANSLATION: "I have context.", CONTEXT: "Lolspeak" -->',
       '{% trans with {"langcode": "zz"} %}Hello new text.{% endtrans %}' => '<!-- TRANSLATION: "Hello new text.", LANGCODE: "zz" -->',
       '{% trans with {"context": "Lolspeak", "langcode": "zz"} %}Hello new text.{% endtrans %}' => '<!-- TRANSLATION: "Hello new text.", CONTEXT: "Lolspeak", LANGCODE: "zz" -->',
@@ -230,8 +217,8 @@ class TwigTransTest extends WebTestBase {
         $edit = array(
           'predefined_langcode' => 'custom',
           'langcode' => $langcode,
-          'name' => $name,
-          'direction' => '0',
+          'label' => $name,
+          'direction' => LanguageInterface::DIRECTION_LTR,
         );
 
         // Install the language in Drupal.
@@ -300,8 +287,8 @@ msgstr "PAS-THRU: !string"
 msgid "Placeholder: %string"
 msgstr "PLAYSHOLDR: %string"
 
-msgid "This @name has a length of: @count. It contains: %numbers and @bad_text. Lets pass the bad text through: !bad_text."
-msgstr "DIS @name HAZ LENGTH OV: @count. IT CONTAYNZ: %numbers AN @bad_text. LETS PAS TEH BAD TEXT THRU: !bad_text."
+msgid "This @token.name has a length of: @count. It contains: %token.numbers and @token.bad_text. Lets pass the bad text through: !token.bad_text."
+msgstr "DIS @token.name HAZ LENGTH OV: @count. IT CONTAYNZ: %token.numbers AN @token.bad_text. LETS PAS TEH BAD TEXT THRU: !token.bad_text."
 
 msgctxt "Lolspeak"
 msgid "I have context."

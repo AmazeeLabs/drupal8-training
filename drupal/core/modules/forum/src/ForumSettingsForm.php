@@ -8,6 +8,7 @@
 namespace Drupal\forum;
 
 use Drupal\Core\Form\ConfigFormBase;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Configure forum settings for this site.
@@ -24,7 +25,7 @@ class ForumSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('forum.settings');
 
     $options = array(5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100, 150, 200, 250, 300, 350, 400, 500);
@@ -63,11 +64,11 @@ class ForumSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->config('forum.settings')
-      ->set('topics.hot_threshold', $form_state['values']['forum_hot_topic'])
-      ->set('topics.page_limit', $form_state['values']['forum_per_page'])
-      ->set('topics.order', $form_state['values']['forum_order'])
+      ->set('topics.hot_threshold', $form_state->getValue('forum_hot_topic'))
+      ->set('topics.page_limit', $form_state->getValue('forum_per_page'))
+      ->set('topics.order', $form_state->getValue('forum_order'))
       ->save();
 
     parent::submitForm($form, $form_state);

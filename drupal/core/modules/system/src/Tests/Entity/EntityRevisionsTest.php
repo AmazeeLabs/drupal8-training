@@ -10,7 +10,10 @@ namespace Drupal\system\Tests\Entity;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests for the basic revisioning functionality of entities.
+ * Create a entity with revisions and test viewing, saving, reverting, and
+ * deleting revisions.
+ *
+ * @group Entity
  */
 class EntityRevisionsTest extends WebTestBase {
 
@@ -21,15 +24,7 @@ class EntityRevisionsTest extends WebTestBase {
    */
   public static $modules = array('entity_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity revisions',
-      'description' => 'Create a entity with revisions and test viewing, saving, reverting, and deleting revisions.',
-      'group' => 'Entity API',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create and login user.
@@ -79,8 +74,8 @@ class EntityRevisionsTest extends WebTestBase {
 
       $entity = entity_load($entity_type, $entity->id->value);
       $entity->setNewRevision(TRUE);
-      $names[] = $entity->name->value = $this->randomName(32);
-      $texts[] = $entity->field_test_text->value = $this->randomName(32);
+      $names[] = $entity->name->value = $this->randomMachineName(32);
+      $texts[] = $entity->field_test_text->value = $this->randomMachineName(32);
       $entity->save();
       $revision_ids[] = $entity->revision_id->value;
 
@@ -103,7 +98,7 @@ class EntityRevisionsTest extends WebTestBase {
     // Confirm the correct revision text appears in the edit form.
     $entity = entity_load($entity_type, $entity->id->value);
     $this->drupalGet($entity_type . '/manage/' . $entity->id->value);
-    $this->assertFieldById('edit-name', $entity->name->value, format_string('%entity_type: Name matches in UI.', array('%entity_type' => $entity_type)));
+    $this->assertFieldById('edit-name-0-value', $entity->name->value, format_string('%entity_type: Name matches in UI.', array('%entity_type' => $entity_type)));
     $this->assertFieldById('edit-field-test-text-0-value', $entity->field_test_text->value, format_string('%entity_type: Text matches in UI.', array('%entity_type' => $entity_type)));
   }
 }

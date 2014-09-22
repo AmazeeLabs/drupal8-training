@@ -8,7 +8,6 @@
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Language\Language;
 
 /**
  * Clears the entity render cache for all entity types.
@@ -16,7 +15,7 @@ use Drupal\Core\Language\Language;
 function entity_render_cache_clear() {
   $entity_manager = Drupal::entityManager();
   foreach ($entity_manager->getDefinitions() as $entity_type => $info) {
-    if ($entity_manager->hasController($entity_type, 'view_builder')) {
+    if ($entity_manager->hasHandler($entity_type, 'view_builder')) {
       $entity_manager->getViewBuilder($entity_type)->resetCache();
     }
   }
@@ -45,32 +44,6 @@ function entity_get_bundles($entity_type = NULL) {
 }
 
 /**
- * Notifies modules about an operation that was performed on a entity bundle.
- *
- * @param string $hook
- *   One of 'create', 'rename' or 'delete'.
- * @param string $entity_type
- *   The entity type to which the bundle is bound.
- * @param string $bundle
- *   The name of the bundle on which the operation was performed.
- * @param string|null $bundle_new
- *   The new name of the bundle in case of a 'rename' operation. Defaults to
- *   NULL.
- */
-function entity_invoke_bundle_hook($hook, $entity_type, $bundle, $bundle_new = NULL) {
-  \Drupal::entityManager()->clearCachedBundles();
-
-  // Notify the entity storage.
-  $method = 'onBundle' . ucfirst($hook);
-  $storage = \Drupal::entityManager()->getStorage($entity_type);
-  if (method_exists($storage, $method)) {
-    $storage->$method($bundle, $bundle_new);
-  }
-  // Invoke hook_entity_bundle_*() hooks.
-  \Drupal::moduleHandler()->invokeAll('entity_bundle_' . $hook, array($entity_type, $bundle, $bundle_new));
-}
-
-/**
  * Loads an entity from the database.
  *
  * @param string $entity_type
@@ -80,12 +53,12 @@ function entity_invoke_bundle_hook($hook, $entity_type, $bundle, $bundle_new = N
  * @param bool $reset
  *   Whether to reset the internal cache for the requested entity type.
  *
- * @return \Drupal\Core\Entity\EntityInterface
- *   The entity object, or NULL if there is no entity with the given id.
+ * @return \Drupal\Core\Entity\EntityInterface|null
+ *   The entity object, or NULL if there is no entity with the given ID.
  *
  * @see \Drupal\Core\Entity\EntityManagerInterface
  * @see \Drupal\Core\Entity\EntityStorageInterface
- * @see \Drupal\Core\Entity\ContentEntityDatabaseStorage
+ * @see \Drupal\Core\Entity\Sql\SqlContentEntityStorage
  * @see \Drupal\Core\Entity\Query\QueryInterface
  */
 function entity_load($entity_type, $id, $reset = FALSE) {
@@ -110,7 +83,7 @@ function entity_load($entity_type, $id, $reset = FALSE) {
  *
  * @see \Drupal\Core\Entity\EntityManagerInterface
  * @see \Drupal\Core\Entity\EntityStorageInterface
- * @see \Drupal\Core\Entity\ContentEntityDatabaseStorage
+ * @see \Drupal\Core\Entity\Sql\SqlContentEntityStorage
  */
 function entity_revision_load($entity_type, $revision_id) {
   return \Drupal::entityManager()
@@ -141,8 +114,6 @@ function entity_revision_delete($entity_type, $revision_id) {
  *   The entity type to load; e.g., 'node' or 'user'.
  * @param string $uuid
  *   The UUID of the entity to load.
- * @param bool $reset
- *   Whether to reset the internal cache for the requested entity type.
  *
  * @return EntityInterface|FALSE
  *   The entity object, or FALSE if there is no entity with the given UUID.
@@ -151,20 +122,11 @@ function entity_revision_delete($entity_type, $revision_id) {
  *   Thrown in case the requested entity type does not support UUIDs.
  *
  * @see \Drupal\Core\Entity\EntityManagerInterface
+ *
+ * @deprecated Use \Drupal::entityManager()->loadEntityByUuid();
  */
-function entity_load_by_uuid($entity_type_id, $uuid, $reset = FALSE) {
-  $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
-
-  if (!$uuid_key = $entity_type->getKey('uuid')) {
-    throw new EntityStorageException("Entity type $entity_type_id does not support UUIDs.");
-  }
-
-  $controller = \Drupal::entityManager()->getStorage($entity_type_id);
-  if ($reset) {
-    $controller->resetCache();
-  }
-  $entities = $controller->loadByProperties(array($uuid_key => $uuid));
-  return reset($entities);
+function entity_load_by_uuid($entity_type_id, $uuid) {
+  return \Drupal::entityManager()->loadEntityByUuid($entity_type_id, $uuid);
 }
 
 /**
@@ -176,13 +138,13 @@ function entity_load_by_uuid($entity_type_id, $uuid, $reset = FALSE) {
  *
  * The actual loading is done through a class that has to implement the
  * Drupal\Core\Entity\EntityStorageInterface interface. By default,
- * Drupal\Core\Entity\ContentEntityDatabaseStorage is used for content entities
+ * Drupal\Core\Entity\Sql\SqlContentEntityStorage is used for content entities
  * and Drupal\Core\Config\Entity\ConfigEntityStorage for config entities. Entity
  * types can specify that a different class should be used by setting the
  * "controllers['storage']" key in the entity plugin annotation. These classes
  * can either implement the Drupal\Core\Entity\EntityStorageInterface
  * interface, or, most commonly, extend the
- * Drupal\Core\Entity\ContentEntityDatabaseStorage class.
+ * Drupal\Core\Entity\Sql\SqlContentEntityStorage class.
  * See Drupal\node\Entity\Node and Drupal\node\NodeStorage
  * for an example.
  *
@@ -194,11 +156,11 @@ function entity_load_by_uuid($entity_type_id, $uuid, $reset = FALSE) {
  *   Whether to reset the internal cache for the requested entity type.
  *
  * @return array
- *   An array of entity objects indexed by their ids.
+ *   An array of entity objects indexed by their IDs.
  *
  * @see \Drupal\Core\Entity\EntityManagerInterface
  * @see \Drupal\Core\Entity\EntityStorageInterface
- * @see \Drupal\Core\Entity\ContentEntityDatabaseStorage
+ * @see \Drupal\Core\Entity\Sql\SqlContentEntityStorage
  * @see \Drupal\Core\Entity\Query\QueryInterface
  */
 function entity_load_multiple($entity_type, array $ids = NULL, $reset = FALSE) {
@@ -219,7 +181,8 @@ function entity_load_multiple($entity_type, array $ids = NULL, $reset = FALSE) {
  *   values are the values those properties must have.
  *
  * @return array
- *   An array of entity objects indexed by their ids.
+ *   An array of entity objects indexed by their IDs. Returns an empty array if
+ *   no matching entities found.
  */
 function entity_load_multiple_by_properties($entity_type, array $values) {
   return \Drupal::entityManager()
@@ -282,21 +245,6 @@ function entity_create($entity_type, array $values = array()) {
 }
 
 /**
- * Gets the entity controller class for an entity type.
- *
- * @return \Drupal\Core\Entity\EntityStorageInterface
- *
- * @see \Drupal\Core\Entity\EntityManagerInterface::getStorage()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
- *   Use \Drupal::entityManager()->getStorage().
- */
-function entity_get_controller($entity_type) {
-  return \Drupal::entityManager()
-    ->getStorage($entity_type);
-}
-
-/**
  * Returns the label of an entity.
  *
  * This is a wrapper for Drupal\Core\Entity\EntityInterface::label(). This function
@@ -316,25 +264,6 @@ function entity_get_controller($entity_type) {
  */
 function entity_page_label(EntityInterface $entity, $langcode = NULL) {
   return $entity->label($langcode);
-}
-
-/**
- * Returns the entity access controller for the given entity type.
- *
- * @param string $entity_type
- *   The type of the entity.
- *
- * @return \Drupal\Core\Entity\EntityAccessControllerInterface
- *   An entity access controller instance.
- *
- * @see \Drupal\Core\Entity\EntityManagerInterface::getAccessController().
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
- *   Use \Drupal::entityManager()->getAccessController().
- */
-function entity_access_controller($entity_type) {
-  return \Drupal::entityManager()
-    ->getAccessController($entity_type);
 }
 
 /**

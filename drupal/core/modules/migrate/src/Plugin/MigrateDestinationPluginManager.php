@@ -11,10 +11,18 @@ namespace Drupal\migrate\Plugin;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\Language\LanguageManager;
 use Drupal\migrate\Entity\MigrationInterface;
 
+/**
+ * Plugin manager for migrate destination plugins.
+ *
+ * @see \Drupal\migrate\Plugin\MigrateDestinationInterface
+ * @see \Drupal\migrate\Plugin\destination\DestinationBase
+ * @see \Drupal\migrate\Annotation\MigrateDestination
+ * @see plugin_api
+ *
+ * @ingroup migration
+ */
 class MigrateDestinationPluginManager extends MigratePluginManager {
 
   /**
@@ -34,8 +42,8 @@ class MigrateDestinationPluginManager extends MigratePluginManager {
   /**
    * {@inheritdoc}
    */
-  public function __construct($type, \Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ModuleHandlerInterface $module_handler, EntityManagerInterface $entity_manager, $annotation = 'Drupal\migrate\Annotation\MigrateDestination') {
-    parent::__construct($type, $namespaces, $cache_backend, $language_manager, $module_handler, $annotation);
+  public function __construct($type, \Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler, EntityManagerInterface $entity_manager, $annotation = 'Drupal\migrate\Annotation\MigrateDestination') {
+    parent::__construct($type, $namespaces, $cache_backend, $module_handler, $annotation);
     $this->entityManager = $entity_manager;
   }
 

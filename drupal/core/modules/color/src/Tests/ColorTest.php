@@ -10,7 +10,10 @@ namespace Drupal\color\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the Color module functionality.
+ * Modify the Bartik theme colors and make sure the changes are reflected on the
+ * frontend.
+ *
+ * @group color
  */
 class ColorTest extends WebTestBase {
 
@@ -45,18 +48,10 @@ class ColorTest extends WebTestBase {
    */
   protected $colorTests;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Color functionality',
-      'description' => 'Modify the Bartik theme colors and make sure the changes are reflected on the frontend.',
-      'group' => 'Color',
-    );
-  }
-
   /**
    * {@inheritdoc}
    */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create user.
@@ -71,11 +66,11 @@ class ColorTest extends WebTestBase {
       ),
       'color_test_theme' => array(
         'palette_input' => 'palette[bg]',
-        'scheme' => '',
+        'scheme' => 'custom',
         'scheme_color' => '#3b3b3b',
       ),
     );
-    theme_enable(array_keys($this->themes));
+    \Drupal::service('theme_handler')->install(array_keys($this->themes));
 
     // Array filled with valid and not valid color values.
     $this->colorTests = array(

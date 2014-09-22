@@ -7,6 +7,7 @@
 
 namespace Drupal\Core\Page;
 
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Template\Attribute;
 
 /**
@@ -75,6 +76,47 @@ class HtmlPage extends HtmlFragment {
    */
   public function getHtmlAttributes() {
     return $this->htmlAttributes;
+  }
+
+  /**
+   * Implodes the meta and link elements for the template.
+   *
+   * @return string
+   *   A string of meta and link tags.
+   */
+  public function getHead() {
+    // Each MetaElement or LinkElement is a subclass of
+    // \Drupal\Core\Page\HeadElement and generates safe output when __toString()
+    // is called on it. Thus, the whole concatenation is also safe.
+    return SafeMarkup::set(implode("\n", $this->getMetaElements()) . implode("\n", $this->getLinkElements()));
+  }
+
+  /**
+   * Returns a themed presentation of all JavaScript code for the current page.
+   *
+   * @param string $scope
+   *   (optional) The scope for which the JavaScript rules should be returned.
+   *   Defaults to 'header'.
+   *
+   * @return string
+   *   All JavaScript code segments and includes for the scope as HTML tags.
+   *
+   * @see drupal_get_js()
+   */
+  public function getScripts($scope = 'header') {
+    return drupal_get_js($scope);
+  }
+
+  /**
+   * Returns a themed representation of all stylesheets to attach to the page.
+   *
+   * @return string
+   *   A string of XHTML CSS tags.
+   *
+   * @see drupal_get_css()
+   */
+  public function getStyles() {
+    return drupal_get_css();
   }
 
   /**

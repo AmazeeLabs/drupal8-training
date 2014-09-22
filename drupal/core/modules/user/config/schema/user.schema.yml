@@ -12,7 +12,7 @@ user.settings:
       label: 'Name'
     verify_mail:
       type: boolean
-      label: 'Require e-mail verification when a visitor creates an account.'
+      label: 'Require email verification when a visitor creates an account'
     notify:
       type: mapping
       label: 'Notify user'
@@ -25,7 +25,7 @@ user.settings:
           label: 'Notify user when password reset'
         status_activated:
           type: boolean
-          label: 'Notify user when account is activated.'
+          label: 'Notify user when account is activated'
         status_blocked:
           type: boolean
           label: 'Account blocked'
@@ -46,7 +46,7 @@ user.settings:
       label: 'Who can register accounts?'
     signatures:
       type: boolean
-      label: 'Enable signatures.'
+      label: 'Enable signatures'
     cancel_method:
       type: string
       label: 'When cancelling a user account'
@@ -62,7 +62,7 @@ user.settings:
 
 user.mail:
  type: mapping
- label: 'E-mail settings'
+ label: 'Email settings'
  mapping:
   cancel_confirm:
     type: mail
@@ -116,18 +116,15 @@ user.flood:
       label: 'User window'
 
 user.role.*:
-  type: mapping
+  type: config_entity
   label: 'User role settings'
   mapping:
     id:
       type: string
-      label: 'User role ID'
-    uuid:
-      type: string
-      label: 'UUID'
+      label: 'ID'
     label:
       type: label
-      label: 'User role label'
+      label: 'Label'
     weight:
       type: integer
       label: 'User role weight'
@@ -137,12 +134,6 @@ user.role.*:
       sequence:
         - type: string
           label: 'Permission'
-    status:
-      type: boolean
-      label: 'Status'
-    langcode:
-      type: string
-      label: 'Default language'
 
 action.configuration.user_add_role_action:
   type: mapping
@@ -175,5 +166,11 @@ action.configuration.user_unblock_user_action:
 search.plugin.user_search:
   type: sequence
   label: 'User search'
-  sequence:
-    - type: undefined
+
+condition.plugin.user_role:
+  type: condition.plugin
+  mapping:
+    roles:
+      type: sequence
+      sequence:
+        - type: string

@@ -10,7 +10,9 @@ namespace Drupal\user\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests resetting a user password.
+ * Ensure that password reset methods work as expected.
+ *
+ * @group user
  */
 class UserPasswordResetTest extends WebTestBase {
   /**
@@ -20,15 +22,7 @@ class UserPasswordResetTest extends WebTestBase {
    */
   protected $account;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Reset password',
-      'description' => 'Ensure that password reset methods work as expected.',
-      'group' => 'User',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a user.
@@ -43,7 +37,7 @@ class UserPasswordResetTest extends WebTestBase {
     // Set the last login time that is used to generate the one-time link so
     // that it is definitely over a second ago.
     $account->login = REQUEST_TIME - mt_rand(10, 100000);
-    db_update('users')
+    db_update('users_field_data')
       ->fields(array('login' => $account->getLastLoginTime()))
       ->condition('uid', $account->id())
       ->execute();
@@ -56,20 +50,20 @@ class UserPasswordResetTest extends WebTestBase {
     // Try to reset the password for an invalid account.
     $this->drupalGet('user/password');
 
-    $edit = array('name' => $this->randomName(32));
-    $this->drupalPostForm(NULL, $edit, t('E-mail new password'));
+    $edit = array('name' => $this->randomMachineName(32));
+    $this->drupalPostForm(NULL, $edit, t('Email new password'));
 
-    $this->assertText(t('Sorry, @name is not recognized as a username or an e-mail address.', array('@name' => $edit['name'])), 'Validation error message shown when trying to request password for invalid account.');
-    $this->assertEqual(count($this->drupalGetMails(array('id' => 'user_password_reset'))), 0, 'No e-mail was sent when requesting a password for an invalid account.');
+    $this->assertText(t('Sorry, @name is not recognized as a username or an email address.', array('@name' => $edit['name'])), 'Validation error message shown when trying to request password for invalid account.');
+    $this->assertEqual(count($this->drupalGetMails(array('id' => 'user_password_reset'))), 0, 'No email was sent when requesting a password for an invalid account.');
 
     // Reset the password by username via the password reset page.
     $edit['name'] = $this->account->getUsername();
-    $this->drupalPostForm(NULL, $edit, t('E-mail new password'));
+    $this->drupalPostForm(NULL, $edit, t('Email new password'));
 
-     // Verify that the user was sent an e-mail.
-    $this->assertMail('to', $this->account->getEmail(), 'Password e-mail sent to user.');
+     // Verify that the user was sent an email.
+    $this->assertMail('to', $this->account->getEmail(), 'Password email sent to user.');
     $subject = t('Replacement login information for @username at @site', array('@username' => $this->account->getUsername(), '@site' => \Drupal::config('system.site')->get('name')));
-    $this->assertMail('subject', $subject, 'Password reset e-mail subject is correct.');
+    $this->assertMail('subject', $subject, 'Password reset email subject is correct.');
 
     $resetURL = $this->getResetURL();
     $this->drupalGet($resetURL);
@@ -98,13 +92,13 @@ class UserPasswordResetTest extends WebTestBase {
     $this->drupalGet($resetURL);
     $this->assertText(t('You have tried to use a one-time login link that has either been used or is no longer valid. Please request a new one using the form below.'), 'One-time link is no longer valid.');
 
-    // Request a new password again, this time using the e-mail address.
+    // Request a new password again, this time using the email address.
     $this->drupalGet('user/password');
     // Count email messages before to compare with after.
     $before = count($this->drupalGetMails(array('id' => 'user_password_reset')));
     $edit = array('name' => $this->account->getEmail());
-    $this->drupalPostForm(NULL, $edit, t('E-mail new password'));
-    $this->assertTrue( count($this->drupalGetMails(array('id' => 'user_password_reset'))) === $before + 1, 'E-mail sent when requesting password reset using e-mail address.');
+    $this->drupalPostForm(NULL, $edit, t('Email new password'));
+    $this->assertTrue( count($this->drupalGetMails(array('id' => 'user_password_reset'))) === $before + 1, 'Email sent when requesting password reset using email address.');
 
     // Create a password reset link as if the request time was 60 seconds older than the allowed limit.
     $timeout = \Drupal::config('user.settings')->get('password_reset_timeout');
@@ -112,10 +106,17 @@ class UserPasswordResetTest extends WebTestBase {
     $_uid = $this->account->id();
     $this->drupalGet("user/reset/$_uid/$bogus_timestamp/" . user_pass_rehash($this->account->getPassword(), $bogus_timestamp, $this->account->getLastLoginTime()));
     $this->assertText(t('You have tried to use a one-time login link that has expired. Please request a new one using the form below.'), 'Expired password reset request rejected.');
+
+    // Create a user, block the account, and verify that a login link is denied.
+    $timestamp = REQUEST_TIME - 1;
+    $blocked_account = $this->drupalCreateUser()->block();
+    $blocked_account->save();
+    $this->drupalGet("user/reset/" . $blocked_account->id() . "/$timestamp/" . user_pass_rehash($blocked_account->getPassword(), $timestamp, $blocked_account->getLastLoginTime()));
+    $this->assertResponse(403);
   }
 
   /**
-   * Retrieves password reset e-mail and extracts the login link.
+   * Retrieves password reset email and extracts the login link.
    */
   public function getResetURL() {
     // Assume the most recent email.
@@ -133,8 +134,8 @@ class UserPasswordResetTest extends WebTestBase {
   public function testUserResetPasswordTextboxFilled() {
     $this->drupalGet('user/login');
     $edit = array(
-      'name' => $this->randomName(),
-      'pass' => $this->randomName(),
+      'name' => $this->randomMachineName(),
+      'pass' => $this->randomMachineName(),
     );
     $this->drupalPostForm('user', $edit, t('Log in'));
     $this->assertRaw(t('Sorry, unrecognized username or password. <a href="@password">Have you forgotten your password?</a>',

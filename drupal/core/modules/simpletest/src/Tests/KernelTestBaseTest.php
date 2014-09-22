@@ -11,6 +11,8 @@ use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests KernelTestBase functionality.
+ *
+ * @group simpletest
  */
 class KernelTestBaseTest extends KernelTestBase {
 
@@ -19,28 +21,30 @@ class KernelTestBaseTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('entity', 'entity_test');
+  public static $modules = array('entity_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'KernelTestBase',
-      'description' => 'Tests KernelTestBase functionality.',
-      'group' => 'SimpleTest',
-    );
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    $original_container = \Drupal::getContainer();
+    parent::setUp();
+    $this->assertNotIdentical(\Drupal::getContainer(), $original_container, 'KernelTestBase test creates a new container.');
   }
 
   /**
    * Tests expected behavior of setUp().
    */
   function testSetUp() {
-    $modules = array('entity', 'entity_test');
+    $modules = array('entity_test');
     $table = 'entity_test';
 
     // Verify that specified $modules have been loaded.
-    $this->assertTrue(function_exists('entity_test_permission'), 'entity_test.module was loaded.');
+    $this->assertTrue(function_exists('entity_test_entity_bundle_info'), 'entity_test.module was loaded.');
     // Verify that there is a fixed module list.
     $this->assertIdentical(array_keys(\Drupal::moduleHandler()->getModuleList()), $modules);
-    $this->assertIdentical(\Drupal::moduleHandler()->getImplementations('permission'), $modules);
+    $this->assertIdentical(\Drupal::moduleHandler()->getImplementations('entity_bundle_info'), ['entity_test']);
+    $this->assertIdentical(\Drupal::moduleHandler()->getImplementations('entity_type_alter'), ['entity_test']);
 
     // Verify that no modules have been installed.
     $this->assertFalse(db_table_exists($table), "'$table' database table not found.");
@@ -56,8 +60,8 @@ class KernelTestBaseTest extends KernelTestBase {
     $this->assertFalse(\Drupal::moduleHandler()->moduleExists($module), "$module module not found.");
     $list = array_keys(\Drupal::moduleHandler()->getModuleList());
     $this->assertFalse(in_array($module, $list), "$module module not found in the extension handler's module list.");
-    $list = \Drupal::moduleHandler()->getImplementations('permission');
-    $this->assertFalse(in_array($module, $list), "{$module}_permission() in \Drupal::moduleHandler()->getImplementations() not found.");
+    $list = \Drupal::moduleHandler()->getImplementations('entity_display_build_alter');
+    $this->assertFalse(in_array($module, $list), "{$module}_entity_display_build_alter() in \Drupal::moduleHandler()->getImplementations() not found.");
 
     // Enable the module.
     $this->enableModules(array($module));
@@ -66,23 +70,23 @@ class KernelTestBaseTest extends KernelTestBase {
     $this->assertTrue(\Drupal::moduleHandler()->moduleExists($module), "$module module found.");
     $list = array_keys(\Drupal::moduleHandler()->getModuleList());
     $this->assertTrue(in_array($module, $list), "$module module found in the extension handler's module list.");
-    $list = \Drupal::moduleHandler()->getImplementations('permission');
-    $this->assertTrue(in_array($module, $list), "{$module}_permission() in \Drupal::moduleHandler()->getImplementations() found.");
+    $list = \Drupal::moduleHandler()->getImplementations('query_efq_table_prefixing_test_alter');
+    $this->assertTrue(in_array($module, $list), "{$module}_query_efq_table_prefixing_test_alter() in \Drupal::moduleHandler()->getImplementations() found.");
   }
 
   /**
    * Tests expected installation behavior of enableModules().
    */
   function testEnableModulesInstall() {
-    $module = 'node';
-    $table = 'node';
+    $module = 'module_test';
+    $table = 'module_test';
 
     // Verify that the module does not exist yet.
     $this->assertFalse(\Drupal::moduleHandler()->moduleExists($module), "$module module not found.");
     $list = array_keys(\Drupal::moduleHandler()->getModuleList());
     $this->assertFalse(in_array($module, $list), "$module module not found in the extension handler's module list.");
-    $list = \Drupal::moduleHandler()->getImplementations('permission');
-    $this->assertFalse(in_array($module, $list), "{$module}_permission() in \Drupal::moduleHandler()->getImplementations() not found.");
+    $list = \Drupal::moduleHandler()->getImplementations('hook_info');
+    $this->assertFalse(in_array($module, $list), "{$module}_hook_info() in \Drupal::moduleHandler()->getImplementations() not found.");
 
     $this->assertFalse(db_table_exists($table), "'$table' database table not found.");
     $schema = drupal_get_schema($table, TRUE);
@@ -95,8 +99,8 @@ class KernelTestBaseTest extends KernelTestBase {
     $this->assertTrue(\Drupal::moduleHandler()->moduleExists($module), "$module module found.");
     $list = array_keys(\Drupal::moduleHandler()->getModuleList());
     $this->assertTrue(in_array($module, $list), "$module module found in the extension handler's module list.");
-    $list = \Drupal::moduleHandler()->getImplementations('permission');
-    $this->assertTrue(in_array($module, $list), "{$module}_permission() in \Drupal::moduleHandler()->getImplementations() found.");
+    $list = \Drupal::moduleHandler()->getImplementations('hook_info');
+    $this->assertTrue(in_array($module, $list), "{$module}_hook_info() in \Drupal::moduleHandler()->getImplementations() found.");
 
     $this->assertTrue(db_table_exists($table), "'$table' database table found.");
     $schema = drupal_get_schema($table);
@@ -108,9 +112,9 @@ class KernelTestBaseTest extends KernelTestBase {
    */
   function testEnableModulesInstallContainer() {
     // Install Node module.
-    $this->enableModules(array('field', 'node'));
+    $this->enableModules(array('user', 'field', 'node'));
 
-    $this->installSchema('node', array('node', 'node_field_data'));
+    $this->installEntitySchema('node', array('node', 'node_field_data'));
     // Perform an entity query against node.
     $query = \Drupal::entityQuery('node');
     // Disable node access checks, since User module is not enabled.
@@ -125,7 +129,7 @@ class KernelTestBaseTest extends KernelTestBase {
    */
   function testInstallSchema() {
     $module = 'entity_test';
-    $table = 'entity_test';
+    $table = 'entity_test_example';
     // Verify that we can install a table from the module schema.
     $this->installSchema($module, $table);
     $this->assertTrue(db_table_exists($table), "'$table' database table found.");
@@ -172,6 +176,18 @@ class KernelTestBaseTest extends KernelTestBase {
   }
 
   /**
+   * Tests expected behavior of installEntitySchema().
+   */
+  function testInstallEntitySchema() {
+    $entity = 'entity_test';
+    // The entity_test Entity has a field that depends on the User module.
+    $this->enableModules(array('user'));
+    // Verity that the entity schema is created properly.
+    $this->installEntitySchema($entity);
+    $this->assertTrue(db_table_exists($entity), "'$entity' database table found.");
+  }
+
+  /**
    * Tests expected behavior of installConfig().
    */
   function testInstallConfig() {
@@ -199,7 +215,7 @@ class KernelTestBaseTest extends KernelTestBase {
    */
   function testEnableModulesFixedList() {
     // Install system module.
-    $this->container->get('module_handler')->install(array('system', 'menu_link'));
+    $this->container->get('module_handler')->install(array('system', 'menu_link_content'));
     $entity_manager = \Drupal::entityManager();
 
     // entity_test is loaded via $modules; its entity type should exist.
@@ -207,7 +223,7 @@ class KernelTestBaseTest extends KernelTestBase {
     $this->assertTrue(TRUE == $entity_manager->getDefinition('entity_test'));
 
     // Load some additional modules; entity_test should still exist.
-    $this->enableModules(array('entity', 'field', 'text', 'entity_test'));
+    $this->enableModules(array('field', 'text', 'entity_test'));
     $this->assertEqual($this->container->get('module_handler')->moduleExists('entity_test'), TRUE);
     $this->assertTrue(TRUE == $entity_manager->getDefinition('entity_test'));
 
@@ -222,28 +238,27 @@ class KernelTestBaseTest extends KernelTestBase {
     $this->assertTrue(TRUE == $entity_manager->getDefinition('entity_test'));
 
     // Set the weight of a module; entity_test should still exist.
-    module_set_weight('entity', -1);
+    module_set_weight('field', -1);
     $this->assertEqual($this->container->get('module_handler')->moduleExists('entity_test'), TRUE);
     $this->assertTrue(TRUE == $entity_manager->getDefinition('entity_test'));
 
     // Reactivate the previously uninstalled module.
     $this->enableModules(array('field_test'));
 
-    // Create a field and an instance.
+    // Create a field.
     entity_create('entity_view_display', array(
       'targetEntityType' => 'entity_test',
       'bundle' => 'entity_test',
       'mode' => 'default',
     ));
-    $field = entity_create('field_config', array(
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'entity_test',
       'type' => 'test_field'
     ));
-    $field->save();
-    entity_create('field_instance_config', array(
-      'field_name' => $field->name,
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'entity_test',
     ))->save();
   }
@@ -264,6 +279,20 @@ class KernelTestBaseTest extends KernelTestBase {
     $element = $original_element;
     $this->disableModules(array('entity_test'));
     $this->assertTrue(drupal_render($element));
+  }
+
+  /**
+   * Tests that there is no theme by default.
+   */
+  function testNoThemeByDefault() {
+    $themes = $this->container->get('config.factory')->get('core.extension')->get('theme');
+    $this->assertEqual($themes, array());
+
+    $extensions = $this->container->get('config.storage')->read('core.extension');
+    $this->assertEqual($extensions['theme'], array());
+
+    $active_theme = $this->container->get('theme.manager')->getActiveTheme();
+    $this->assertEqual($active_theme->getName(), 'core');
   }
 
   /**

@@ -28,8 +28,8 @@ class Server
     private static $client;
 
     public static $started;
-    public static $url = 'http://127.0.0.1:8124/';
-    public static $port = 8124;
+    public static $url = 'http://127.0.0.1:8125/';
+    public static $port = 8125;
 
     /**
      * Flush the received requests from the server
@@ -37,7 +37,9 @@ class Server
      */
     public static function flush()
     {
-        self::$started && self::$client->delete('guzzle-server/requests');
+        self::start();
+
+        return self::$client->delete('guzzle-server/requests');
     }
 
     /**
@@ -126,7 +128,7 @@ class Server
         self::$started = false;
     }
 
-    public static function wait($maxTries = 3)
+    public static function wait($maxTries = 5)
     {
         $tries = 0;
         while (!self::isListening() && ++$tries < $maxTries) {

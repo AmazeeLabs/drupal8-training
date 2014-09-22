@@ -13,6 +13,7 @@ use Drupal\views\Tests\ViewTestData;
 /**
  * Tests basic integration of views data from the statistics module.
  *
+ * @group statistics
  * @see
  */
 class IntegrationTest extends ViewTestBase {
@@ -46,14 +47,6 @@ class IntegrationTest extends ViewTestBase {
    */
   public static $testViews = array('test_statistics_integration');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Statistics: Integration tests',
-      'description' => 'Tests basic integration of views data from the statistics module.',
-      'group' => 'Views module integration',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
 
@@ -62,6 +55,7 @@ class IntegrationTest extends ViewTestBase {
     // Create a new user for viewing nodes.
     $this->webUser = $this->drupalCreateUser(array('access content'));
 
+    $this->drupalCreateContentType(array('type' => 'page'));
     $this->node = $this->drupalCreateNode(array('type' => 'page'));
 
     // Enable access logging.

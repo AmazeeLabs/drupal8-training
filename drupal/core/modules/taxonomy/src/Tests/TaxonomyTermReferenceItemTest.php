@@ -7,14 +7,16 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FieldItemInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\field\Tests\FieldUnitTestBase;
 
 /**
  * Tests the new entity API for the taxonomy term reference field type.
+ *
+ * @group taxonomy
  */
 class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
 
@@ -23,7 +25,7 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('taxonomy', 'options', 'text', 'filter');
+  public static $modules = array('taxonomy', 'entity_reference', 'options', 'text', 'filter');
 
   /**
    * The term entity.
@@ -32,31 +34,22 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
    */
   protected $term;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Taxonomy reference field item',
-      'description' => 'Tests using entity fields of the taxonomy term reference field type.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('taxonomy', 'taxonomy_term_data');
-    $this->installSchema('taxonomy', 'taxonomy_term_hierarchy');
+    $this->installEntitySchema('taxonomy_term');
 
     $vocabulary = entity_create('taxonomy_vocabulary', array(
-      'name' => $this->randomName(),
-      'vid' => drupal_strtolower($this->randomName()),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'name' => $this->randomMachineName(),
+      'vid' => drupal_strtolower($this->randomMachineName()),
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $vocabulary->save();
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => 'field_test_taxonomy',
       'entity_type' => 'entity_test',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -66,15 +59,15 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
         ),
       ),
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'entity_type' => 'entity_test',
       'field_name' => 'field_test_taxonomy',
       'bundle' => 'entity_test',
     ))->save();
     $this->term = entity_create('taxonomy_term', array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'vid' => $vocabulary->id(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $this->term->save();
   }
@@ -87,7 +80,7 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
     // Just being able to create the entity like this verifies a lot of code.
     $entity = entity_create('entity_test');
     $entity->field_test_taxonomy->target_id = $this->term->id();
-    $entity->name->value = $this->randomName();
+    $entity->name->value = $this->randomMachineName();
     $entity->save();
 
     $entity = entity_load('entity_test', $entity->id());
@@ -99,7 +92,7 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
     $this->assertEqual($entity->field_test_taxonomy->entity->uuid(), $this->term->uuid(), 'Field item entity contains the expected UUID.');
 
     // Change the name of the term via the reference.
-    $new_name = $this->randomName();
+    $new_name = $this->randomMachineName();
     $entity->field_test_taxonomy->entity->setName($new_name);
     $entity->field_test_taxonomy->entity->save();
     // Verify it is the correct name.
@@ -108,15 +101,20 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
 
     // Make sure the computed term reflects updates to the term id.
     $term2 = entity_create('taxonomy_term', array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'vid' => $this->term->getVocabularyId(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $term2->save();
 
     $entity->field_test_taxonomy->target_id = $term2->id();
     $this->assertEqual($entity->field_test_taxonomy->entity->id(), $term2->id(), 'Field item entity contains the new TID.');
     $this->assertEqual($entity->field_test_taxonomy->entity->getName(), $term2->getName(), 'Field item entity contains the new name.');
+
+    // Test sample item generation.
+    $entity = entity_create('entity_test');
+    $entity->field_test_taxonomy->generateSampleItems();
+    $this->entityValidateAndSave($entity);
   }
 
 }

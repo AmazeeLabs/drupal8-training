@@ -20,50 +20,30 @@
 /**
  * Password strength indicator.
  */
-.password-strength {
-  width: 13em;
-  float: right;  /* LTR */
-}
-[dir="rtl"] .password-strength {
-  float: left;
-}
-.password-strength-title {
+.password-strength__title,
+.password-strength__text {
   display: inline;
 }
-.password-strength-text {
-  float: right; /* LTR */
-  font-weight: bold;
+.password-strength__meter {
+  background-color: #ebeae4;
+  height: 0.75em;
+  margin-top: 0.5em;
 }
-[dir="rtl"] .password-strength-text {
-  float: left;
-}
-.password-indicator {
-  background-color: #c4c4c4;
-  height: 0.3em;
-  width: 100%;
-}
-.password-indicator div {
+.password-strength__indicator {
   height: 100%;
   width: 0%;
-  background-color: #47c965;
+  background-color: #77b259;
+  -webkit-transition: width 0.5s ease-out;
+  transition: width 0.5s ease-out;
 }
 input.password-confirm,
-input.password-field {
-  width: 13.7em;
-  margin-bottom: 0.4em;
-  float: left; /* LTR */
+input.password-field,
+.password-strength {
+  width: 55%;
 }
 div.password-confirm {
-  float: right;  /* LTR */
   visibility: hidden;
-  width: 13em;
-}
-[dir="rtl"] input.password-confirm,
-[dir="rtl"] input.password-field {
-  float: right;
-}
-[dir="rtl"] div.password-confirm {
-  float: left;
+  width: 55%;
 }
 div.form-item div.password-suggestions {
   padding: 0.2em 0.5em;
@@ -85,35 +65,15 @@ div.password-suggestions ul {
 [dir="rtl"] .password-parent {
   clear: right;
 }
-
-/**
- * Password strength indicator on narrow viewport.
- */
-@media screen and (max-width: 600px) {
-  .password-strength,
-  div.password-confirm {
-    float: none;
-    width: auto;
-    max-width: 100%;
-  }
-  .password-indicator {
-    margin-bottom: 0.4em;
-  }
-  input.password-confirm,
-  input.password-field {
-    margin-bottom: 0;
-    width: 100%;
-    max-width: none;
-  }
-  div.form-item div.password-suggestions {
-    width: auto;
-    max-width: 100%;
-  }
-  .confirm-parent,
-  .password-parent {
-    clear: none;
-    width: 100%;
-    max-width: none;
-    overflow: hidden;
-  }
+.password-strength__indicator.is-weak {
+  background-color: #e62600;
+}
+.password-strength__indicator.is-fair {
+  background-color: #e09600;
+}
+.password-strength__indicator.is-good {
+  background-color: #0074bd;
+}
+.password-strength__indicator.is-strong {
+  background-color: #77b259;
 }

@@ -42,7 +42,7 @@ use Drupal\Core\Asset\CssOptimizer;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the CssOptimizer class.
+ * Tests the CSS asset optimizer.
  *
  * @group Asset
  */
@@ -69,15 +69,7 @@ class CssOptimizerUnitTest extends UnitTestCase {
    */
   protected $inline_css_group;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'CSS asset optimizer functionality',
-      'description' => 'Tests the CSS asset optimizer.',
-      'group' => 'Asset handling',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->optimizer = new CssOptimizer();
@@ -174,6 +166,7 @@ class CssOptimizerUnitTest extends UnitTestCase {
       ),
       // File in subfolder. Tests:
       // - CSS import path is properly interpreted. (https://drupal.org/node/1198904)
+      // - Don't adjust data URIs (https://drupal.org/node/2142441)
       5 => array(
         array(
           'group' => -100,

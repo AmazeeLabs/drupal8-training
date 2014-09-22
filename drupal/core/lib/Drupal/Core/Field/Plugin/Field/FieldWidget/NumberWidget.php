@@ -9,6 +9,7 @@ namespace Drupal\Core\Field\Plugin\Field\FieldWidget;
 
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\WidgetBase;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
@@ -38,7 +39,7 @@ class NumberWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     $element['placeholder'] = array(
       '#type' => 'textfield',
       '#title' => t('Placeholder'),
@@ -68,7 +69,7 @@ class NumberWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, array &$form_state) {
+  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
     $value = isset($items[$delta]->value) ? $items[$delta]->value : NULL;
     $field_settings = $this->getFieldSettings();
 
@@ -100,11 +101,11 @@ class NumberWidget extends WidgetBase {
     // Add prefix and suffix.
     if ($field_settings['prefix']) {
       $prefixes = explode('|', $field_settings['prefix']);
-      $element['#field_prefix'] = field_filter_xss(array_pop($prefixes));
+      $element['#field_prefix'] = $this->fieldFilterXss(array_pop($prefixes));
     }
     if ($field_settings['suffix']) {
       $suffixes = explode('|', $field_settings['suffix']);
-      $element['#field_suffix'] = field_filter_xss(array_pop($suffixes));
+      $element['#field_suffix'] = $this->fieldFilterXss(array_pop($suffixes));
     }
 
     return array('value' => $element);
@@ -113,7 +114,7 @@ class NumberWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function errorElement(array $element, ConstraintViolationInterface $error, array $form, array &$form_state) {
+  public function errorElement(array $element, ConstraintViolationInterface $violation, array $form, FormStateInterface $form_state) {
     return $element['value'];
   }
 

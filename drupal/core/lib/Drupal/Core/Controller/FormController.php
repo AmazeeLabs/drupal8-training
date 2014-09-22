@@ -7,9 +7,9 @@
 
 namespace Drupal\Core\Controller;
 
-use Drupal\Core\DependencyInjection\DependencySerialization;
-use Drupal\Core\Controller\ControllerResolverInterface;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Form\FormState;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -17,8 +17,8 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @todo Make this a trait in PHP 5.4.
  */
-abstract class FormController extends DependencySerialization {
-
+abstract class FormController {
+  use DependencySerializationTrait;
   /**
    * The form definition. The format may vary depending on the child class.
    *
@@ -67,7 +67,7 @@ abstract class FormController extends DependencySerialization {
 
     // Add the form and form_state to trick the getArguments method of the
     // controller resolver.
-    $form_state = array();
+    $form_state = new FormState();
     $request->attributes->set('form', array());
     $request->attributes->set('form_state', $form_state);
     $args = $this->controllerResolver->getArguments($request, array($form_object, 'buildForm'));
@@ -76,10 +76,9 @@ abstract class FormController extends DependencySerialization {
 
     // Remove $form and $form_state from the arguments, and re-index them.
     unset($args[0], $args[1]);
-    $form_state['build_info']['args'] = array_values($args);
+    $form_state->addBuildInfo('args', array_values($args));
 
-    $form_id = $this->formBuilder->getFormId($form_object, $form_state);
-    return $this->formBuilder->buildForm($form_id, $form_state);
+    return $this->formBuilder->buildForm($form_object, $form_state);
   }
 
   /**

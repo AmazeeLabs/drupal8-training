@@ -13,6 +13,8 @@ use Drupal\user;
  * Interface for typed data objects.
  *
  * @see \Drupal\Core\TypedData\DataDefinitionInterface
+ *
+ * @ingroup typed_data
  */
 interface TypedDataInterface {
 
@@ -42,6 +44,8 @@ interface TypedDataInterface {
    *   TRUE. If a property is updated from a parent object, set it to FALSE to
    *   avoid being notified again.
    *
+   * @throws \InvalidArgumentException
+   *   If the value input is inappropriate.
    * @throws \Drupal\Core\TypedData\ReadOnlyException
    *   If the data is read-only.
    */

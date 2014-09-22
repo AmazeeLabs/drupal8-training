@@ -7,26 +7,25 @@
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\comment\CommentInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Core\Session\AccountInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Implements hook_help().
  */
-function tracker_help($route_name, Request $request) {
+function tracker_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.tracker':
       $output = '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Tracker module displays the most recently added and updated content on your site, and allows you to follow new content created by each user. This module has no configuration options. For more information, see the online handbook entry for <a href="@tracker">Tracker module</a>.', array('@tracker' => 'http://drupal.org/documentation/modules/tracker')) . '</p>';
+      $output .= '<p>' . t('The Tracker module displays the most recently added and updated content on your site, and allows you to follow new content created by each user. This module has no configuration options. For more information, see the <a href="!tracker">online documentation for the Tracker module</a>.', array('!tracker' => 'https://drupal.org/documentation/modules/tracker')) . '</p>';
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
-      $output .= '<dt>' . t('Tracker navigation') . '</dt>';
-      $output .= '<dd>' . t('The Tracker module adds a new menu item to the Tools menu, called <em>Recent content</em>. You can configure menu items via the <a href="@menus">Menus administration page</a>.', array('@menus' => url('admin/structure/menu'))) . '</dd>';
       $output .= '<dt>' . t('Tracking new and updated site content') . '</dt>';
-      $output .= '<dd>' . t("The <a href='@recent'>Recent content</a> page shows new and updated content in reverse chronological order, listing the content type, title, author's name, number of comments, and time of last update. Content is considered updated when changes occur in the text, or when new comments are added. The <em>My recent content</em> tab limits the list to the currently logged-in user.", array('@recent' => url('tracker'))) . '</dd>';
+      $output .= '<dd>' . t('The <a href="!recent">Recent content</a> page shows new and updated content in reverse chronological order, listing the content type, title, author\'s name, number of comments, and time of last update. Content is considered updated when changes occur in the text, or when new comments are added. The <em>My recent content</em> tab limits the list to the currently logged-in user.', array('!recent' => \Drupal::url('tracker.page'))) . '</dd>';
       $output .= '<dt>' . t('Tracking user-specific content') . '</dt>';
-      $output .= '<dd>' . t("To follow a specific user's new and updated content, select the <em>Track</em> tab from the user's profile page.") . '</dd>';
+      $output .= '<dd>' . t("To follow a specific user's new and updated content, select the <em>Activity</em> tab from the user's profile page.") . '</dd>';
       $output .= '</dl>';
       return $output;
   }
@@ -39,36 +38,41 @@ function tracker_help($route_name, Request $request) {
  * 'tracker.index_nid' is set to ((the last node ID that was indexed) - 1) and
  * used to select the nodes to be processed. If there are no remaining nodes to
  * process, 'tracker.index_nid' will be 0.
+ * This process does not run regularly on live sites, rather it updates tracking
+ * info once on an existing site just after the tracker module was installed.
  */
 function tracker_cron() {
   $state = \Drupal::state();
   $max_nid = $state->get('tracker.index_nid') ?: 0;
   if ($max_nid > 0) {
-    $batch_size = \Drupal::config('tracker.settings')->get('cron_index_limit');
     $last_nid = FALSE;
-    // @todo This should be actually filtering on the desired language and just
-    //   fall back to the default language.
-    $result = db_query_range('SELECT nid, uid, status FROM {node_field_data} WHERE nid <= :max_nid AND default_langcode = 1 ORDER BY nid DESC', 0, $batch_size, array(':max_nid' => $max_nid), array('target' => 'slave'));
-
     $count = 0;
 
-    foreach ($result as $row) {
+    $nids = \Drupal::entityQuery('node')
+      ->condition('nid', $max_nid, '<=')
+      ->sort('nid', 'DESC')
+      ->range(0, \Drupal::config('tracker.settings')->get('cron_index_limit'))
+      ->execute();
+
+    $nodes = Node::loadMultiple($nids);
+    foreach ($nodes as $nid => $node) {
+
       // Calculate the changed timestamp for this node.
-      $changed = _tracker_calculate_changed($row->nid);
+      $changed = _tracker_calculate_changed($node);
 
       // Remove existing data for this node.
       db_delete('tracker_node')
-        ->condition('nid', $row->nid)
+        ->condition('nid', $nid)
         ->execute();
       db_delete('tracker_user')
-        ->condition('nid', $row->nid)
+        ->condition('nid', $nid)
         ->execute();
 
       // Insert the node-level data.
       db_insert('tracker_node')
         ->fields(array(
-          'nid' => $row->nid,
-          'published' => $row->status,
+          'nid' => $nid,
+          'published' => $node->isPublished(),
           'changed' => $changed,
         ))
         ->execute();
@@ -76,34 +80,41 @@ function tracker_cron() {
       // Insert the user-level data for the node's author.
       db_insert('tracker_user')
         ->fields(array(
-          'nid' => $row->nid,
-          'published' => $row->status,
+          'nid' => $nid,
+          'published' => $node->isPublished(),
           'changed' => $changed,
-          'uid' => $row->uid,
+          'uid' => $node->getOwnerId(),
         ))
         ->execute();
 
-      $query = db_select('comment', 'c', array('target' => 'slave'));
-      // Force PostgreSQL to do an implicit cast by adding 0.
-      $query->addExpression('0 + :changed', 'changed', array(':changed' => $changed));
-      $query->addField('c', 'status', 'published');
-      $query->addField('c', 'entity_id', 'nid');
-      $query
-        ->distinct()
-        ->fields('c', array('uid'))
-        ->condition('c.entity_id', $row->nid)
-        ->condition('c.entity_type', 'node')
-        ->condition('c.uid', $row->uid, '<>')
-        ->condition('c.status', CommentInterface::PUBLISHED);
-
       // Insert the user-level data for the commenters (except if a commenter
       // is the node's author).
-      db_insert('tracker_user')
-        ->from($query)
+
+      // Get unique user IDs via entityQueryAggregate because it's the easiest
+      // database agnostic way. We don't actually care about the comments here
+      // so don't add an aggregate field.
+      $result = \Drupal::entityQueryAggregate('comment')
+        ->condition('entity_type', 'node')
+        ->condition('entity_id', $node->id())
+        ->condition('uid', $node->getOwnerId(), '<>')
+        ->condition('status', CommentInterface::PUBLISHED)
+        ->groupBy('uid')
         ->execute();
+      if ($result) {
+        $query = db_insert('tracker_user');
+        foreach ($result as $row) {
+          $query->fields(array(
+            'uid' => $row['uid'],
+            'nid' => $nid,
+            'published' => CommentInterface::PUBLISHED,
+            'changed' => $changed,
+          ));
+        }
+        $query->execute();
+      }
 
       // Note that we have indexed at least one node.
-      $last_nid = $row->nid;
+      $last_nid = $nid;
 
       $count++;
     }
@@ -112,7 +123,7 @@ function tracker_cron() {
       // Prepare a starting point for the next run.
       $state->set('tracker.index_nid', $last_nid - 1);
 
-      watchdog('tracker', 'Indexed %count content items for tracking.', array('%count' => $count));
+      \Drupal::logger('tracker')->notice('Indexed %count content items for tracking.', array('%count' => $count));
     }
     else {
       // If all nodes have been indexed, set to zero to skip future cron runs.
@@ -155,7 +166,7 @@ function _tracker_user_access($account) {
 }
 
 /**
- * Implements hook_node_insert().
+ * Implements hook_ENTITY_TYPE_insert() for node entities.
  *
  * Adds new tracking information for this node since it's new.
  */
@@ -164,7 +175,7 @@ function tracker_node_insert(NodeInterface $node, $arg = 0) {
 }
 
 /**
- * Implements hook_node_update().
+ * Implements hook_ENTITY_TYPE_update() for node entities.
  *
  * Adds tracking information for this node since it's been updated.
  */
@@ -173,7 +184,7 @@ function tracker_node_update(NodeInterface $node, $arg = 0) {
 }
 
 /**
- * Implements hook_node_predelete().
+ * Implements hook_ENTITY_TYPE_predelete() for node entities.
  *
  * Deletes tracking information for a node.
  */
@@ -187,42 +198,30 @@ function tracker_node_predelete(EntityInterface $node, $arg = 0) {
 }
 
 /**
- * Implements hook_comment_update().
- *
- * Comment module doesn't call hook_comment_unpublish() when saving individual
- * comments so we need to check for those here.
+ * Implements hook_ENTITY_TYPE_update() for comment entities.
  */
 function tracker_comment_update(CommentInterface $comment) {
-  // $comment->save() calls hook_comment_publish() for all published comments
-  // so we need to handle all other values here.
-  if (!$comment->isPublished() && $comment->getCommentedEntityTypeId() == 'node') {
-    _tracker_remove($comment->getCommentedEntityId(), $comment->getOwnerId(), $comment->getChangedTime());
+  if ($comment->getCommentedEntityTypeId() == 'node') {
+    if ($comment->isPublished()) {
+      _tracker_add($comment->getCommentedEntityId(), $comment->getOwnerId(), $comment->getChangedTime());
+    }
+    else {
+      _tracker_remove($comment->getCommentedEntityId(), $comment->getOwnerId(), $comment->getChangedTime());
+    }
   }
 }
 
 /**
- * Implements hook_comment_publish().
- *
- * This actually handles the insert and update of published nodes since
- * $comment->save() calls hook_comment_publish() for all published comments.
+ * Implements hook_ENTITY_TYPE_insert() for comment entities.
  */
-function tracker_comment_publish(CommentInterface $comment) {
-  if ($comment->getCommentedEntityTypeId() == 'node') {
+function tracker_comment_insert(CommentInterface $comment) {
+  if ($comment->getCommentedEntityTypeId() == 'node' && $comment->isPublished()) {
     _tracker_add($comment->getCommentedEntityId(), $comment->getOwnerId(), $comment->getChangedTime());
   }
 }
 
 /**
- * Implements hook_comment_unpublish().
- */
-function tracker_comment_unpublish(CommentInterface $comment) {
-  if ($comment->getCommentedEntityTypeId() == 'node') {
-    _tracker_remove($comment->getCommentedEntityId(), $comment->getOwnerId(), $comment->getChangedTime());
-  }
-}
-
-/**
- * Implements hook_comment_delete().
+ * Implements hook_ENTITY_TYPE_delete() for comment entities.
  */
 function tracker_comment_delete(CommentInterface $comment) {
   if ($comment->getCommentedEntityTypeId() == 'node') {
@@ -258,7 +257,7 @@ function _tracker_add($nid, $uid, $changed) {
     ))
     ->execute();
 
-  // Create or update the user-level data.
+  // Create or update the user-level data, first for the user posting.
   db_merge('tracker_user')
     ->keys(array(
       'nid' => $nid,
@@ -269,28 +268,34 @@ function _tracker_add($nid, $uid, $changed) {
       'published' => $node->status,
     ))
     ->execute();
+  // Update the times for all the other users tracking the post.
+  db_update('tracker_user')
+    ->condition('nid', $nid)
+    ->fields(array(
+      'changed' => $changed,
+      'published' => $node->status,
+    ))
+    ->execute();
 }
 
 /**
  * Picks the most recent timestamp between node changed and the last comment.
  *
- * @param $nid
- *   A node ID.
+ * @param \Drupal\node\NodeInterface $node
+ *   The node entity.
  *
- * @return
- *  The node changed timestamp, or most recent comment timestamp, whichever is
- *  the greatest.
+ * @return int
+ *   The node changed timestamp, or most recent comment timestamp, whichever is
+ *   the greatest.
+ *
+ * @todo Check if we should introduce 'language context' here, because the
+ *   callers may need different timestamps depending on the users' language?
  */
-function _tracker_calculate_changed($nid) {
-  // @todo This should be actually filtering on the desired language and just
-  //   fall back to the default language.
-  $changed = db_query('SELECT changed FROM {node_field_data} WHERE nid = :nid AND default_langcode = 1 ORDER BY changed DESC', array(':nid' => $nid), array('target' => 'slave'))->fetchField();
-  $latest_comment = db_query_range("SELECT cid, changed FROM {comment} WHERE entity_type = 'node' AND entity_id = :nid AND status = :status ORDER BY changed DESC", 0, 1, array(
-    ':nid' => $nid,
-    ':status' => CommentInterface::PUBLISHED,
-  ), array('target' => 'slave'))->fetchObject();
-  if ($latest_comment && $latest_comment->changed > $changed) {
-    $changed = $latest_comment->changed;
+function _tracker_calculate_changed($node) {
+  $changed = $node->getChangedTime();
+  $latest_comment = \Drupal::service('comment.statistics')->read(array($node), 'node', FALSE);
+  if ($latest_comment && $latest_comment->last_comment_timestamp > $changed) {
+    $changed = $latest_comment->last_comment_timestamp;
   }
   return $changed;
 }
@@ -306,23 +311,24 @@ function _tracker_calculate_changed($nid) {
  *   The last changed timestamp of the node.
  */
 function _tracker_remove($nid, $uid = NULL, $changed = NULL) {
-  // @todo This should be actually filtering on the desired language and just
-  //   fall back to the default language.
-  $node = db_query('SELECT nid, status, uid, changed FROM {node_field_data} WHERE nid = :nid AND default_langcode = 1 ORDER BY changed DESC, status DESC', array(':nid' => $nid))->fetchObject();
+  $node = Node::load($nid);
 
   // The user only keeps their subscription if the node exists.
   if ($node) {
     // And they are the author of the node.
-    $keep_subscription = ($node->uid == $uid);
+    $keep_subscription = ($node->getOwnerId() == $uid);
 
     // Or if they have commented on the node.
     if (!$keep_subscription) {
       // Check if the user has commented at least once on the given nid.
-      $keep_subscription = db_query_range("SELECT COUNT(*) FROM {comment} WHERE entity_type = 'node' AND entity_id = :nid AND uid = :uid AND status = :status", 0, 1, array(
-        ':nid' => $nid,
-        ':uid' => $uid,
-        ':status' => CommentInterface::PUBLISHED,
-      ))->fetchField();
+      $keep_subscription = \Drupal::entityQuery('comment')
+        ->condition('entity_type', 'node')
+        ->condition('entity_id', $nid)
+        ->condition('uid', $uid)
+        ->condition('status', CommentInterface::PUBLISHED)
+        ->range(0, 1)
+        ->count()
+        ->execute();
     }
 
     // If we haven't found a reason to keep the user's subscription, delete it.
@@ -343,21 +349,21 @@ function _tracker_remove($nid, $uid = NULL, $changed = NULL) {
       // established the node's changed timestamp.
 
       // We just have to recalculate things from scratch.
-      $changed = _tracker_calculate_changed($nid);
+      $changed = _tracker_calculate_changed($node);
 
       // And then we push the out the new changed timestamp to our denormalized
       // tables.
       db_update('tracker_node')
         ->fields(array(
           'changed' => $changed,
-          'published' => $node->status,
+          'published' => $node->isPublished(),
         ))
         ->condition('nid', $nid)
         ->execute();
       db_update('tracker_node')
         ->fields(array(
           'changed' => $changed,
-          'published' => $node->status,
+          'published' => $node->isPublished(),
         ))
         ->condition('nid', $nid)
         ->execute();

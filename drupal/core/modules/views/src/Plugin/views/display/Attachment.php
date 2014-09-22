@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\display;
 
 use Drupal\Component\Utility\String;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 
 /**
@@ -140,11 +141,11 @@ class Attachment extends DisplayPluginBase {
   /**
    * Provide the default form for setting options.
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     // It is very important to call the parent function here:
     parent::buildOptionsForm($form, $form_state);
 
-    switch ($form_state['section']) {
+    switch ($form_state->get('section')) {
       case 'inherit_arguments':
         $form['#title'] .= t('Inherit contextual filters');
         $form['inherit_arguments'] = array(
@@ -214,26 +215,27 @@ class Attachment extends DisplayPluginBase {
    * Perform any necessary changes to the form values prior to storage.
    * There is no need for this function to actually store the data.
    */
-  public function submitOptionsForm(&$form, &$form_state) {
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
     // It is very important to call the parent function here:
     parent::submitOptionsForm($form, $form_state);
-    switch ($form_state['section']) {
+    $section = $form_state->get('section');
+    switch ($section) {
       case 'displays':
-        $form_state['values'][$form_state['section']] = array_filter($form_state['values'][$form_state['section']]);
+        $form_state->setValue($section, array_filter($form_state->getValue($section)));
       case 'inherit_arguments':
       case 'inherit_pager':
       case 'render_pager':
       case 'inherit_exposed_filters':
       case 'attachment_position':
-        $this->setOption($form_state['section'], $form_state['values'][$form_state['section']]);
+        $this->setOption($section, $form_state->getValue($section));
         break;
     }
   }
 
   /**
-   * Attach to another view.
+   * {@inheritdoc}
    */
-  public function attachTo(ViewExecutable $view, $display_id) {
+  public function attachTo(ViewExecutable $view, $display_id, array &$build) {
     $displays = $this->getOption('displays');
 
     if (empty($displays[$display_id])) {

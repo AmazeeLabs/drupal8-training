@@ -7,8 +7,12 @@
 
 namespace Drupal\Core\Field\Plugin\Field\FieldType;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\TypedData\OptionsProviderInterface;
 use Drupal\Core\TypedData\DataDefinition;
 
 /**
@@ -18,10 +22,21 @@ use Drupal\Core\TypedData\DataDefinition;
  *   id = "boolean",
  *   label = @Translation("Boolean"),
  *   description = @Translation("An entity field containing a boolean value."),
- *   no_ui = TRUE
+ *   default_widget = "boolean_checkbox",
+ *   default_formatter = "boolean",
  * )
  */
-class BooleanItem extends FieldItemBase {
+class BooleanItem extends FieldItemBase implements OptionsProviderInterface {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function defaultStorageSettings() {
+    return array(
+      'on_label' => t('On'),
+      'off_label' => t('Off'),
+    ) + parent::defaultStorageSettings();
+  }
 
   /**
    * {@inheritdoc}
@@ -48,4 +63,63 @@ class BooleanItem extends FieldItemBase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function storageSettingsForm(array &$form, FormStateInterface $form_state, $has_data) {
+    $element['on_label'] = array(
+      '#type' => 'textfield',
+      '#title' => $this->t('"On" label'),
+      '#default_value' => $this->getSetting('on_label'),
+      '#required' => TRUE,
+    );
+    $element['off_label'] = array(
+      '#type' => 'textfield',
+      '#title' => $this->t('"Off" label'),
+      '#default_value' => $this->getSetting('off_label'),
+      '#required' => TRUE,
+    );
+
+    return $element;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPossibleValues(AccountInterface $account = NULL) {
+    return array(0, 1);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPossibleOptions(AccountInterface $account = NULL) {
+    return array(
+      0 => $this->getSetting('off_label'),
+      1 => $this->getSetting('on_label'),
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSettableValues(AccountInterface $account = NULL) {
+    return array(0, 1);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSettableOptions(AccountInterface $account = NULL) {
+    return $this->getPossibleOptions($account);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    $values['value'] = mt_rand(0, 1);
+    return $values;
+  }
 }
+

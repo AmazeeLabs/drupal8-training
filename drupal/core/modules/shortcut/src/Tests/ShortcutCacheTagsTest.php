@@ -12,6 +12,8 @@ use Drupal\system\Tests\Entity\EntityCacheTagsTestBase;
 
 /**
  * Tests the Shortcut entity's cache tags.
+ *
+ * @group shortcut
  */
 class ShortcutCacheTagsTest extends EntityCacheTagsTestBase {
 
@@ -23,20 +25,14 @@ class ShortcutCacheTagsTest extends EntityCacheTagsTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return parent::generateStandardizedInfo('Shortcut link', 'Shortcut');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Give anonymous users permission to customize shortcut links, so that we
     // can verify the cache tags of cached versions of shortcuts.
     $user_role = entity_load('user_role', DRUPAL_ANONYMOUS_RID);
     $user_role->grantPermission('customize shortcut links');
+    $user_role->grantPermission('access shortcuts');
     $user_role->save();
   }
 

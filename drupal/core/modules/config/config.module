@@ -5,12 +5,12 @@
  * Allows site administrators to modify configuration.
  */
 
-use Symfony\Component\HttpFoundation\Request;
+use Drupal\Core\Routing\RouteMatchInterface;
 
 /**
  * Implements hook_help().
  */
-function config_help($route_name, Request $request) {
+function config_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.config':
       $output = '';
@@ -25,25 +25,6 @@ function config_help($route_name, Request $request) {
       $output .= '<p>' . t('Import configuration that is placed in your staging directory. All changes, deletions, renames, and additions are listed below.') . '</p>';
       return $output;
   }
-}
-
-/**
- * Implements hook_permission().
- */
-function config_permission() {
-  $permissions['synchronize configuration'] = array(
-    'title' => t('Synchronize configuration'),
-    'restrict access' => TRUE,
-  );
-  $permissions['export configuration'] = array(
-    'title' => t('Export configuration'),
-    'restrict access' => TRUE,
-  );
-  $permissions['import configuration'] = array(
-    'title' => t('Import configuration'),
-    'restrict access' => TRUE,
-  );
-  return $permissions;
 }
 
 /**

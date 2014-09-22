@@ -8,31 +8,26 @@
 namespace Drupal\node\Tests;
 
 use Drupal\Core\Database\Database;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
- * Tests creating and saving a node.
+ * Create a node and test saving it.
+ *
+ * @group node
  */
 class NodeCreationTest extends NodeTestBase {
 
   /**
    * Modules to enable.
    *
-   * Enable dummy module that implements hook_node_insert() for exceptions.
+   * Enable dummy module that implements hook_ENTITY_TYPE_insert() for
+   * exceptions (function node_test_exception_node_insert() ).
    *
    * @var array
    */
   public static $modules = array('node_test_exception', 'dblog', 'test_page_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node creation',
-      'description' => 'Create a node and test saving it.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array('create page content', 'edit own page content'));
@@ -50,8 +45,8 @@ class NodeCreationTest extends NodeTestBase {
     $this->assertUrl('node/add/page');
     // Create a node.
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName(8);
-    $edit['body[0][value]'] = $this->randomName(16);
+    $edit['title[0][value]'] = $this->randomMachineName(8);
+    $edit['body[0][value]'] = $this->randomMachineName(16);
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
 
     // Check that the Basic page has been created.
@@ -62,17 +57,18 @@ class NodeCreationTest extends NodeTestBase {
     $this->assertTrue($node, 'Node found in database.');
 
     // Verify that pages do not show submitted information by default.
-    $submitted_by = t('Submitted by !username on !datetime', array('!username' => $this->loggedInUser->getUsername(), '!datetime' => format_date($node->getCreatedTime())));
     $this->drupalGet('node/' . $node->id());
-    $this->assertNoText($submitted_by);
+    $this->assertNoText($node->getOwner()->getUsername());
+    $this->assertNoText(format_date($node->getCreatedTime()));
 
     // Change the node type setting to show submitted by information.
     $node_type = entity_load('node_type', 'page');
-    $node_type->settings['node']['submitted'] = TRUE;
+    $node_type->setDisplaySubmitted(TRUE);
     $node_type->save();
 
     $this->drupalGet('node/' . $node->id());
-    $this->assertText($submitted_by);
+    $this->assertText($node->getOwner()->getUsername());
+    $this->assertText(format_date($node->getCreatedTime()));
   }
 
   /**
@@ -84,7 +80,7 @@ class NodeCreationTest extends NodeTestBase {
       'uid'      => $this->loggedInUser->id(),
       'name'     => $this->loggedInUser->name,
       'type'     => 'page',
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       'title'    => 'testing_transaction_exception',
     );
 
@@ -126,12 +122,15 @@ class NodeCreationTest extends NodeTestBase {
     \Drupal::config('system.site')->set('page.front', 'test-page')->save();
 
     // Set "Basic page" content type to be unpublished by default.
-    \Drupal::config('node.type.page')->set('settings.node.options', array())->save();
+    $fields = \Drupal::entityManager()->getFieldDefinitions('node', 'page');
+    $fields['status']->getConfig('page')
+      ->setDefaultValue(FALSE)
+      ->save();
 
     // Create a node.
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName(8);
-    $edit['body[0][value]'] = $this->randomName(16);
+    $edit['title[0][value]'] = $this->randomMachineName(8);
+    $edit['body[0][value]'] = $this->randomMachineName(16);
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
 
     // Check that the user was redirected to the home page.
@@ -151,7 +150,7 @@ class NodeCreationTest extends NodeTestBase {
 
     $this->drupalGet('node/add/page');
 
-    $result = $this->xpath('//input[@id="edit-uid" and contains(@data-autocomplete-path, "user/autocomplete")]');
+    $result = $this->xpath('//input[@id="edit-uid-0-value" and contains(@data-autocomplete-path, "user/autocomplete")]');
     $this->assertEqual(count($result), 0, 'No autocompletion without access user profiles.');
 
     $admin_user = $this->drupalCreateUser(array('administer nodes', 'create page content', 'access user profiles'));
@@ -159,8 +158,31 @@ class NodeCreationTest extends NodeTestBase {
 
     $this->drupalGet('node/add/page');
 
-    $result = $this->xpath('//input[@id="edit-uid" and contains(@data-autocomplete-path, "user/autocomplete")]');
+    $result = $this->xpath('//input[@id="edit-uid-0-target-id" and contains(@data-autocomplete-path, "/entity_reference/autocomplete/tags/uid/node/page")]');
     $this->assertEqual(count($result), 1, 'Ensure that the user does have access to the autocompletion');
   }
 
+  /**
+   * Check node/add when no node types exist.
+   */
+  function testNodeAddWithoutContentTypes () {
+    $this->drupalGet('node/add');
+    $this->assertResponse(200);
+    $this->assertNoLinkByHref('/admin/structure/types/add');
+
+    // Test /node/add page without content types.
+    foreach (entity_load_multiple('node_type') as $entity ) {
+      $entity->delete();
+    }
+
+    $this->drupalGet('node/add');
+    $this->assertResponse(403);
+
+    $admin_content_types = $this->drupalCreateUser(array('administer content types'));
+    $this->drupalLogin($admin_content_types);
+
+    $this->drupalGet('node/add');
+
+    $this->assertLinkByHref('/admin/structure/types/add');
+  }
 }

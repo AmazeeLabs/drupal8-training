@@ -7,22 +7,23 @@
 
 namespace Drupal\user;
 
-use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
 use Drupal\Core\Password\PasswordInterface;
-use Drupal\Core\Database\Connection;
+use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\Core\Entity\ContentEntityDatabaseStorage;
 
 /**
  * Controller class for users.
  *
- * This extends the Drupal\Core\Entity\ContentEntityDatabaseStorage class,
+ * This extends the Drupal\Core\Entity\Sql\SqlContentEntityStorage class,
  * adding required special handling for user objects.
  */
-class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInterface {
+class UserStorage extends SqlContentEntityStorage implements UserStorageInterface {
 
   /**
    * Provides the password hashing service object.
@@ -30,13 +31,6 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    * @var \Drupal\Core\Password\PasswordInterface
    */
   protected $password;
-
-  /**
-   * Provides the user data service object.
-   *
-   * @var \Drupal\user\UserDataInterface
-   */
-  protected $userData;
 
   /**
    * Constructs a new UserStorage object.
@@ -47,18 +41,15 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    *   The database connection to be used.
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
-   * @param \Drupal\Component\Uuid\UuidInterface $uuid_service
-   *   The UUID Service.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cache_backend
+   *   Cache backend instance to use.
    * @param \Drupal\Core\Password\PasswordInterface $password
    *   The password hashing service.
-   * @param \Drupal\user\UserDataInterface $user_data
-   *   The user data service.
    */
-  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
-    parent::__construct($entity_type, $database, $entity_manager, $uuid_service);
+  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, CacheBackendInterface $cache, PasswordInterface $password) {
+    parent::__construct($entity_type, $database, $entity_manager, $cache);
 
     $this->password = $password;
-    $this->userData = $user_data;
   }
 
   /**
@@ -69,9 +60,8 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
       $entity_type,
       $container->get('database'),
       $container->get('entity.manager'),
-      $container->get('uuid'),
-      $container->get('password'),
-      $container->get('user.data')
+      $container->get('cache.entity'),
+      $container->get('password')
     );
   }
 
@@ -105,6 +95,14 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
       $entity->enforceIsNew();
     }
     parent::save($entity);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function isColumnSerial($table_name, $schema_name) {
+    // User storage does not use a serial column for the user id.
+    return $table_name == $this->revisionTable && $schema_name == $this->revisionKey;
   }
 
   /**
@@ -148,10 +146,26 @@ class UserStorage extends ContentEntityDatabaseStorage implements UserStorageInt
    * {@inheritdoc}
    */
   public function updateLastLoginTimestamp(UserInterface $account) {
-    $this->database->update('users')
+    $this->database->update('users_field_data')
       ->fields(array('login' => $account->getLastLoginTime()))
       ->condition('uid', $account->id())
       ->execute();
+    // Ensure that the entity cache is cleared.
+    $this->resetCache(array($account->id()));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function updateLastAccessTimestamp(AccountInterface $account, $timestamp) {
+    $this->database->update('users_field_data')
+      ->fields(array(
+        'access' => $timestamp,
+      ))
+      ->condition('uid', $account->id())
+      ->execute();
+    // Ensure that the entity cache is cleared.
+    $this->resetCache(array($account->id()));
   }
 
 }

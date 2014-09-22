@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Update;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the update system functionality.
+ * Tests the update script access and functionality.
+ *
+ * @group Update
  */
 class UpdateScriptTest extends WebTestBase {
 
@@ -26,40 +28,10 @@ class UpdateScriptTest extends WebTestBase {
   private $update_url;
   private $update_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Update functionality',
-      'description' => 'Tests the update script access and functionality.',
-      'group' => 'Update',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->update_url = $GLOBALS['base_url'] . '/core/update.php';
-    $this->update_user = $this->drupalCreateUser(array('administer software updates'));
-  }
-
-  /**
-   * Tests that updates from schema versions prior to 8000 are prevented.
-   */
-  function testInvalidMigration() {
-    // Mock a D7 system table so that the schema value of the system module
-    // can be retrieved.
-    db_create_table('system', $this->getSystemSchema());
-    // Assert that the table exists.
-    $this->assertTrue(db_table_exists('system'), 'The table exists.');
-    // Insert a value for the system module.
-    db_insert('system')
-      ->fields(array(
-        'name' => 'system',
-        'schema_version' => 7000,
-      ))
-      ->execute();
-    $system_schema = db_query('SELECT schema_version FROM {system} WHERE name = :system', array(':system' => 'system'))->fetchField();
-    $this->drupalGet($this->update_url, array('external' => TRUE));
-    $text = 'Your system schema version is ' . $system_schema . '. Updating directly from a schema version prior to 8000 is not supported. You must <a href="https://drupal.org/node/2179269">migrate your site to Drupal 8</a> first.';
-    $this->assertRaw($text, 'Updates from schema versions prior to 8000 are prevented.');
+    $this->update_url = $GLOBALS['base_url'] . '/update.php';
+    $this->update_user = $this->drupalCreateUser(array('administer software updates', 'access site in maintenance mode'));
   }
 
   /**
@@ -83,11 +55,7 @@ class UpdateScriptTest extends WebTestBase {
     $this->assertResponse(200);
 
     // Access the update page as user 1.
-    $user1 = user_load(1);
-    $user1->pass_raw = user_password();
-    $user1->pass = $this->container->get('password')->hash(trim($user1->pass_raw));
-    db_query("UPDATE {users} SET pass = :pass WHERE uid = :uid", array(':pass' => $user1->getPassword(), ':uid' => $user1->id()));
-    $this->drupalLogin($user1);
+    $this->drupalLogin($this->root_user);
     $this->drupalGet($this->update_url, array('external' => TRUE));
     $this->assertResponse(200);
   }
@@ -102,7 +70,7 @@ class UpdateScriptTest extends WebTestBase {
     // If there are no requirements warnings or errors, we expect to be able to
     // go through the update process uninterrupted.
     $this->drupalGet($this->update_url, array('external' => TRUE));
-    $this->drupalPostForm(NULL, array(), t('Continue'));
+    $this->clickLink(t('Continue'));
     $this->assertText(t('No pending updates.'), 'End of update process was reached.');
     // Confirm that all caches were cleared.
     $this->assertText(t('hook_cache_flush() invoked for update_script_test.module.'), 'Caches were cleared when there were no requirements warnings or errors.');
@@ -119,8 +87,8 @@ class UpdateScriptTest extends WebTestBase {
     $this->assertText('This is a requirements warning provided by the update_script_test module.');
     $this->clickLink('try again');
     $this->assertNoText('This is a requirements warning provided by the update_script_test module.');
-    $this->drupalPostForm(NULL, array(), t('Continue'));
-    $this->drupalPostForm(NULL, array(), 'Apply pending updates');
+    $this->clickLink(t('Continue'));
+    $this->clickLink(t('Apply pending updates'));
     $this->assertText(t('The update_script_test_update_8001() update was executed successfully.'), 'End of update process was reached.');
     // Confirm that all caches were cleared.
     $this->assertText(t('hook_cache_flush() invoked for update_script_test.module.'), 'Caches were cleared after resolving a requirements warning and applying updates.');
@@ -130,7 +98,7 @@ class UpdateScriptTest extends WebTestBase {
     $this->assertText('This is a requirements warning provided by the update_script_test module.');
     $this->clickLink('try again');
     $this->assertNoText('This is a requirements warning provided by the update_script_test module.');
-    $this->drupalPostForm(NULL, array(), t('Continue'));
+    $this->clickLink(t('Continue'));
     $this->assertText(t('No pending updates.'), 'End of update process was reached.');
     // Confirm that all caches were cleared.
     $this->assertText(t('hook_cache_flush() invoked for update_script_test.module.'), 'Caches were cleared after applying updates and re-running the script.');
@@ -165,7 +133,8 @@ class UpdateScriptTest extends WebTestBase {
   function testNoUpdateFunctionality() {
     // Click through update.php with 'administer software updates' permission.
     $this->drupalLogin($this->update_user);
-    $this->drupalPostForm($this->update_url, array(), t('Continue'), array('external' => TRUE));
+    $this->drupalGet($this->update_url, array('external' => TRUE));
+    $this->clickLink(t('Continue'));
     $this->assertText(t('No pending updates.'));
     $this->assertNoLink('Administration pages');
     $this->assertNoLinkByHref('update.php', 0);
@@ -175,7 +144,8 @@ class UpdateScriptTest extends WebTestBase {
     // Click through update.php with 'access administration pages' permission.
     $admin_user = $this->drupalCreateUser(array('administer software updates', 'access administration pages'));
     $this->drupalLogin($admin_user);
-    $this->drupalPostForm($this->update_url, array(), t('Continue'), array('external' => TRUE));
+    $this->drupalGet($this->update_url, array('external' => TRUE));
+    $this->clickLink(t('Continue'));
     $this->assertText(t('No pending updates.'));
     $this->assertLink('Administration pages');
     $this->assertNoLinkByHref('update.php', 1);
@@ -197,8 +167,9 @@ class UpdateScriptTest extends WebTestBase {
 
     // Click through update.php with 'administer software updates' permission.
     $this->drupalLogin($this->update_user);
-    $this->drupalPostForm($this->update_url, array(), t('Continue'), array('external' => TRUE));
-    $this->drupalPostForm(NULL, array(), t('Apply pending updates'));
+    $this->drupalGet($this->update_url, array('external' => TRUE));
+    $this->clickLink(t('Continue'));
+    $this->clickLink(t('Apply pending updates'));
 
     // Verify that updates were completed successfully.
     $this->assertText('Updates were attempted.');
@@ -229,10 +200,11 @@ class UpdateScriptTest extends WebTestBase {
 
     // Click through update.php with 'access administration pages' and
     // 'access site reports' permissions.
-    $admin_user = $this->drupalCreateUser(array('administer software updates', 'access administration pages', 'access site reports'));
+    $admin_user = $this->drupalCreateUser(array('administer software updates', 'access administration pages', 'access site reports', 'access site in maintenance mode'));
     $this->drupalLogin($admin_user);
-    $this->drupalPostForm($this->update_url, array(), t('Continue'), array('external' => TRUE));
-    $this->drupalPostForm(NULL, array(), t('Apply pending updates'));
+    $this->drupalGet($this->update_url, array('external' => TRUE));
+    $this->clickLink(t('Continue'));
+    $this->clickLink(t('Apply pending updates'));
     $this->assertText('Updates were attempted.');
     $this->assertLink('logged');
     $this->assertLink('Administration pages');

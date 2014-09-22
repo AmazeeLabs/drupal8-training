@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\row\RowPluginBase.
+ * Contains \Drupal\views\Plugin\views\row\RowPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\row;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Views;
@@ -14,15 +15,31 @@ use Drupal\views\Views;
 /**
  * @defgroup views_row_plugins Views row plugins
  * @{
- * Row plugins control how Views outputs an individual record.
+ * Plugins that control how Views outputs an individual record.
  *
- * They are tightly coupled to style plugins, in that a style plugin is what
- * calls the row plugin.
+ * Row plugins handle rendering each individual record from the view results.
+ * For instance, a row plugin could render fields, render an entire entity
+ * in a particular view mode, or render the raw data from the results.
+ *
+ * Row plugins are used by some (but not all) style plugins. They are not
+ * activated unless the style plugin sets them up. See the
+ * @link views_style_plugins Views style plugins topic @endlink for
+ * more information.
+ *
+ * Row plugins extend \Drupal\views\Plugin\views\row\RowPluginBase. They must
+ * be annotated with \Drupal\views\Annotation\ViewsRow annotation, and
+ * they must be in namespace directory Plugin\views\row.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
- * Default plugin to view a single row of a table. This is really just a wrapper around
- * a theme function.
+ * Base class for Views row plugins.
+ *
+ * This is really just a wrapper around a theme hook. It renders a row
+ * of the result table by putting it into a render array with the set theme
+ * hook.
  */
 abstract class RowPluginBase extends PluginBase {
 
@@ -62,10 +79,10 @@ abstract class RowPluginBase extends PluginBase {
   /**
    * Provide a form for setting options.
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     if (isset($this->base_table)) {
-      $executable = $form_state['view']->getExecutable();
+      $executable = $form_state->get('view')->getExecutable();
 
       // A whole bunch of code to figure out what relationships are valid for
       // this item.
@@ -111,13 +128,13 @@ abstract class RowPluginBase extends PluginBase {
   /**
    * Validate the options form.
    */
-  public function validateOptionsForm(&$form, &$form_state) { }
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * Perform any necessary changes to the form values prior to storage.
    * There is no need for this function to actually store the data.
    */
-  public function submitOptionsForm(&$form, &$form_state) { }
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * {@inheritdoc}

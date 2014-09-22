@@ -7,20 +7,12 @@
 
 namespace Drupal\file\Tests;
 
-use Drupal\Core\Language\Language;
-
 /**
- * Tests file handling with node revisions.
+ * Tests creating and deleting revisions with files attached.
+ *
+ * @group file
  */
 class FileFieldRevisionTest extends FileFieldTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'File field revision test',
-      'description' => 'Test creating and deleting revisions with files attached.',
-      'group' => 'File',
-    );
-  }
-
   /**
    * Tests creating multiple revisions of a node and managing attached files.
    *
@@ -34,7 +26,7 @@ class FileFieldRevisionTest extends FileFieldTestBase {
    */
   function testRevisions() {
     $type_name = 'article';
-    $field_name = strtolower($this->randomName());
+    $field_name = strtolower($this->randomMachineName());
     $this->createFileField($field_name, 'node', $type_name);
     // Create the same fields for users.
     $this->createFileField($field_name, 'user', 'user');

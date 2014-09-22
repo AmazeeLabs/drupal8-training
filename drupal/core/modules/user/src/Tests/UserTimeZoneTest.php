@@ -10,7 +10,9 @@ namespace Drupal\user\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests for user-configurable time zones.
+ * Set a user time zone and verify that dates are displayed in local time.
+ *
+ * @group user
  */
 class UserTimeZoneTest extends WebTestBase {
 
@@ -20,14 +22,6 @@ class UserTimeZoneTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('node');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User time zones',
-      'description' => 'Set a user time zone and verify that dates are displayed in local time.',
-      'group' => 'User',
-    );
-  }
 
   /**
    * Tests the display of dates and time when user-configurable time zones are set.
@@ -52,6 +46,7 @@ class UserTimeZoneTest extends WebTestBase {
     $date2 = '2007-03-11 01:00:00 -0800';
     // One date in PDT (summer time):
     $date3 = '2007-03-20 21:00:00 -0700';
+    $this->drupalCreateContentType(array('type' => 'article'));
     $node1 = $this->drupalCreateNode(array('created' => strtotime($date1), 'type' => 'article'));
     $node2 = $this->drupalCreateNode(array('created' => strtotime($date2), 'type' => 'article'));
     $node3 = $this->drupalCreateNode(array('created' => strtotime($date3), 'type' => 'article'));

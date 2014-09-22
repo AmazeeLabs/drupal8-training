@@ -12,12 +12,8 @@ use Drupal\Tests\UnitTestCase;
 use Symfony\Component\Routing\Route;
 
 /**
- * Tests the RouteProcessorManager class.
- *
- * @group Drupal
- * @group Routing
- *
- * @see \Drupal\Core\RouteProcessor\RouteProcessorManager
+ * @coversDefaultClass \Drupal\Core\RouteProcessor\RouteProcessorManager
+ * @group RouteProcessor
  */
 class RouteProcessorManagerTest extends UnitTestCase {
 
@@ -28,15 +24,7 @@ class RouteProcessorManagerTest extends UnitTestCase {
    */
   protected $processorManager;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Route processor manager',
-      'description' => 'Tests the RouteProcessorManager class.',
-      'group' => 'Routing',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     $this->processorManager = new RouteProcessorManager();
   }
 

@@ -11,23 +11,14 @@ use Drupal\Core\Batch\Percentage;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Unit tests of progress percentage rounding.
+ * @coversDefaultClass \Drupal\Component\Batch\Batch
+ * @group Batch
  *
  * Tests the Batch helper object to make sure that the rounding works properly
  * in all cases.
- *
- * @see \Drupal\Component\Batch\Batch
  */
 class PercentagesTest extends UnitTestCase {
   protected $testCases = array();
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Batch percentages',
-      'description' => 'Unit tests of progress percentage rounding.',
-      'group' => 'Batch API',
-    );
-  }
 
   /**
    * Tests the format() function.
@@ -70,7 +61,7 @@ class PercentagesTest extends UnitTestCase {
       // The same logic holds for 1/200: we should get 0.5%.
       array(200, 1, '0.5'),
       // Numbers that come out evenly, such as 50/200, should be forced to have
-      // extra digits for consistancy.
+      // extra digits for consistency.
       array(200, 50, '25.0'),
       // Regardless of number of digits we're using, 100% should always just be
       // 100%.

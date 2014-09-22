@@ -5,7 +5,7 @@ Clients
 Clients are used to create requests, create transactions, send requests
 through an HTTP adapter, and return a response. You can add default request
 options to a client that are applied to every request (e.g., default headers,
-default query string parameters, etc), and you can add event listeners and
+default query string parameters, etc.), and you can add event listeners and
 subscribers to every request created by a client.
 
 Creating a client
@@ -56,6 +56,11 @@ defaults
     default headers (e.g., User-Agent), default query string parameters, SSL
     configurations, and any other supported request options.
 
+emitter
+    Specifies an event emitter (``GuzzleHttp\Event\EmitterInterface``) instance
+    to be used by the client to emit request events. This option is useful if
+    you need to inject an emitter with listeners/subscribers already attached.
+
 Here's an example of creating a client with various options, including using
 a mock adapter that just returns the result of a callable function and a
 base URL that is a URI template with parameters.
@@ -65,7 +70,7 @@ base URL that is a URI template with parameters.
     use GuzzleHttp\Client;
 
     $client = new Client([
-        'base_url' => ['https://api.twitter.com/{version}', ['version' => 'v1.1']],
+        'base_url' => ['https://api.twitter.com/{version}/', ['version' => 'v1.1']],
         'defaults' => [
             'headers' => ['Foo' => 'Bar'],
             'query'   => ['testing' => '123'],
@@ -198,7 +203,7 @@ The ``sendAll()`` method accepts the following associative array of options:
 The "before", "complete", and "error" event options accept a callable or an
 array of associative arrays where each associative array contains a "fn" key
 with a callable value, an optional "priority" key representing the event
-priority (with a default value is 0), and an optional "once" key that can be
+priority (with a default value of 0), and an optional "once" key that can be
 set to true so that the event listener will be removed from the request after
 it is first triggered.
 
@@ -245,7 +250,7 @@ request using event callbacks.
             // Do something with the completion of the request...
         },
         'error' => function (ErrorEvent $event) {
-            echo 'Request failed: ' . $event->getRequest()->getUrl() . "\n"
+            echo 'Request failed: ' . $event->getRequest()->getUrl() . "\n";
             echo $event->getException();
             // Do something to handle the error...
         }
@@ -284,7 +289,7 @@ Throwing Errors Immediately
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It sometimes is useful to throw exceptions immediately when the occur. The
-following exmaple shows how to use an event listener to throw exceptions
+following example shows how to use an event listener to throw exceptions
 immeditaley and prevent subsequent requests from being sent.
 
 .. code-block:: php
@@ -292,18 +297,18 @@ immeditaley and prevent subsequent requests from being sent.
     use GuzzleHttp\Event\ErrorEvent;
 
     $client->sendAll($requests, [
-        'error' => function (ErrorEvent $event) use (&$errors) {
+        'error' => function (ErrorEvent $event) {
             throw $event->getException();
         }
     ]);
 
-.. _request-options:
+.. _batch-requests:
 
 Batching Requests
 -----------------
 
 Sometimes you just want to send a few requests in parallel and then process
-the results all at once after they've sent. Guzzle provides a convenience
+the results all at once after they've been sent. Guzzle provides a convenience
 function ``GuzzleHttp\batch()`` that makes this very simple:
 
 .. code-block:: php
@@ -334,9 +339,11 @@ function ``GuzzleHttp\batch()`` that makes this very simple:
 
 ``GuzzleHttp\batch()`` accepts an optional associative array of options in the
 third argument that allows you to specify the 'before', 'complete' and 'error'
-events as well as specify the maximum number of request to send in parallel
+events as well as specify the maximum number of requests to send in parallel
 using the 'parallel' option key. This options array is the exact same format as
 the options array exposed in ``GuzzleHttp\ClientInterface::sendAll()``.
+
+.. _request-options:
 
 Request Options
 ===============
@@ -425,6 +432,33 @@ This setting can be set to any of the following types:
       $stream = GuzzleHttp\Stream\Stream::factory('contents...');
       $client->post('/post', ['body' => $stream]);
 
+json
+----
+
+:Summary: The ``json`` option is used to easily upload JSON encoded data as the
+    body of a request. A Content-Type header of ``application/json`` will be
+    added if no Content-Type header is already present on the message.
+:Types:
+    Any PHP type that can be operated on by PHP's ``json_encode()`` function.
+:Default: None
+
+.. code-block:: php
+
+    $request = $client->createRequest('/put', ['json' => ['foo' => 'bar']]);
+    echo $request->getHeader('Content-Type');
+    // application/json
+    echo $request->getBody();
+    // {"foo":"bar"}
+
+.. note::
+
+    This request option does not support customizing the Content-Type header
+    or any of the options from PHP's `json_encode() <http://www.php.net/manual/en/function.json-encode.php>`_
+    function. If you need to customize these settings, then you must pass the
+    JSON encoded data into the request yourself using the ``body`` request
+    option and you must specify the correct Content-Type header using the
+    ``headers`` request option.
+
 query
 -----
 
@@ -437,7 +471,7 @@ query
 .. code-block:: php
 
     // Send a GET request to /get?foo=bar
-    $client->get('/get', ['query' => ['foo' => 'bar']);
+    $client->get('/get', ['query' => ['foo' => 'bar']]);
 
 Query strings specified in the ``query`` option are combined with any query
 string values that are parsed from the URL.
@@ -445,7 +479,7 @@ string values that are parsed from the URL.
 .. code-block:: php
 
     // Send a GET request to /get?abc=123&foo=bar
-    $client->get('/get?abc=123', ['query' => ['foo' => 'bar']);
+    $client->get('/get?abc=123', ['query' => ['foo' => 'bar']]);
 
 auth
 ----
@@ -510,7 +544,7 @@ to ensure that they are fired last or near last in the event chain.
      * Listens to the "before" event of a request and only modifies the request
      * when the "auth" config setting of the request is "foo".
      */
-    class FooAuth implements GuzzleHttp\Common\SubscriberInterface
+    class FooAuth implements GuzzleHttp\Event\SubscriberInterface
     {
         private $password;
 
@@ -532,14 +566,14 @@ to ensure that they are fired last or near last in the event chain.
         }
     }
 
-    $client->getEmitter->attach(new FooAuth('password'));
+    $client->getEmitter()->attach(new FooAuth('password'));
     $client->get('/', ['auth' => 'foo']);
 
 Adapter Specific Authentication Schemes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you need to use authentication methods provided by cURL (e.g., NTLM, GSS,
-etc...), then you need to specify a curl adapter option in the ``options``
+etc.), then you need to specify a curl adapter option in the ``options``
 request option array. See :ref:`config-option` for more information.
 
 .. _cookies-option:
@@ -665,7 +699,7 @@ to an open Guzzle stream:
 events
 ------
 
-:Summary: Associative array mapping event names to a callable. or an
+:Summary: An associative array mapping event names to a callable. Or an
     associative array containing the 'fn' key that maps to a callable, an
     optional 'priority' key used to specify the event priority, and an optional
     'once' key used to specify if the event should remove itself the first time
@@ -862,7 +896,7 @@ Pass a string to specify a proxy for all protocols.
 
 .. code-block:: php
 
-    $client->get('/', ['proxy' => 'tcp://localhost:8124']);
+    $client->get('/', ['proxy' => 'tcp://localhost:8125']);
 
 Pass an associative array to specify HTTP proxies for specific URI schemes
 (i.e., "http", "https").
@@ -871,7 +905,7 @@ Pass an associative array to specify HTTP proxies for specific URI schemes
 
     $client->get('/', [
         'proxy' => [
-            'http'  => 'tcp://localhost:8124', // Use this proxy with "http"
+            'http'  => 'tcp://localhost:8125', // Use this proxy with "http"
             'https' => 'tcp://localhost:9124'  // Use this proxy with "https"
         ]
     ]);
@@ -1069,7 +1103,7 @@ behavior of the library.
 ``HTTP_PROXY``
     Defines the proxy to use when sending requests using the "http" protocol.
 ``HTTPS_PROXY``
-    Defines the proxy to use when sending requests using the "https": protocol.
+    Defines the proxy to use when sending requests using the "https" protocol.
 
 Relevant ini Settings
 ---------------------

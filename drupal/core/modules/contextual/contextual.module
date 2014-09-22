@@ -7,8 +7,8 @@
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Template\Attribute;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Implements hook_toolbar().
@@ -64,31 +64,26 @@ function contextual_page_build(&$page) {
 /**
  * Implements hook_help().
  */
-function contextual_help($route_name, Request $request) {
+function contextual_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.contextual':
       $output = '';
       $output .= '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Contextual Links module displays links related to regions of pages on your site to users with <em>access contextual links</em> permission. For more information, see the online handbook entry for <a href="@contextual">Contextual Links module</a>.', array('@contextual' => 'http://drupal.org/documentation/modules/contextual')) . '</p>';
+      $output .= '<p>' . t('The Contextual links module gives users with the <em>Use contextual links</em> permission quick access to tasks associated with certain areas of pages on your site. For example, a menu displayed as a block has links to edit the menu and configure the block. For more information, see <a href="!contextual">the online documentation for the Contextual Links module</a>.', array('!contextual' => 'https://drupal.org/documentation/modules/contextual')) . '</p>';
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Displaying contextual links') . '</dt>';
-      $output .= '<dd>' . t('Contextual links are supplied by modules, to give you quick access to tasks associated with regions of pages on your site. For instance, if you have a custom menu block displayed in a sidebar of your site, the Blocks and Menu UI modules will supply links to configure the block and edit the menu. The Contextual Links module collects these links into a list for display by your theme, and also adds JavaScript code to the page to hide the links initially, and display them when your mouse hovers over the block.') . '</dd>';
+      $output .= '<dd>';
+      $output .= t('Contextual links for an area on a page are displayed using a contextual links button. There are two ways to make the contextual links button visible:');
+      $output .= '<ol>';
+      $output .= '<li>' . t('Hovering over the area of interest will temporarily make the contextual links button visible (which looks like a pencil in most themes, and is normally displayed in the upper right corner of the area). The icon typically looks like this: <img src="!pencil" alt="contextual links button" />', array('!pencil' => file_create_url('core/misc/icons/bebebe/pencil.svg'))) . '</li>';
+      $output .= '<li>' . t('If you have the <a href="!toolbar">Toolbar module</a> enabled, clicking the contextual links button in the toolbar (which looks like a pencil) will make all contextual links buttons on the page visible. Clicking this button again will toggle them to invisible.', array('!toolbar' => \Drupal::url('help.page', array('name' => 'toolbar')))) . '</li>';
+      $output .= '</ol>';
+      $output .= t('Once the contextual links button for the area of interest is visible, click the button to display the links.');
+      $output .= '</dd>';
       $output .= '</dl>';
       return $output;
   }
-}
-
-/**
- * Implements hook_permission().
- */
-function contextual_permission() {
-  return array(
-    'access contextual links' => array(
-      'title' => t('Use contextual links'),
-      'description' => t('Use contextual links to perform actions related to elements on a page.'),
-    ),
-  );
 }
 
 /**
@@ -176,7 +171,7 @@ function contextual_pre_render_placeholder($element) {
  * @param $element
  *   A renderable array containing a #contextual_links property, which is a
  *   keyed array. Each key is the name of the group of contextual links to
- *   render (based on the 'group' key in the *.contextual_links.yml files for
+ *   render (based on the 'group' key in the *.links.contextual.yml files for
  *   all enabled modules). The value contains an associative array containing
  *   the following keys:
  *   - route_parameters: The route parameters passed to the url generator.

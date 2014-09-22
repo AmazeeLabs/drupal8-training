@@ -34,24 +34,24 @@ class NodeViewBuilder extends EntityViewBuilder {
       $bundle = $entity->bundle();
       $display = $displays[$bundle];
 
-      $callback = '\Drupal\node\NodeViewBuilder::renderLinks';
-      $context = array(
-        'node_entity_id' => $entity->id(),
-        'view_mode' => $view_mode,
-        'langcode' => $langcode,
-        'in_preview' => !empty($entity->in_preview),
-        'token' => drupal_render_cache_generate_token(),
-      );
-
-      $build[$id]['links'] = array(
-        '#post_render_cache' => array(
-          $callback => array(
-            $context,
+      if ($display->getComponent('links')) {
+        $callback = '\Drupal\node\NodeViewBuilder::renderLinks';
+        $context = array(
+          'node_entity_id' => $entity->id(),
+          'view_mode' => $view_mode,
+          'langcode' => $langcode,
+          'in_preview' => !empty($entity->in_preview),
+        );
+        $placeholder = drupal_render_cache_generate_placeholder($callback, $context);
+        $build[$id]['links'] = array(
+          '#post_render_cache' => array(
+            $callback => array(
+              $context,
+            ),
           ),
-        ),
-        '#markup' => drupal_render_cache_generate_placeholder($callback, $context, $context['token']),
-      );
-
+          '#markup' => $placeholder,
+        );
+      }
 
       // Add Language field text element to node render array.
       if ($display->getComponent('langcode')) {
@@ -76,12 +76,6 @@ class NodeViewBuilder extends EntityViewBuilder {
     if (isset($defaults['#cache']) && isset($entity->in_preview)) {
       unset($defaults['#cache']);
     }
-    else {
-      // The node 'submitted' info is not rendered in a standard way (renderable
-      // array) so we have to add a cache tag manually.
-      // @todo Delete this once https://drupal.org/node/2226493 lands.
-      $defaults['#cache']['tags']['user'][] = $entity->getOwnerId();
-    }
 
     return $defaults;
   }
@@ -105,7 +99,7 @@ class NodeViewBuilder extends EntityViewBuilder {
    */
   public static function renderLinks(array $element, array $context) {
     $callback = '\Drupal\node\NodeViewBuilder::renderLinks';
-    $placeholder = drupal_render_cache_generate_placeholder($callback, $context, $context['token']);
+    $placeholder = drupal_render_cache_generate_placeholder($callback, $context);
 
     $links = array(
       '#theme' => 'links__node',

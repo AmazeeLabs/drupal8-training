@@ -7,7 +7,7 @@
 
 namespace Drupal\language\Plugin\LanguageNegotiation;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\PathProcessor\OutboundPathProcessorInterface;
 use Drupal\language\LanguageNegotiationMethodBase;
 use Drupal\language\LanguageSwitcherInterface;
@@ -68,9 +68,7 @@ class LanguageNegotiationSession extends LanguageNegotiationMethodBase implement
   /**
    * {@inheritdoc}
    */
-  public function persist(Language $language) {
-    parent::persist($language);
-
+  public function persist(LanguageInterface $language) {
     // We need to update the session parameter with the request value only if we
     // have an authenticated user.
     $langcode = $language->id;
@@ -131,11 +129,11 @@ class LanguageNegotiationSession extends LanguageNegotiationMethodBase implement
     $query = array();
     parse_str($request->getQueryString(), $query);
 
-    foreach ($this->languageManager->getLanguages() as $language) {
+    foreach ($this->languageManager->getNativeLanguages() as $language) {
       $langcode = $language->id;
       $links[$langcode] = array(
         'href' => $path,
-        'title' => $language->name,
+        'title' => $language->getName(),
         'attributes' => array('class' => array('language-link')),
         'query' => $query,
       );

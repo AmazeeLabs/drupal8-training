@@ -36,15 +36,31 @@ action.configuration.comment_unpublish_by_keyword_action:
       type: sequence
       label: 'Keywords'
       sequence:
-        - type: sequence
+        - type: string
           label: 'Keyword'
 
 action.configuration.comment_unpublish_action:
   type: action_configuration_default
   label: 'Unpublish comment configuration'
 
+comment.type.*:
+  type: config_entity
+  label: 'Comment type settings'
+  mapping:
+    id:
+      type: string
+      label: 'ID'
+    label:
+      type: label
+      label: 'Label'
+    target_entity_type_id:
+      type: string
+      label: 'Target Entity Type ID'
+    description:
+      type: text
+      label: 'Description'
 
-field.comment.settings:
+field.comment.storage_settings:
   type: sequence
   label: 'Settings'
   sequence:
@@ -77,7 +93,7 @@ field.comment.value:
           type: integer
           label: 'Count'
 
-field.comment.instance_settings:
+field.comment.field_settings:
   type: mapping
   label: 'Comment settings'
   mapping:
@@ -90,9 +106,6 @@ field.comment.instance_settings:
     anonymous:
       type: integer
       label: 'Mode'
-    subject:
-      type: boolean
-      label: 'Allow comment title'
     form_location:
       type: boolean
       label: ' Allow comment title'

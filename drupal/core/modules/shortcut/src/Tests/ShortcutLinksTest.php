@@ -10,7 +10,9 @@ use Drupal\shortcut\Entity\Shortcut;
 use Drupal\shortcut\Entity\ShortcutSet;
 
 /**
- * Defines shortcut links test cases.
+ * Create, view, edit, delete, and change shortcut links.
+ *
+ * @group shortcut
  */
 class ShortcutLinksTest extends ShortcutTestBase {
 
@@ -21,14 +23,6 @@ class ShortcutLinksTest extends ShortcutTestBase {
    */
   public static $modules = array('router_test', 'views');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Shortcut link functionality',
-      'description' => 'Create, view, edit, delete, and change shortcut links.',
-      'group' => 'Shortcut',
-    );
-  }
-
   /**
    * Tests that creating a shortcut works properly.
    */
@@ -38,24 +32,25 @@ class ShortcutLinksTest extends ShortcutTestBase {
     // Create an alias for the node so we can test aliases.
     $path = array(
       'source' => 'node/' . $this->node->id(),
-      'alias' => $this->randomName(8),
+      'alias' => $this->randomMachineName(8),
     );
     $this->container->get('path.alias_storage')->save($path['source'], $path['alias']);
 
     // Create some paths to test.
     $test_cases = array(
-      array('path' => ''),
-      array('path' => 'admin'),
-      array('path' => 'admin/config/system/site-information'),
-      array('path' => 'node/' . $this->node->id() . '/edit'),
-      array('path' => $path['alias']),
-      array('path' => 'router_test/test2'),
-      array('path' => 'router_test/test3/value'),
+      array('path' => '', 'route_name' => '<front>'),
+      array('path' => '<front>', 'route_name' => '<front>'),
+      array('path' => 'admin', 'route_name' => 'system.admin'),
+      array('path' => 'admin/config/system/site-information', 'route_name' => 'system.site_information_settings'),
+      array('path' => 'node/' . $this->node->id() . '/edit', 'route_name' => 'entity.node.edit_form'),
+      array('path' => $path['alias'], 'route_name' => 'entity.node.canonical'),
+      array('path' => 'router_test/test2', 'route_name' => 'router_test.2'),
+      array('path' => 'router_test/test3/value', 'route_name' => 'router_test.3'),
     );
 
     // Check that each new shortcut links where it should.
     foreach ($test_cases as $test) {
-      $title = $this->randomName();
+      $title = $this->randomMachineName();
       $form_data = array(
         'title[0][value]' => $title,
         'path' => $test['path'],
@@ -63,8 +58,8 @@ class ShortcutLinksTest extends ShortcutTestBase {
       $this->drupalPostForm('admin/config/user-interface/shortcut/manage/' . $set->id() . '/add-link', $form_data, t('Save'));
       $this->assertResponse(200);
       $saved_set = ShortcutSet::load($set->id());
-      $paths = $this->getShortcutInformation($saved_set, 'path');
-      $this->assertTrue(in_array($this->container->get('path.alias_manager')->getPathByAlias($test['path']), $paths), 'Shortcut created: ' . $test['path']);
+      $routes = $this->getShortcutInformation($saved_set, 'route_name');
+      $this->assertTrue(in_array($test['route_name'], $routes), 'Shortcut created: ' . $test['path']);
       $this->assertLink($title, 0, 'Shortcut link found on the page.');
     }
     $saved_set = ShortcutSet::load($set->id());
@@ -79,13 +74,32 @@ class ShortcutLinksTest extends ShortcutTestBase {
         $this->assertEqual($entity->get('route_parameters')->first()->getValue(), $loaded->get('route_parameters')->first()->getValue());
       }
     }
+
+    // Login as non admin user, to check that access is checked when creating
+    // shortcuts.
+    $this->drupalLogin($this->shortcut_user);
+    $title = $this->randomMachineName();
+    $form_data = [
+      'title[0][value]' => $title,
+      'path' => 'admin',
+    ];
+    $this->drupalPostForm('admin/config/user-interface/shortcut/manage/' . $set->id() . '/add-link', $form_data, t('Save'));
+    $this->assertResponse(200);
+    $this->assertRaw(t('The shortcut must correspond to a valid path on the site.'));
+
+    $form_data = [
+      'title[0][value]' => $title,
+      'path' => 'node',
+    ];
+    $this->drupalPostForm('admin/config/user-interface/shortcut/manage/' . $set->id() . '/add-link', $form_data, t('Save'));
+    $this->assertLink($title, 0, 'Shortcut link found on the page.');
   }
 
   /**
    * Tests that the "add to shortcut" and "remove from shortcut" links work.
    */
   public function testShortcutQuickLink() {
-    theme_enable(array('seven'));
+    \Drupal::service('theme_handler')->install(array('seven'));
     \Drupal::config('system.theme')->set('admin', 'seven')->save();
     $this->container->get('config.factory')->get('node.settings')->set('use_admin_theme', '1')->save();
     $this->container->get('router.builder')->rebuild();
@@ -104,7 +118,6 @@ class ShortcutLinksTest extends ShortcutTestBase {
     // Test the "Remove from shortcuts" link.
     $this->clickLink('Cron');
     $this->clickLink('Remove from Default shortcuts');
-    $this->drupalPostForm(NULL, array(), 'Delete');
     $this->assertText('The shortcut Cron has been deleted.');
     $this->assertNoLink('Cron', 'Shortcut link removed from page');
 
@@ -119,7 +132,7 @@ class ShortcutLinksTest extends ShortcutTestBase {
     $set = $this->set;
 
     // Attempt to rename shortcut link.
-    $new_link_name = $this->randomName();
+    $new_link_name = $this->randomMachineName();
 
     $shortcuts = $set->getShortcuts();
     $shortcut = reset($shortcuts);
@@ -143,8 +156,8 @@ class ShortcutLinksTest extends ShortcutTestBase {
     $shortcut = reset($shortcuts);
     $this->drupalPostForm('admin/config/user-interface/shortcut/link/' . $shortcut->id(), array('title[0][value]' => $shortcut->getTitle(), 'path' => $new_link_path), t('Save'));
     $saved_set = ShortcutSet::load($set->id());
-    $paths = $this->getShortcutInformation($saved_set, 'path');
-    $this->assertTrue(in_array($new_link_path, $paths), 'Shortcut path changed: ' . $new_link_path);
+    $routes = $this->getShortcutInformation($saved_set, 'route_name');
+    $this->assertTrue(in_array('system.admin_config', $routes), 'Shortcut path changed: ' . $new_link_path);
     $this->assertLinkByHref($new_link_path, 0, 'Shortcut with new path appears on the page.');
   }
 
@@ -189,7 +202,7 @@ class ShortcutLinksTest extends ShortcutTestBase {
    */
   public function testNoShortcutLink() {
     // Change to a theme that displays shortcuts.
-    theme_enable(array('seven'));
+    \Drupal::service('theme_handler')->install(array('seven'));
     \Drupal::config('system.theme')
       ->set('default', 'seven')
       ->save();
@@ -213,6 +226,64 @@ class ShortcutLinksTest extends ShortcutTestBase {
     $this->drupalGet('router_test/test2');
     $result = $this->xpath('//div[contains(@class, "add-shortcut")]');
     $this->assertTrue(!empty($result), 'Add to shortcuts link was shown on a page the user does have access to.');
+  }
+
+  /**
+   * Tests that the 'access shortcuts' permissions works properly.
+   */
+  public function testAccessShortcutsPermission() {
+    // Change to a theme that displays shortcuts.
+    \Drupal::service('theme_handler')->install(array('seven'));
+    \Drupal::config('system.theme')
+      ->set('default', 'seven')
+      ->save();
+
+    // Add cron to the default shortcut set.
+    $this->drupalLogin($this->root_user);
+    $this->drupalGet('admin/config/system/cron');
+    $this->clickLink('Add to Default shortcuts');
+
+    // Verify that users without the 'access shortcuts' permission can't see the
+    // shortcuts.
+    $this->drupalLogin($this->drupalCreateUser(array('access toolbar')));
+    $this->assertNoLink('Shortcuts', 0, 'Shortcut link not found on page.');
+
+    // Verify that users with the 'access shortcuts' permission can see the
+    // shortcuts.
+    $this->drupalLogin($this->drupalCreateUser(array('access toolbar', 'access shortcuts')));
+    $this->clickLink('Shortcuts', 0, 'Shortcut link found on page.');
+    $this->assertLink('Cron', 0, 'Cron shortcut link found on page.');
+
+    $this->verifyAccessShortcutsPermissionForEditPages();
+  }
+
+  /**
+   * Tests that the 'access shortcuts' permission is required for shortcut set
+   * administration page access.
+   */
+  private function verifyAccessShortcutsPermissionForEditPages() {
+    // Create a user with customize links and switch sets permissions  but
+    // without the 'access shortcuts' permission.
+    $test_permissions = array(
+      'customize shortcut links',
+      'switch shortcut sets',
+    );
+    $noaccess_user = $this->drupalCreateUser($test_permissions);
+    $this->drupalLogin($noaccess_user);
+
+    // Verify that set administration pages are inaccessible without the
+    // 'access shortcuts' permission.
+    $edit_paths = array(
+      'admin/config/user-interface/shortcut/manage/default/customize',
+      'admin/config/user-interface/shortcut/manage/default',
+      'user/' . $noaccess_user->id() . '/shortcuts',
+    );
+
+    foreach ($edit_paths as $path) {
+      $this->drupalGet($path);
+      $message = format_string('Access is denied on %s', array('%s' => $path));
+      $this->assertResponse(403, $message);
+    }
   }
 
 }

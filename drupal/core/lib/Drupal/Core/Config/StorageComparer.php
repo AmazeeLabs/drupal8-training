@@ -9,12 +9,13 @@ namespace Drupal\Core\Config;
 
 use Drupal\Component\Utility\String;
 use Drupal\Core\Config\Entity\ConfigDependencyManager;
-use Drupal\Core\DependencyInjection\DependencySerialization;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 
 /**
  * Defines a config storage comparer.
  */
-class StorageComparer extends DependencySerialization implements StorageComparerInterface {
+class StorageComparer implements StorageComparerInterface {
+  use DependencySerializationTrait;
 
   /**
    * The source storage used to discover configuration changes.
@@ -184,7 +185,7 @@ class StorageComparer extends DependencySerialization implements StorageComparer
     $this->changelist[$collection][$op] = array_merge($this->changelist[$collection][$op], $changes);
     if (isset($sort_order)) {
       $count = count($this->changelist[$collection][$op]);
-      // Sort the changlist in the same order as the $sort_order array and
+      // Sort the changelist in the same order as the $sort_order array and
       // ensure the array is keyed from 0.
       $this->changelist[$collection][$op] = array_values(array_intersect($sort_order, $this->changelist[$collection][$op]));
       if ($count != count($this->changelist[$collection][$op])) {
@@ -218,8 +219,8 @@ class StorageComparer extends DependencySerialization implements StorageComparer
    * Creates the delete changelist.
    *
    * The list of deletes is sorted so that dependencies are deleted after
-   * configuration entities that depend on them. For example, field instances
-   * should be deleted after fields.
+   * configuration entities that depend on them. For example, fields should be
+   * deleted after field storages.
    *
    * @param string $collection
    *   The storage collection to operate on.
@@ -233,8 +234,8 @@ class StorageComparer extends DependencySerialization implements StorageComparer
    * Creates the create changelist.
    *
    * The list of creates is sorted so that dependencies are created before
-   * configuration entities that depend on them. For example, fields
-   * should be created before field instances.
+   * configuration entities that depend on them. For example, field storages
+   * should be created before fields.
    *
    * @param string $collection
    *   The storage collection to operate on.
@@ -248,8 +249,8 @@ class StorageComparer extends DependencySerialization implements StorageComparer
    * Creates the update changelist.
    *
    * The list of updates is sorted so that dependencies are created before
-   * configuration entities that depend on them. For example, fields
-   * should be updated before field instances.
+   * configuration entities that depend on them. For example, field storages
+   * should be updated before fields.
    *
    * @param string $collection
    *   The storage collection to operate on.

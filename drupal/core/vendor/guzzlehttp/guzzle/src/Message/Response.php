@@ -126,21 +126,19 @@ class Response extends AbstractMessage implements ResponseInterface
 
     public function json(array $config = [])
     {
-        $data = json_decode(
-            (string) $this->getBody(),
-            isset($config['object']) ? !$config['object'] : true,
-            512,
-            isset($config['big_int_strings']) ? JSON_BIGINT_AS_STRING : 0
-        );
-
-        if (JSON_ERROR_NONE !== json_last_error()) {
+        try {
+            return \GuzzleHttp\json_decode(
+                (string) $this->getBody(),
+                isset($config['object']) ? !$config['object'] : true,
+                512,
+                isset($config['big_int_strings']) ? JSON_BIGINT_AS_STRING : 0
+            );
+        } catch (\InvalidArgumentException $e) {
             throw new ParseException(
-                'Unable to parse response body into JSON: ' . json_last_error(),
+                $e->getMessage(),
                 $this
             );
         }
-
-        return $data;
     }
 
     public function xml(array $config = [])
@@ -152,7 +150,8 @@ class Response extends AbstractMessage implements ResponseInterface
             // Allow XML to be retrieved even if there is no response body
             $xml = new \SimpleXMLElement(
                 (string) $this->getBody() ?: '<root />',
-                LIBXML_NONET,
+                isset($config['libxml_options']) ? $config['libxml_options'] : LIBXML_NONET,
+                false,
                 isset($config['ns']) ? $config['ns'] : '',
                 isset($config['ns_is_prefix']) ? $config['ns_is_prefix'] : false
             );
@@ -194,11 +193,5 @@ class Response extends AbstractMessage implements ResponseInterface
         if (isset($options['reason_phrase'])) {
             $this->reasonPhrase = $options['reason_phrase'];
         }
-    }
-
-    protected function getStartLine()
-    {
-        return 'HTTP/' . $this->getProtocolVersion()
-            . " {$this->statusCode} {$this->reasonPhrase}";
     }
 }

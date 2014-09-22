@@ -8,7 +8,9 @@
 namespace Drupal\system\Tests\File;
 
 /**
- * Tests the file_unmanaged_save_data() function on remote filesystems.
+ * Tests the unmanaged file save data function.
+ *
+ * @group File
  */
 class RemoteFileUnmanagedSaveDataTest extends UnmanagedSaveDataTest {
 
@@ -33,13 +35,7 @@ class RemoteFileUnmanagedSaveDataTest extends UnmanagedSaveDataTest {
    */
   protected $classname = 'Drupal\file_test\DummyRemoteStreamWrapper';
 
-  public static function getInfo() {
-    $info = parent::getInfo();
-    $info['group'] = 'File API (remote)';
-    return $info;
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     \Drupal::config('system.file')->set('default_scheme', 'dummy-remote')->save();
   }

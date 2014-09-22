@@ -30,22 +30,7 @@ class NodeRow extends EntityRow {
 
     $options['view_mode']['default'] = 'teaser';
 
-    $options['links'] = array('default' => TRUE, 'bool' => TRUE);
-
     return $options;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function buildOptionsForm(&$form, &$form_state) {
-    parent::buildOptionsForm($form, $form_state);
-
-    $form['links'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Display links'),
-      '#default_value' => $this->options['links'],
-    );
   }
 
 }

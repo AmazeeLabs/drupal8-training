@@ -13,6 +13,7 @@ use Drupal\views\Tests\ViewTestBase;
 /**
  * Tests the history timestamp handlers.
  *
+ * @group history
  * @see \Drupal\history\Plugin\views\field\HistoryTimestamp.
  * @see \Drupal\history\Plugin\views\filter\HistoryTimestamp.
  */
@@ -32,14 +33,6 @@ class HistoryTimestampTest extends ViewTestBase {
    */
   public static $testViews = array('test_history');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'History Integration',
-      'description' => 'Tests the history timestamp handlers.',
-      'group' => 'Views module integration',
-    );
-  }
-
   /**
    * Tests the handlers.
    */
@@ -50,7 +43,7 @@ class HistoryTimestampTest extends ViewTestBase {
 
     $account = $this->drupalCreateUser();
     $this->drupalLogin($account);
-    $GLOBALS['user'] = $account;
+    \Drupal::currentUser()->setAccount($account);
 
     db_insert('history')
       ->fields(array(

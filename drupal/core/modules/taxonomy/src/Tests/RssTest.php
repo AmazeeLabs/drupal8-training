@@ -7,10 +7,13 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
- * Tests the rendering of term reference fields in RSS feeds.
+ * Ensure that data added as terms appears in RSS feeds if "RSS Category" format
+ * is selected.
+ *
+ * @group taxonomy
  */
 class RssTest extends TaxonomyTestBase {
 
@@ -21,15 +24,7 @@ class RssTest extends TaxonomyTestBase {
    */
   public static $modules = array('node', 'field_ui', 'views');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Taxonomy RSS Content.',
-      'description' => 'Ensure that data added as terms appears in RSS feeds if "RSS Category" format is selected.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->admin_user = $this->drupalCreateUser(array('administer taxonomy', 'bypass node access', 'administer content types', 'administer node display'));
@@ -37,11 +32,11 @@ class RssTest extends TaxonomyTestBase {
     $this->vocabulary = $this->createVocabulary();
     $this->field_name = 'taxonomy_' . $this->vocabulary->id();
 
-    $this->field = entity_create('field_config', array(
+    $this->fieldStorage = entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -51,11 +46,10 @@ class RssTest extends TaxonomyTestBase {
         ),
       ),
     ));
-    $this->field->save();
-    entity_create('field_instance_config', array(
-      'field_name' => $this->field_name,
+    $this->fieldStorage->save();
+    entity_create('field_config', array(
+      'field_storage' => $this->fieldStorage,
       'bundle' => 'article',
-      'entity_type' => 'node',
     ))->save();
     entity_get_form_display('node', 'article', 'default')
       ->setComponent($this->field_name, array(
@@ -94,7 +88,7 @@ class RssTest extends TaxonomyTestBase {
 
     // Post an article.
     $edit = array();
-    $edit['title[0][value]'] = $this->randomName();
+    $edit['title[0][value]'] = $this->randomMachineName();
     $edit[$this->field_name . '[]'] = $term1->id();
     $this->drupalPostForm('node/add/article', $edit, t('Save'));
 

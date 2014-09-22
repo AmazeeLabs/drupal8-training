@@ -8,6 +8,7 @@
 namespace Drupal\editor\Plugin;
 
 use Drupal\Component\Plugin\PluginInspectionInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\editor\Entity\Editor;
 
 /**
@@ -15,6 +16,11 @@ use Drupal\editor\Entity\Editor;
  *
  * Modules implementing this interface may want to extend the EditorBase class,
  * which provides default implementations of each method where appropriate.
+ *
+ * @see \Drupal\editor\Annotation\Editor
+ * @see \Drupal\editor\Plugin\EditorBase
+ * @see \Drupal\editor\Plugin\EditorManager
+ * @see plugin_api
  */
 interface EditorPluginInterface extends PluginInspectionInterface {
 
@@ -37,7 +43,7 @@ interface EditorPluginInterface extends PluginInspectionInterface {
    *
    * @param array $form
    *   An empty form array to be populated with a configuration form, if any.
-   * @param array $form_state
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The state of the entire filter administration form.
    * @param \Drupal\editor\Entity\Editor $editor
    *   A configured text editor object.
@@ -45,34 +51,34 @@ interface EditorPluginInterface extends PluginInspectionInterface {
    * @return array
    *   A render array for the settings form.
    */
-  public function settingsForm(array $form, array &$form_state, Editor $editor);
+  public function settingsForm(array $form, FormStateInterface $form_state, Editor $editor);
 
   /**
    * Validates the settings form for an editor.
    *
    * The contents of the editor settings are located in
-   * $form_state['values']['editor']['settings']. Calls to form_error() should
-   * reflect this location in the settings form.
+   * $form_state->getValue(array('editor', 'settings')). Calls to $form_state->setError()
+   * should reflect this location in the settings form.
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A reference to a keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    */
-  public function settingsFormValidate(array $form, array &$form_state);
+  public function settingsFormValidate(array $form, FormStateInterface $form_state);
 
   /**
    * Modifies any values in the form state to prepare them for saving.
    *
-   * Values in $form_state['values']['editor']['settings'] are saved by Editor
-   * module in editor_form_filter_admin_format_submit().
+   * Values in $form_state->getValue(array('editor', 'settings')) are saved by
+   * Editor module in editor_form_filter_admin_format_submit().
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A reference to a keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    */
-  public function settingsFormSubmit(array $form, array &$form_state);
+  public function settingsFormSubmit(array $form, FormStateInterface $form_state);
 
   /**
    * Returns JavaScript settings to be attached.

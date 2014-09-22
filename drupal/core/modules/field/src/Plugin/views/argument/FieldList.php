@@ -7,6 +7,9 @@
 
 namespace Drupal\field\Plugin\views\argument;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Field\AllowedTagsXssTrait;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\argument\Numeric;
@@ -20,6 +23,8 @@ use Drupal\views\Plugin\views\argument\Numeric;
  * @ViewsArgument("field_list")
  */
 class FieldList extends Numeric {
+
+  use AllowedTagsXssTrait;
 
   /**
    * Stores the allowed values of this field.
@@ -35,8 +40,8 @@ class FieldList extends Numeric {
     parent::init($view, $display, $options);
 
     $field_storage_definitions = \Drupal::entityManager()->getFieldStorageDefinitions($this->definition['entity_type']);
-    $field = $field_storage_definitions[$this->definition['field_name']];
-    $this->allowed_values = options_allowed_values($field);
+    $field_storage = $field_storage_definitions[$this->definition['field_name']];
+    $this->allowed_values = options_allowed_values($field_storage);
   }
 
   protected function defineOptions() {
@@ -46,7 +51,7 @@ class FieldList extends Numeric {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['summary']['human'] = array(
@@ -65,11 +70,11 @@ class FieldList extends Numeric {
     $value = $data->{$this->name_alias};
     // If the list element has a human readable name show it,
     if (isset($this->allowed_values[$value]) && !empty($this->options['summary']['human'])) {
-      return field_filter_xss($this->allowed_values[$value]);
+      return $this->fieldFilterXss($this->allowed_values[$value]);
     }
     // else fallback to the key.
     else {
-      return check_plain($value);
+      return String::checkPlain($value);
     }
   }
 

@@ -8,18 +8,12 @@
 namespace Drupal\node\Tests;
 
 /**
- * Verifies the rebuild functionality for the node_access table.
+ * Ensures that node access rebuild functions work correctly.
+ *
+ * @group node
  */
 class NodeAccessRebuildTest extends NodeTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Node access rebuild',
-      'description' => 'Ensures that node access rebuild functions work correctly.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array('administer site configuration', 'access administration pages', 'access site reports'));

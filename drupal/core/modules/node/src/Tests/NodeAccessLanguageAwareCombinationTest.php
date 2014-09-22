@@ -7,10 +7,14 @@
 
 namespace Drupal\node\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
- * Tests node access with multiple languages and access control modules.
+ * Tests node access functionality with multiple languages and two node access
+ * modules.
+ *
+ * @group node
  */
 class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
 
@@ -42,34 +46,28 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
    */
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node access language-aware combination',
-      'description' => 'Tests node access functionality with multiple languages and two node access modules.',
-      'group' => 'Node',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
+
+    node_access_test_add_field(entity_load('node_type', 'page'));
 
     // Create the 'private' field, which allows the node to be marked as private
     // (restricted access) in a given translation.
-    $field_private = entity_create('field_config', array(
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'field_private',
       'entity_type' => 'node',
-      'type' => 'list_boolean',
+      'type' => 'boolean',
       'cardinality' => 1,
       'translatable'  => TRUE,
       'settings' => array(
-        'allowed_values' => array(0 => 'Not private', 1 => 'Private'),
+        'on_label' => 'Private',
+        'off_label' => 'Not private',
       ),
     ));
-    $field_private->save();
+    $field_storage->save();
 
-    entity_create('field_instance_config', array(
-      'field_name' => $field_private->name,
-      'entity_type' => 'node',
+    entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'page',
       'widget' => array(
         'type' => 'options_buttons',
@@ -80,14 +78,8 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
     node_access_rebuild();
 
     // Add Hungarian and Catalan.
-    $language = new Language(array(
-      'id' => 'hu',
-    ));
-    language_save($language);
-    $language = new Language(array(
-      'id' => 'ca',
-    ));
-    language_save($language);
+    ConfigurableLanguage::createFromLangcode('hu')->save();
+    ConfigurableLanguage::createFromLangcode('ca')->save();
 
     // Create a normal authenticated user.
     $this->web_user = $this->drupalCreateUser(array('access content'));
@@ -174,18 +166,22 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
     $this->nodes['public_no_language_private'] = $this->drupalCreateNode(array(
       'field_private' => array(array('value' => 1)),
       'private' => FALSE,
+        'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $this->nodes['public_no_language_public'] = $this->drupalCreateNode(array(
       'field_private' => array(array('value' => 0)),
       'private' => FALSE,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $this->nodes['private_no_language_private'] = $this->drupalCreateNode(array(
       'field_private' => array(array('value' => 1)),
       'private' => TRUE,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $this->nodes['private_no_language_public'] = $this->drupalCreateNode(array(
       'field_private' => array(array('value' => 1)),
       'private' => TRUE,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
   }
 

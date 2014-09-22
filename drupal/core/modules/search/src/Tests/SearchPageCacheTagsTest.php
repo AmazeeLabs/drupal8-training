@@ -9,6 +9,8 @@ namespace Drupal\search\Tests;
 
 /**
  * Tests the search_page entity cache tags on the search results pages.
+ *
+ * @group search
  */
 class SearchPageCacheTagsTest extends SearchTestBase {
 
@@ -16,15 +18,7 @@ class SearchPageCacheTagsTest extends SearchTestBase {
 
   protected $searching_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Search page cache tags',
-      'description' => 'Tests the presence of the SearchPage entity\'s cache tags on the search results pages.',
-      'group' => 'Search'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create user.

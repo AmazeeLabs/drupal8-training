@@ -7,6 +7,7 @@
 
 namespace Drupal\views_ui;
 
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -80,6 +81,12 @@ class ViewListBuilder extends ConfigEntityListBuilder {
    */
   public function buildRow(EntityInterface $view) {
     $row = parent::buildRow($view);
+    $display_paths = '';
+    $separator = '';
+    foreach ($this->getDisplayPaths($view) as $display_path) {
+      $display_paths .= $separator . SafeMarkup::escape($display_path);
+      $separator = ', ';
+    }
     return array(
       'data' => array(
         'view_name' => array(
@@ -96,7 +103,7 @@ class ViewListBuilder extends ConfigEntityListBuilder {
           'class' => array('views-table-filter-text-source'),
         ),
         'tag' => $view->get('tag'),
-        'path' => implode(', ', $this->getDisplayPaths($view)),
+        'path' => SafeMarkup::set($display_paths),
         'operations' => $row['operations'],
       ),
       'title' => $this->t('Machine name: @name', array('@name' => $view->id())),
@@ -138,17 +145,17 @@ class ViewListBuilder extends ConfigEntityListBuilder {
   public function getDefaultOperations(EntityInterface $entity) {
     $operations = parent::getDefaultOperations($entity);
 
-    if ($entity->hasLinkTemplate('clone')) {
-      $operations['clone'] = array(
-        'title' => $this->t('Clone'),
+    if ($entity->hasLinkTemplate('duplicate-form')) {
+      $operations['duplicate'] = array(
+        'title' => $this->t('Duplicate'),
         'weight' => 15,
-      ) + $entity->urlInfo('clone')->toArray();
+      ) + $entity->urlInfo('duplicate-form')->toArray();
     }
 
     // Add AJAX functionality to enable/disable operations.
     foreach (array('enable', 'disable') as $op) {
       if (isset($operations[$op])) {
-        $operations[$op]['route_name'] = "views_ui.$op";
+        $operations[$op]['route_name'] = "entity.view.{$op}";
         $operations[$op]['route_parameters'] = array('view' => $entity->id());
 
         // Enable and disable operations should use AJAX.
@@ -230,12 +237,14 @@ class ViewListBuilder extends ConfigEntityListBuilder {
     foreach ($view->get('display') as $display) {
       $definition = $this->displayManager->getDefinition($display['display_plugin']);
       if (!empty($definition['admin'])) {
-        $displays[$definition['admin']] = TRUE;
+        // Cast the admin label to a string since it is an object.
+        // @see \Drupal\Core\StringTranslation\TranslationWrapper
+        $displays[] = (string) $definition['admin'];
       }
     }
 
-    ksort($displays);
-    return array_keys($displays);
+    sort($displays);
+    return $displays;
   }
 
   /**

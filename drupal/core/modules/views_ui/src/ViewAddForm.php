@@ -7,6 +7,7 @@
 
 namespace Drupal\views_ui;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\wizard\WizardPluginBase;
 use Drupal\views\Plugin\views\wizard\WizardException;
 use Drupal\views\Plugin\ViewsPluginManager;
@@ -53,7 +54,7 @@ class ViewAddForm extends ViewFormBase {
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     $form['#attached']['css'] = static::getAdminCSS();
     $form['#attached']['js'][] = drupal_get_path('module', 'views_ui') . '/js/views-admin.js';
     $form['#attributes']['class'] = array('views-admin');
@@ -145,16 +146,15 @@ class ViewAddForm extends ViewFormBase {
   /**
    * {@inheritdoc}
    */
-  protected function actions(array $form, array &$form_state) {
+  protected function actions(array $form, FormStateInterface $form_state) {
     $actions = parent::actions($form, $form_state);
     $actions['submit']['#value'] = $this->t('Save and edit');
-
+    // Remove EntityFormController::save() form the submission handlers.
+    $actions['submit']['#submit'] = array(array($this, 'submitForm'));
     $actions['cancel'] = array(
       '#type' => 'submit',
       '#value' => $this->t('Cancel'),
-      '#submit' => array(
-        array($this, 'cancel'),
-      ),
+      '#submit' => array('::cancel'),
       '#limit_validation_errors' => array(),
     );
     return $actions;
@@ -163,16 +163,16 @@ class ViewAddForm extends ViewFormBase {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
-    $wizard_type = $form_state['values']['show']['wizard_key'];
+  public function validate(array $form, FormStateInterface $form_state) {
+    $wizard_type = $form_state->getValue(array('show', 'wizard_key'));
     $wizard_instance = $this->wizardManager->createInstance($wizard_type);
-    $form_state['wizard'] = $wizard_instance->getPluginDefinition();
-    $form_state['wizard_instance'] = $wizard_instance;
-    $errors = $form_state['wizard_instance']->validateView($form, $form_state);
+    $form_state->set('wizard', $wizard_instance->getPluginDefinition());
+    $form_state->set('wizard_instance', $wizard_instance);
+    $errors = $wizard_instance->validateView($form, $form_state);
 
     foreach ($errors as $display_errors) {
       foreach ($display_errors as $name => $message) {
-        $this->setFormError($name, $form_state, $message);
+        $form_state->setErrorByName($name, $message);
       }
     }
   }
@@ -180,21 +180,21 @@ class ViewAddForm extends ViewFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submit(array $form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     try {
       /** @var $wizard \Drupal\views\Plugin\views\wizard\WizardInterface */
-      $wizard = $form_state['wizard_instance'];
-      $view = $wizard->createView($form, $form_state);
+      $wizard = $form_state->get('wizard_instance');
+      $this->entity = $wizard->createView($form, $form_state);
     }
     // @todo Figure out whether it really makes sense to throw and catch exceptions on the wizard.
     catch (WizardException $e) {
       drupal_set_message($e->getMessage(), 'error');
-      $form_state['redirect_route']['route_name'] = 'views_ui.list';
+      $form_state->setRedirect('views_ui.list');
       return;
     }
-    $view->save();
+    $this->entity->save();
 
-    $form_state['redirect_route'] = $view->urlInfo('edit-form');
+    $form_state->setRedirectUrl($this->entity->urlInfo('edit-form'));
   }
 
   /**
@@ -202,11 +202,11 @@ class ViewAddForm extends ViewFormBase {
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A reference to a keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    */
-  public function cancel(array $form, array &$form_state) {
-    $form_state['redirect_route']['route_name'] = 'views_ui.list';
+  public function cancel(array $form, FormStateInterface $form_state) {
+    $form_state->setRedirect('views_ui.list');
   }
 
 }

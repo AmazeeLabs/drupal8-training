@@ -1,8 +1,0 @@
-id: long
-label: 'Default long date'
-status: true
-langcode: en
-locked: false
-pattern:
-  php: 'l, F j, Y - H:i'
-  intl: 'EEEE, LLLL d, yyyy - kk:mm'

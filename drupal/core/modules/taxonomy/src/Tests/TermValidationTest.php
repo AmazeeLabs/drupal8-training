@@ -11,6 +11,8 @@ use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
  * Tests term validation constraints.
+ *
+ * @group taxonomy
  */
 class TermValidationTest extends EntityUnitTestBase {
 
@@ -21,20 +23,12 @@ class TermValidationTest extends EntityUnitTestBase {
    */
   public static $modules = array('taxonomy');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Term Validation',
-      'description' => 'Tests the term validation constraints.',
-      'group' => 'Taxonomy',
-    );
-  }
-
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('taxonomy', array('taxonomy_term_data'));
+    $this->installEntitySchema('taxonomy_term');
   }
 
   /**
@@ -69,6 +63,10 @@ class TermValidationTest extends EntityUnitTestBase {
     $term->set('parent', 9999);
     $violations = $term->validate();
     $this->assertEqual(count($violations), 1, 'Violation found when term parent is invalid.');
-    $this->assertEqual($violations[0]->getMessage(), format_string('%id is not a valid parent for this term.', array('%id' => 9999)));
+    $this->assertEqual($violations[0]->getMessage(), format_string('The referenced entity (%type: %id) does not exist.', array('%type' => 'taxonomy_term', '%id' => 9999)));
+
+    $term->set('parent', 0);
+    $violations = $term->validate();
+    $this->assertEqual(count($violations), 0, 'No violations for parent id 0.');
   }
 }

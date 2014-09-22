@@ -11,6 +11,7 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -168,11 +169,11 @@ class BookManager implements BookManagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function addFormElements(array $form, array &$form_state, NodeInterface $node, AccountInterface $account, $collapsed = TRUE) {
+  public function addFormElements(array $form, FormStateInterface $form_state, NodeInterface $node, AccountInterface $account, $collapsed = TRUE) {
     // If the form is being processed during the Ajax callback of our book bid
     // dropdown, then $form_state will hold the value that was selected.
-    if (isset($form_state['values']['book'])) {
-      $node->book = $form_state['values']['book'];
+    if ($form_state->hasValue('book')) {
+      $node->book = $form_state->getValue('book');
     }
     $form['book'] = array(
       '#type' => 'details',

@@ -2,15 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\node\NodeStorageController.
+ * Contains \Drupal\node\NodeStorage.
  */
 
 namespace Drupal\node;
 
-use Drupal\Core\Database\Database;
-use Drupal\Core\Entity\ContentEntityDatabaseStorage;
+use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Defines the controller class for nodes.
@@ -18,7 +17,7 @@ use Drupal\Core\Language\Language;
  * This extends the base storage class, adding required special handling for
  * node entities.
  */
-class NodeStorage extends ContentEntityDatabaseStorage implements NodeStorageInterface {
+class NodeStorage extends SqlContentEntityStorage implements NodeStorageInterface {
 
   /**
    * {@inheritdoc}
@@ -55,8 +54,9 @@ class NodeStorage extends ContentEntityDatabaseStorage implements NodeStorageInt
    */
   public function clearRevisionsLanguage($language) {
     return $this->database->update('node_revision')
-      ->fields(array('langcode' => Language::LANGCODE_NOT_SPECIFIED))
+      ->fields(array('langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED))
       ->condition('langcode', $language->id)
       ->execute();
   }
+
 }

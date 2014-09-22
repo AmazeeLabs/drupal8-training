@@ -10,18 +10,12 @@ namespace Drupal\taxonomy\Tests;
 use Drupal\Core\Entity\Query\QueryFactory;
 
 /**
- * Tests the functionality of EntityQueryInterface for taxonomy entities.
+ * Verifies operation of a taxonomy-based Entity Query.
+ *
+ * @group taxonomy
  */
 class EfqTest extends TaxonomyTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Taxonomy entity query',
-      'description' => 'Verifies operation of a taxonomy-based Entity Query.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->admin_user = $this->drupalCreateUser(array('administer taxonomy'));
     $this->drupalLogin($this->admin_user);

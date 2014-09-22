@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Plugin\views\area;
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Views area text handler.
  *
@@ -29,7 +31,7 @@ class Text extends TokenizeAreaPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['content'] = array(
@@ -45,9 +47,10 @@ class Text extends TokenizeAreaPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function submitOptionsForm(&$form, &$form_state) {
-    $form_state['values']['options']['format'] = $form_state['values']['options']['content']['format'];
-    $form_state['values']['options']['content'] = $form_state['values']['options']['content']['value'];
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
+    $content = $form_state->getValue(array('options', 'content'));
+    $form_state->setValue(array('options', 'format'), $content['format']);
+    $form_state->setValue(array('options', 'content'), $content['value']);
     parent::submitOptionsForm($form, $form_state);
   }
 
@@ -58,20 +61,13 @@ class Text extends TokenizeAreaPluginBase {
     $format = isset($this->options['format']) ? $this->options['format'] : filter_default_format();
     if (!$empty || !empty($this->options['empty'])) {
       return array(
-        '#markup' => $this->renderTextarea($this->options['content'], $format),
+        '#type' => 'processed_text',
+        '#text' => $this->tokenizeValue($this->options['content']),
+        '#format' => $format,
       );
     }
 
     return array();
-  }
-
-  /**
-   * Render a text area, using the proper format.
-   */
-  public function renderTextarea($value, $format) {
-    if ($value) {
-      return check_markup($this->tokenizeValue($value), $format, '', FALSE);
-    }
   }
 
 }

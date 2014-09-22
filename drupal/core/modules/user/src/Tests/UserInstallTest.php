@@ -11,6 +11,8 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests user_install().
+ *
+ * @group user
  */
 class UserInstallTest extends DrupalUnitTestBase {
 
@@ -24,20 +26,11 @@ class UserInstallTest extends DrupalUnitTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'User install tests',
-      'description' => 'Tests user_install().',
-      'group' => 'User'
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
-    $this->installSchema('user', array('users'));
+    $this->container->get('module_handler')->loadInclude('user', 'install');
+    $this->installEntitySchema('user');
+    user_install();
   }
 
 
@@ -45,9 +38,10 @@ class UserInstallTest extends DrupalUnitTestBase {
    * Test that the initial users have correct values.
    */
   public function testUserInstall() {
-    user_install();
-    $anon = db_query('SELECT * FROM {users} WHERE uid = 0')->fetchObject();
-    $admin = db_query('SELECT * FROM {users} WHERE uid = 1')->fetchObject();
+    $result = db_query('SELECT u.uid, u.uuid, u.langcode, uf.status FROM {users} u INNER JOIN {users_field_data} uf ON u.uid=uf.uid ORDER BY u.uid')
+      ->fetchAllAssoc('uid');
+    $anon = $result[0];
+    $admin = $result[1];
     $this->assertFalse(empty($anon->uuid), 'Anon user has a UUID');
     $this->assertFalse(empty($admin->uuid), 'Admin user has a UUID');
 

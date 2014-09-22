@@ -7,13 +7,13 @@
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\node\NodeInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Implements hook_help().
  */
-function statistics_help($route_name, Request $request) {
+function statistics_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.statistics':
       $output = '';
@@ -34,21 +34,7 @@ function statistics_help($route_name, Request $request) {
 }
 
 /**
- * Implements hook_permission().
- */
-function statistics_permission() {
-  return array(
-    'administer statistics' => array(
-      'title' => t('Administer statistics'),
-    ),
-    'view post access counter' => array(
-      'title' => t('View content hits'),
-    ),
-  );
-}
-
-/**
- * Implements hook_node_view().
+ * Implements hook_ENTITY_TYPE_view() for node entities.
  */
 function statistics_node_view(array &$build, EntityInterface $node, EntityViewDisplayInterface $display, $view_mode) {
   if (!$node->isNew() && $view_mode == 'full' && node_is_page($node) && empty($node->in_preview)) {
@@ -119,7 +105,7 @@ function statistics_title_list($dbfield, $dbrows) {
     $query = db_select('node_field_data', 'n');
     $query->addTag('node_access');
     $query->join('node_counter', 's', 'n.nid = s.nid');
-    $query->join('users', 'u', 'n.uid = u.uid');
+    $query->join('users_field_data', 'u', 'n.uid = u.uid');
 
     return $query
       ->fields('n', array('nid', 'title'))
@@ -129,6 +115,7 @@ function statistics_title_list($dbfield, $dbrows) {
       // @todo This should be actually filtering on the desired node status
       //   field language and just fall back to the default language.
       ->condition('n.default_langcode', 1)
+      ->condition('u.default_langcode', 1)
       ->orderBy($dbfield, 'DESC')
       ->range(0, $dbrows)
       ->execute();
@@ -155,7 +142,7 @@ function statistics_get($nid) {
 
   if ($nid > 0) {
     // Retrieve an array with both totalcount and daycount.
-    return db_query('SELECT totalcount, daycount, timestamp FROM {node_counter} WHERE nid = :nid', array(':nid' => $nid), array('target' => 'slave'))->fetchAssoc();
+    return db_query('SELECT totalcount, daycount, timestamp FROM {node_counter} WHERE nid = :nid', array(':nid' => $nid), array('target' => 'replica'))->fetchAssoc();
   }
 }
 
@@ -195,7 +182,7 @@ function _statistics_format_item($title, $path) {
 }
 
 /**
- * Implements hook_node_predelete().
+ * Implements hook_ENTITY_TYPE_predelete() for node entities.
  */
 function statistics_node_predelete(EntityInterface $node) {
   // clean up statistics table when node is deleted

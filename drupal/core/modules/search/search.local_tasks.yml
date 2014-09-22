@@ -1,3 +1,0 @@
-search.plugins:
-  class: \Drupal\Core\Menu\LocalTaskDefault
-  derivative: \Drupal\search\Plugin\Derivative\SearchLocalTask

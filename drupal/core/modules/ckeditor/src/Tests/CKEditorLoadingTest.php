@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests loading of CKEditor.
+ *
+ * @group ckeditor
  */
 class CKEditorLoadingTest extends WebTestBase {
 
@@ -21,15 +23,7 @@ class CKEditorLoadingTest extends WebTestBase {
    */
   public static $modules = array('filter', 'editor', 'ckeditor', 'node');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'CKEditor loading',
-      'description' => 'Tests loading of CKEditor.',
-      'group' => 'CKEditor',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create text format, associate CKEditor.
@@ -122,6 +116,7 @@ class CKEditorLoadingTest extends WebTestBase {
     // configuration also results in modified CKEditor configuration, so we
     // don't test that here.
     \Drupal::moduleHandler()->install(array('ckeditor_test'));
+    $this->resetAll();
     $this->container->get('plugin.manager.ckeditor.plugin')->clearCachedDefinitions();
     $editor_settings = $editor->getSettings();
     $editor_settings['toolbar']['buttons'][0][] = 'Llama';
@@ -129,12 +124,14 @@ class CKEditorLoadingTest extends WebTestBase {
     $editor->save();
     $this->drupalGet('node/add/article');
     list($settings, $editor_settings_present, $editor_js_present, $body, $format_selector) = $this->getThingsToCheck();
-    $expected = array('formats' => array('filtered_html' => array(
-      'format' => 'filtered_html',
-      'editor' => 'ckeditor',
-      'editorSettings' => $ckeditor_plugin->getJSSettings($editor),
-      'editorSupportsContentFiltering' => TRUE,
-      'isXssSafe' => FALSE,
+    $expected = array(
+      'formats' => array(
+        'filtered_html' => array(
+          'format' => 'filtered_html',
+          'editor' => 'ckeditor',
+          'editorSettings' => $ckeditor_plugin->getJSSettings($editor),
+          'editorSupportsContentFiltering' => TRUE,
+          'isXssSafe' => FALSE,
     )));
     $this->assertTrue($editor_settings_present, "Text Editor module's JavaScript settings are on the page.");
     $this->assertIdentical($expected, $settings['editor'], "Text Editor module's JavaScript settings on the page are correct.");

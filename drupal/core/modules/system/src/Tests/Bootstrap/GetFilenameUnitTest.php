@@ -7,19 +7,19 @@
 
 namespace Drupal\system\Tests\Bootstrap;
 
-use Drupal\simpletest\UnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
- * Tests drupal_get_filename()'s availability.
+ * Tests that drupal_get_filename() works correctly.
+ *
+ * @group Bootstrap
  */
-class GetFilenameUnitTest extends UnitTestBase {
+class GetFilenameUnitTest extends KernelTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Get filename test',
-      'description' => 'Test that drupal_get_filename() works correctly.',
-      'group' => 'Bootstrap',
-    );
+  protected function setUp() {
+    parent::setUp();
+    $this->container = NULL;
+    \Drupal::setContainer(NULL);
   }
 
   /**
@@ -31,11 +31,12 @@ class GetFilenameUnitTest extends UnitTestBase {
     global $install_state;
     $install_state['parameters']['profile'] = 'testing';
 
-    // Assert that the test is meaningful by making sure the keyvalue service
-    // does not exist.
-    $this->assertFalse(\Drupal::hasService('keyvalue'), 'The container has no keyvalue service.');
+    // Assert that this test is meaningful.
+    $this->assertNull($this->container);
+    $this->assertNull(\Drupal::getContainer());
+
     // Retrieving the location of a module.
-    $this->assertIdentical(drupal_get_filename('module', 'xmlrpc'), 'core/modules/xmlrpc/xmlrpc.info.yml');
+    $this->assertIdentical(drupal_get_filename('module', 'system'), 'core/modules/system/system.info.yml');
 
     // Retrieving the location of a theme.
     $this->assertIdentical(drupal_get_filename('theme', 'stark'), 'core/themes/stark/stark.info.yml');

@@ -9,7 +9,7 @@ namespace Drupal\migrate\Plugin\migrate\id_map;
 
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Database\Connection;
-use Drupal\Core\Field\FieldDefinition;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\migrate\Entity\MigrationInterface;
 use Drupal\migrate\MigrateException;
@@ -219,7 +219,7 @@ class Sql extends PluginBase implements MigrateIdMapInterface {
    * @return \Drupal\Core\Database\Connection
    *   The database connection object.
    */
-  protected function getDatabase() {
+  public function getDatabase() {
     if (!isset($this->database)) {
       $this->database = \Drupal::database();
     }
@@ -386,7 +386,7 @@ class Sql extends PluginBase implements MigrateIdMapInterface {
     if (count($type_parts) == 1) {
       $type_parts[] = 'value';
     }
-    $schema = FieldDefinition::create($type_parts[0])->getColumns();
+    $schema = BaseFieldDefinition::create($type_parts[0])->getColumns();
     return $schema[$type_parts[1]];
   }
 

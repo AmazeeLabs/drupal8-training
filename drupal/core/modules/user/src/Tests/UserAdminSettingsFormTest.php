@@ -11,19 +11,13 @@ use Drupal\system\Tests\System\SystemConfigFormTestBase;
 use Drupal\user\AccountSettingsForm;
 
 /**
- * Tests the administrative user settings configuration form.
+ * Configuration object user.mail and user.settings save test.
+ *
+ * @group user
  */
 class UserAdminSettingsFormTest extends SystemConfigFormTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'User admin settings',
-      'description' => 'Configuration object user.mail and user.settings save test.',
-      'group' => 'User',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->form = AccountSettingsForm::create($this->container);

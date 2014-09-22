@@ -6,11 +6,13 @@
 
 namespace Drupal\user\Tests;
 
-use Drupal\field\Entity\FieldInstanceConfig;
+use Drupal\field\Entity\FieldConfig;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
- * User entity reference test cases.
+ * Tests the user reference field functionality.
+ *
+ * @group user
  */
 class UserEntityReferenceTest extends EntityUnitTestBase {
 
@@ -34,40 +36,29 @@ class UserEntityReferenceTest extends EntityUnitTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'User entity reference',
-      'description' => 'Tests the user reference field functionality.',
-      'group' => 'User',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->role1 = entity_create('user_role', array(
-      'id' => strtolower($this->randomName(8)),
-      'label' => $this->randomName(8),
+      'id' => strtolower($this->randomMachineName(8)),
+      'label' => $this->randomMachineName(8),
     ));
     $this->role1->save();
 
     $this->role2 = entity_create('user_role', array(
-      'id' => strtolower($this->randomName(8)),
-      'label' => $this->randomName(8),
+      'id' => strtolower($this->randomMachineName(8)),
+      'label' => $this->randomMachineName(8),
     ));
     $this->role2->save();
 
-    entity_reference_create_instance('user', 'user', 'user_reference', 'User reference', 'user');
+    entity_reference_create_field('user', 'user', 'user_reference', 'User reference', 'user');
   }
 
   /**
    * Tests user selection by roles.
    */
   function testUserSelectionByRole() {
-    $field_definition = FieldInstanceConfig::loadByName('user', 'user', 'user_reference');
+    $field_definition = FieldConfig::loadByName('user', 'user', 'user_reference');
     $field_definition->settings['handler_settings']['filter']['role'] = array(
       $this->role1->id() => $this->role1->id(),
       $this->role2->id() => 0,

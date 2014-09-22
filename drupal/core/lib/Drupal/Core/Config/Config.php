@@ -63,10 +63,10 @@ class Config extends StorableConfigBase {
    *   configuration data.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   An event dispatcher instance to use for configuration events.
-   * @param \Drupal\Core\Config\TypedConfigManager $typed_config
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config
    *   The typed configuration manager service.
    */
-  public function __construct($name, StorageInterface $storage, EventDispatcherInterface $event_dispatcher, TypedConfigManager $typed_config) {
+  public function __construct($name, StorageInterface $storage, EventDispatcherInterface $event_dispatcher, TypedConfigManagerInterface $typed_config) {
     $this->name = $name;
     $this->storage = $storage;
     $this->eventDispatcher = $event_dispatcher;
@@ -110,7 +110,7 @@ class Config extends StorableConfigBase {
    * {@inheritdoc}
    */
   public function setData(array $data) {
-    $this->data = $data;
+    parent::setData($data);
     $this->resetOverriddenData();
     return $this;
   }

@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Database;
 use \Drupal\Core\Database\RowCountException;
 
 /**
- * Tests more complex select statements.
+ * Tests the Select query builder with more complex queries.
+ *
+ * @group Database
  */
 class SelectComplexTest extends DatabaseTestBase {
 
@@ -19,15 +21,7 @@ class SelectComplexTest extends DatabaseTestBase {
    *
    * @var array
    */
-  public static $modules = array('node_access_test', 'field');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Select tests, complex',
-      'description' => 'Test the Select query builder with more complex queries.',
-      'group' => 'Database',
-    );
-  }
+  public static $modules = array('system', 'user', 'node_access_test', 'field');
 
   /**
    * Tests simple JOIN statements.
@@ -328,16 +322,14 @@ class SelectComplexTest extends DatabaseTestBase {
    * Tests that we can join on a query.
    */
   function testJoinSubquery() {
-    $this->enableModules(array('system'), FALSE);
     $this->installSchema('system', 'sequences');
-    $this->enableModules(array('field', 'user'));
 
     $account = entity_create('user', array(
-      'name' => $this->randomName(),
-      'mail' => $this->randomName() . '@example.com',
+      'name' => $this->randomMachineName(),
+      'mail' => $this->randomMachineName() . '@example.com',
     ));
 
-    $query = db_select('test_task', 'tt', array('target' => 'slave'));
+    $query = db_select('test_task', 'tt', array('target' => 'replica'));
     $query->addExpression('tt.pid + 1', 'abc');
     $query->condition('priority', 1, '>');
     $query->condition('priority', 100, '<');

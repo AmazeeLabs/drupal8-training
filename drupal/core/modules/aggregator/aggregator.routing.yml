@@ -35,7 +35,7 @@ aggregator.opml_add:
   path: '/admin/config/services/aggregator/add/opml'
   defaults:
     _form: '\Drupal\aggregator\Form\OpmlFeedAdd'
-    _title: 'Import OMPL'
+    _title: 'Import OPML'
   requirements:
     _permission: 'administer news feeds'
 
@@ -49,15 +49,15 @@ aggregator.feed_add:
   options:
     _admin_route: TRUE
 
-aggregator.feed_view:
+entity.aggregator_feed.canonical:
   path: '/aggregator/sources/{aggregator_feed}'
   defaults:
-    _content: '\Drupal\aggregator\Controller\AggregatorController::viewFeed'
+    _entity_view: 'aggregator_feed'
     _title_callback: '\Drupal\aggregator\Controller\AggregatorController::feedTitle'
   requirements:
     _permission: 'access news feeds'
 
-aggregator.feed_configure:
+entity.aggregator_feed.edit_form:
   path: '/aggregator/sources/{aggregator_feed}/configure'
   defaults:
     _entity_form: 'aggregator_feed.default'
@@ -67,7 +67,7 @@ aggregator.feed_configure:
   options:
     _admin_route: TRUE
 
-aggregator.feed_delete:
+entity.aggregator_feed.delete_form:
   path: '/aggregator/sources/{aggregator_feed}/delete'
   defaults:
     _entity_form: 'aggregator_feed.delete'

@@ -7,13 +7,48 @@
 
 namespace Drupal\system\Form;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Datetime\DateFormatter;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Form\ConfigFormBase;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Configure file system settings for this site.
  */
 class FileSystemForm extends ConfigFormBase {
+
+  /**
+   * The date formatter service.
+   *
+   * @var \Drupal\Core\Datetime\DateFormatter
+   */
+  protected $dateFormatter;
+
+  /**
+   * Constructs a FileSystemForm object.
+   *
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   *   The factory for configuration objects.
+   * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
+   *   The date formatter service.
+   */
+  public function __construct(ConfigFactoryInterface $config_factory, DateFormatter $date_formatter) {
+    parent::__construct($config_factory);
+    $this->dateFormatter = $date_formatter;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static (
+      $container->get('config.factory'),
+      $container->get('date.formatter')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -25,7 +60,7 @@ class FileSystemForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('system.file');
     $form['file_public_path'] = array(
       '#type' => 'item',
@@ -55,7 +90,7 @@ class FileSystemForm extends ConfigFormBase {
     // Any visible, writeable wrapper can potentially be used for the files
     // directory, including a remote file system that integrates with a CDN.
     foreach (file_get_stream_wrappers(STREAM_WRAPPERS_WRITE_VISIBLE) as $scheme => $info) {
-      $options[$scheme] = check_plain($info['description']);
+      $options[$scheme] = String::checkPlain($info['description']);
     }
 
     if (!empty($options)) {
@@ -69,7 +104,7 @@ class FileSystemForm extends ConfigFormBase {
     }
 
     $intervals = array(0, 21600, 43200, 86400, 604800, 2419200, 7776000);
-    $period = array_combine($intervals, array_map('format_interval', $intervals));
+    $period = array_combine($intervals, array_map(array($this->dateFormatter, 'formatInterval'), $intervals));
     $period[0] = t('Never');
     $form['temporary_maximum_age'] = array(
       '#type' => 'select',
@@ -85,14 +120,14 @@ class FileSystemForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $config = $this->config('system.file')
-      ->set('path.private', $form_state['values']['file_private_path'])
-      ->set('path.temporary', $form_state['values']['file_temporary_path'])
-      ->set('temporary_maximum_age', $form_state['values']['temporary_maximum_age']);
+      ->set('path.private', $form_state->getValue('file_private_path'))
+      ->set('path.temporary', $form_state->getValue('file_temporary_path'))
+      ->set('temporary_maximum_age', $form_state->getValue('temporary_maximum_age'));
 
-    if (isset($form_state['values']['file_default_scheme'])) {
-      $config->set('default_scheme', $form_state['values']['file_default_scheme']);
+    if ($form_state->hasValue('file_default_scheme')) {
+      $config->set('default_scheme', $form_state->getValue('file_default_scheme'));
     }
     $config->save();
 

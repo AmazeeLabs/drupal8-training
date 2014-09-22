@@ -8,11 +8,12 @@
 namespace Drupal\image;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
+use Drupal\Core\Config\Entity\ThirdPartySettingsInterface;
 
 /**
  * Provides an interface defining an image style entity.
  */
-interface ImageStyleInterface extends ConfigEntityInterface {
+interface ImageStyleInterface extends ConfigEntityInterface, ThirdPartySettingsInterface {
 
   /**
    * Returns the replacement ID.
@@ -36,7 +37,7 @@ interface ImageStyleInterface extends ConfigEntityInterface {
    * @param string $name
    *   The name of the image style.
    *
-   * @return \Drupal\image\ImageEffectInterface
+   * @return \Drupal\image\ImageStyleInterface
    *   The class instance this method is called on.
    */
   public function setName($name);
@@ -95,8 +96,7 @@ interface ImageStyleInterface extends ConfigEntityInterface {
    *   (optional) The original image path or URI. If it's supplied, only this
    *   image derivative will be flushed.
    *
-   * @return self
-   *   This image style.
+   * @return $this
    */
   public function flush($path = NULL);
 
@@ -159,7 +159,7 @@ interface ImageStyleInterface extends ConfigEntityInterface {
    * @return string
    *   The image effect ID.
    */
-  public function saveImageEffect(array $configuration);
+  public function addImageEffect(array $configuration);
 
   /**
    * Deletes an image effect from this style.
@@ -167,8 +167,7 @@ interface ImageStyleInterface extends ConfigEntityInterface {
    * @param \Drupal\image\ImageEffectInterface $effect
    *   The image effect object.
    *
-   * @return self
-   *   This image style.
+   * @return $this
    */
   public function deleteImageEffect(ImageEffectInterface $effect);
 

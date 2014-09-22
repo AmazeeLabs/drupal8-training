@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests the Drupal 6 filter format to Drupal 8 migration.
+ * Upgrade variables to filter.formats.*.yml.
+ *
+ * @group migrate_drupal
  */
 class MigrateFilterFormatTest extends MigrateDrupalTestBase {
 
@@ -23,19 +25,7 @@ class MigrateFilterFormatTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate variables to filter.formats.*.yml',
-      'description'  => 'Upgrade variables to filter.formats.*.yml',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $migration = entity_load('migration', 'd6_filter_format');
     $dumps = array(
@@ -60,9 +50,9 @@ class MigrateFilterFormatTest extends MigrateDrupalTestBase {
     $this->assertTrue($filters['filter_html']['status']);
 
     // These should be false by default.
-    $this->assertFalse($filters['filter_html_escape']['status']);
-    $this->assertFalse($filters['filter_caption']['status']);
-    $this->assertFalse($filters['filter_html_image_secure']['status']);
+    $this->assertFalse(isset($filters['filter_html_escape']));
+    $this->assertFalse(isset($filters['filter_caption']));
+    $this->assertFalse(isset($filters['filter_html_image_secure']));
 
     // Check variables migrated into filter.
     $this->assertIdentical($filters['filter_html']['settings']['allowed_html'], '<a> <em> <strong> <cite> <code> <ul> <ol> <li> <dl> <dt> <dd>');

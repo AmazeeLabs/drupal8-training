@@ -7,9 +7,9 @@
 
 namespace Drupal\taxonomy;
 
-use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityForm;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Base for controller for taxonomy term edit forms.
@@ -19,20 +19,20 @@ class TermForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     $term = $this->entity;
     $vocab_storage = $this->entityManager->getStorage('taxonomy_vocabulary');
     $vocabulary = $vocab_storage->load($term->bundle());
 
     $parent = array_keys(taxonomy_term_load_parents($term->id()));
-    $form_state['taxonomy']['parent'] = $parent;
-    $form_state['taxonomy']['vocabulary'] = $vocabulary;
+    $form_state->set(['taxonomy', 'parent'], $parent);
+    $form_state->set(['taxonomy', 'vocabulary'], $vocabulary);
 
     $language_configuration = $this->moduleHandler->moduleExists('language') ? language_get_default_configuration('taxonomy_term', $vocabulary->id()) : FALSE;
     $form['langcode'] = array(
       '#type' => 'language_select',
       '#title' => $this->t('Language'),
-      '#languages' => Language::STATE_ALL,
+      '#languages' => LanguageInterface::STATE_ALL,
       '#default_value' => $term->getUntranslated()->language()->id,
       '#access' => !empty($language_configuration['language_show']),
     );
@@ -98,36 +98,32 @@ class TermForm extends ContentEntityForm {
       '#value' => $term->id(),
     );
 
-    if ($term->isNew()) {
-      $form_state['redirect'] = current_path();
-    }
-
     return parent::form($form, $form_state, $term);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
     // Ensure numeric values.
-    if (isset($form_state['values']['weight']) && !is_numeric($form_state['values']['weight'])) {
-      $this->setFormError('weight', $form_state, $this->t('Weight value must be numeric.'));
+    if ($form_state->hasValue('weight') && !is_numeric($form_state->getValue('weight'))) {
+      $form_state->setErrorByName('weight', $this->t('Weight value must be numeric.'));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildEntity(array $form, array &$form_state) {
+  public function buildEntity(array $form, FormStateInterface $form_state) {
     $term = parent::buildEntity($form, $form_state);
 
     // Prevent leading and trailing spaces in term names.
     $term->setName(trim($term->getName()));
 
     // Assign parents with proper delta values starting from 0.
-    $term->parent = array_keys($form_state['values']['parent']);
+    $term->parent = array_keys($form_state->getValue('parent'));
 
     return $term;
   }
@@ -135,44 +131,43 @@ class TermForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function save(array $form, array &$form_state) {
+  public function save(array $form, FormStateInterface $form_state) {
     $term = $this->entity;
 
     switch ($term->save()) {
       case SAVED_NEW:
         drupal_set_message($this->t('Created new term %term.', array('%term' => $term->getName())));
-        watchdog('taxonomy', 'Created new term %term.', array('%term' => $term->getName()), WATCHDOG_NOTICE, l($this->t('Edit'), 'taxonomy/term/' . $term->id() . '/edit'));
+        $this->logger('taxonomy')->notice('Created new term %term.', array('%term' => $term->getName(), 'link' => l($this->t('Edit'), 'taxonomy/term/' . $term->id() . '/edit')));
         break;
       case SAVED_UPDATED:
         drupal_set_message($this->t('Updated term %term.', array('%term' => $term->getName())));
-        watchdog('taxonomy', 'Updated term %term.', array('%term' => $term->getName()), WATCHDOG_NOTICE, l($this->t('Edit'), 'taxonomy/term/' . $term->id() . '/edit'));
-        // Clear the page and block caches to avoid stale data.
-        Cache::invalidateTags(array('content' => TRUE));
+        $this->logger('taxonomy')->notice('Updated term %term.', array('%term' => $term->getName(), 'link' => l($this->t('Edit'), 'taxonomy/term/' . $term->id() . '/edit')));
         break;
     }
 
-    $current_parent_count = count($form_state['values']['parent']);
-    $previous_parent_count = count($form_state['taxonomy']['parent']);
+    $current_parent_count = count($form_state->getValue('parent'));
+    $previous_parent_count = count($form_state->get(['taxonomy', 'parent']));
     // Root doesn't count if it's the only parent.
-    if ($current_parent_count == 1 && isset($form_state['values']['parent'][0])) {
+    if ($current_parent_count == 1 && $form_state->hasValue(array('parent', 0))) {
       $current_parent_count = 0;
-      $form_state['values']['parent'] = array();
+      $form_state->setValue('parent', array());
     }
 
     // If the number of parents has been reduced to one or none, do a check on the
     // parents of every term in the vocabulary value.
+    $vocabulary = $form_state->get(['taxonomy', 'vocabulary']);
     if ($current_parent_count < $previous_parent_count && $current_parent_count < 2) {
-      taxonomy_check_vocabulary_hierarchy($form_state['taxonomy']['vocabulary'], $form_state['values']);
+      taxonomy_check_vocabulary_hierarchy($vocabulary, $form_state->getValues());
     }
     // If we've increased the number of parents and this is a single or flat
     // hierarchy, update the vocabulary immediately.
-    elseif ($current_parent_count > $previous_parent_count && $form_state['taxonomy']['vocabulary']->hierarchy != TAXONOMY_HIERARCHY_MULTIPLE) {
-      $form_state['taxonomy']['vocabulary']->hierarchy = $current_parent_count == 1 ? TAXONOMY_HIERARCHY_SINGLE : TAXONOMY_HIERARCHY_MULTIPLE;
-      $form_state['taxonomy']['vocabulary']->save();
+    elseif ($current_parent_count > $previous_parent_count && $vocabulary->hierarchy != TAXONOMY_HIERARCHY_MULTIPLE) {
+      $vocabulary->hierarchy = $current_parent_count == 1 ? TAXONOMY_HIERARCHY_SINGLE : TAXONOMY_HIERARCHY_MULTIPLE;
+      $vocabulary->save();
     }
 
-    $form_state['values']['tid'] = $term->id();
-    $form_state['tid'] = $term->id();
+    $form_state->setValue('tid', $term->id());
+    $form_state->set('tid', $term->id());
   }
 
 }

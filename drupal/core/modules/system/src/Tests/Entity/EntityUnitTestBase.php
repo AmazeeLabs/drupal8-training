@@ -36,15 +36,17 @@ abstract class EntityUnitTestBase extends DrupalUnitTestBase {
    */
   protected $state;
 
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->entityManager = $this->container->get('entity.manager');
     $this->state = $this->container->get('state');
 
-    $this->installSchema('user', array('users', 'users_roles'));
     $this->installSchema('system', 'sequences');
-    $this->installSchema('entity_test', 'entity_test');
+
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('entity_test');
+
     $this->installConfig(array('field'));
   }
 
@@ -64,8 +66,8 @@ abstract class EntityUnitTestBase extends DrupalUnitTestBase {
     if ($permissions) {
       // Create a new role and apply permissions to it.
       $role = entity_create('user_role', array(
-        'id' => strtolower($this->randomName(8)),
-        'label' => $this->randomName(8),
+        'id' => strtolower($this->randomMachineName(8)),
+        'label' => $this->randomMachineName(8),
       ));
       $role->save();
       user_role_grant_permissions($role->id(), $permissions);
@@ -73,7 +75,7 @@ abstract class EntityUnitTestBase extends DrupalUnitTestBase {
     }
 
     $account = entity_create('user', $values + array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'status' => 1,
     ));
     $account->enforceIsNew();
@@ -107,6 +109,37 @@ abstract class EntityUnitTestBase extends DrupalUnitTestBase {
     $hooks = $this->state->get($key);
     $this->state->set($key, array());
     return $hooks;
+  }
+
+  /**
+   * Installs a module and refreshes services.
+   *
+   * @param string $module
+   *   The module to install.
+   */
+  protected function installModule($module) {
+    $this->enableModules(array($module));
+    $this->refreshServices();
+  }
+
+  /**
+   * Uninstalls a module and refreshes services.
+   *
+   * @param string $module
+   *   The module to uninstall.
+   */
+  protected function uninstallModule($module) {
+    $this->disableModules(array($module));
+    $this->refreshServices();
+  }
+
+  /**
+   * Refresh services.
+   */
+  protected function refreshServices() {
+    $this->container = \Drupal::getContainer();
+    $this->entityManager = $this->container->get('entity.manager');
+    $this->state = $this->container->get('state');
   }
 
 }

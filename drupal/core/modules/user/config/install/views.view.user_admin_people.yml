@@ -23,7 +23,7 @@ display:
         options:
           disable_sql_rewrite: false
           distinct: false
-          slave: false
+          replica: false
           query_comment: false
           query_tags: {  }
         provider: views
@@ -53,7 +53,7 @@ display:
           expose:
             items_per_page: false
             items_per_page_label: 'Items per page'
-            items_per_page_options: '5, 10, 20, 40, 60'
+            items_per_page_options: '5, 10, 25, 50'
             items_per_page_options_all: false
             items_per_page_options_all_label: '- All -'
             offset: false
@@ -77,7 +77,6 @@ display:
             created: created
             access: access
             edit_node: edit_node
-            translation_link: translation_link
             dropbutton: dropbutton
           info:
             user_bulk_form:
@@ -125,11 +124,6 @@ display:
               separator: ''
               empty_column: false
               responsive: priority-low
-            translation_link:
-              align: ''
-              separator: ''
-              empty_column: false
-              responsive: ''
             dropbutton:
               sortable: false
               default_sort_order: asc
@@ -196,7 +190,7 @@ display:
           provider: user
         name:
           id: name
-          table: users
+          table: users_field_data
           field: name
           relationship: none
           group_type: group
@@ -250,7 +244,7 @@ display:
           provider: user
         status:
           id: status
-          table: users
+          table: users_field_data
           field: status
           relationship: none
           group_type: group
@@ -356,7 +350,7 @@ display:
           provider: user
         created:
           id: created
-          table: users
+          table: users_field_data
           field: created
           relationship: none
           group_type: group
@@ -409,7 +403,7 @@ display:
           provider: views
         access:
           id: access
-          table: users
+          table: users_field_data
           field: access
           relationship: none
           group_type: group
@@ -511,58 +505,6 @@ display:
           text: Edit
           plugin_id: user_link_edit
           provider: user
-        translation_link:
-          id: translation_link
-          table: users
-          field: translation_link
-          relationship: none
-          group_type: group
-          admin_label: ''
-          label: 'Translation link'
-          exclude: true
-          alter:
-            alter_text: false
-            text: ''
-            make_link: false
-            path: ''
-            absolute: false
-            external: false
-            replace_spaces: false
-            path_case: none
-            trim_whitespace: false
-            alt: ''
-            rel: ''
-            link_class: ''
-            prefix: ''
-            suffix: ''
-            target: ''
-            nl2br: false
-            max_length: ''
-            word_boundary: true
-            ellipsis: true
-            more_link: false
-            more_link_text: ''
-            more_link_path: ''
-            strip_tags: false
-            trim: false
-            preserve_tags: ''
-            html: false
-          element_type: ''
-          element_class: ''
-          element_label_type: ''
-          element_label_class: ''
-          element_label_colon: true
-          element_wrapper_type: ''
-          element_wrapper_class: ''
-          element_default_classes: true
-          empty: ''
-          hide_empty: false
-          empty_zero: false
-          hide_alter_empty: true
-          text: Translate
-          optional: true
-          plugin_id: content_translation_link
-          provider: content_translation
         dropbutton:
           id: dropbutton
           table: views
@@ -613,7 +555,6 @@ display:
           hide_alter_empty: true
           fields:
             edit_node: edit_node
-            translation_link: translation_link
             user_bulk_form: '0'
             name: '0'
             status: '0'
@@ -624,7 +565,7 @@ display:
           plugin_id: dropbutton
         mail:
           id: mail
-          table: users
+          table: users_field_data
           field: mail
           relationship: none
           group_type: group
@@ -686,7 +627,7 @@ display:
           exposed: true
           expose:
             operator_id: combine_op
-            label: 'Name or e-mail contains'
+            label: 'Name or email contains'
             description: ''
             use_operator: false
             operator: combine_op
@@ -798,7 +739,7 @@ display:
           provider: user
         status:
           id: status
-          table: users
+          table: users_field_data
           field: status
           relationship: none
           group_type: group
@@ -886,7 +827,7 @@ display:
       sorts:
         created:
           id: created
-          table: users
+          table: users_field_data
           field: created
           relationship: none
           group_type: group
@@ -939,14 +880,14 @@ display:
         type: 'default tab'
         title: List
         description: 'Find and manage people interacting with your site.'
-        name: admin
+        menu_name: admin
         weight: -10
         context: ''
       tab_options:
         type: normal
         title: People
         description: 'Manage user accounts, roles, and permissions.'
-        name: admin
+        menu_name: admin
         weight: 0
       defaults:
         show_admin_links: false

@@ -8,6 +8,8 @@ namespace Drupal\search\Tests;
 
 /**
  * Tests that the search prepocessing uses the correct language code.
+ *
+ * @group search
  */
 class SearchPreprocessLangcodeTest extends SearchTestBase {
 
@@ -18,15 +20,7 @@ class SearchPreprocessLangcodeTest extends SearchTestBase {
    */
   public static $modules = array('search_langcode_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Search preprocess langcode',
-      'description' => 'Tests that the search prepocessing uses the correct language code.',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array(

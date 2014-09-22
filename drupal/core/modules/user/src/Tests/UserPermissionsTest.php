@@ -11,21 +11,16 @@ use Drupal\simpletest\WebTestBase;
 use Drupal\user\RoleStorage;
 
 /**
- * Tests the user role permission UI.
+ * Verify that role permissions can be added and removed via the permissions
+ * page.
+ *
+ * @group user
  */
 class UserPermissionsTest extends WebTestBase {
   protected $admin_user;
   protected $rid;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Role permissions',
-      'description' => 'Verify that role permissions can be added and removed via the permissions page.',
-      'group' => 'User'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->admin_user = $this->drupalCreateUser(array('administer permissions', 'access user profiles', 'administer site configuration', 'administer modules', 'administer account settings'));

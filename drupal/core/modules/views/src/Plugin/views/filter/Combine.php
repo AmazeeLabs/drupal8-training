@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Plugin\views\filter;
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Filter handler which allows to search on multiple fields.
  *
@@ -28,7 +30,7 @@ class Combine extends String {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $this->view->initStyle();
 
@@ -49,7 +51,7 @@ class Combine extends String {
         );
       }
       else {
-        form_set_error('', $form_state, t('You have to add some fields to be able to use this filter.'));
+        $form_state->setErrorByName('', t('You have to add some fields to be able to use this filter.'));
       }
     }
   }

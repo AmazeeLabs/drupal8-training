@@ -12,6 +12,8 @@ use Drupal\system\Tests\Entity\EntityWithUriCacheTagsTestBase;
 
 /**
  * Tests the Node entity's cache tags.
+ *
+ * @group node
  */
 class NodeCacheTagsTest extends EntityWithUriCacheTagsTestBase {
 
@@ -23,14 +25,7 @@ class NodeCacheTagsTest extends EntityWithUriCacheTagsTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return parent::generateStandardizedInfo('Node', 'Node');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Give anonymous users permission to view nodes, so that we can verify the
@@ -65,7 +60,7 @@ class NodeCacheTagsTest extends EntityWithUriCacheTagsTestBase {
    * Each node must have an author.
    */
   protected function getAdditionalCacheTagsForEntity(EntityInterface $node) {
-    return array('user:' . $node->getOwnerId());
+    return array('user:' . $node->getOwnerId(), 'user_view:1');
   }
 
 }

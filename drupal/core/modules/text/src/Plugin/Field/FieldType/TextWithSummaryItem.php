@@ -8,6 +8,7 @@
 namespace Drupal\text\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 
 /**
@@ -15,8 +16,8 @@ use Drupal\Core\TypedData\DataDefinition;
  *
  * @FieldType(
  *   id = "text_with_summary",
- *   label = @Translation("Long text and summary"),
- *   description = @Translation("This field stores long text in the database along with optional summary text."),
+ *   label = @Translation("Text (formatted, long, with summary)"),
+ *   description = @Translation("This field stores long text with a format and an optional summary."),
  *   default_widget = "text_textarea_with_summary",
  *   default_formatter = "text_default"
  * )
@@ -26,11 +27,10 @@ class TextWithSummaryItem extends TextItemBase {
   /**
    * {@inheritdoc}
    */
-  public static function defaultInstanceSettings() {
+  public static function defaultFieldSettings() {
     return array(
-      'text_processing' => 1,
       'display_summary' => 0,
-    ) + parent::defaultInstanceSettings();
+    ) + parent::defaultFieldSettings();
   }
 
   /**
@@ -91,19 +91,10 @@ class TextWithSummaryItem extends TextItemBase {
   /**
    * {@inheritdoc}
    */
-  public function instanceSettingsForm(array $form, array &$form_state) {
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     $element = array();
     $settings = $this->getSettings();
 
-    $element['text_processing'] = array(
-      '#type' => 'radios',
-      '#title' => t('Text processing'),
-      '#default_value' => $settings['text_processing'],
-      '#options' => array(
-        t('Plain text'),
-        t('Filtered text (user selects text format)'),
-      ),
-    );
     $element['display_summary'] = array(
       '#type' => 'checkbox',
       '#title' => t('Summary input'),

@@ -25,7 +25,7 @@ abstract class PhpStorageTestBase extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->storageFactory = new PhpStorageFactory();
@@ -35,7 +35,7 @@ abstract class PhpStorageTestBase extends UnitTestCase {
    * Assert that a PHP storage's load/save/delete operations work.
    */
   public function assertCRUD($php) {
-    $name = $this->randomName() . '/' . $this->randomName() . '.php';
+    $name = $this->randomMachineName() . '/' . $this->randomMachineName() . '.php';
 
     // Find a global that doesn't exist.
     do {

@@ -11,6 +11,7 @@ use Drupal\book\BookManagerInterface;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\node\NodeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -68,7 +69,7 @@ class BookAdminEditForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, NodeInterface $node = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, NodeInterface $node = NULL) {
     $form['#title'] = $node->label();
     $form['#node'] = $node;
     $this->bookAdminTable($node, $form);
@@ -83,25 +84,26 @@ class BookAdminEditForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
-    if ($form_state['values']['tree_hash'] != $form_state['values']['tree_current_hash']) {
-      $this->setFormError('', $form_state, $this->t('This book has been modified by another user, the changes could not be saved.'));
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    if ($form_state->getValue('tree_hash') != $form_state->getValue('tree_current_hash')) {
+      $form_state->setErrorByName('', $this->t('This book has been modified by another user, the changes could not be saved.'));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     // Save elements in the same order as defined in post rather than the form.
     // This ensures parents are updated before their children, preventing orphans.
-    $order = array_flip(array_keys($form_state['input']['table']));
+    $user_input = $form_state->getUserInput();
+    $order = array_flip(array_keys($user_input['table']));
     $form['table'] = array_merge($order, $form['table']);
 
     foreach (Element::children($form['table']) as $key) {
       if ($form['table'][$key]['#item']) {
         $row = $form['table'][$key];
-        $values = $form_state['values']['table'][$key];
+        $values = $form_state->getValue(array('table', $key));
 
         // Update menu item if moved.
         if ($row['pid']['#default_value'] != $values['pid'] || $row['weight']['#default_value'] != $values['weight']) {
@@ -114,12 +116,12 @@ class BookAdminEditForm extends FormBase {
         // Update the title if changed.
         if ($row['title']['#default_value'] != $values['title']) {
           $node = $this->nodeStorage->load($values['nid']);
-          $node->log = $this->t('Title changed from %original to %current.', array('%original' => $node->label(), '%current' => $values['title']));
+          $node->revision_log = $this->t('Title changed from %original to %current.', array('%original' => $node->label(), '%current' => $values['title']));
           $node->title = $values['title'];
           $node->book['link_title'] = $values['title'];
           $node->setNewRevision();
           $node->save();
-          watchdog('content', 'book: updated %title.', array('%title' => $node->label()), WATCHDOG_NOTICE, l($this->t('View'), 'node/' . $node->id()));
+          $this->logger('content')->notice('book: updated %title.', array('%title' => $node->label(), 'link' => l($this->t('View'), 'node/' . $node->id())));
         }
       }
     }

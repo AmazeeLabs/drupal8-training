@@ -12,7 +12,7 @@
    * @return {Array}
    */
   function autocompleteSplitValues(value) {
-    // We will match the value against comma-seperated terms.
+    // We will match the value against comma-separated terms.
     var result = [];
     var quote = false;
     var current = '';
@@ -162,10 +162,10 @@
    *
    * @return {Object}
    */
-  function renderItem (ul, item) {
+  function renderItem(ul, item) {
     return $("<li>")
-      .append( $("<a>").html(item.label))
-      .appendTo( ul );
+      .append($("<a>").html(item.label))
+      .appendTo(ul);
   }
 
   /**

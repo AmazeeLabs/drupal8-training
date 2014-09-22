@@ -10,7 +10,9 @@ namespace Drupal\editor\Tests;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
- * Unit tests for editor.module's entity hooks to track file usage.
+ * Tests tracking of file usage by the Text Editor module.
+ *
+ * @group editor
  */
 class EditorFileUsageTest extends EntityUnitTestBase {
 
@@ -21,18 +23,12 @@ class EditorFileUsageTest extends EntityUnitTestBase {
    */
   public static $modules = array('editor', 'editor_test', 'node', 'file');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Text Editor file usage',
-      'description' => 'Tests tracking of file usage by the Text Editor module.',
-      'group' => 'Text Editor',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('node', array('node', 'node_access', 'node_field_data', 'node_field_revision', 'node_revision'));
-    $this->installSchema('file', array('file_managed', 'file_usage'));
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('file');
+    $this->installSchema('node', array('node_access'));
+    $this->installSchema('file', array('file_usage'));
 
     // Add text formats.
     $filtered_html_format = entity_create('filter_format', array(
@@ -66,13 +62,18 @@ class EditorFileUsageTest extends EntityUnitTestBase {
     $file_usage = $this->container->get('file.usage');
     $this->assertIdentical(array(), $file_usage->listUsage($image), 'The image has zero usages.');
 
+    $body_value = '<p>Hello, world!</p><img src="awesome-llama.jpg" data-editor-file-uuid="' . $image->uuid() . '" />';
+    // Test handling of an invalid data- attribute.
+    $body_value .= '<img src="awesome-llama.jpg" data-editor-file-uuid="invalid-editor-file-uuid-value" />';
+    // Test handling of a non-existing UUID.
+    $body_value .= '<img src="awesome-llama.jpg" data-editor-file-uuid="30aac704-ba2c-40fc-b609-9ed121aa90f4" />';
     // Test editor_entity_insert(): increment.
     $this->createUser();
     $node = entity_create('node', array(
       'type' => 'page',
       'title' => 'test',
       'body' => array(
-        'value' => '<p>Hello, world!</p><img src="awesome-llama.jpg" data-editor-file-uuid="' . $image->uuid() . '" />',
+        'value' => $body_value,
         'format' => 'filtered_html',
       ),
       'uid' => 1,

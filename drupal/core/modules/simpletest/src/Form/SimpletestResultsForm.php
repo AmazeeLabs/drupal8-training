@@ -7,8 +7,12 @@
 
 namespace Drupal\simpletest\Form;
 
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormState;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\simpletest\TestDiscovery;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
@@ -48,31 +52,37 @@ class SimpletestResultsForm extends FormBase {
    */
   public function __construct(Connection $database) {
     $this->database = $database;
+  }
+
+  /**
+   * Builds the status image map.
+   */
+  protected function buildStatusImageMap() {
     // Initialize image mapping property.
     $image_pass = array(
       '#theme' => 'image',
-      '#uri' => 'core/misc/icons/73b355/check.png',
+      '#uri' => 'core/misc/icons/73b355/check.svg',
       '#width' => 18,
       '#height' => 18,
       '#alt' => $this->t('Pass'),
     );
     $image_fail = array(
       '#theme' => 'image',
-      '#uri' => 'core/misc/icons/ea2800/error.png',
+      '#uri' => 'core/misc/icons/ea2800/error.svg',
       '#width' => 18,
       '#height' => 18,
       '#alt' => $this->t('Fail'),
     );
     $image_exception = array(
       '#theme' => 'image',
-      '#uri' => 'core/misc/icons/e29700/warning.png',
+      '#uri' => 'core/misc/icons/e29700/warning.svg',
       '#width' => 18,
       '#height' => 18,
       '#alt' => $this->t('Exception'),
     );
     $image_debug = array(
       '#theme' => 'image',
-      '#uri' => 'core/misc/icons/e29700/warning.png',
+      '#uri' => 'core/misc/icons/e29700/warning.svg',
       '#width' => 18,
       '#height' => 18,
       '#alt' => $this->t('Debug'),
@@ -95,7 +105,8 @@ class SimpletestResultsForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, $test_id = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, $test_id = NULL) {
+    $this->buildStatusImageMap();
     // Make sure there are test results to display and a re-run is not being
     // performed.
     $results = array();
@@ -141,7 +152,7 @@ class SimpletestResultsForm extends FormBase {
     $form['result']['results'] = array();
     foreach ($results as $group => $assertions) {
       // Create group details with summary information.
-      $info = call_user_func(array($group, 'getInfo'));
+      $info = TestDiscovery::getTestInfo(new \ReflectionClass($group));
       $form['result']['results'][$group] = array(
         '#type' => 'details',
         '#title' => $info['name'],
@@ -155,7 +166,8 @@ class SimpletestResultsForm extends FormBase {
       $rows = array();
       foreach ($assertions as $assertion) {
         $row = array();
-        $row[] = $assertion->message;
+        // Assertion messages are in code, so we assume they are safe.
+        $row[] = SafeMarkup::set($assertion->message);
         $row[] = $assertion->message_group;
         $row[] = drupal_basename($assertion->file);
         $row[] = $assertion->line;
@@ -239,14 +251,14 @@ class SimpletestResultsForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
-    $pass = $form_state['values']['filter_pass'] ? explode(',', $form_state['values']['filter_pass']) : array();
-    $fail = $form_state['values']['filter_fail'] ? explode(',', $form_state['values']['filter_fail']) : array();
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $pass = $form_state->getValue('filter_pass') ? explode(',', $form_state->getValue('filter_pass')) : array();
+    $fail = $form_state->getValue('filter_fail') ? explode(',', $form_state->getValue('filter_fail')) : array();
 
-    if ($form_state['values']['filter'] == 'all') {
+    if ($form_state->getValue('filter') == 'all') {
       $classes = array_merge($pass, $fail);
     }
-    elseif ($form_state['values']['filter'] == 'pass') {
+    elseif ($form_state->getValue('filter') == 'pass') {
       $classes = $pass;
     }
     else {
@@ -254,24 +266,26 @@ class SimpletestResultsForm extends FormBase {
     }
 
     if (!$classes) {
-      $form_state['redirect_route']['route_name'] = 'simpletest.test_form';
+      $form_state->setRedirect('simpletest.test_form');
       return;
     }
 
     $form_execute = array();
-    $form_state_execute = array('values' => array());
+    $form_state_execute = new FormState();
     foreach ($classes as $class) {
-      $form_state_execute['values']['tests'][$class] = $class;
+      $form_state_execute->setValue(['tests', $class], $class);
     }
 
     // Submit the simpletest test form to rerun the tests.
     // Under normal circumstances, a form object's submitForm() should never be
     // called directly, FormBuilder::submitForm() should be called instead.
-    // However, it sets $form_state['programmed'], which disables the Batch API.
+    // However, it calls $form_state->setProgrammed(), which disables the Batch API.
     $simpletest_test_form = new SimpletestTestForm();
     $simpletest_test_form->buildForm($form_execute, $form_state_execute);
     $simpletest_test_form->submitForm($form_execute, $form_state_execute);
-    $form_state['redirect_route'] = $form_state_execute['redirect_route'];
+    if ($redirect = $form_state_execute->getRedirect()) {
+      $form_state->setRedirectUrl($redirect);
+    }
   }
 
   /**

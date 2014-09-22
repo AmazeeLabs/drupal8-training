@@ -10,12 +10,8 @@ namespace Drupal\Tests\Core\Lock;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the LockBackendAbstract class.
- *
- * @group Drupal
+ * @coversDefaultClass \Drupal\Tests\Core\Lock\LockBackendAbstractTest
  * @group Lock
- *
- * @see \Drupal\Tests\Core\Lock\LockBackendAbstractTest
  */
 class LockBackendAbstractTest extends UnitTestCase {
 
@@ -26,15 +22,7 @@ class LockBackendAbstractTest extends UnitTestCase {
    */
   protected $lock;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'LockBackendAbstract test',
-      'description' => 'Test the LockBackendAbstract class.',
-      'group' => 'Lock',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     $this->lock = $this->getMockForAbstractClass('Drupal\Core\Lock\LockBackendAbstract');
   }
 

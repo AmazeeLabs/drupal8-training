@@ -13,6 +13,8 @@ use Drupal\ckeditor\Plugin\Editor\CKEditor;
 
 /**
  * Tests for the 'CKEditor' text editor plugin.
+ *
+ * @group ckeditor
  */
 class CKEditorTest extends DrupalUnitTestBase {
 
@@ -21,7 +23,7 @@ class CKEditorTest extends DrupalUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('system', 'editor', 'ckeditor', 'filter_test');
+  public static $modules = array('system', 'user', 'filter', 'editor', 'ckeditor', 'filter_test');
 
   /**
    * An instance of the "CKEditor" text editor plugin.
@@ -37,20 +39,11 @@ class CKEditorTest extends DrupalUnitTestBase {
    */
   protected $manager;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'CKEditor text editor plugin',
-      'description' => 'Tests all aspects of the CKEditor text editor plugin.',
-      'group' => 'CKEditor',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Install the Filter module.
     $this->installSchema('system', 'url_alias');
-    $this->enableModules(array('user', 'filter'));
 
     // Create text format, associate CKEditor.
     $filtered_html_format = entity_create('filter_format', array(

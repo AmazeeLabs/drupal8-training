@@ -79,7 +79,7 @@ class Drupal {
   /**
    * The current system version.
    */
-  const VERSION = '8.0-dev';
+  const VERSION = '8.0.0-dev';
 
   /**
    * Core API compatibility.
@@ -158,7 +158,7 @@ class Drupal {
    *   TRUE if there is a currently active request object, FALSE otherwise.
    */
   public static function hasRequest() {
-    return static::$container && static::$container->has('request') && static::$container->initialized('request') && static::$container->isScopeActive('request');
+    return static::$container && static::$container->has('request_stack') && static::$container->get('request_stack')->getCurrentRequest() !== NULL;
   }
 
   /**
@@ -184,7 +184,17 @@ class Drupal {
    *   The currently active request object.
    */
   public static function request() {
-    return static::$container->get('request');
+    return static::$container->get('request_stack')->getCurrentRequest();
+  }
+
+  /**
+   * Retrieves the currently active route match object.
+   *
+   * @return \Drupal\Core\Routing\RouteMatchInterface
+   *   The currently active route match object.
+   */
+  public static function routeMatch() {
+    return static::$container->get('current_route_match');
   }
 
   /**
@@ -461,7 +471,8 @@ class Drupal {
    *     displayed outside the site, such as in an RSS feed.
    *   - 'language': An optional language object used to look up the alias
    *     for the URL. If $options['language'] is omitted, the language will be
-   *     obtained from \Drupal::languageManager()->getCurrentLanguage(Language::TYPE_URL).
+   *     obtained from
+   *     \Drupal::languageManager()->getCurrentLanguage(LanguageInterface::TYPE_URL).
    *   - 'https': Whether this URL should point to a secure location. If not
    *     defined, the current scheme is used, so the user stays on HTTP or HTTPS
    *     respectively. if mixed mode sessions are permitted, TRUE enforces HTTPS
@@ -613,6 +624,15 @@ class Drupal {
   }
 
   /**
+   * Gets the theme service.
+   *
+   * @return \Drupal\Core\Theme\ThemeManagerInterface
+   */
+  public static function theme() {
+    return static::$container->get('theme.manager');
+  }
+
+  /**
    * Gets the syncing state.
    *
    * @return bool
@@ -629,11 +649,40 @@ class Drupal {
    *   The name of the channel. Can be any string, but the general practice is
    *   to use the name of the subsystem calling this.
    *
-   * @return \Drupal\Core\Logger\LoggerChannelInterface
+   * @return \Psr\Log\LoggerInterface
    *   The logger for this channel.
    */
   public static function logger($channel) {
     return static::$container->get('logger.factory')->get($channel);
+  }
+
+  /**
+   * Returns the menu tree.
+   *
+   * @return \Drupal\Core\Menu\MenuLinkTreeInterface
+   *   The menu tree.
+   */
+  public static function menuTree() {
+    return static::$container->get('menu.link_tree');
+  }
+
+  /**
+   * Returns the path validator.
+   *
+   * @return \Drupal\Core\Path\PathValidatorInterface
+   */
+  public static function pathValidator() {
+    return static::$container->get('path.validator');
+  }
+
+  /**
+   * Returns the access manager service.
+   *
+   * @return \Drupal\Core\Access\AccessManagerInterface
+   *   The access manager service.
+   */
+  public static function accessManager() {
+    return static::$container->get('access_manager');
   }
 
 }

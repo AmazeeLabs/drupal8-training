@@ -13,7 +13,10 @@ use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests filtering for XSS in rendered entity templates in all themes.
+ * Tests themed output for each entity type in all available themes to ensure
+ * entity labels are filtered for XSS.
+ *
+ * @group Theme
  */
 class EntityFilteringThemeTest extends WebTestBase {
 
@@ -72,21 +75,13 @@ class EntityFilteringThemeTest extends WebTestBase {
    */
   protected $xss_label = "string with <em>HTML</em> and <script>alert('JS');</script>";
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity filtering theme test',
-      'description' => 'Tests themed output for each entity type in all available themes to ensure entity labels are filtered for XSS.',
-      'group' => 'Theme',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    // Enable all available non-testing themes.
+    // Install all available non-testing themes.
     $listing = new ExtensionDiscovery();
     $this->themes = $listing->scan('theme', FALSE);
-    theme_enable(array_keys($this->themes));
+    \Drupal::service('theme_handler')->install(array_keys($this->themes));
 
     // Create a test user.
     $this->user = $this->drupalCreateUser(array('access content', 'access user profiles'));
@@ -118,7 +113,7 @@ class EntityFilteringThemeTest extends WebTestBase {
       'field_name' => 'comment',
       'status' => CommentInterface::PUBLISHED,
       'subject' => $this->xss_label,
-      'comment_body' => array($this->randomName()),
+      'comment_body' => array($this->randomMachineName()),
     ));
     $this->comment->save();
   }

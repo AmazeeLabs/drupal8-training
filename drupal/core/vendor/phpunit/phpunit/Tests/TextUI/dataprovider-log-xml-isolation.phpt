@@ -2,8 +2,6 @@
 phpunit --process-isolation --log-junit php://stdout DataProviderTest ../_files/DataProviderTest.php
 --FILE--
 <?php
-define('PHPUNIT_TESTSUITE', TRUE);
-
 $_SERVER['argv'][1] = '--no-configuration';
 $_SERVER['argv'][2] = '--process-isolation';
 $_SERVER['argv'][3] = '--log-junit';
@@ -11,7 +9,7 @@ $_SERVER['argv'][4] = 'php://stdout';
 $_SERVER['argv'][5] = 'DataProviderTest';
 $_SERVER['argv'][6] = dirname(dirname(__FILE__)) . '/_files/DataProviderTest.php';
 
-require_once dirname(dirname(dirname(__FILE__))) . '/PHPUnit/Autoload.php';
+require __DIR__ . '/../bootstrap.php';
 PHPUnit_TextUI_Command::main();
 ?>
 --EXPECTF--
@@ -36,14 +34,14 @@ Failed asserting that 2 matches expected 3.
 </testsuites>
 
 
-Time: %i %s, Memory: %sMb
+Time: %s, Memory: %sMb
 
 There was 1 failure:
 
 1) DataProviderTest::testAdd with data set #2 (1, 1, 3)
 Failed asserting that 2 matches expected 3.
+
 %s:%i
 
 FAILURES!
 Tests: 4, Assertions: 4, Failures: 1.
-

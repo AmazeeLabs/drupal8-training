@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsDisplayExtender.
+ * Contains \Drupal\views\Annotation\ViewsDisplayExtender.
  */
 
 namespace Drupal\views\Annotation;
@@ -10,9 +10,11 @@ namespace Drupal\views\Annotation;
 /**
  * Defines a Plugin annotation object for views display extender plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\display_extender\DisplayExtenderPluginBase
+ *
+ * @ingroup views_display_extender_plugins
+ *
+ * @Annotation
  */
 class ViewsDisplayExtender extends ViewsPluginAnnotationBase {
 

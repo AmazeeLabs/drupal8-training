@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\relationship;
 
 use Drupal\Core\Database\Query\AlterableInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Views;
 
 /**
@@ -81,7 +82,7 @@ class GroupwiseMax extends RelationshipPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     // Get the sorts that apply to our base.
@@ -148,7 +149,7 @@ class GroupwiseMax extends RelationshipPluginBase {
 
     $form['subquery_regenerate'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Generate subquery each time view is run.'),
+      '#title' => t('Generate subquery each time view is run'),
       '#default_value' => $this->options['subquery_regenerate'],
       '#description' => t('Will re-generate the subquery for this relationship every time the view is run, instead of only when these options are saved. Use for testing if you are making changes elsewhere. WARNING: seriously impairs performance.'),
     );
@@ -168,7 +169,7 @@ class GroupwiseMax extends RelationshipPluginBase {
   /**
    * When the form is submitted, make sure to clear the subquery string cache.
    */
-  public function submitOptionsForm(&$form, &$form_state) {
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) {
     $cid = 'views_relationship_groupwise_max:' . $this->view->storage->id() . ':' . $this->view->current_display . ':' . $this->options['id'];
     \Drupal::cache('views_results')->delete($cid);
   }

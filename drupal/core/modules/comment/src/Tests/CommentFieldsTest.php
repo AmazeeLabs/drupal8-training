@@ -8,11 +8,13 @@
 namespace Drupal\comment\Tests;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\Entity\FieldConfig;
-use Drupal\field\Entity\FieldInstanceConfig;
 
 /**
  * Tests fields on comments.
+ *
+ * @group comment
  */
 class CommentFieldsTest extends CommentTestBase {
 
@@ -22,14 +24,6 @@ class CommentFieldsTest extends CommentTestBase {
    * @var array
    */
   public static $modules = array('field_ui');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Comment fields',
-      'description' => 'Tests fields on comments.',
-      'group' => 'Comment',
-    );
-  }
 
   /**
    * Tests that the default 'comment_body' field is correctly added.
@@ -41,14 +35,14 @@ class CommentFieldsTest extends CommentTestBase {
     $this->container->get('comment.manager')->addDefaultField('node', 'test_node_type');
 
     // Check that the 'comment_body' field is present on the comment bundle.
-    $instance = FieldInstanceConfig::loadByName('comment', 'node__comment', 'comment_body');
-    $this->assertTrue(!empty($instance), 'The comment_body field is added when a comment bundle is created');
+    $field = FieldConfig::loadByName('comment', 'comment', 'comment_body');
+    $this->assertTrue(!empty($field), 'The comment_body field is added when a comment bundle is created');
 
-    $instance->delete();
+    $field->delete();
 
     // Check that the 'comment_body' field is deleted.
-    $field = FieldConfig::loadByName('comment', 'comment_body');
-    $this->assertTrue(empty($field), 'The comment_body field was deleted');
+    $field_storage = FieldStorageConfig::loadByName('comment', 'comment_body');
+    $this->assertTrue(empty($field_storage), 'The comment_body field was deleted');
 
     // Create a new content type.
     $type_name = 'test_node_type_2';
@@ -57,14 +51,14 @@ class CommentFieldsTest extends CommentTestBase {
 
     // Check that the 'comment_body' field exists and has an instance on the
     // new comment bundle.
-    $field = FieldConfig::loadByName('comment', 'comment_body');
-    $this->assertTrue($field, 'The comment_body field exists');
-    $instance = FieldInstanceConfig::loadByName('comment', 'node__comment', 'comment_body');
-    $this->assertTrue(isset($instance), format_string('The comment_body field is present for comments on type @type', array('@type' => $type_name)));
+    $field_storage = FieldStorageConfig::loadByName('comment', 'comment_body');
+    $this->assertTrue($field_storage, 'The comment_body field exists');
+    $field = FieldConfig::loadByName('comment', 'comment', 'comment_body');
+    $this->assertTrue(isset($field), format_string('The comment_body field is present for comments on type @type', array('@type' => $type_name)));
 
     // Test adding a field that defaults to CommentItemInterface::CLOSED.
-    $this->container->get('comment.manager')->addDefaultField('node', 'test_node_type', 'who_likes_ponies', CommentItemInterface::CLOSED);
-    $field = entity_load('field_instance_config', 'node.test_node_type.who_likes_ponies');
+    $this->container->get('comment.manager')->addDefaultField('node', 'test_node_type', 'who_likes_ponies', CommentItemInterface::CLOSED, 'who_likes_ponies');
+    $field = entity_load('field_config', 'node.test_node_type.who_likes_ponies');
     $this->assertEqual($field->default_value[0]['status'], CommentItemInterface::CLOSED);
   }
 
@@ -77,16 +71,13 @@ class CommentFieldsTest extends CommentTestBase {
     $this->drupalLogin($this->admin_user);
 
     // Drop default comment field added in CommentTestBase::setup().
-    FieldConfig::loadByName('node', 'comment')->delete();
-    if ($field = FieldConfig::loadByName('node', 'comment_node_forum')) {
-      $field->delete();
+    FieldStorageConfig::loadByName('node', 'comment')->delete();
+    if ($field_storage = FieldStorageConfig::loadByName('node', 'comment_forum')) {
+      $field_storage->delete();
     }
 
     // Purge field data now to allow comment module to be uninstalled once the
     // field has been deleted.
-    field_purge_batch(10);
-    // Call again as field_purge_batch() won't remove both the instances and
-    // field in a single pass.
     field_purge_batch(10);
 
     // Disable the comment module.
@@ -120,27 +111,7 @@ class CommentFieldsTest extends CommentTestBase {
     // asserting that the body is actually posted correctly.
     $this->web_user = $this->drupalCreateUser(array('access content', 'access comments', 'post comments', 'skip comment approval'));
     $this->drupalLogin($this->web_user);
-    $this->postComment($book_node, $this->randomName(), $this->randomName());
+    $this->postComment($book_node, $this->randomMachineName(), $this->randomMachineName());
   }
 
-  /**
-   * Tests that comment module works correctly with plain text format.
-   */
-  function testCommentFormat() {
-    // Disable text processing for comments.
-    $this->drupalLogin($this->admin_user);
-    $edit = array('instance[settings][text_processing]' => 0);
-    $this->drupalPostForm('admin/structure/comments/manage/node__comment/fields/comment.node__comment.comment_body', $edit, t('Save settings'));
-
-    // Change formatter settings.
-    $this->drupalGet('admin/structure/comments/manage/node__comment/display');
-    $edit = array('fields[comment_body][type]' => 'text_trimmed', 'refresh_rows' => 'comment_body');
-    $commands = $this->drupalPostAjaxForm(NULL, $edit, array('op' => t('Refresh')));
-    $this->assertTrue($commands, 'Ajax commands returned');
-
-    // Post a comment without an explicit subject.
-    $this->drupalLogin($this->web_user);
-    $edit = array('comment_body[0][value]' => $this->randomName(8));
-    $this->drupalPostForm('node/' . $this->node->id(), $edit, t('Save'));
-  }
 }

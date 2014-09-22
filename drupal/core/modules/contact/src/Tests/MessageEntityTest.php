@@ -12,6 +12,7 @@ use Drupal\simpletest\DrupalUnitTestBase;
 /**
  * Tests the message entity class.
  *
+ * @group contact
  * @see \Drupal\contact\Entity\Message
  */
 class MessageEntityTest extends DrupalUnitTestBase {
@@ -23,14 +24,6 @@ class MessageEntityTest extends DrupalUnitTestBase {
    */
   public static $modules = array('system', 'contact', 'field', 'user');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Message entity tests',
-      'description' => 'Tests the message entity class.',
-      'group' => 'Contact'
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
     $this->installConfig(array('contact'));
@@ -41,7 +34,7 @@ class MessageEntityTest extends DrupalUnitTestBase {
    */
   public function testMessageMethods() {
     $message_storage = $this->container->get('entity.manager')->getStorage('contact_message');
-    $message = $message_storage->create(array('category' => 'feedback'));
+    $message = $message_storage->create(array('contact_form' => 'feedback'));
 
     // Check for empty values first.
     $this->assertEqual($message->getMessage(), '');
@@ -50,7 +43,7 @@ class MessageEntityTest extends DrupalUnitTestBase {
     $this->assertFalse($message->copySender());
 
     // Check for default values.
-    $this->assertEqual('feedback', $message->getCategory()->id());
+    $this->assertEqual('feedback', $message->getContactForm()->id());
     $this->assertFalse($message->isPersonal());
 
     // Set some values and check for them afterwards.

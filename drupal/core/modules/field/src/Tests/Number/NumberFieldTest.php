@@ -10,7 +10,9 @@ namespace Drupal\field\Tests\Number;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests for numeric field types.
+ * Tests the creation of numeric fields.
+ *
+ * @group field
  */
 class NumberFieldTest extends WebTestBase {
 
@@ -22,35 +24,13 @@ class NumberFieldTest extends WebTestBase {
   public static $modules = array('node', 'entity_test', 'field_ui');
 
   /**
-   * A field to use in this class.
-   *
-   * @var \Drupal\field\Entity\FieldConfig
-   */
-  protected $field;
-
-  /**
-   * A field instance to use in this test class.
-   *
-   * @var \Drupal\field\Entity\FieldInstanceConfig
-   */
-  protected $instance;
-
-  /**
    * A user with permission to view and manage entities and content types.
    *
    * @var \Drupal\user\UserInterface
    */
   protected $web_user;
 
-  public static function getInfo() {
-    return array(
-      'name'  => 'Numeric fields',
-      'description'  => 'Test the creation of numeric fields.',
-      'group' => 'Field types'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->web_user = $this->drupalCreateUser(array('view test entity', 'administer entity_test content', 'administer content types', 'administer node fields', 'administer node display', 'bypass node access'));
@@ -62,8 +42,8 @@ class NumberFieldTest extends WebTestBase {
    */
   function testNumberDecimalField() {
     // Create a field with settings to validate.
-    $field_name = drupal_strtolower($this->randomName());
-    entity_create('field_config', array(
+    $field_name = drupal_strtolower($this->randomMachineName());
+    entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'decimal',
@@ -71,7 +51,7 @@ class NumberFieldTest extends WebTestBase {
         'precision' => 8, 'scale' => 4, 'decimal_separator' => '.',
       )
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'bundle' => 'entity_test',
@@ -99,15 +79,13 @@ class NumberFieldTest extends WebTestBase {
     // Submit a signed decimal value within the allowed precision and scale.
     $value = '-1234.5678';
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $value,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
     preg_match('|entity_test/manage/(\d+)|', $this->url, $match);
     $id = $match[1];
     $this->assertText(t('entity_test @id has been created.', array('@id' => $id)), 'Entity was created');
-    $this->assertRaw(round($value, 2), 'Value is displayed.');
+    $this->assertRaw($value, 'Value is displayed.');
 
     // Try to create entries with more than one decimal separator; assert fail.
     $wrong_entries = array(
@@ -154,14 +132,14 @@ class NumberFieldTest extends WebTestBase {
     $maximum = rand(2000, 4000);
 
     // Create a field with settings to validate.
-    $field_name = drupal_strtolower($this->randomName());
-    entity_create('field_config', array(
+    $field_name = drupal_strtolower($this->randomMachineName());
+    entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'integer',
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'bundle' => 'entity_test',
@@ -192,8 +170,6 @@ class NumberFieldTest extends WebTestBase {
     // Submit a valid integer
     $value = rand($minimum, $maximum);
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $value,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -204,8 +180,6 @@ class NumberFieldTest extends WebTestBase {
     // Try to set a value below the minimum value
     $this->drupalGet('entity_test/add');
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $minimum - 1,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -214,8 +188,6 @@ class NumberFieldTest extends WebTestBase {
     // Try to set a decimal value
     $this->drupalGet('entity_test/add');
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => 1.5,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -224,8 +196,6 @@ class NumberFieldTest extends WebTestBase {
     // Try to set a value above the maximum value
     $this->drupalGet('entity_test/add');
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $maximum + 1,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -241,8 +211,6 @@ class NumberFieldTest extends WebTestBase {
     foreach ($valid_entries as $valid_entry) {
       $this->drupalGet('entity_test/add');
       $edit = array(
-        'user_id' => 1,
-        'name' => $this->randomName(),
         "{$field_name}[0][value]" => $valid_entry,
       );
       $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -258,14 +226,14 @@ class NumberFieldTest extends WebTestBase {
   */
   function testNumberFloatField() {
     // Create a field with settings to validate.
-    $field_name = drupal_strtolower($this->randomName());
-    entity_create('field_config', array(
+    $field_name = drupal_strtolower($this->randomMachineName());
+    entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'float',
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'bundle' => 'entity_test',
@@ -294,8 +262,6 @@ class NumberFieldTest extends WebTestBase {
     // Submit a signed decimal value within the allowed precision and scale.
     $value = '-1234.5678';
     $edit = array(
-      'user_id' => 1,
-      'name' => $this->randomName(),
       "{$field_name}[0][value]" => $value,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -345,32 +311,32 @@ class NumberFieldTest extends WebTestBase {
    * Test default formatter behavior
    */
   function testNumberFormatter() {
-    $type = drupal_strtolower($this->randomName());
-    $float_field = drupal_strtolower($this->randomName());
-    $integer_field = drupal_strtolower($this->randomName());
+    $type = drupal_strtolower($this->randomMachineName());
+    $float_field = drupal_strtolower($this->randomMachineName());
+    $integer_field = drupal_strtolower($this->randomMachineName());
     $thousand_separators = array('', '.', ',', ' ', chr(8201), "'");
     $decimal_separators = array('.', ',');
-    $prefix = $this->randomName();
-    $suffix = $this->randomName();
+    $prefix = $this->randomMachineName();
+    $suffix = $this->randomMachineName();
     $random_float = rand(0,pow(10,6));
     $random_integer = rand(0, pow(10,6));
 
     // Create a content type containing float and integer fields.
     $this->drupalCreateContentType(array('type' => $type));
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $float_field,
       'entity_type' => 'node',
       'type' => 'float',
     ))->save();
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $integer_field,
       'entity_type' => 'node',
       'type' => 'integer',
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $float_field,
       'entity_type' => 'node',
       'bundle' => $type,
@@ -380,7 +346,7 @@ class NumberFieldTest extends WebTestBase {
       ),
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $integer_field,
       'entity_type' => 'node',
       'bundle' => $type,
@@ -417,7 +383,7 @@ class NumberFieldTest extends WebTestBase {
     // Create a node to test formatters.
     $node = entity_create('node', array(
       'type' => $type,
-      'title' => $this->randomName(),
+      'title' => $this->randomMachineName(),
       $float_field => array(
         'value' => $random_float,
       ),

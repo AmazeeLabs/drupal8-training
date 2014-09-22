@@ -7,7 +7,7 @@
 
 namespace Drupal\language\Plugin\Block;
 
-use Drupal\block\BlockBase;
+use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -20,7 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   id = "language_block",
  *   admin_label = @Translation("Language switcher"),
  *   category = @Translation("System"),
- *   derivative = "Drupal\language\Plugin\Derivative\LanguageBlock"
+ *   deriver = "Drupal\language\Plugin\Derivative\LanguageBlock"
  * )
  */
 class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface {
@@ -66,7 +66,7 @@ class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface
   /**
    * {@inheritdoc}
    */
-  function access(AccountInterface $account) {
+  protected function blockAccess(AccountInterface $account) {
     return $this->languageManager->isMultilingual();
   }
 

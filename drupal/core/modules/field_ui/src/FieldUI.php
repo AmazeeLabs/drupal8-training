@@ -28,7 +28,7 @@ class FieldUI {
    */
   public static function getOverviewRouteInfo($entity_type_id, $bundle) {
     $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
-    if ($entity_type->hasLinkTemplate('admin-form')) {
+    if ($entity_type->get('field_ui_base_route')) {
       return new Url("field_ui.overview_$entity_type_id", array(
         $entity_type->getBundleEntityType() => $bundle,
       ));
@@ -41,20 +41,25 @@ class FieldUI {
    * @param array $destinations
    *   An array of destinations to redirect to.
    *
-   * @return array
+   * @return \Drupal\Core\Url
    *   The next destination to redirect to.
    */
   public static function getNextDestination(array $destinations) {
     $next_destination = array_shift($destinations);
     if (is_array($next_destination)) {
       $next_destination['options']['query']['destinations'] = $destinations;
+      $next_destination += array(
+        'route_parameters' => array(),
+      );
+      $next_destination = new Url($next_destination['route_name'], $next_destination['route_parameters'], $next_destination['options']);
     }
     else {
       $options = UrlHelper::parse($next_destination);
       if ($destinations) {
         $options['query']['destinations'] = $destinations;
       }
-      $next_destination = array($options['path'], $options);
+      $next_destination = Url::createFromPath($options['path']);
+      $next_destination->setOptions($options);
     }
     return $next_destination;
   }

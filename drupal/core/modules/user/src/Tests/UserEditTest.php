@@ -10,17 +10,11 @@ namespace Drupal\user\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the user edit form.
+ * Tests user edit page.
+ *
+ * @group user
  */
 class UserEditTest extends WebTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User edit',
-      'description' => 'Test user edit page.',
-      'group' => 'User',
-    );
-  }
 
   /**
    * Test user edit page.
@@ -39,11 +33,11 @@ class UserEditTest extends WebTestBase {
     // Check that filling out a single password field does not validate.
     $edit = array();
     $edit['pass[pass1]'] = '';
-    $edit['pass[pass2]'] = $this->randomName();
+    $edit['pass[pass2]'] = $this->randomMachineName();
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
     $this->assertText(t("The specified passwords do not match."), 'Typing mismatched passwords displays an error message.');
 
-    $edit['pass[pass1]'] = $this->randomName();
+    $edit['pass[pass1]'] = $this->randomMachineName();
     $edit['pass[pass2]'] = '';
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
     $this->assertText(t("The specified passwords do not match."), 'Typing mismatched passwords displays an error message.');
@@ -51,9 +45,9 @@ class UserEditTest extends WebTestBase {
     // Test that the error message appears when attempting to change the mail or
     // pass without the current password.
     $edit = array();
-    $edit['mail'] = $this->randomName() . '@new.example.com';
+    $edit['mail'] = $this->randomMachineName() . '@new.example.com';
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
-    $this->assertRaw(t("Your current password is missing or incorrect; it's required to change the %name.", array('%name' => t('E-mail address'))));
+    $this->assertRaw(t("Your current password is missing or incorrect; it's required to change the %name.", array('%name' => t('Email address'))));
 
     $edit['current_pass'] = $user1->pass_raw;
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
@@ -61,7 +55,7 @@ class UserEditTest extends WebTestBase {
 
     // Test that the user must enter current password before changing passwords.
     $edit = array();
-    $edit['pass[pass1]'] = $new_pass = $this->randomName();
+    $edit['pass[pass1]'] = $new_pass = $this->randomMachineName();
     $edit['pass[pass2]'] = $new_pass;
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
     $this->assertRaw(t("Your current password is missing or incorrect; it's required to change the %name.", array('%name' => t('Password'))));
@@ -70,6 +64,9 @@ class UserEditTest extends WebTestBase {
     $edit['current_pass'] = $user1->pass_raw;
     $this->drupalPostForm("user/" . $user1->id() . "/edit", $edit, t('Save'));
     $this->assertRaw(t("The changes have been saved."));
+
+    // Make sure the changed timestamp is updated.
+    $this->assertEqual($user1->getChangedTime(), REQUEST_TIME, 'Changing a user sets "changed" timestamp.');
 
     // Make sure the user can log in with their new password.
     $this->drupalLogout();
@@ -91,15 +88,15 @@ class UserEditTest extends WebTestBase {
   }
 
   /**
-   * Tests editing of a user account without an e-mail address.
+   * Tests editing of a user account without an email address.
    */
   function testUserWithoutEmailEdit() {
-    // Test that an admin can edit users without an e-mail address.
+    // Test that an admin can edit users without an email address.
     $admin = $this->drupalCreateUser(array('administer users'));
     $this->drupalLogin($admin);
     // Create a regular user.
     $user1 = $this->drupalCreateUser(array());
-    // This user has no e-mail address.
+    // This user has no email address.
     $user1->mail = '';
     $user1->save();
     $this->drupalPostForm("user/" . $user1->id() . "/edit", array('mail' => ''), t('Save'));

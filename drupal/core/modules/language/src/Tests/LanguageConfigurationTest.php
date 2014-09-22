@@ -7,11 +7,13 @@
 
 namespace Drupal\language\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Functional tests for language configuration's effect on negotiation setup.
+ * Adds and configures languages to check negotiation changes.
+ *
+ * @group language
  */
 class LanguageConfigurationTest extends WebTestBase {
 
@@ -22,19 +24,10 @@ class LanguageConfigurationTest extends WebTestBase {
    */
   public static $modules = array('language');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Language negotiation autoconfiguration',
-      'description' => 'Adds and configures languages to check negotiation changes.',
-      'group' => 'Language',
-    );
-  }
-
   /**
    * Functional tests for adding, editing and deleting languages.
    */
   function testLanguageConfiguration() {
-    global $base_url;
 
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'administer site configuration'));
@@ -160,7 +153,7 @@ class LanguageConfigurationTest extends WebTestBase {
     \Drupal::languageManager()->reset();
     $max_configurable_language_weight = $this->getHighestConfigurableLanguageWeight();
     $replacements = array('@event' => $state);
-    foreach (\Drupal::languageManager()->getLanguages(Language::STATE_LOCKED) as $locked_language) {
+    foreach (\Drupal::languageManager()->getLanguages(LanguageInterface::STATE_LOCKED) as $locked_language) {
       $replacements['%language'] = $locked_language->name;
       $this->assertTrue($locked_language->weight > $max_configurable_language_weight, format_string('System language %language has higher weight than configurable languages @event', $replacements));
     }
@@ -175,7 +168,7 @@ class LanguageConfigurationTest extends WebTestBase {
   protected function getHighestConfigurableLanguageWeight(){
     $max_weight = 0;
 
-    $languages = entity_load_multiple('language_entity', NULL, TRUE);
+    $languages = entity_load_multiple('configurable_language', NULL, TRUE);
     foreach ($languages as $language) {
       if (!$language->locked && $language->weight > $max_weight) {
         $max_weight = $language->weight;

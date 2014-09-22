@@ -8,28 +8,18 @@
 namespace Drupal\locale\Tests;
 
 /**
- * Tests for translation update using cron.
+ * Tests for using cron to update project interface translations.
+ *
+ * @group locale
  */
 class LocaleUpdateCronTest extends LocaleUpdateBase {
 
-  protected $batch_output = array();
+  protected $batchOutput = array();
 
   /**
-   * Modules to enable.
-   *
-   * @var array
+   * {@inheritdoc}
    */
-  public static $modules = array('update', 'locale', 'locale_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Update translations using cron',
-      'description' => 'Tests for using cron to update project interface translations.',
-      'group' => 'Locale',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $admin_user = $this->drupalCreateUser(array('administer modules', 'administer site configuration', 'administer languages', 'access administration pages', 'translate interface'));
     $this->drupalLogin($admin_user);
@@ -39,7 +29,7 @@ class LocaleUpdateCronTest extends LocaleUpdateBase {
   /**
    * Tests interface translation update using cron.
    */
-  function testUpdateCron() {
+  public function testUpdateCron() {
     // Set a flag to let the locale_test module replace the project data with a
     // set of test projects.
     \Drupal::state()->set('locale.test_projects_alter', TRUE);

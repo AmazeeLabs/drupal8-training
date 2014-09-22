@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests the Drupal 6 taxonomy vocabularies to Drupal 8 migration.
+ * Migrate taxonomy vocabularies to taxonomy.vocabulary.*.yml.
+ *
+ * @group migrate_drupal
  */
 class MigrateTaxonomyVocabularyTest extends MigrateDrupalTestBase {
 
@@ -21,18 +23,6 @@ class MigrateTaxonomyVocabularyTest extends MigrateDrupalTestBase {
    * @var array
    */
   public static $modules = array('taxonomy');
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate taxonomy vocabularies.',
-      'description'  => 'Migrate taxonomy vocabularies to taxonomy.vocabulary.*.yml',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
 
   /**
    * {@inheritdoc}
@@ -59,8 +49,13 @@ class MigrateTaxonomyVocabularyTest extends MigrateDrupalTestBase {
       $this->assertEqual($vocabulary->name, "vocabulary $j (i=$i)");
       $this->assertEqual($vocabulary->description, "description of vocabulary $j (i=$i)");
       $this->assertEqual($vocabulary->hierarchy, $i);
-      $this->assertEqual($vocabulary->weight, 4   + $i);
+      $this->assertEqual($vocabulary->weight, 4 + $i);
     }
+    $vocabulary = entity_load('taxonomy_vocabulary', 'vocabulary_name_much_longer_than');
+    $this->assertEqual($vocabulary->name, 'vocabulary name much longer than thirty two characters');
+    $this->assertEqual($vocabulary->description, 'description of vocabulary name much longer than thirty two characters');
+    $this->assertEqual($vocabulary->hierarchy, 3);
+    $this->assertEqual($vocabulary->weight, 7);
   }
 
 }

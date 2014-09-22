@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\views\Tests\Handler\HandlerTest.
+ * Contains \Drupal\views\Tests\Handler\HandlerTest.
  */
 
 namespace Drupal\views\Tests\Handler;
@@ -13,7 +13,9 @@ use Drupal\views\Plugin\views\HandlerBase;
 use Drupal\views\Views;
 
 /**
- * Tests abstract handlers of views.
+ * Tests abstract handler definitions.
+ *
+ * @group views
  */
 class HandlerTest extends ViewTestBase {
 
@@ -30,14 +32,6 @@ class HandlerTest extends ViewTestBase {
    * @var array
    */
   public static $modules = array('views_ui', 'comment', 'node');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Handler: Base',
-      'description' => 'Tests abstract handler definitions.',
-      'group' => 'Views Handlers',
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -91,102 +85,99 @@ class HandlerTest extends ViewTestBase {
   }
 
   /**
-   * Tests the breakPhraseString() method.
+   * Tests the breakString method.
    */
-  function testBreakPhraseString() {
-    $empty_stdclass = new \stdClass();
-    $empty_stdclass->operator = 'or';
-    $empty_stdclass->value = array();
+  public function testBreakString() {
+    // Check defaults.
+    $this->assertEqual((object) array('value' => array(), 'operator' => NULL), HandlerBase::breakString(''));
 
-    // check defaults
-    $null = NULL;
-    $this->assertEqual($empty_stdclass, HandlerBase::breakPhraseString('', $null));
-
-    $item = array(
-      'table' => 'node',
-      'field' => 'title',
-    );
-    $handler = $this->container->get('plugin.manager.views.argument')->getHandler($item);
-    $this->assertEqual($handler, HandlerBase::breakPhraseString('', $handler), 'The breakPhraseString() method works correctly.');
-
-    // test ors
-    $handler = HandlerBase::breakPhraseString('word1 word2+word');
+    // Test ors
+    $handler = HandlerBase::breakString('word1 word2+word');
     $this->assertEqualValue(array('word1', 'word2', 'word'), $handler);
     $this->assertEqual('or', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word1+word2+word');
+    $handler = HandlerBase::breakString('word1+word2+word');
     $this->assertEqualValue(array('word1', 'word2', 'word'), $handler);
     $this->assertEqual('or', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word1 word2 word');
+    $handler = HandlerBase::breakString('word1 word2 word');
     $this->assertEqualValue(array('word1', 'word2', 'word'), $handler);
     $this->assertEqual('or', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word-1+word-2+word');
+    $handler = HandlerBase::breakString('word-1+word-2+word');
     $this->assertEqualValue(array('word-1', 'word-2', 'word'), $handler);
     $this->assertEqual('or', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('wõrd1+wõrd2+wõrd');
+    $handler = HandlerBase::breakString('wõrd1+wõrd2+wõrd');
     $this->assertEqualValue(array('wõrd1', 'wõrd2', 'wõrd'), $handler);
     $this->assertEqual('or', $handler->operator);
 
-    // test ands.
-    $handler = HandlerBase::breakPhraseString('word1,word2,word');
+    // Test ands.
+    $handler = HandlerBase::breakString('word1,word2,word');
     $this->assertEqualValue(array('word1', 'word2', 'word'), $handler);
     $this->assertEqual('and', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word1 word2,word');
+    $handler = HandlerBase::breakString('word1 word2,word');
     $this->assertEqualValue(array('word1 word2', 'word'), $handler);
     $this->assertEqual('and', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word1,word2 word');
+    $handler = HandlerBase::breakString('word1,word2 word');
     $this->assertEqualValue(array('word1', 'word2 word'), $handler);
     $this->assertEqual('and', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('word-1,word-2,word');
+    $handler = HandlerBase::breakString('word-1,word-2,word');
     $this->assertEqualValue(array('word-1', 'word-2', 'word'), $handler);
     $this->assertEqual('and', $handler->operator);
-    $handler = HandlerBase::breakPhraseString('wõrd1,wõrd2,wõrd');
+    $handler = HandlerBase::breakString('wõrd1,wõrd2,wõrd');
     $this->assertEqualValue(array('wõrd1', 'wõrd2', 'wõrd'), $handler);
     $this->assertEqual('and', $handler->operator);
 
-    // test a single word
-    $handler = HandlerBase::breakPhraseString('word');
+    // Test a single word
+    $handler = HandlerBase::breakString('word');
     $this->assertEqualValue(array('word'), $handler);
     $this->assertEqual('and', $handler->operator);
-  }
 
-  /**
-   * Tests Drupal\views\Plugin\views\HandlerBase::breakPhrase() function.
-   */
-  function testBreakPhrase() {
-    $empty_stdclass = new \stdClass();
-    $empty_stdclass->operator = 'or';
-    $empty_stdclass->value = array();
-
-    $null = NULL;
-    // check defaults
-    $this->assertEqual($empty_stdclass, HandlerBase::breakPhrase('', $null));
-
-    $item = array(
-      'table' => 'node',
-      'field' => 'title',
-    );
-    $handler = $this->container->get('plugin.manager.views.argument')->getHandler($item);
-    $this->assertEqual($handler, HandlerBase::breakPhrase('', $handler), 'The breakPhrase() method works correctly.');
-
+    $s1 = $this->randomMachineName();
     // Generate three random numbers which can be used below;
     $n1 = rand(0, 100);
     $n2 = rand(0, 100);
     $n3 = rand(0, 100);
-    // test ors
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1 $n2+$n3", $handler));
-    $this->assertEqual('or', $handler->operator);
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1+$n2+$n3", $handler));
-    $this->assertEqual('or', $handler->operator);
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1 $n2 $n3", $handler));
-    $this->assertEqual('or', $handler->operator);
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1 $n2++$n3", $handler));
-    $this->assertEqual('or', $handler->operator);
 
-    // test ands.
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1,$n2,$n3", $handler));
-    $this->assertEqual('and', $handler->operator);
-    $this->assertEqualValue(array($n1, $n2, $n3), HandlerBase::breakPhrase("$n1,,$n2,$n3", $handler));
-    $this->assertEqual('and', $handler->operator);
+    // Test "or"s.
+    $handlerBase = HandlerBase::breakString("$s1 $n2+$n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1+$n2+$n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1 $n2 $n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1 $n2++$n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
+
+    // Test "and"s.
+    $handlerBase = HandlerBase::breakString("$s1,$n2,$n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('and', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1,,$n2,$n3");
+    $this->assertEqualValue(array($s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('and', $handlerBase->operator);
+
+    // Enforce int values.
+    $handlerBase = HandlerBase::breakString("$n1,$n2,$n3", TRUE);
+    $this->assertEqualValue(array($n1, $n2, $n3), $handlerBase);
+    $this->assertEqual('and', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$n1+$n2+$n3", TRUE);
+    $this->assertEqualValue(array($n1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1,$n2,$n3", TRUE);
+    $this->assertEqualValue(array((int) $s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('and', $handlerBase->operator);
+
+    $handlerBase = HandlerBase::breakString("$s1+$n2+$n3", TRUE);
+    $this->assertEqualValue(array((int) $s1, $n2, $n3), $handlerBase);
+    $this->assertEqual('or', $handlerBase->operator);
   }
 
   /**
@@ -213,16 +204,14 @@ class HandlerTest extends ViewTestBase {
       $loaded_order = array_keys($view->display_handler->getOption($type));
       $this->assertIdentical($original_order[$type], $loaded_order);
     }
-
   }
-
 
   /**
    * Check to see if a value is the same as the value on a certain handler.
    *
-   * @param $first
-   *   The first value to check.
-   * @param \Drupal\views\Plugin\views\HandlerBase $handler
+   * @param $expected
+   *   The expected value to check.
+   * @param \Drupal\views\Plugin\views\ViewsHandlerInterface $handler
    *   The handler that has the $handler->value property to compare with first.
    * @param string $message
    *   The message to display along with the assertion.
@@ -232,8 +221,12 @@ class HandlerTest extends ViewTestBase {
    * @return bool
    *   TRUE if the assertion succeeded, FALSE otherwise.
    */
-  protected function assertEqualValue($first, $handler, $message = '', $group = 'Other') {
-    return $this->assert($first == $handler->value, $message ? $message : t('First value is equal to second value'), $group);
+  protected function assertEqualValue($expected, $handler, $message = '', $group = 'Other') {
+    if (empty($message)) {
+      $message = t('Comparing @first and @second', array('@first' => implode(',', $expected), '@second' => implode(',', $handler->value)));
+    }
+
+    return $this->assert($expected == $handler->value, $message, $group);
   }
 
   /**
@@ -282,9 +275,9 @@ class HandlerTest extends ViewTestBase {
     $view = Views::getView('test_handler_relationships');
     $view->setDisplay();
     // Setup a broken relationship.
-    $view->addHandler('default', 'relationship', $this->randomName(), $this->randomName(), array(), 'broken_relationship');
+    $view->addHandler('default', 'relationship', $this->randomMachineName(), $this->randomMachineName(), array(), 'broken_relationship');
     // Setup a valid relationship.
-    $view->addHandler('default', 'relationship', 'comment', 'node', array('relationship' => 'cid'), 'valid_relationship');
+    $view->addHandler('default', 'relationship', 'comment_field_data', 'node', array('relationship' => 'cid'), 'valid_relationship');
     $view->initHandlers();
     $field = $view->field['title'];
 
@@ -292,7 +285,7 @@ class HandlerTest extends ViewTestBase {
     $field->setRelationship();
     $this->assertFalse($field->relationship, 'Make sure that an empty relationship does not create a relationship on the field.');
 
-    $field->options['relationship'] = $this->randomName();
+    $field->options['relationship'] = $this->randomMachineName();
     $field->setRelationship();
     $this->assertFalse($field->relationship, 'Make sure that a random relationship does not create a relationship on the field.');
 
@@ -334,8 +327,8 @@ class HandlerTest extends ViewTestBase {
 
     // Set another table/field combination and make sure there are new
     // placeholders.
-    $table = $handler->table = $this->randomName();
-    $field = $handler->field = $this->randomName();
+    $table = $handler->table = $this->randomMachineName();
+    $field = $handler->field = $this->randomMachineName();
     $string = ':' . $table . '_' . $field;
 
     // Make sure the placeholder variables are like expected.

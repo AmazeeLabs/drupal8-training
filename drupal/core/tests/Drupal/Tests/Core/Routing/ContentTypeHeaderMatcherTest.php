@@ -13,9 +13,9 @@ use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Basic tests for the ContentTypeHeaderMatcher class.
+ * Confirm that the content types partial matcher is functioning properly.
  *
- * @coversClassDefault \Drupal\Core\Routing\ContentTypeHeaderMatcher
+ * @group Routing
  */
 class ContentTypeHeaderMatcherTest extends UnitTestCase {
 
@@ -36,18 +36,7 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Content Type header matcher test',
-      'description' => 'Confirm that the content types partial matcher is functioning properly.',
-      'group' => 'Routing',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->fixtures = new RoutingFixtures();

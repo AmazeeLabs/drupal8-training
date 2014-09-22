@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests migration of field instances.
+ * Migrate field widget settings.
+ *
+ * @group migrate_drupal
  */
 class MigrateFieldWidgetSettingsTest extends MigrateDrupalTestBase {
 
@@ -33,18 +35,7 @@ class MigrateFieldWidgetSettingsTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Migrate field widget settings to entity.form_display.*.*.default.yml',
-      'description' => 'Migrate field widget settings.',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     entity_create('node_type', array('type' => 'test_page'))->save();
@@ -69,7 +60,7 @@ class MigrateFieldWidgetSettingsTest extends MigrateDrupalTestBase {
         array(array('field_test_datetime'), array('node', 'field_test_datetime')),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
     $migration = entity_load('migration', 'd6_field_instance_widget_settings');
     $dumps = array(
       $this->getDumpDirectory() . '/Drupal6FieldInstance.php',
@@ -92,6 +83,7 @@ class MigrateFieldWidgetSettingsTest extends MigrateDrupalTestBase {
     $component = $form_display->getComponent('field_test');
     $expected = array('weight' => 1, 'type' => 'text_textfield');
     $expected['settings'] = array('size' => 60, 'placeholder' => '');
+    $expected['third_party_settings'] = array();
     $this->assertEqual($component, $expected, 'Text field settings are correct.');
 
     // Integer field.

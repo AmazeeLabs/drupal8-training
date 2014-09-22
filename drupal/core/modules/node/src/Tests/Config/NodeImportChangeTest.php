@@ -10,7 +10,9 @@ namespace Drupal\node\Tests\Config;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests updating content types as part of config import.
+ * Change content types during config create method invocation.
+ *
+ * @group node
  */
 class NodeImportChangeTest extends DrupalUnitTestBase {
 
@@ -24,19 +26,11 @@ class NodeImportChangeTest extends DrupalUnitTestBase {
   /**
    * Set the default field storage backend for fields created during tests.
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Set default storage backend.
     $this->installConfig(array('field', 'node_test_config'));
-  }
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Node config change tests',
-      'description' => 'Change content types during config create method invocation.',
-      'group' => 'Node',
-    );
   }
 
   /**

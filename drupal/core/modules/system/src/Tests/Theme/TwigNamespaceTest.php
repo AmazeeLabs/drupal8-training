@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests Twig namespaces.
+ *
+ * @group Theme
  */
 class TwigNamespaceTest extends WebTestBase {
 
@@ -26,17 +28,9 @@ class TwigNamespaceTest extends WebTestBase {
    */
   protected $twig;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Twig Namespaces',
-      'description' => 'Tests Twig namespaces.',
-      'group' => 'Theme',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
-    theme_enable(array('test_theme', 'bartik'));
+    \Drupal::service('theme_handler')->install(array('test_theme', 'bartik'));
     $this->twig = \Drupal::service('twig');
   }
 

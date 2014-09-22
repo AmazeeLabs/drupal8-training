@@ -10,7 +10,9 @@ namespace Drupal\config\Tests;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Unit tests for configuration controllers and objects.
+ * Tests for configuration dependencies.
+ *
+ * @group config
  */
 class ConfigDependencyTest extends DrupalUnitTestBase {
 
@@ -20,14 +22,6 @@ class ConfigDependencyTest extends DrupalUnitTestBase {
    * @var array
    */
   public static $modules = array('system', 'config_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Configuration dependency tests',
-      'description' => 'Tests for configuration dependencies.',
-      'group' => 'Configuration',
-    );
-  }
 
   /**
    * Tests that calculating dependencies for system module.
@@ -149,6 +143,69 @@ class ConfigDependencyTest extends DrupalUnitTestBase {
     $this->assertTrue(in_array('config_query_test:entity1', $dependent_ids), 'config_test.query.entity1 has a dependency on config_test module.');
     $this->assertTrue(in_array('config_query_test:entity2', $dependent_ids), 'config_test.query.entity2 has a dependency on config_test module.');
 
+  }
+
+  /**
+   * Tests ConfigManager::uninstall() and config entity dependency management.
+   */
+  public function testConfigEntityUninstall() {
+    /** @var \Drupal\Core\Config\ConfigManagerInterface $config_manager */
+    $config_manager = \Drupal::service('config.manager');
+    /** @var \Drupal\Core\Config\Entity\ConfigEntityStorage $storage */
+    $storage = $this->container->get('entity.manager')->getStorage('config_test');
+    // Test dependencies between modules.
+    $entity1 = $storage->create(
+      array(
+        'id' => 'entity1',
+        'test_dependencies' => array(
+          'module' => array('node', 'config_test')
+        ),
+      )
+    );
+    $entity1->save();
+    $entity2 = $storage->create(
+      array(
+        'id' => 'entity2',
+        'test_dependencies' => array(
+          'entity' => array($entity1->getConfigDependencyName()),
+        ),
+      )
+    );
+    $entity2->save();
+    // Test that doing a config uninstall of the node module deletes entity2
+    // since it is dependent on entity1 which is dependent on the node module.
+    $config_manager->uninstall('module', 'node');
+    $this->assertFalse($storage->load('entity1'), 'Entity 1 deleted');
+    $this->assertFalse($storage->load('entity2'), 'Entity 2 deleted');
+
+    $entity1 = $storage->create(
+      array(
+        'id' => 'entity1',
+        'test_dependencies' => array(
+          'module' => array('node', 'config_test')
+        ),
+      )
+    );
+    $entity1->save();
+    $entity2 = $storage->create(
+      array(
+        'id' => 'entity2',
+        'test_dependencies' => array(
+          'entity' => array($entity1->getConfigDependencyName()),
+        ),
+      )
+    );
+    $entity2->save();
+    \Drupal::state()->set('config_test.fix_dependencies', array($entity1->getConfigDependencyName()));
+    // Test that doing a config uninstall of the node module does not delete
+    // entity2 since the state setting allows
+    // \Drupal\config_test\Entity::onDependencyRemoval() to remove the
+    // dependency before config entities are deleted during the uninstall.
+    $config_manager->uninstall('module', 'node');
+    $this->assertFalse($storage->load('entity1'), 'Entity 1 deleted');
+    $entity2 = $storage->load('entity2');
+    $this->assertTrue($entity2, 'Entity 2 not deleted');
+    $this->assertEqual($entity2->calculateDependencies()['entity'], array(), 'Entity 2 dependencies updated to remove dependency on Entity1.');
   }
 
   /**

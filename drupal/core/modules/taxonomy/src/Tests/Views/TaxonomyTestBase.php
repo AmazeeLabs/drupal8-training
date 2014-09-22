@@ -7,8 +7,8 @@
 
 namespace Drupal\taxonomy\Tests\Views;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\views\Tests\ViewTestBase;
 use Drupal\views\Tests\ViewTestData;
 
@@ -45,7 +45,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
    */
   protected $term2;
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->mockStandardInstall();
 
@@ -78,12 +78,12 @@ abstract class TaxonomyTestBase extends ViewTestBase {
     ));
     $this->vocabulary->save();
     $this->field_name = 'field_' . $this->vocabulary->id();
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       // Set cardinality to unlimited for tagging.
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -93,7 +93,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
         ),
       ),
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $this->field_name,
       'entity_type' => 'node',
       'label' => 'Tags',
@@ -131,12 +131,12 @@ abstract class TaxonomyTestBase extends ViewTestBase {
     $filter_formats = filter_formats();
     $format = array_pop($filter_formats);
     $term = entity_create('taxonomy_term', array(
-      'name' => $this->randomName(),
-      'description' => $this->randomName(),
+      'name' => $this->randomMachineName(),
+      'description' => $this->randomMachineName(),
       // Use the first available text format.
       'format' => $format->format,
       'vid' => $this->vocabulary->id(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $term->save();
     return $term;

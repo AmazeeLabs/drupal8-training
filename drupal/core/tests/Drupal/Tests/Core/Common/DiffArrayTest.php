@@ -12,6 +12,8 @@ use Drupal\Tests\UnitTestCase;
 
 /**
  * Tests the DiffArray helper class.
+ *
+ * @group Common
  */
 class DiffArrayTest extends UnitTestCase {
 
@@ -29,15 +31,7 @@ class DiffArrayTest extends UnitTestCase {
    */
   protected $array2;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'DiffArray functionality',
-      'description' => 'Tests the DiffArray helper class.',
-      'group' => 'System',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->array1 = array(

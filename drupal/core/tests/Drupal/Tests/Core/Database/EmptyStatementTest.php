@@ -13,16 +13,10 @@ use Drupal\Tests\UnitTestCase;
 
 /**
  * Tests the empty pseudo-statement class.
+ *
+ * @group Database
  */
 class EmptyStatementTest extends UnitTestCase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Empty statement',
-      'description' => 'Test the empty pseudo-statement class.',
-      'group' => 'Database',
-    );
-  }
-
   /**
    * Tests that the empty result set behaves as empty.
    */
@@ -38,12 +32,7 @@ class EmptyStatementTest extends UnitTestCase {
    */
   function testEmptyIteration() {
     $result = new StatementEmpty();
-
-    $count = 0;
-    foreach ($result as $record) {
-      $count++;
-    }
-    $this->assertSame(0, $count, 'Iterating empty result set should not iterate.');
+    $this->assertSame(0, iterator_count($result), 'Empty result set should not iterate.');
   }
 
   /**

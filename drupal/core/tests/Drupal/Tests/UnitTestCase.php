@@ -14,6 +14,8 @@ use Drupal\Core\DependencyInjection\ContainerBuilder;
 
 /**
  * Provides a base class and helpers for Drupal unit tests.
+ *
+ * @ingroup testing
  */
 abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
 
@@ -23,27 +25,6 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
    * @var \Drupal\Component\Utility\Random
    */
   protected $randomGenerator;
-
-  /**
-   * Provides meta information about this test case, such as test name.
-   *
-   * @return array
-   *   An array of untranslated strings with the following keys:
-   *   - name: An overview of what is tested by the class; for example, "User
-   *     access rules".
-   *   - description: One sentence describing the test, starting with a verb.
-   *   - group: The human-readable name of the module ("Node", "Statistics"), or
-   *     the human-readable name of the Drupal facility tested (e.g. "Form API"
-   *     or "XML-RPC").
-   */
-  public static function getInfo() {
-    // PHP does not allow us to declare this method as abstract public static,
-    // so we simply throw an exception here if this has not been implemented by
-    // a child class.
-    throw new \RuntimeException(String::format('@class must implement \Drupal\Tests\UnitTestCase::getInfo().', array(
-      '@class' => get_called_class(),
-    )));
-  }
 
   /**
    * {@inheritdoc}
@@ -66,7 +47,7 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
    *
    * @see \Drupal\Component\Utility\Random::name()
    */
-  public function randomName($length = 8) {
+  public function randomMachineName($length = 8) {
     return $this->getRandomGenerator()->name($length, TRUE);
   }
 
@@ -176,7 +157,7 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
    *   The mocked block.
    */
   protected function getBlockMockWithMachineName($machine_name) {
-    $plugin = $this->getMockBuilder('Drupal\block\BlockBase')
+    $plugin = $this->getMockBuilder('Drupal\Core\Block\BlockBase')
       ->disableOriginalConstructor()
       ->getMock();
     $plugin->expects($this->any())
@@ -242,7 +223,7 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
       ->method('getInstanceFromDefinition')
       ->will($this->returnCallback(function ($class) {
         if (is_subclass_of($class, 'Drupal\Core\DependencyInjection\ContainerInjectionInterface')) {
-          return $class::create(\Drupal::getContainer());
+          return $class::create(new ContainerBuilder());
         }
         else {
           return new $class();

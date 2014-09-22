@@ -5,40 +5,40 @@
  * Handles the server side AJAX interactions of Views.
  */
 
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Ajax\HighlightCommand;
 use Drupal\Core\Ajax\OpenModalDialogCommand;
 use Drupal\Core\Ajax\AjaxResponse;
 
 /**
- * @defgroup views_ajax Views AJAX library
- * @{
- * Handles the server side AJAX interactions of Views.
- */
-
-/**
- * Wrapper around drupal_build_form to handle some AJAX stuff automatically.
+ * Wrapper around \Drupal\Core\Form\FormBuilderInterface::buildForm() to handle
+ * some AJAX stuff automatically.
  * This makes some assumptions about the client.
  */
-function views_ajax_form_wrapper($form_id, &$form_state) {
+function views_ajax_form_wrapper($form_class, FormStateInterface &$form_state) {
   // This won't override settings already in.
-  $form_state += array(
-    'rerender' => FALSE,
-    'no_redirect' => !empty($form_state['ajax']),
-    'no_cache' => TRUE,
-    'build_info' => array(
-      'args' => array(),
-    ),
-  );
+  if (!$form_state->has('rerender')) {
+    $form_state->set('rerender', FALSE);
+  }
+  $ajax = $form_state->get('ajax');
+  // Do not overwrite if the redirect has been disabled.
+  if (!$form_state->isRedirectDisabled()) {
+    $form_state->disableRedirect($ajax);
+  }
+  $form_state->disableCache();
 
-  $form = drupal_build_form($form_id, $form_state);
+  $form = \Drupal::formBuilder()->buildForm($form_class, $form_state);
   $output = drupal_render($form);
+  drupal_process_attached($form);
 
   // These forms have the title built in, so set the title here:
-  if (empty($form_state['ajax']) && !empty($form_state['title'])) {
+  $title = $form_state->get('title') ?: '';
+  if (!$ajax && $title) {
     $form['#attached']['css'][] = drupal_get_path('module', 'views_ui') . '/css/views_ui.admin.css';
   }
 
-  if (!empty($form_state['ajax']) && (empty($form_state['executed']) || !empty($form_state['rerender']))) {
+  if ($ajax && (!$form_state->isExecuted() || $form_state->get('rerender'))) {
     // If the form didn't execute and we're using ajax, build up a
     // Ajax command list to execute.
     $response = new AjaxResponse();
@@ -50,7 +50,6 @@ function views_ajax_form_wrapper($form_id, &$form_state) {
     }
     $display .= $output;
 
-    $title = empty($form_state['title']) ? '' : $form_state['title'];
     $options = array(
       'dialogClass' => 'views-ui-dialog',
       'width' => '50%',
@@ -58,16 +57,12 @@ function views_ajax_form_wrapper($form_id, &$form_state) {
 
     $response->addCommand(new OpenModalDialogCommand($title, $display, $options));
 
-    if (!empty($form_state['#section'])) {
-      $response->addCommand(new HighlightCommand('.' . drupal_clean_css_identifier($form_state['#section'])));
+    if ($section = $form_state->get('#section')) {
+      $response->addCommand(new HighlightCommand('.' . Html::cleanCssIdentifier($section)));
     }
 
     return $response;
   }
 
-  return (!empty($form_state['title'])) ? array('#title' => $form_state['title'], '#markup' => $output) : $output;
+  return $title ? ['#title' => $title, '#markup' => $output] : $output;
 }
-
-/**
- * @}
- */

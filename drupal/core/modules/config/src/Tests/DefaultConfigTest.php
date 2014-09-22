@@ -10,11 +10,16 @@ namespace Drupal\config\Tests;
 use Drupal\config_test\TestInstallStorage;
 use Drupal\Core\Config\InstallStorage;
 use Drupal\Core\Config\TypedConfigManager;
+use Drupal\simpletest\KernelTestBase;
 
 /**
- * Tests default configuration availability and type with configuration schema.
+ * Tests that default configuration provided by all modules matches schema.
+ *
+ * @group config
  */
-class DefaultConfigTest extends ConfigSchemaTestBase {
+class DefaultConfigTest extends KernelTestBase {
+
+  use SchemaCheckTestTrait;
 
   /**
    * Modules to enable.
@@ -22,17 +27,6 @@ class DefaultConfigTest extends ConfigSchemaTestBase {
    * @var array
    */
   public static $modules = array('config_test');
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Default configuration',
-      'description' => 'Tests that default configuration provided by all modules matches schema.',
-      'group' => 'Configuration',
-    );
-  }
 
   /**
    * Tests default configuration data type.
@@ -43,7 +37,8 @@ class DefaultConfigTest extends ConfigSchemaTestBase {
     $typed_config = new TypedConfigManager(
       \Drupal::service('config.storage'),
       new TestInstallStorage(InstallStorage::CONFIG_SCHEMA_DIRECTORY),
-      \Drupal::service('cache.discovery')
+      \Drupal::service('cache.discovery'),
+      \Drupal::service('module_handler')
     );
 
     // Create a configuration storage with access to default configuration in
@@ -51,12 +46,6 @@ class DefaultConfigTest extends ConfigSchemaTestBase {
     $default_config_storage = new TestInstallStorage();
 
     foreach ($default_config_storage->listAll() as $config_name) {
-      // @todo: remove once migration (https://drupal.org/node/2183957) schemas
-      // are in.
-      if (strpos($config_name, 'migrate.migration') === 0) {
-        continue;
-      }
-
       // Skip files provided by the config_schema_test module since that module
       // is explicitly for testing schema.
       if (strpos($config_name, 'config_schema_test') === 0) {

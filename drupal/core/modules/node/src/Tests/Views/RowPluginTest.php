@@ -7,12 +7,12 @@
 
 namespace Drupal\node\Tests\Views;
 
-use Drupal\Core\Language\Language;
 use Drupal\views\Views;
 
 /**
  * Tests the node row plugin.
  *
+ * @group node
  * @see \Drupal\node\Plugin\views\row\NodeRow
  */
 class RowPluginTest extends NodeTestBase {
@@ -45,14 +45,6 @@ class RowPluginTest extends NodeTestBase {
    */
   protected $nodes;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node: Row plugin',
-      'description' => 'Tests the node row plugin.',
-      'group' => 'Views module integration',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
 
@@ -67,9 +59,9 @@ class RowPluginTest extends NodeTestBase {
           'type' => 'article',
           'body' => array(
             array(
-              'value' => $this->randomName(42),
+              'value' => $this->randomMachineName(42),
               'format' => filter_default_format(),
-              'summary' => $this->randomName(),
+              'summary' => $this->randomMachineName(),
             ),
           ),
         )
@@ -95,11 +87,11 @@ class RowPluginTest extends NodeTestBase {
    */
   public function drupalCreateComment(array $settings = array()) {
     $settings += array(
-      'subject' => $this->randomName(),
+      'subject' => $this->randomMachineName(),
       'entity_id' => $settings['entity_id'],
       'field_name' => 'comment',
       'entity_type' => 'node',
-      'comment_body' => $this->randomName(40),
+      'comment_body' => $this->randomMachineName(40),
     );
 
     $comment = entity_create('comment', $settings);
@@ -133,27 +125,6 @@ class RowPluginTest extends NodeTestBase {
       $this->assertTrue(strpos($output, $node->body->summary) !== FALSE, 'Make sure the teaser appears in the output of the view.');
       $this->assertFalse(strpos($output, $node->body->value) !== FALSE, 'Make sure the full text does not appears in the output of the view if teaser is set as viewmode.');
     }
-
-    // Test with links disabled.
-    $view->rowPlugin->options['links'] = FALSE;
-    \Drupal::entityManager()->getViewBuilder('node')->resetCache();
-    $output = $view->preview();
-    $output = drupal_render($output);
-    $this->drupalSetContent($output);
-    foreach ($this->nodes as $node) {
-      $this->assertFalse($this->xpath('//li[contains(@class, :class)]/a[contains(@href, :href)]', array(':class' => 'node-readmore', ':href' => "node/{$node->id()}")), 'Make sure no readmore link appears.');
-    }
-
-    // Test with links enabled.
-    $view->rowPlugin->options['links'] = TRUE;
-    \Drupal::entityManager()->getViewBuilder('node')->resetCache();
-    $output = $view->preview();
-    $output = drupal_render($output);
-    $this->drupalSetContent($output);
-    foreach ($this->nodes as $node) {
-      $this->assertTrue($this->xpath('//li[contains(@class, :class)]/a[contains(@href, :href)]', array(':class' => 'node-readmore', ':href' => "node/{$node->id()}")), 'Make sure no readmore link appears.');
-    }
-
   }
 
 }

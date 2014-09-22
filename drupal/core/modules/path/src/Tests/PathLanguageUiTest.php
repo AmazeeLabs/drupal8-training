@@ -8,7 +8,9 @@
 namespace Drupal\path\Tests;
 
 /**
- * Tests the user interface for creating path aliases, with languages.
+ * Confirm that the Path module user interface works with languages.
+ *
+ * @group path
  */
 class PathLanguageUiTest extends PathTestBase {
 
@@ -19,15 +21,7 @@ class PathLanguageUiTest extends PathTestBase {
    */
   public static $modules = array('path', 'locale');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Path aliases with languages',
-      'description' => 'Confirm that the Path module user interface works with languages.',
-      'group' => 'Path',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create and login user.
@@ -49,7 +43,7 @@ class PathLanguageUiTest extends PathTestBase {
    * Tests that a language-neutral URL alias works.
    */
   function testLanguageNeutralUrl() {
-    $name = $this->randomName(8);
+    $name = $this->randomMachineName(8);
     $edit = array();
     $edit['source'] = 'admin/config/search/path';
     $edit['alias'] = $name;
@@ -63,7 +57,7 @@ class PathLanguageUiTest extends PathTestBase {
    * Tests that a default language URL alias works.
    */
   function testDefaultLanguageUrl() {
-    $name = $this->randomName(8);
+    $name = $this->randomMachineName(8);
     $edit = array();
     $edit['source'] = 'admin/config/search/path';
     $edit['alias'] = $name;
@@ -78,7 +72,7 @@ class PathLanguageUiTest extends PathTestBase {
    * Tests that a non-default language URL alias works.
    */
   function testNonDefaultUrl() {
-    $name = $this->randomName(8);
+    $name = $this->randomMachineName(8);
     $edit = array();
     $edit['source'] = 'admin/config/search/path';
     $edit['alias'] = $name;

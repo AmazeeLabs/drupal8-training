@@ -12,6 +12,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests theme suggestion alter hooks.
+ *
+ * @group Theme
  */
 class ThemeSuggestionsAlterTest extends WebTestBase {
 
@@ -22,17 +24,9 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
    */
   public static $modules = array('theme_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Theme suggestions alter',
-      'description' => 'Test theme suggestion alter hooks.',
-      'group' => 'Theme',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
-    theme_enable(array('test_theme'));
+    \Drupal::service('theme_handler')->install(array('test_theme'));
   }
 
   /**
@@ -42,7 +36,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     $this->drupalGet('theme-test/suggestion-provided');
     $this->assertText('Template for testing suggestions provided by the module declaring the theme hook.');
 
-    // Enable test_theme, it contains a template suggested by theme_test.module
+    // Install test_theme, it contains a template suggested by theme_test.module
     // in theme_test_theme_suggestions_theme_test_suggestion_provided().
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
@@ -59,7 +53,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     $this->drupalGet('theme-test/general-suggestion-alter');
     $this->assertText('Original template for testing hook_theme_suggestions_alter().');
 
-    // Enable test_theme and test that themes can alter template suggestions.
+    // Install test_theme and test that themes can alter template suggestions.
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
       ->save();
@@ -69,6 +63,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     // Enable the theme_suggestions_test module to test modules implementing
     // suggestions alter hooks.
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
     $this->drupalGet('theme-test/general-suggestion-alter');
     $this->assertText('Template overridden based on new theme suggestion provided by a module via hook_theme_suggestions_alter().');
   }
@@ -80,7 +75,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     $this->drupalGet('theme-test/suggestion-alter');
     $this->assertText('Original template for testing hook_theme_suggestions_HOOK_alter().');
 
-    // Enable test_theme and test that themes can alter template suggestions.
+    // Install test_theme and test that themes can alter template suggestions.
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
       ->save();
@@ -90,6 +85,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     // Enable the theme_suggestions_test module to test modules implementing
     // suggestions alter hooks.
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
     $this->drupalGet('theme-test/suggestion-alter');
     $this->assertText('Template overridden based on new theme suggestion provided by a module via hook_theme_suggestions_HOOK_alter().');
   }
@@ -113,6 +109,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
 
     // Ensure that the base hook is used to determine the suggestion alter hook.
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
     $this->drupalGet('theme-test/specific-suggestion-alter');
     $this->assertText('Template overridden based on suggestion alter hook determined by the base hook.');
     $this->assertTrue(strpos($this->drupalGetContent(), 'theme_test_specific_suggestions__variant') < strpos($this->drupalGetContent(), 'theme_test_specific_suggestions__variant__foo'), 'Specific theme call is added to the suggestions array before the suggestions alter hook.');
@@ -125,7 +122,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     $this->drupalGet('theme-test/function-suggestion-alter');
     $this->assertText('Original theme function.');
 
-    // Enable test_theme and test that themes can alter theme suggestions.
+    // Install test_theme and test that themes can alter theme suggestions.
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
       ->save();
@@ -135,6 +132,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     // Enable the theme_suggestions_test module to test modules implementing
     // suggestions alter hooks.
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
     $this->drupalGet('theme-test/function-suggestion-alter');
     $this->assertText('Theme function overridden based on new theme suggestion provided by a module.');
   }
@@ -151,6 +149,7 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
     // the include file is always loaded. The file will always be included for
     // the first request because the theme registry is being rebuilt.
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
     $this->drupalGet('theme-test/suggestion-alter-include');
     $this->assertText('Function suggested via suggestion alter hook found in include file.', 'Include file loaded for initial request.');
     $this->drupalGet('theme-test/suggestion-alter-include');
@@ -164,11 +163,12 @@ class ThemeSuggestionsAlterTest extends WebTestBase {
    * hook_theme_suggestions_HOOK_alter() within an extension (module or theme).
    */
   function testExecutionOrder() {
-    // Enable our test theme and module.
+    // Install our test theme and module.
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
       ->save();
     \Drupal::moduleHandler()->install(array('theme_suggestions_test'));
+    $this->resetAll();
 
     // Send two requests so that we get all the messages we've set via
     // drupal_set_message().

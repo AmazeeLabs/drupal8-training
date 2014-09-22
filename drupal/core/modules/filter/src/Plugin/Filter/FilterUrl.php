@@ -7,6 +7,8 @@
 
 namespace Drupal\filter\Plugin\Filter;
 
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\filter\FilterProcessResult;
 use Drupal\filter\Plugin\FilterBase;
 
 /**
@@ -26,7 +28,7 @@ class FilterUrl extends FilterBase {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     $form['filter_url_length'] = array(
       '#type' => 'number',
       '#title' => $this->t('Maximum link text length'),
@@ -41,15 +43,15 @@ class FilterUrl extends FilterBase {
   /**
    * {@inheritdoc}
    */
-  public function process($text, $langcode, $cache, $cache_id) {
-    return _filter_url($text, $this);
+  public function process($text, $langcode) {
+    return new FilterProcessResult(_filter_url($text, $this));
   }
 
   /**
    * {@inheritdoc}
    */
   public function tips($long = FALSE) {
-    return $this->t('Web page addresses and e-mail addresses turn into links automatically.');
+    return $this->t('Web page addresses and email addresses turn into links automatically.');
   }
 
 }

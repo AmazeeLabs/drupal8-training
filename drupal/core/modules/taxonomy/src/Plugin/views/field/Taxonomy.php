@@ -7,6 +7,7 @@
 
 namespace Drupal\taxonomy\Plugin\views\field;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\area\Result;
 use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -48,7 +49,7 @@ class Taxonomy extends FieldPluginBase {
   /**
    * Provide link to taxonomy option
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_taxonomy'] = array(
       '#title' => t('Link this field to its taxonomy term page'),
       '#description' => t("Enable to override this field's links."),
@@ -76,12 +77,9 @@ class Taxonomy extends FieldPluginBase {
    *   Returns a string for the link text.
    */
   protected function renderLink($data, ResultRow $values) {
-    $tid = $this->getValue($values, 'tid');
-    if (!empty($this->options['link_to_taxonomy']) && !empty($tid) && $data !== NULL && $data !== '') {
-      $term = entity_create('taxonomy_term', array(
-        'tid' => $tid,
-        'vid' => $this->getValue($values, 'vid'),
-      ));
+    $term = $this->getEntity($values);
+
+    if (!empty($this->options['link_to_taxonomy']) && $term && $data !== NULL && $data !== '') {
       $this->options['alter']['make_link'] = TRUE;
       $this->options['alter']['path'] = $term->getSystemPath();
     }

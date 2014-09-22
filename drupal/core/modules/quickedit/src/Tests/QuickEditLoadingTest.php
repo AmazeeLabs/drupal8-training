@@ -14,7 +14,10 @@ use Drupal\Core\Ajax\AppendCommand;
 use Drupal\Component\Utility\Unicode;
 
 /**
- * Tests loading of Quick Edit and lazy-loading of in-place editors.
+ * Tests loading of in-place editing functionality and lazy loading of its
+ * in-place editors.
+ *
+ * @group quickedit
  */
 class QuickEditLoadingTest extends WebTestBase {
 
@@ -24,14 +27,6 @@ class QuickEditLoadingTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('contextual', 'quickedit', 'filter', 'node');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'In-place editing loading',
-      'description' => 'Tests loading of in-place editing functionality and lazy loading of its in-place editors.',
-      'group' => 'Quick Edit',
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -60,7 +55,7 @@ class QuickEditLoadingTest extends WebTestBase {
           'format' => 'filtered_html',
         )
       ),
-      'log' => $this->randomString(),
+      'revision_log' => $this->randomString(),
     ));
 
     // Create 2 users, the only difference being the ability to use in-place
@@ -84,26 +79,24 @@ class QuickEditLoadingTest extends WebTestBase {
 
     // HTML annotation must always exist (to not break the render cache).
     $this->assertRaw('data-quickedit-entity-id="node/1"');
-    $this->assertRaw('data-quickedit-field-id="node/1/body/und/full"');
+    $this->assertRaw('data-quickedit-field-id="node/1/body/en/full"');
 
     // Retrieving the metadata should result in an empty 403 response.
-    $post = array('fields[0]' => 'node/1/body/und/full');
+    $post = array('fields[0]' => 'node/1/body/en/full');
     $response = $this->drupalPost('quickedit/metadata', 'application/json', $post);
     $this->assertIdentical('{}', $response);
     $this->assertResponse(403);
 
-    // Quick Edit's JavaScript would never hit these endpoints if the metadata
+    // Quick Edit's JavaScript would SearchRankingTestnever hit these endpoints if the metadata
     // was empty as above, but we need to make sure that malicious users aren't
     // able to use any of the other endpoints either.
     $post = array('editors[0]' => 'form') + $this->getAjaxPageStatePostData();
     $response = $this->drupalPost('quickedit/attachments', 'application/vnd.drupal-ajax', $post);
-    // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-    // $this->assertIdentical('[]', $response);
+    $this->assertIdentical('{}', $response);
     $this->assertResponse(403);
     $post = array('nocssjs' => 'true') + $this->getAjaxPageStatePostData();
-    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
-    // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-    // $this->assertIdentical('[]', $response);
+    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
+    $this->assertIdentical('{}', $response);
     $this->assertResponse(403);
     $edit = array();
     $edit['form_id'] = 'quickedit_field_form';
@@ -113,14 +106,12 @@ class QuickEditLoadingTest extends WebTestBase {
     $edit['body[0][value]'] = '<p>Malicious content.</p>';
     $edit['body[0][format]'] = 'filtered_html';
     $edit['op'] = t('Save');
-    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $edit);
-    // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-    // $this->assertIdentical('[]', $response);
+    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $edit);
+    $this->assertIdentical('{}', $response);
     $this->assertResponse(403);
     $post = array('nocssjs' => 'true');
     $response = $this->drupalPost('quickedit/entity/' . 'node/1', 'application/json', $post);
-    // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-    // $this->assertIdentical('[]', $response);
+    $this->assertIdentical('{}', $response);
     $this->assertResponse(403);
   }
 
@@ -140,21 +131,21 @@ class QuickEditLoadingTest extends WebTestBase {
 
     // HTML annotation must always exist (to not break the render cache).
     $this->assertRaw('data-quickedit-entity-id="node/1"');
-    $this->assertRaw('data-quickedit-field-id="node/1/body/und/full"');
+    $this->assertRaw('data-quickedit-field-id="node/1/body/en/full"');
 
     // There should be only one revision so far.
     $node = node_load(1);
     $vids = \Drupal::entityManager()->getStorage('node')->revisionIds($node);
     $this->assertIdentical(1, count($vids), 'The node has only one revision.');
-    $original_log = $node->log->value;
+    $original_log = $node->revision_log->value;
 
     // Retrieving the metadata should result in a 200 JSON response.
     $htmlPageDrupalSettings = $this->drupalSettings;
-    $post = array('fields[0]' => 'node/1/body/und/full');
+    $post = array('fields[0]' => 'node/1/body/en/full');
     $response = $this->drupalPost('quickedit/metadata', 'application/json', $post);
     $this->assertResponse(200);
     $expected = array(
-      'node/1/body/und/full' => array(
+      'node/1/body/en/full' => array(
         'label' => 'Body',
         'access' => TRUE,
         'editor' => 'form',
@@ -182,7 +173,7 @@ class QuickEditLoadingTest extends WebTestBase {
     // Retrieving the form for this field should result in a 200 response,
     // containing only a quickeditFieldForm command.
     $post = array('nocssjs' => 'true', 'reset' => 'true') + $this->getAjaxPageStatePostData();
-    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
+    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
     $this->assertResponse(200);
     $ajax_commands = Json::decode($response);
     $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -210,7 +201,7 @@ class QuickEditLoadingTest extends WebTestBase {
 
       // Submit field form and check response. This should store the updated
       // entity in TempStore on the server.
-      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
+      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
       $this->assertResponse(200);
       $ajax_commands = Json::decode($response);
       $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -240,19 +231,19 @@ class QuickEditLoadingTest extends WebTestBase {
       $node = node_load(1);
       $vids = \Drupal::entityManager()->getStorage('node')->revisionIds($node);
       $this->assertIdentical(1, count($vids), 'The node has only one revision.');
-      $this->assertIdentical($original_log, $node->log->value, 'The revision log message is unchanged.');
+      $this->assertIdentical($original_log, $node->revision_log->value, 'The revision log message is unchanged.');
 
       // Now configure this node type to create new revisions automatically,
       // then again retrieve the field form, fill it, submit it (so it ends up
       // in TempStore) and then save the entity. Now there should be two
       // revisions.
       $node_type = entity_load('node_type', 'article');
-      $node_type->settings['node']['options']['revision'] = TRUE;
+      $node_type->setNewRevision(TRUE);
       $node_type->save();
 
       // Retrieve field form.
       $post = array('nocssjs' => 'true', 'reset' => 'true');
-      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
+      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
       $this->assertResponse(200);
       $ajax_commands = Json::decode($response);
       $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -269,9 +260,7 @@ class QuickEditLoadingTest extends WebTestBase {
         'form_build_id' => $build_id_match[1],
       );
       $post += $edit + $this->getAjaxPageStatePostData();
-      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
-      // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-      // $this->assertIdentical('[]', $response);
+      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
       $this->assertResponse(200);
       $ajax_commands = Json::decode($response);
       $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -281,17 +270,19 @@ class QuickEditLoadingTest extends WebTestBase {
       // Save the entity.
       $post = array('nocssjs' => 'true');
       $response = $this->drupalPost('quickedit/entity/' . 'node/1', 'application/json', $post);
-      // @todo Uncomment the below once https://drupal.org/node/2063303 is fixed.
-      // $this->assertIdentical('[]', $response);
       $this->assertResponse(200);
+      $ajax_commands = Json::decode($response);
+      $this->assertIdentical(1, count($ajax_commands));
+      $this->assertIdentical('quickeditEntitySaved', $ajax_commands[0]['command'], 'The first AJAX command is an quickeditEntitySaved command.');
+      $this->assertEqual($ajax_commands[0]['data'], ['entity_type' => 'node', 'entity_id' => 1], 'Updated entity type and ID returned');
 
       // Test that a revision was created with the correct log message.
       $vids = \Drupal::entityManager()->getStorage('node')->revisionIds(node_load(1));
       $this->assertIdentical(2, count($vids), 'The node has two revisions.');
       $revision = node_revision_load($vids[0]);
-      $this->assertIdentical($original_log, $revision->log->value, 'The first revision log message is unchanged.');
+      $this->assertIdentical($original_log, $revision->revision_log->value, 'The first revision log message is unchanged.');
       $revision = node_revision_load($vids[1]);
-      $this->assertIdentical('Updated the <em class="placeholder">Body</em> field through in-place editing.', $revision->log->value, 'The second revision log message was correctly generated by Quick Edit module.');
+      $this->assertIdentical('Updated the <em class="placeholder">Body</em> field through in-place editing.', $revision->revision_log->value, 'The second revision log message was correctly generated by Quick Edit module.');
     }
   }
 
@@ -304,16 +295,16 @@ class QuickEditLoadingTest extends WebTestBase {
 
     // Ensure that the full page title is actually in-place editable
     $node = entity_load('node', 1);
-    $elements = $this->xpath('//h1/span[@data-quickedit-field-id="node/1/title/und/full" and normalize-space(text())=:title]', array(':title' => $node->label()));
+    $elements = $this->xpath('//h1/span[@data-quickedit-field-id="node/1/title/en/full" and normalize-space(text())=:title]', array(':title' => $node->label()));
     $this->assertTrue(!empty($elements), 'Title with data-quickedit-field-id attribute found.');
 
     // Retrieving the metadata should result in a 200 JSON response.
     $htmlPageDrupalSettings = $this->drupalSettings;
-    $post = array('fields[0]' => 'node/1/title/und/full');
+    $post = array('fields[0]' => 'node/1/title/en/full');
     $response = $this->drupalPost('quickedit/metadata', 'application/json', $post);
     $this->assertResponse(200);
     $expected = array(
-      'node/1/title/und/full' => array(
+      'node/1/title/en/full' => array(
         'label' => 'Title',
         'access' => TRUE,
         'editor' => 'plain_text',
@@ -328,7 +319,7 @@ class QuickEditLoadingTest extends WebTestBase {
     // Retrieving the form for this field should result in a 200 response,
     // containing only a quickeditFieldForm command.
     $post = array('nocssjs' => 'true', 'reset' => 'true') + $this->getAjaxPageStatePostData();
-    $response = $this->drupalPost('quickedit/form/' . 'node/1/title/und/full', 'application/vnd.drupal-ajax', $post);
+    $response = $this->drupalPost('quickedit/form/' . 'node/1/title/en/full', 'application/vnd.drupal-ajax', $post);
     $this->assertResponse(200);
     $ajax_commands = Json::decode($response);
     $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -355,7 +346,7 @@ class QuickEditLoadingTest extends WebTestBase {
 
       // Submit field form and check response. This should store the
       // updated entity in TempStore on the server.
-      $response = $this->drupalPost('quickedit/form/' . 'node/1/title/und/full', 'application/vnd.drupal-ajax', $post);
+      $response = $this->drupalPost('quickedit/form/' . 'node/1/title/en/full', 'application/vnd.drupal-ajax', $post);
       $this->assertResponse(200);
       $ajax_commands = Json::decode($response);
       $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
@@ -393,7 +384,7 @@ class QuickEditLoadingTest extends WebTestBase {
     $this->drupalGet('node/1');
 
     // Check that the data- attribute is not added.
-    $this->assertNoRaw('data-quickedit-field-id="node/1/quickedit_test_pseudo_field/und/default"');
+    $this->assertNoRaw('data-quickedit-field-id="node/1/quickedit_test_pseudo_field/en/default"');
   }
 
   /**
@@ -416,7 +407,7 @@ class QuickEditLoadingTest extends WebTestBase {
   public function testCustomPipeline() {
     \Drupal::moduleHandler()->install(array('quickedit_test'));
 
-    $custom_render_url = 'quickedit/form/node/1/body/und/quickedit_test-custom-render-data';
+    $custom_render_url = 'quickedit/form/node/1/body/en/quickedit_test-custom-render-data';
     $this->drupalLogin($this->editor_user);
 
     // Request editing to render results with the custom render pipeline.
@@ -465,7 +456,7 @@ class QuickEditLoadingTest extends WebTestBase {
     $this->drupalLogin($this->editor_user);
 
     $post = array('nocssjs' => 'true') + $this->getAjaxPageStatePostData();
-    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
+    $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
     $this->assertResponse(200);
     $ajax_commands = Json::decode($response);
 
@@ -492,7 +483,7 @@ class QuickEditLoadingTest extends WebTestBase {
 
       // Submit field form and check response. Should throw a validation error
       // because the node was changed in the meantime.
-      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/und/full', 'application/vnd.drupal-ajax', $post);
+      $response = $this->drupalPost('quickedit/form/' . 'node/1/body/en/full', 'application/vnd.drupal-ajax', $post);
       $this->assertResponse(200);
       $ajax_commands = Json::decode($response);
       $this->assertIdentical(2, count($ajax_commands), 'The field form HTTP request results in two AJAX commands.');

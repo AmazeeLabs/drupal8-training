@@ -12,6 +12,8 @@ use Drupal\views_test_data\Plugin\views\display\DisplayTest as DisplayTestPlugin
 
 /**
  * Tests the basic display plugin.
+ *
+ * @group views
  */
 class DisplayTest extends PluginTestBase {
 
@@ -29,15 +31,7 @@ class DisplayTest extends PluginTestBase {
    */
   public static $modules = array('views_ui', 'node', 'block');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Display',
-      'description' => 'Tests the basic display plugin.',
-      'group' => 'Views Plugins',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->enableViewsTestModule();

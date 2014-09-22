@@ -11,7 +11,9 @@ use Drupal\simpletest\WebTestBase;
 use Drupal\Core\PhpStorage\PhpStorageFactory;
 
 /**
- * Tests Twig engine configuration via settings.php.
+ * Tests overriding Twig engine settings via settings.php.
+ *
+ * @group Theme
  */
 class TwigSettingsTest extends WebTestBase {
 
@@ -22,27 +24,23 @@ class TwigSettingsTest extends WebTestBase {
    */
   public static $modules = array('theme_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Twig Settings',
-      'description' => 'Tests overriding Twig engine settings via settings.php.',
-      'group' => 'Theme',
-    );
-  }
-
   /**
    * Ensures Twig template auto reload setting can be overridden.
    */
   function testTwigAutoReloadOverride() {
     // Enable auto reload and rebuild the service container.
-    $this->settingsSet('twig_auto_reload', TRUE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['auto_reload'] = TRUE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
 
     // Check isAutoReload() via the Twig service container.
     $this->assertTrue($this->container->get('twig')->isAutoReload(), 'Automatic reloading of Twig templates enabled.');
 
     // Disable auto reload and check the service container again.
-    $this->settingsSet('twig_auto_reload', FALSE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['auto_reload'] = FALSE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
 
     $this->assertFalse($this->container->get('twig')->isAutoReload(), 'Automatic reloading of Twig templates disabled.');
@@ -53,7 +51,9 @@ class TwigSettingsTest extends WebTestBase {
    */
   function testTwigDebugOverride() {
     // Enable debug and rebuild the service container.
-    $this->settingsSet('twig_debug', TRUE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['debug'] = TRUE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
 
     // Check isDebug() via the Twig service container.
@@ -61,12 +61,16 @@ class TwigSettingsTest extends WebTestBase {
     $this->assertTrue($this->container->get('twig')->isAutoReload(), 'Twig automatic reloading is enabled when debug is enabled.');
 
     // Override auto reload when debug is enabled.
-    $this->settingsSet('twig_auto_reload', FALSE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['auto_reload'] = FALSE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
     $this->assertFalse($this->container->get('twig')->isAutoReload(), 'Twig automatic reloading can be disabled when debug is enabled.');
 
     // Disable debug and check the service container again.
-    $this->settingsSet('twig_debug', FALSE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['debug'] = FALSE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
 
     $this->assertFalse($this->container->get('twig')->isDebug(), 'Twig debug disabled.');
@@ -78,12 +82,11 @@ class TwigSettingsTest extends WebTestBase {
   function testTwigCacheOverride() {
     $extension = twig_extension();
     $theme_handler = $this->container->get('theme_handler');
-    $theme_handler->enable(array('test_theme'));
+    $theme_handler->install(array('test_theme'));
     $theme_handler->setDefault('test_theme');
 
     // The registry still works on theme globals, so set them here.
-    $GLOBALS['theme'] = 'test_theme';
-    $GLOBALS['theme_info'] = $theme_handler->listInfo()['test_theme'];
+    \Drupal::theme()->setActiveTheme(\Drupal::service('theme.initialization')->getActiveThemeByName('test_theme'));
 
     // Reset the theme registry, so that the new theme is used.
     $this->container->set('theme.registry', NULL);
@@ -105,12 +108,30 @@ class TwigSettingsTest extends WebTestBase {
     $this->assertTrue(PhpStorageFactory::get('twig')->exists($cache_filename), 'Cached Twig template found.');
 
     // Disable the Twig cache and rebuild the service container.
-    $this->settingsSet('twig_cache', FALSE);
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['cache'] = FALSE;
+    $this->setContainerParameter('twig.config', $parameters);
     $this->rebuildContainer();
 
     // This should return false after rebuilding the service container.
     $new_cache_filename = $this->container->get('twig')->getCacheFilename($template_filename);
     $this->assertFalse($new_cache_filename, 'Twig environment does not return cache filename after caching is disabled.');
+  }
+
+  /**
+   * Tests twig inline templates with auto_reload.
+   */
+  public function testTwigInlineWithAutoReload() {
+    $parameters = $this->container->getParameter('twig.config');
+    $parameters['auto_reload'] = TRUE;
+    $parameters['debug'] = TRUE;
+    $this->setContainerParameter('twig.config', $parameters);
+    $this->rebuildContainer();
+
+    $this->drupalGet('theme-test/inline-template-test');
+    $this->assertResponse(200);
+    $this->drupalGet('theme-test/inline-template-test');
+    $this->assertResponse(200);
   }
 
 }

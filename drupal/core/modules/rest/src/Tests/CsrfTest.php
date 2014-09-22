@@ -6,7 +6,9 @@
 namespace Drupal\rest\Tests;
 
 /**
- * Tests the CSRF access check.
+ * Tests the CSRF protection.
+ *
+ * @group rest
  */
 class CsrfTest extends RESTTestBase {
 
@@ -34,18 +36,7 @@ class CsrfTest extends RESTTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'CSRF access',
-      'description' => 'Tests the CSRF protection.',
-      'group' => 'REST',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->enableService('entity:' . $this->testEntityType, 'POST', 'hal_json', array('basic_auth', 'cookie'));

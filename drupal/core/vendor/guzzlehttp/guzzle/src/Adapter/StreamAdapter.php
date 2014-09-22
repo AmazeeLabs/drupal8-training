@@ -72,7 +72,7 @@ class StreamAdapter implements AdapterInterface
         if ($saveTo = $request->getConfig()['save_to']) {
             // Stream the response into the destination stream
             $saveTo = is_string($saveTo)
-                ? Stream\create(fopen($saveTo, 'r+'))
+                ? new Stream\LazyOpenStream($saveTo, 'r+')
                 : Stream\create($saveTo);
         } else {
             // Stream into the default temp stream
@@ -100,18 +100,9 @@ class StreamAdapter implements AdapterInterface
             $options['reason_phrase'] = $parts[2];
         }
 
-        // Set the size on the stream if it was returned in the response
-        $responseHeaders = [];
-        foreach ($headers as $header) {
-            $headerParts = explode(':', $header, 2);
-            $responseHeaders[$headerParts[0]] = isset($headerParts[1])
-                ? $headerParts[1]
-                : '';
-        }
-
         $response = $this->messageFactory->createResponse(
             $parts[1],
-            $responseHeaders,
+            $this->headersFromLines($headers),
             $stream,
             $options
         );
@@ -120,6 +111,20 @@ class StreamAdapter implements AdapterInterface
         RequestEvents::emitHeaders($transaction);
 
         return $response;
+    }
+
+    private function headersFromLines(array $lines)
+    {
+        $responseHeaders = [];
+
+        foreach ($lines as $line) {
+            $headerParts = explode(':', $line, 2);
+            $responseHeaders[$headerParts[0]][] = isset($headerParts[1])
+                ? trim($headerParts[1])
+                : '';
+        }
+
+        return $responseHeaders;
     }
 
     /**
@@ -146,7 +151,7 @@ class StreamAdapter implements AdapterInterface
             if (isset($options['http']['proxy'])) {
                 $message .= "[proxy] {$options['http']['proxy']} ";
             }
-            foreach (error_get_last() as $key => $value) {
+            foreach ((array) error_get_last() as $key => $value) {
                 $message .= "[{$key}] {$value} ";
             }
             throw new RequestException(trim($message), $request);
@@ -215,10 +220,12 @@ class StreamAdapter implements AdapterInterface
     {
         if (!is_array($value)) {
             $options['http']['proxy'] = $value;
+            $options['http']['request_fulluri'] = true;
         } else {
             $scheme = $request->getScheme();
             if (isset($value[$scheme])) {
                 $options['http']['proxy'] = $value[$scheme];
+                $options['http']['request_fulluri'] = true;
             }
         }
     }
@@ -309,13 +316,13 @@ class StreamAdapter implements AdapterInterface
         array $options,
         array $params
     ) {
-        return $this->createResource(function () use (
+        return $this->createResource(
+            function () use ($request, $options, $params) {
+                return stream_context_create($options, $params);
+            },
             $request,
-            $options,
-            $params
-        ) {
-            return stream_context_create($options, $params);
-        }, $request, $options);
+            $options
+        );
     }
 
     private function createStreamResource(
@@ -330,16 +337,16 @@ class StreamAdapter implements AdapterInterface
             $url = 'compress.zlib://' . $url;
         }
 
-        return $this->createResource(function () use (
-            $url,
-            &$http_response_header,
-            $context
-        ) {
-            if (false === strpos($url, 'http')) {
-                trigger_error("URL is invalid: {$url}", E_USER_WARNING);
-                return null;
-            }
-            return fopen($url, 'r', null, $context);
-        }, $request, $options);
+        return $this->createResource(
+            function () use ($url, &$http_response_header, $context) {
+                if (false === strpos($url, 'http')) {
+                    trigger_error("URL is invalid: {$url}", E_USER_WARNING);
+                    return null;
+                }
+                return fopen($url, 'r', null, $context);
+            },
+            $request,
+            $options
+        );
     }
 }

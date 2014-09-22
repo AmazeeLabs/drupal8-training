@@ -176,7 +176,7 @@
      * Triggers change events in case a state changed.
      */
     reevaluate: function () {
-      // Check whether any constraint for this dependent state is satisifed.
+      // Check whether any constraint for this dependent state is satisfied.
       var value = this.verifyConstraints(this.constraints);
 
       // Only invoke a state change event when the value actually changed.
@@ -428,7 +428,6 @@
     }
   };
 
-
   /**
    * A state object is used for describing the state and performing aliasing.
    */
@@ -552,23 +551,28 @@
     }
   });
 
-
   /**
    * These are helper functions implementing addition "operators" and don't
    * implement any logic that is particular to states.
    */
 
-  // Bitwise AND with a third undefined state.
+  /**
+   * Bitwise AND with a third undefined state.
+   */
   function ternary(a, b) {
     return typeof a === 'undefined' ? b : (typeof b === 'undefined' ? a : a && b);
   }
 
-  // Inverts a (if it's not undefined) when invertState is true.
+  /**
+   * Inverts a (if it's not undefined) when invertState is true.
+   */
   function invert(a, invertState) {
     return (invertState && typeof a !== 'undefined') ? !a : a;
   }
 
-  // Compares two values while ignoring undefined values.
+  /**
+   * Compares two values while ignoring undefined values.
+   */
   function compare(a, b) {
     return (a === b) ? (typeof a === 'undefined' ? a : true) : (typeof a === 'undefined' || typeof b === 'undefined');
   }

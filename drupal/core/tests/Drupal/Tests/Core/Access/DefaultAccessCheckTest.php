@@ -7,16 +7,15 @@
 
 namespace Drupal\Tests\Core\Access;
 
-use Drupal\Core\Access\AccessInterface;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\DefaultAccessCheck;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
 
 /**
- * Defines a test to check the default access checker.
- *
- * @see \Drupal\Core\Access\DefaultAccessCheck
+ * @coversDefaultClass \Drupal\Core\Access\DefaultAccessCheck
+ * @group Access
  */
 class DefaultAccessCheckTest extends UnitTestCase {
 
@@ -33,14 +32,6 @@ class DefaultAccessCheckTest extends UnitTestCase {
    * @var \Drupal\Core\Session\AccountInterface|\PHPUnit_Framework_MockObject_MockObject
    */
   protected $account;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'DefaultAccessCheck access checker',
-      'description' => 'Tests the DefaultAccessCheck class.',
-      'group' => 'Routing',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -59,13 +50,13 @@ class DefaultAccessCheckTest extends UnitTestCase {
     $request = new Request(array());
 
     $route = new Route('/test-route', array(), array('_access' => 'NULL'));
-    $this->assertSame(AccessInterface::DENY, $this->accessChecker->access($route, $request, $this->account));
+    $this->assertEquals(AccessResult::create(), $this->accessChecker->access($route, $request, $this->account));
 
     $route = new Route('/test-route', array(), array('_access' => 'FALSE'));
-    $this->assertSame(AccessInterface::KILL, $this->accessChecker->access($route, $request, $this->account));
+    $this->assertEquals(AccessResult::forbidden(), $this->accessChecker->access($route, $request, $this->account));
 
     $route = new Route('/test-route', array(), array('_access' => 'TRUE'));
-    $this->assertSame(AccessInterface::ALLOW, $this->accessChecker->access($route, $request, $this->account));
+    $this->assertEquals(AccessResult::allowed(), $this->accessChecker->access($route, $request, $this->account));
   }
 
 }

@@ -34,9 +34,13 @@ class TwigEnvironment extends \Twig_Environment {
    * Constructs a TwigEnvironment object and stores cache and storage
    * internally.
    */
-  public function __construct(\Twig_LoaderInterface $loader = NULL, $options = array(), ModuleHandlerInterface $module_handler, ThemeHandlerInterface $theme_handler) {
+  public function __construct(\Twig_LoaderInterface $loader = NULL, ModuleHandlerInterface $module_handler, ThemeHandlerInterface $theme_handler, $options = array()) {
     // @todo Pass as arguments from the DIC.
     $this->cache_object = \Drupal::cache();
+
+    // Ensure that twig.engine is loaded, given that it is needed to render a
+    // template because functions like twig_drupal_escape_filter are called.
+    require_once DRUPAL_ROOT . '/core/themes/engines/twig/twig.engine';
 
     // Set twig path namespace for themes and modules.
     $namespaces = array();
@@ -56,17 +60,27 @@ class TwigEnvironment extends \Twig_Environment {
 
     $this->templateClasses = array();
 
-    parent::__construct($loader, $options);
+    $options += array(
+      // @todo Ensure garbage collection of expired files.
+      'cache' => TRUE,
+      'debug' => FALSE,
+      'auto_reload' => NULL,
+    );
+    // Ensure autoescaping is always on.
+    $options['autoescape'] = TRUE;
+
+    $this->loader = new \Twig_Loader_Chain([$loader, new \Twig_Loader_String()]);
+    parent::__construct($this->loader, $options);
   }
 
   /**
    * Checks if the compiled template needs an update.
    */
-  public function needsUpdate($cache_filename, $name) {
-     $cid = 'twig:' . $cache_filename;
-     $obj = $this->cache_object->get($cid);
-     $mtime = isset($obj->data) ? $obj->data : FALSE;
-     return $mtime !== FALSE && !$this->isTemplateFresh($name, $mtime);
+  protected function isFresh($cache_filename, $name) {
+    $cid = 'twig:' . $cache_filename;
+    $obj = $this->cache_object->get($cid);
+    $mtime = isset($obj->data) ? $obj->data : FALSE;
+    return $mtime === FALSE || $this->isTemplateFresh($name, $mtime);
   }
 
   /**
@@ -88,6 +102,19 @@ class TwigEnvironment extends \Twig_Environment {
    *
    * This is a straight copy from loadTemplate() changed to use
    * drupal_php_storage().
+   *
+   * @param string $name
+   *   The template name or the string which should be rendered as template.
+   * @param int $index
+   *   The index if it is an embedded template.
+   *
+   * @return \Twig_TemplateInterface
+   *   A template instance representing the given template name.
+   *
+   * @throws \Twig_Error_Loader
+   *   When the template cannot be found.
+   * @throws \Twig_Error_Syntax
+   *   When an error occurred during compilation.
    */
   public function loadTemplate($name, $index = NULL) {
     $cls = $this->getTemplateClass($name, $index);
@@ -100,14 +127,14 @@ class TwigEnvironment extends \Twig_Environment {
       $cache_filename = $this->getCacheFilename($name);
 
       if ($cache_filename === FALSE) {
-        $source = $this->loader->getSource($name);
-        $compiled_source = $this->compileSource($source, $name);
+        $compiled_source = $this->compileSource($this->loader->getSource($name), $name);
         eval('?' . '>' . $compiled_source);
-      } else {
+      }
+      else {
 
         // If autoreload is on, check that the template has not been
         // modified since the last compilation.
-        if ($this->isAutoReload() && $this->needsUpdate($cache_filename, $name)) {
+        if ($this->isAutoReload() && !$this->isFresh($cache_filename, $name)) {
           $this->updateCompiledTemplate($cache_filename, $name);
         }
 
@@ -138,18 +165,50 @@ class TwigEnvironment extends \Twig_Environment {
   }
 
   /**
-   * {@inheritdoc}
+   * Gets the template class associated with the given string.
+   *
+   * @param string $name
+   *   The name for which to calculate the template class name.
+   * @param int $index
+   *   The index if it is an embedded template.
+   *
+   * @return string
+   *   The template class name.
    */
-  public function getTemplateClass($name, $index = null) {
+  public function getTemplateClass($name, $index = NULL) {
     // We override this method to add caching because it gets called multiple
     // times when the same template is used more than once. For example, a page
     // rendering 50 nodes without any node template overrides will use the same
     // node.html.twig for the output of each node and the same compiled class.
     $cache_index = $name . (NULL === $index ? '' : '_' . $index);
     if (!isset($this->templateClasses[$cache_index])) {
-      $this->templateClasses[$cache_index] = parent::getTemplateClass($name, $index);
+      $this->templateClasses[$cache_index] = $this->templateClassPrefix . hash('sha256', $this->loader->getCacheKey($name)) . (NULL === $index ? '' : '_' . $index);
     }
     return $this->templateClasses[$cache_index];
+  }
+
+  /**
+   * Renders a twig string directly.
+   *
+   * Warning: You should use the render element 'inline_template' together with
+   * the #template attribute instead of this method directly.
+   * On top of that you have to ensure that the template string is not dynamic
+   * but just an ordinary static php string, because there may be installations
+   * using read-only PHPStorage that want to generate all possible twig
+   * templates as part of a build step. So it is important that an automated
+   * script can find the templates and extract them. This is only possible if
+   * the template is a regular string.
+   *
+   * @param string $template_string
+   *   The template string to render with placeholders.
+   * @param array $context
+   *   An array of parameters to pass to the template.
+   *
+   * @return string
+   *   The rendered inline template.
+   */
+  public function renderInline($template_string, array $context = array()) {
+    return $this->loadTemplate($template_string, NULL)->render($context);
   }
 
 }

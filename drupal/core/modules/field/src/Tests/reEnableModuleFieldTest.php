@@ -10,7 +10,9 @@ namespace Drupal\field\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests a field is still present after it's module is disabled then re-enabled.
+ * Tests the behavior of a field module after being disabled and re-enabled.
+ *
+ * @group field
  */
 class reEnableModuleFieldTest extends WebTestBase {
 
@@ -27,15 +29,7 @@ class reEnableModuleFieldTest extends WebTestBase {
     'telephone'
   );
 
-  public static function getInfo() {
-    return array(
-      'name'  => 'Test field module re-enable',
-      'description'  => "Test the behavior of a field module after being disabled and re-enabled.",
-      'group' => 'Field types'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'article'));
@@ -49,17 +43,16 @@ class reEnableModuleFieldTest extends WebTestBase {
   function testReEnabledField() {
 
     // Add a telephone field to the article content type.
-    $field = entity_create('field_config', array(
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'field_telephone',
       'entity_type' => 'node',
       'type' => 'telephone',
     ));
-    $field->save();
-    entity_create('field_instance_config', array(
-      'field_name' => 'field_telephone',
-      'label' => 'Telephone Number',
-      'entity_type' => 'node',
+    $field_storage->save();
+    entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'article',
+      'label' => 'Telephone Number',
     ))->save();
 
     entity_get_form_display('node', 'article', 'default')
@@ -85,7 +78,7 @@ class reEnableModuleFieldTest extends WebTestBase {
     // Submit an article node with a telephone field so data exist for the
     // field.
     $edit = array(
-      'title[0][value]' => $this->randomName(),
+      'title[0][value]' => $this->randomMachineName(),
       'field_telephone[0][value]' => "123456789",
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -97,7 +90,7 @@ class reEnableModuleFieldTest extends WebTestBase {
     $this->drupalLogin($admin_user);
     $this->drupalGet('admin/modules');
     $this->assertText('Fields type(s) in use');
-    $field->delete();
+    $field_storage->delete();
     $this->drupalGet('admin/modules');
     $this->assertText('Fields pending deletion');
     $this->cronRun();

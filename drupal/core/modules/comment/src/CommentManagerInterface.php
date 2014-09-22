@@ -6,14 +6,25 @@
  */
 
 namespace Drupal\comment;
-use Drupal\Core\Entity\EntityInterface;
 
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 
 /**
  * Comment manager contains common functions to manage comment fields.
  */
 interface CommentManagerInterface {
+
+  /**
+   * Comments are displayed in a flat list - expanded.
+   */
+  const COMMENT_MODE_FLAT = 0;
+
+  /**
+   * Comments are displayed as a threaded list - expanded.
+   */
+  const COMMENT_MODE_THREADED = 1;
 
   /**
    * Utility function to return an array of comment fields.
@@ -33,11 +44,6 @@ interface CommentManagerInterface {
   public function getFields($entity_type_id);
 
   /**
-   * Utility function to return all comment fields.
-   */
-  public function getAllFields();
-
-  /**
    * Utility method to add the default comment field to an entity.
    *
    * Attaches a comment field named 'comment' to the given entity type and
@@ -46,38 +52,26 @@ interface CommentManagerInterface {
    * @param string $entity_type
    *   The entity type to attach the default comment field to.
    * @param string $bundle
-   *   The bundle to attach the default comment field instance to.
+   *   The bundle to attach the default comment field to.
    * @param string $field_name
-   *   (optional) Field name to use for the comment field. Defaults to 'comment'.
+   *   (optional) Field name to use for the comment field. Defaults to
+   *     'comment'.
    * @param int $default_value
    *   (optional) Default value, one of CommentItemInterface::HIDDEN,
    *   CommentItemInterface::OPEN, CommentItemInterface::CLOSED. Defaults to
    *   CommentItemInterface::OPEN.
+   * @param string $comment_type_id
+   *   (optional) ID of comment type to use. Defaults to 'comment'.
    */
-  public function addDefaultField($entity_type, $bundle, $field_name = 'comment', $default_value = CommentItemInterface::OPEN);
+  public function addDefaultField($entity_type, $bundle, $field_name = 'comment', $default_value = CommentItemInterface::OPEN, $comment_type_id = 'comment');
 
   /**
-   * Creates a comment_body field instance.
+   * Creates a comment_body field.
    *
-   * @param string $entity_type
-   *   The type of the entity to which the comment field attached.
-   * @param string $field_name
-   *   Name of the comment field to add comment_body field.
+   * @param string $comment_type
+   *   The comment bundle.
    */
-  public function addBodyField($entity_type, $field_name);
-
-  /**
-   * Builds human readable page title for field_ui management screens.
-   *
-   * @param string $commented_entity_type
-   *   The entity type to which the comment field is attached.
-   * @param string $field_name
-   *   The comment field for which the overview is to be displayed.
-   *
-   * @return string
-   *   The human readable field name.
-   */
-  public function getFieldUIPageTitle($commented_entity_type, $field_name);
+  public function addBodyField($comment_type);
 
   /**
    * Provides a message if posting comments is forbidden.
@@ -95,5 +89,21 @@ interface CommentManagerInterface {
    *   HTML for a "you can't post comments" notice.
    */
   public function forbiddenMessage(EntityInterface $entity, $field_name);
+
+  /**
+   * Returns the number of new comments available on a given entity for a user.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity to which the comments are attached to.
+   * @param string $field_name
+   *   (optional) The field_name to count comments for. Defaults to any field.
+   * @param int $timestamp
+   *   (optional) Time to count from. Defaults to time of last user access the
+   *   entity.
+   *
+   * @return int|false
+   *   The number of new comments or FALSE if the user is not authenticated.
+   */
+  public function getCountNewComments(EntityInterface $entity, $field_name = NULL, $timestamp = 0);
 
 }

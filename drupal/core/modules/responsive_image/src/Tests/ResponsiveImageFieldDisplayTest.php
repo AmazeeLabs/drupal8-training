@@ -7,12 +7,12 @@
 
 namespace Drupal\responsive_image\Tests;
 
-use Drupal\Core\Language\Language;
-use Drupal\breakpoint\Entity\Breakpoint;
 use Drupal\image\Tests\ImageFieldTestBase;
 
 /**
- * Test class to check that formatters and display settings are working.
+ * Tests responsive image display formatter.
+ *
+ * @group responsive_image
  */
 class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
 
@@ -23,23 +23,12 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
    *
    * @var array
    */
-  public static $modules = array('field_ui', 'responsive_image');
-
-  /**
-   * Drupal\simpletest\WebTestBase\getInfo().
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Responsive Image field display tests',
-      'description' => 'Test responsive image display formatter.',
-      'group' => 'Responsive Image',
-    );
-  }
+  public static $modules = array('field_ui', 'responsive_image', 'responsive_image_test_module');
 
   /**
    * Drupal\simpletest\WebTestBase\setUp().
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create user.
@@ -57,45 +46,17 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
       'administer image styles'
     ));
     $this->drupalLogin($this->admin_user);
-
-    // Add breakpoint_group and breakpoints.
-    $breakpoint_group = entity_create('breakpoint_group', array(
-      'name' => 'atestset',
-      'label' => 'A test set',
-      'sourceType' => Breakpoint::SOURCE_TYPE_USER_DEFINED,
-    ));
-
-    $breakpoint_names = array('small', 'medium', 'large');
-    for ($i = 0; $i < 3; $i++) {
-      $width = ($i + 1) * 200;
-      $breakpoint = entity_create('breakpoint', array(
-        'name' => $breakpoint_names[$i],
-        'mediaQuery' => "(min-width: {$width}px)",
-        'source' => 'user',
-        'sourceType' => Breakpoint::SOURCE_TYPE_USER_DEFINED,
-        'multipliers' => array(
-          '1.5x' => 0,
-          '2x' => '2x',
-        ),
-      ));
-      $breakpoint->save();
-      $breakpoint_group->addBreakpoints(array($breakpoint));
-    }
-    $breakpoint_group->save();
-
     // Add responsive image mapping.
     $responsive_image_mapping = entity_create('responsive_image_mapping', array(
       'id' => 'mapping_one',
       'label' => 'Mapping One',
-      'breakpointGroup' => $breakpoint_group->id(),
+      'breakpointGroup' => 'responsive_image_test_module',
     ));
-    $responsive_image_mapping->save();
-    $mappings = array();
-    $mappings['custom.user.small']['1x'] = 'thumbnail';
-    $mappings['custom.user.medium']['1x'] = 'medium';
-    $mappings['custom.user.large']['1x'] = 'large';
-    $responsive_image_mapping->setMappings($mappings);
-    $responsive_image_mapping->save();
+    $responsive_image_mapping
+      ->addMapping('responsive_image_test_module.mobile', '1x', 'thumbnail')
+      ->addMapping('responsive_image_test_module.narrow', '1x', 'medium')
+      ->addMapping('responsive_image_test_module.wide', '1x', 'large')
+      ->save();
   }
 
   /**
@@ -118,7 +79,7 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
    * Test responsive image formatters on node display.
    */
   public function _testResponsiveImageFieldFormatters($scheme) {
-    $field_name = drupal_strtolower($this->randomName());
+    $field_name = drupal_strtolower($this->randomMachineName());
     $this->createImageField($field_name, 'article', array('uri_scheme' => $scheme));
     // Create a new node with an image attached.
     $test_image = current($this->drupalGetTestFiles('image'));
@@ -133,14 +94,16 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
       '#width' => 40,
       '#height' => 20,
     );
-    $default_output = drupal_render($image);
+    $default_output = str_replace("\n", NULL, drupal_render($image));
     $this->assertRaw($default_output, 'Default formatter displaying correctly on full node view.');
 
     // Use the responsive image formatter linked to file formatter.
     $display_options = array(
       'type' => 'responsive_image',
       'module' => 'responsive_image',
-      'settings' => array('image_link' => 'file'),
+      'settings' => array(
+        'image_link' => 'file'
+      ),
     );
     $display = entity_get_display('node', 'article', 'default');
     $display->setComponent($field_name, $display_options)
@@ -188,9 +151,9 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
     $this->assertRaw('/styles/thumbnail/');
     $this->assertRaw('/styles/medium/');
     $this->assertRaw('/styles/large/');
-    $this->assertRaw('media="(min-width: 200px)"');
-    $this->assertRaw('media="(min-width: 400px)"');
-    $this->assertRaw('media="(min-width: 600px)"');
+    $this->assertRaw('media="(min-width: 0px)"');
+    $this->assertRaw('media="(min-width: 560px)"');
+    $this->assertRaw('media="(min-width: 851px)"');
     $cache_tags = explode(' ', $this->drupalGetHeader('X-Drupal-Cache-Tags'));
     $this->assertTrue(in_array('responsive_image_mapping:mapping_one', $cache_tags));
     $this->assertTrue(in_array('image_style:thumbnail', $cache_tags));
@@ -202,7 +165,7 @@ class ResponsiveImageFieldDisplayTest extends ImageFieldTestBase {
     $fallback_image = array(
       '#theme' => 'responsive_image_source',
       '#src' => $large_style->buildUrl($image_uri),
-      '#dimensions' => array('width' => 480, 'height' => 240),
+      '#dimensions' => array('width' => 40, 'height' => 20),
     );
     $default_output = drupal_render($fallback_image);
     $this->assertRaw($default_output, 'Image style thumbnail formatter displaying correctly on full node view.');

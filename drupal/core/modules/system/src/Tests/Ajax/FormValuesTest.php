@@ -10,18 +10,12 @@ namespace Drupal\system\Tests\Ajax;
 use Drupal\Core\Ajax\DataCommand;
 
 /**
- * Tests that $form_state['values'] is properly delivered to $ajax['callback'].
+ * Tests that form values are properly delivered to AJAX callbacks.
+ *
+ * @group Ajax
  */
 class FormValuesTest extends AjaxTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'AJAX command form values',
-      'description' => 'Tests that form values are properly delivered to AJAX callbacks.',
-      'group' => 'AJAX',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->web_user = $this->drupalCreateUser(array('access content'));

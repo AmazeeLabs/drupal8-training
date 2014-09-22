@@ -8,7 +8,9 @@
 namespace Drupal\node\Tests;
 
 /**
- * Tests the node form buttons.
+ * Tests all the different buttons on the node form.
+ *
+ * @group node
  */
 class NodeFormButtonsTest extends NodeTestBase {
 
@@ -16,15 +18,7 @@ class NodeFormButtonsTest extends NodeTestBase {
 
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node form buttons',
-      'description' => 'Test all the different buttons on the node form.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a user that has no access to change the state of the node.
@@ -108,7 +102,10 @@ class NodeFormButtonsTest extends NodeTestBase {
     // Set article content type default to unpublished. This will change the
     // the initial order of buttons and/or status of the node when creating
     // a node.
-    \Drupal::config('node.type.article')->set('settings.node.options.status', FALSE)->save();
+    $fields = \Drupal::entityManager()->getFieldDefinitions('node', 'article');
+    $fields['status']->getConfig('article')
+      ->setDefaultValue(FALSE)
+      ->save();
 
     // Verify the buttons on a node add form for an administrator.
     $this->drupalLogin($this->admin_user);

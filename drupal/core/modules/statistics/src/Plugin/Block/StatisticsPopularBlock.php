@@ -7,7 +7,8 @@
 
 namespace Drupal\statistics\Plugin\Block;
 
-use Drupal\block\BlockBase;
+use Drupal\Core\Block\BlockBase;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
@@ -55,7 +56,7 @@ class StatisticsPopularBlock extends BlockBase {
   /**
    * {@inheritdoc}
    */
-  public function access(AccountInterface $account) {
+  protected function blockAccess(AccountInterface $account) {
     if ($account->hasPermission('access content')) {
       $daytop = $this->configuration['top_day_num'];
       if (!$daytop || !($result = statistics_title_list('daycount', $daytop)) || !($this->day_list = node_title_list($result, t("Today's:")))) {
@@ -75,9 +76,9 @@ class StatisticsPopularBlock extends BlockBase {
   }
 
   /**
-   * Overrides \Drupal\block\BlockBase::blockForm().
+   * {@inheritdoc}
    */
-  public function blockForm($form, &$form_state) {
+  public function blockForm($form, FormStateInterface $form_state) {
     // Popular content block settings.
     $numbers = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40);
     $numbers = array('0' => t('Disabled')) + array_combine($numbers, $numbers);
@@ -106,12 +107,12 @@ class StatisticsPopularBlock extends BlockBase {
   }
 
   /**
-   * Overrides \Drupal\block\BlockBase::blockSubmit().
+   * {@inheritdoc}
    */
-  public function blockSubmit($form, &$form_state) {
-    $this->configuration['top_day_num'] = $form_state['values']['statistics_block_top_day_num'];
-    $this->configuration['top_all_num'] = $form_state['values']['statistics_block_top_all_num'];
-    $this->configuration['top_last_num'] = $form_state['values']['statistics_block_top_last_num'];
+  public function blockSubmit($form, FormStateInterface $form_state) {
+    $this->configuration['top_day_num'] = $form_state->getValue('statistics_block_top_day_num');
+    $this->configuration['top_all_num'] = $form_state->getValue('statistics_block_top_all_num');
+    $this->configuration['top_last_num'] = $form_state->getValue('statistics_block_top_last_num');
   }
 
   /**

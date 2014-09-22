@@ -11,22 +11,10 @@ use Drupal\Core\Entity\Controller\EntityViewController;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the entity view controller.
- *
- * @group Drupal
+ * @coversDefaultClass \Drupal\Core\Entity\Controller\EntityViewController
  * @group Entity
- *
- * @see \Drupal\Core\Entity\Controller\EntityViewController
  */
 class EntityViewControllerTest extends UnitTestCase{
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity view controller test',
-      'description' => 'Tests the entity view controller.',
-      'group' => 'Entity'
-    );
-  }
 
   /**
    * Tests the enhancer method.
@@ -59,7 +47,7 @@ class EntityViewControllerTest extends UnitTestCase{
       ->will($this->returnValue('name'));
 
     // Mock the 'name' field's definition.
-    $field_definition = $this->getMock('Drupal\Core\Field\FieldDefinition');
+    $field_definition = $this->getMock('Drupal\Core\Field\BaseFieldDefinition');
     $field_definition->expects($this->any())
       ->method('getDisplayOptions')
       ->with('view')

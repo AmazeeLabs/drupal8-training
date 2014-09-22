@@ -13,6 +13,8 @@ use Drupal\system\Tests\TypedData;
 
 /**
  * Tests validation constraints for BundleConstraintValidator.
+ *
+ * @group Entity
  */
 class BundleConstraintValidatorTest extends DrupalUnitTestBase {
 
@@ -25,15 +27,7 @@ class BundleConstraintValidatorTest extends DrupalUnitTestBase {
 
   public static $modules = array('entity', 'node', 'field', 'text', 'user');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity bundle constraint',
-      'description' => 'Tests validation constraints for BundleConstraintValidator.',
-      'group' => 'Validation',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->typedData = $this->container->get('typed_data_manager');
   }

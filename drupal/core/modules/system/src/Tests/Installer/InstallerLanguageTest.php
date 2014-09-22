@@ -2,26 +2,20 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Installer\InstallerLanguageTest.
+ * Contains Drupal\system\Tests\Installer\InstallerLanguageTest.
  */
 
 namespace Drupal\system\Tests\Installer;
 
-use Drupal\simpletest\WebTestBase;
+use Drupal\simpletest\KernelTestBase;
 use Drupal\Core\StringTranslation\Translator\FileTranslation;
 
 /**
- * Tests installer language detection.
+ * Tests for installer language support.
+ *
+ * @group Installer
  */
-class InstallerLanguageTest extends WebTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Installer language tests',
-      'description' => 'Tests for installer language support.',
-      'group' => 'Installer',
-    );
-  }
+class InstallerLanguageTest extends KernelTestBase {
 
   /**
    * Tests that the installer can find translation files.
@@ -30,9 +24,9 @@ class InstallerLanguageTest extends WebTestBase {
     // Different translation files would be found depending on which language
     // we are looking for.
     $expected_translation_files = array(
-      NULL => array('drupal-8.0.hu.po', 'drupal-8.0.de.po'),
-      'de' => array('drupal-8.0.de.po'),
-      'hu' => array('drupal-8.0.hu.po'),
+      NULL => array('drupal-8.0.0-beta2.hu.po', 'drupal-8.0.0.de.po'),
+      'de' => array('drupal-8.0.0.de.po'),
+      'hu' => array('drupal-8.0.0-beta2.hu.po'),
       'it' => array(),
     );
 

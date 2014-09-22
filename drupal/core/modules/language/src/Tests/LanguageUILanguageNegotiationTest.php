@@ -7,6 +7,7 @@
 
 namespace Drupal\language\Tests;
 
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationBrowser;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationSelected;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
@@ -14,11 +15,12 @@ use Drupal\user\Plugin\LanguageNegotiation\LanguageNegotiationUser;
 use Drupal\user\Plugin\LanguageNegotiation\LanguageNegotiationUserAdmin;
 use Drupal\simpletest\WebTestBase;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Drupal\language\LanguageNegotiatorInterface;
 
 /**
- * Test UI language negotiation
+ * Tests UI language switching.
  *
  * 1. URL (PATH) > DEFAULT
  *    UI Language base on URL prefix, browser language preference has no
@@ -42,6 +44,8 @@ use Drupal\language\LanguageNegotiatorInterface;
  *          UI language in site default
  *        http://example.cn/admin/config
  *          UI language in Chinese
+ *
+ * @group language
  */
 class LanguageUILanguageNegotiationTest extends WebTestBase {
 
@@ -56,19 +60,8 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
    */
   public static $modules = array('locale', 'language_test', 'block', 'user');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'UI language negotiation',
-      'description' => 'Test UI language switching.',
-      'group' => 'Language',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
-
-    $this->request = Request::createFromGlobals();
-    $this->container->set('request', $this->request);
 
     $admin_user = $this->drupalCreateUser(array('administer languages', 'translate interface', 'access administration pages', 'administer blocks'));
     $this->drupalLogin($admin_user);
@@ -90,24 +83,15 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // For setting browser language preference to some unknown.
     $http_header_blah = array("Accept-Language: blah;q=1");
 
-    // This domain should switch the UI to Chinese.
-    $language_domain = 'example.cn';
-
     // Setup the site languages by installing two languages.
     // Set the default language in order for the translated string to be registered
     // into database when seen by t(). Without doing this, our target string
     // is for some reason not found when doing translate search. This might
     // be some bug.
     $default_language = \Drupal::languageManager()->getDefaultLanguage();
-    $language = new Language(array(
-      'id' => $langcode_browser_fallback,
-      'default' => TRUE,
-    ));
-    language_save($language);
-    $language = new Language(array(
-      'id' => $langcode,
-    ));
-    language_save($language);
+    ConfigurableLanguage::createFromLangcode($langcode_browser_fallback)->save();
+    \Drupal::config('system.site')->set('langcode', $langcode_browser_fallback)->save();
+    ConfigurableLanguage::createFromLangcode($langcode)->save();
 
     // We will look for this string in the admin/config screen to see if the
     // corresponding translated string is shown.
@@ -119,7 +103,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Now the t()'ed string is in db so switch the language back to default.
     // This will rebuild the container so we need to rebuild the container in
     // the test environment.
-    language_save($default_language);
+    \Drupal::config('system.site')->set('langcode', $default_language->getId())->save();
     \Drupal::config('language.negotiation')->set('url.prefixes.en', '')->save();
     $this->rebuildContainer();
 
@@ -243,7 +227,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Unknown language prefix should return 404.
     $definitions = \Drupal::languageManager()->getNegotiator()->getNegotiationMethods();
     \Drupal::config('language.types')
-      ->set('negotiation.' . Language::TYPE_INTERFACE . '.enabled', array_flip(array_keys($definitions)))
+      ->set('negotiation.' . LanguageInterface::TYPE_INTERFACE . '.enabled', array_flip(array_keys($definitions)))
       ->save();
     $this->drupalGet("$langcode_unknown/admin/config", array(), $http_header_browser_fallback);
     $this->assertResponse(404, "Unknown language path prefix should return 404");
@@ -338,7 +322,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
   protected function runTest($test) {
     if (!empty($test['language_negotiation'])) {
       $method_weights = array_flip($test['language_negotiation']);
-      $this->container->get('language_negotiator')->saveConfiguration(Language::TYPE_INTERFACE, $method_weights);
+      $this->container->get('language_negotiator')->saveConfiguration(LanguageInterface::TYPE_INTERFACE, $method_weights);
     }
     if (!empty($test['language_negotiation_url_part'])) {
       \Drupal::config('language.negotiation')
@@ -360,10 +344,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
   function testUrlLanguageFallback() {
     // Add the Italian language.
     $langcode_browser_fallback = 'it';
-    $language = new Language(array(
-      'id' => $langcode_browser_fallback,
-    ));
-    language_save($language);
+    ConfigurableLanguage::createFromLangcode($langcode_browser_fallback)->save();
     $languages = $this->container->get('language_manager')->getLanguages();
 
     // Enable the path prefix for the default language: this way any unprefixed
@@ -382,7 +363,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->drupalGet('admin/config/regional/language/detection');
 
     // Enable the language switcher block.
-    $this->drupalPlaceBlock('language_block:' . Language::TYPE_INTERFACE, array('id' => 'test_language_block'));
+    $this->drupalPlaceBlock('language_block:' . LanguageInterface::TYPE_INTERFACE, array('id' => 'test_language_block'));
 
     // Log out, because for anonymous users, the "active" class is set by PHP
     // (which means we can easily test it here), whereas for authenticated users
@@ -411,11 +392,8 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
    */
   function testLanguageDomain() {
     // Add the Italian language.
-    $langcode = 'it';
-    $language = new Language(array(
-      'id' => $langcode,
-    ));
-    language_save($language);
+    ConfigurableLanguage::createFromLangcode('it')->save();
+
     $languages = $this->container->get('language_manager')->getLanguages();
 
     // Enable browser and URL language detection.
@@ -440,7 +418,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Base path gives problems on the testbot, so $correct_link is hard-coded.
     // @see UrlAlterFunctionalTest::assertUrlOutboundAlter (path.test).
     $italian_url = url('admin', array('language' => $languages['it'], 'script' => ''));
-    $url_scheme = $this->request->isSecure() ? 'https://' : 'http://';
+    $url_scheme = \Drupal::request()->isSecure() ? 'https://' : 'http://';
     $correct_link = $url_scheme . $link;
     $this->assertEqual($italian_url, $correct_link, format_string('The url() function returns the right URL (@url) in accordance with the chosen language', array('@url' => $italian_url)));
 
@@ -454,9 +432,9 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->settingsSet('mixed_mode_sessions', FALSE);
 
     // Test HTTPS via current URL scheme.
-    $generator = $this->container->get('url_generator');
     $request = Request::create('', 'GET', array(), array(), array(), array('HTTPS' => 'on'));
-    $generator->setRequest($request);
+    $this->container->get('request_stack')->push($request);
+    $generator = $this->container->get('url_generator');
     $italian_url = url('admin', array('language' => $languages['it'], 'script' => ''));
     $correct_link = 'https://' . $link;
     $this->assertTrue($italian_url == $correct_link, format_string('The url() function returns the right URL (via current URL scheme) (@url) in accordance with the chosen language', array('@url' => $italian_url)));

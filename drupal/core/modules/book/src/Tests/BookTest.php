@@ -11,7 +11,9 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the functionality of the Book module.
+ * Create a book, add pages, and test book interface.
+ *
+ * @group book
  */
 class BookTest extends WebTestBase {
 
@@ -50,15 +52,7 @@ class BookTest extends WebTestBase {
    */
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Book functionality',
-      'description' => 'Create a book, add pages, and test book interface.',
-      'group' => 'Book',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // node_access_test requires a node_access_rebuild().
@@ -261,8 +255,8 @@ class BookTest extends WebTestBase {
     static $number = 0; // Used to ensure that when sorted nodes stay in same order.
 
     $edit = array();
-    $edit['title[0][value]'] = $number . ' - SimpleTest test node ' . $this->randomName(10);
-    $edit['body[0][value]'] = 'SimpleTest test body ' . $this->randomName(32) . ' ' . $this->randomName(32);
+    $edit['title[0][value]'] = $number . ' - SimpleTest test node ' . $this->randomMachineName(10);
+    $edit['body[0][value]'] = 'SimpleTest test body ' . $this->randomMachineName(32) . ' ' . $this->randomMachineName(32);
     $edit['book[bid]'] = $book_nid;
 
     if ($parent !== NULL) {
@@ -605,4 +599,19 @@ class BookTest extends WebTestBase {
     $this->assertEqual($return, $link);
   }
 
+  /**
+   * Tests the listing of all books.
+   */
+  public function testBookListing() {
+    // Create a new book.
+    $this->createBook();
+
+    // Must be a user with 'node test view' permission since node_access_test is enabled.
+    $this->drupalLogin($this->web_user);
+
+    // Load the book page and assert the created book title is displayed.
+    $this->drupalGet('book');
+
+    $this->assertText($this->book->label(), 'The book title is displayed on the book listing page.');
+  }
 }

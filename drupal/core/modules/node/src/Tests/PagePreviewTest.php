@@ -7,10 +7,13 @@
 
 namespace Drupal\node\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\node\Entity\NodeType;
 
 /**
  * Tests the node entity preview functionality.
+ *
+ * @group node
  */
 class PagePreviewTest extends NodeTestBase {
 
@@ -28,15 +31,7 @@ class PagePreviewTest extends NodeTestBase {
    */
   protected $field_name;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node preview',
-      'description' => 'Test node preview functionality.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array('edit own page content', 'create page content'));
@@ -44,10 +39,10 @@ class PagePreviewTest extends NodeTestBase {
 
     // Add a vocabulary so we can test different view modes.
     $vocabulary = entity_create('taxonomy_vocabulary', array(
-      'name' => $this->randomName(),
-      'description' => $this->randomName(),
-      'vid' => $this->randomName(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'name' => $this->randomMachineName(),
+      'description' => $this->randomMachineName(),
+      'vid' => $this->randomMachineName(),
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       'help' => '',
     ));
     $vocabulary->save();
@@ -56,18 +51,18 @@ class PagePreviewTest extends NodeTestBase {
 
     // Add a term to the vocabulary.
     $term = entity_create('taxonomy_term', array(
-      'name' => $this->randomName(),
-      'description' => $this->randomName(),
+      'name' => $this->randomMachineName(),
+      'description' => $this->randomMachineName(),
       'vid' => $this->vocabulary->id(),
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     ));
     $term->save();
 
     $this->term = $term;
 
-    // Set up a field and instance.
-    $this->field_name = drupal_strtolower($this->randomName());
-    entity_create('field_config', array(
+    // Create a field.
+    $this->field_name = drupal_strtolower($this->randomMachineName());
+    entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
@@ -81,7 +76,7 @@ class PagePreviewTest extends NodeTestBase {
       ),
       'cardinality' => '-1',
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $this->field_name,
       'entity_type' => 'node',
       'bundle' => 'page',
@@ -116,19 +111,43 @@ class PagePreviewTest extends NodeTestBase {
 
     // Fill in node creation form and preview node.
     $edit = array();
-    $edit[$title_key] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit[$title_key] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     $edit[$term_key] = $this->term->getName();
     $this->drupalPostForm('node/add/page', $edit, t('Preview'));
 
     // Check that the preview is displaying the title, body and term.
-    $this->assertTitle(t('Preview | Drupal'), 'Basic page title is preview.');
+    $this->assertTitle(t('@title | Drupal', array('@title' => $edit[$title_key])), 'Basic page title is preview.');
     $this->assertText($edit[$title_key], 'Title displayed.');
     $this->assertText($edit[$body_key], 'Body displayed.');
     $this->assertText($edit[$term_key], 'Term displayed.');
+    $this->assertLink(t('Back to content editing'));
+
+    // Get the UUID.
+    $url = parse_url($this->getUrl());
+    $paths = explode('/', $url['path']);
+    $view_mode = array_pop($paths);
+    $uuid = array_pop($paths);
+
+    // Switch view mode. We'll remove the body from the teaser view mode.
+    entity_get_display('node', 'page', 'teaser')
+      ->removeComponent('body')
+      ->save();
+
+    $view_mode_edit = array('view_mode' => 'teaser');
+    $this->drupalPostForm('node/preview/' . $uuid . '/default', $view_mode_edit, t('Switch'));
+    $this->assertRaw('view-mode-teaser', 'View mode teaser class found.');
+    $this->assertNoText($edit[$body_key], 'Body not displayed.');
 
     // Check that the title, body and term fields are displayed with the
-    // correct values.
+    // values after going back to the content edit page.
+    $this->clickLink(t('Back to content editing'));
+    $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
+    $this->assertFieldByName($body_key, $edit[$body_key], 'Body field displayed.');
+    $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
+
+    // Assert the content is kept when reloading the page.
+    $this->drupalGet('node/add/page', array('query' => array('uuid' => $uuid)));
     $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
     $this->assertFieldByName($body_key, $edit[$body_key], 'Body field displayed.');
     $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
@@ -148,8 +167,8 @@ class PagePreviewTest extends NodeTestBase {
     // Check with two new terms on the edit form, additionally to the existing
     // one.
     $edit = array();
-    $newterm1 = $this->randomName(8);
-    $newterm2 = $this->randomName(8);
+    $newterm1 = $this->randomMachineName(8);
+    $newterm2 = $this->randomMachineName(8);
     $edit[$term_key] = $this->term->getName() . ', ' . $newterm1 . ', ' . $newterm2;
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Preview'));
     $this->assertRaw('>' . $newterm1 . '<', 'First new term displayed.');
@@ -159,12 +178,12 @@ class PagePreviewTest extends NodeTestBase {
     $this->assertNoLink($newterm1);
     $this->assertNoLink($newterm2);
 
-    $this->drupalPostForm(NULL, $edit, t('Save'));
+    $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
 
     // Check with one more new term, keeping old terms, removing the existing
     // one.
     $edit = array();
-    $newterm3 = $this->randomName(8);
+    $newterm3 = $this->randomMachineName(8);
     $edit[$term_key] = $newterm1 . ', ' . $newterm3 . ', ' . $newterm2;
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Preview'));
     $this->assertRaw('>' . $newterm1 . '<', 'First existing term displayed.');
@@ -174,7 +193,6 @@ class PagePreviewTest extends NodeTestBase {
     $this->assertLink($newterm1);
     $this->assertLink($newterm2);
     $this->assertNoLink($newterm3);
-    $this->drupalPostForm(NULL, $edit, t('Save'));
   }
 
   /**
@@ -185,29 +203,32 @@ class PagePreviewTest extends NodeTestBase {
     $body_key = 'body[0][value]';
     $term_key = $this->field_name;
     // Force revision on "Basic page" content.
-    $this->container->get('config.factory')->get('node.type.page')->set('settings.node.options', array('status', 'revision'))->save();
+    $node_type = NodeType::load('page');
+    $node_type->setNewRevision(TRUE);
+    $node_type->save();
 
     // Fill in node creation form and preview node.
     $edit = array();
-    $edit[$title_key] = $this->randomName(8);
-    $edit[$body_key] = $this->randomName(16);
+    $edit[$title_key] = $this->randomMachineName(8);
+    $edit[$body_key] = $this->randomMachineName(16);
     $edit[$term_key] = $this->term->id();
-    $edit['log'] = $this->randomName(32);
+    $edit['revision_log[0][value]'] = $this->randomString(32);
     $this->drupalPostForm('node/add/page', $edit, t('Preview'));
 
     // Check that the preview is displaying the title, body and term.
-    $this->assertTitle(t('Preview | Drupal'), 'Basic page title is preview.');
+    $this->assertTitle(t('@title | Drupal', array('@title' => $edit[$title_key])), 'Basic page title is preview.');
     $this->assertText($edit[$title_key], 'Title displayed.');
     $this->assertText($edit[$body_key], 'Body displayed.');
     $this->assertText($edit[$term_key], 'Term displayed.');
 
-    // Check that the title, body and term fields are displayed with the correct values.
-    $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
+    // Check that the title and body fields are displayed with the correct
+    // values after going back to the content edit page.
+    $this->clickLink(t('Back to content editing'));    $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
     $this->assertFieldByName($body_key, $edit[$body_key], 'Body field displayed.');
     $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
 
-    // Check that the log field has the correct value.
-    $this->assertFieldByName('log', $edit['log'], 'Log field displayed.');
+    // Check that the revision log field has the correct value.
+    $this->assertFieldByName('revision_log[0][value]', $edit['revision_log[0][value]'], 'Revision log field displayed.');
   }
 
 }

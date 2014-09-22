@@ -8,7 +8,9 @@
 namespace Drupal\search\Tests;
 
 /**
- * Tests that we can embed a form in search results and submit it.
+ * Verifies that a form embedded in search results works.
+ *
+ * @group search
  */
 class SearchEmbedFormTest extends SearchTestBase {
 
@@ -29,15 +31,7 @@ class SearchEmbedFormTest extends SearchTestBase {
    */
   public $submit_count = 0;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Embedded forms',
-      'description' => 'Verifies that a form embedded in search results works',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a user and a node, and update the search index.

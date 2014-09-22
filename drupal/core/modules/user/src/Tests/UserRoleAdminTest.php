@@ -10,19 +10,13 @@ namespace Drupal\user\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test case to test adding, editing and deleting roles.
+ * Tests adding, editing and deleting user roles and changing role weights.
+ *
+ * @group user
  */
 class UserRoleAdminTest extends WebTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'User role administration',
-      'description' => 'Test adding, editing and deleting user roles and changing role weights.',
-      'group' => 'User',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->admin_user = $this->drupalCreateUser(array('administer permissions', 'administer users'));
   }
@@ -52,19 +46,18 @@ class UserRoleAdminTest extends WebTestBase {
     $this->assertTrue(is_object($role), 'The role was successfully retrieved from the database.');
 
     // Check that the role was created in site default language.
-    $this->assertEqual($role->langcode, $default_langcode);
+    $this->assertEqual($role->language()->getId(), $default_langcode);
 
     // Try adding a duplicate role.
     $this->drupalPostForm('admin/people/roles/add', $edit, t('Save'));
     $this->assertRaw(t('The machine-readable name is already in use. It must be unique.'), 'Duplicate role warning displayed.');
 
     // Test renaming a role.
-    $old_name = $role_name;
     $role_name = '456';
     $edit = array('label' => $role_name);
     $this->drupalPostForm("admin/people/roles/manage/{$role->id()}", $edit, t('Save'));
     $this->assertRaw(t('Role %label has been updated.', array('%label' => $role_name)));
-    $new_role = entity_load('user_role', $old_name);
+    $new_role = entity_load('user_role', $role->id(), TRUE);
     $this->assertEqual($new_role->label(), $role_name, 'The role name has been successfully changed.');
 
     // Test deleting a role.
@@ -73,7 +66,7 @@ class UserRoleAdminTest extends WebTestBase {
     $this->drupalPostForm(NULL, array(), t('Delete'));
     $this->assertRaw(t('Role %label has been deleted.', array('%label' => $role_name)));
     $this->assertNoLinkByHref("admin/people/roles/manage/{$role->id()}", 'Role edit link removed.');
-    $this->assertFalse(entity_load('user_role', $role_name), 'A deleted role can no longer be loaded.');
+    $this->assertFalse(entity_load('user_role', $role->id(), TRUE), 'A deleted role can no longer be loaded.');
 
     // Make sure that the system-defined roles can be edited via the user
     // interface.
@@ -98,9 +91,9 @@ class UserRoleAdminTest extends WebTestBase {
     // Change the role weights to make the roles in reverse order.
     $edit = array();
     foreach ($roles as $role) {
-      $edit['entities['. $role->id() .'][weight]'] =  $weight;
+      $edit['entities[' . $role->id() . '][weight]'] = $weight;
       $new_role_weights[$role->id()] = $weight;
-      $saved_rids[] = $role->id;
+      $saved_rids[] = $role->id();
       $weight--;
     }
     $this->drupalPostForm('admin/people/roles', $edit, t('Save order'));
@@ -112,8 +105,8 @@ class UserRoleAdminTest extends WebTestBase {
     $rids = array();
     // Test that the role weights have been correctly saved.
     foreach ($roles as $role) {
-      $this->assertEqual($role->weight, $new_role_weights[$role->id()]);
-      $rids[] = $role->id;
+      $this->assertEqual($role->getWeight(), $new_role_weights[$role->id()]);
+      $rids[] = $role->id();
     }
     // The order of the roles should be reversed.
     $this->assertIdentical($rids, array_reverse($saved_rids));

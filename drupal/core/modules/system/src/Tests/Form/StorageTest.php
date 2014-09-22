@@ -10,13 +10,16 @@ namespace Drupal\system\Tests\Form;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test the form storage on a multistep form.
+ * Tests a multistep form using form storage and makes sure validation and
+ * caching works right.
  *
  * The tested form puts data into the storage during the initial form
  * construction. These tests verify that there are no duplicate form
  * constructions, with and without manual form caching activiated. Furthermore
  * when a validation error occurs, it makes sure that changed form element
  * values aren't lost due to a wrong form rebuild.
+ *
+ * @group Form
  */
 class StorageTest extends WebTestBase {
 
@@ -27,15 +30,7 @@ class StorageTest extends WebTestBase {
    */
   public static $modules = array('form_test');
 
-  public static function getInfo() {
-    return array(
-      'name'  => 'Multistep form using form storage',
-      'description'  => 'Tests a multistep form using form storage and makes sure validation and caching works right.',
-      'group' => 'Form API',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->web_user = $this->drupalCreateUser();
@@ -69,7 +64,7 @@ class StorageTest extends WebTestBase {
   }
 
   /**
-   * Tests using the form with an activated $form_state['cache'] property.
+   * Tests using the form after calling $form_state->setCached().
    */
   function testFormCached() {
     $this->drupalGet('form_test/form-storage', array('query' => array('cache' => 1)));

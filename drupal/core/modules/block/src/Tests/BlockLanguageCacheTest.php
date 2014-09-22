@@ -8,11 +8,13 @@
 namespace Drupal\block\Tests;
 
 use Drupal\Component\Utility\Unicode;
-use Drupal\Core\Language\Language;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests multilingual block definition caching.
+ * Tests display of menu blocks with multiple languages.
+ *
+ * @group block
  */
 class BlockLanguageCacheTest extends WebTestBase {
 
@@ -30,25 +32,17 @@ class BlockLanguageCacheTest extends WebTestBase {
    */
   protected $langcodes = array();
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Multilingual blocks',
-      'description' => 'Checks display of menu blocks with multiple languages.',
-      'group' => 'Block',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create test languages.
-    $this->langcodes = array(language_load('en'));
+    $this->langcodes = array(ConfigurableLanguage::load('en'));
     for ($i = 1; $i < 3; ++$i) {
-      $language = new Language(array(
+      $language = ConfigurableLanguage::create(array(
         'id' => 'l' . $i,
-        'name' => $this->randomString(),
+        'label' => $this->randomString(),
       ));
-      language_save($language);
+      $language->save();
       $this->langcodes[$i] = $language;
     }
   }
@@ -71,7 +65,7 @@ class BlockLanguageCacheTest extends WebTestBase {
     }
 
     // Create a menu in the default language.
-    $edit['label'] = $this->randomName();
+    $edit['label'] = $this->randomMachineName();
     $edit['id'] = Unicode::strtolower($edit['label']);
     $this->drupalPostForm('admin/structure/menu/add', $edit, t('Save'));
     $this->assertText(t('Menu @label has been added.', array('@label' => $edit['label'])));

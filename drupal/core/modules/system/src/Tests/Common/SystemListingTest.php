@@ -12,16 +12,10 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests scanning system directories in drupal_system_listing().
+ *
+ * @group Common
  */
 class SystemListingTest extends DrupalUnitTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Drupal system listing',
-      'description' => 'Tests scanning system directories in drupal_system_listing().',
-      'group' => 'Common',
-    );
-  }
-
   /**
    * Tests that files in different directories take precedence as expected.
    */
@@ -29,13 +23,6 @@ class SystemListingTest extends DrupalUnitTestBase {
     // Define the module files we will search for, and the directory precedence
     // we expect.
     $expected_directories = array(
-      // When the copy of the module in the profile directory is incompatible
-      // with Drupal core, the copy in the core modules directory takes
-      // precedence.
-      'drupal_system_listing_incompatible_test' => array(
-        'core/modules/system/tests/modules',
-        'core/profiles/testing/modules',
-      ),
       // When both copies of the module are compatible with Drupal core, the
       // copy in the profile directory takes precedence.
       'drupal_system_listing_compatible_test' => array(

@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\System;
 
+use Drupal\Core\Form\FormState;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -47,14 +48,15 @@ abstract class SystemConfigFormTestBase extends WebTestBase {
    */
   public function testConfigForm() {
     // Programmatically submit the given values.
+    $values = array();
     foreach ($this->values as $form_key => $data) {
       $values[$form_key] = $data['#value'];
     }
-    $form_state = array('values' => $values);
-    drupal_form_submit($this->form, $form_state);
+    $form_state = (new FormState())->setValues($values);
+    \Drupal::formBuilder()->submitForm($this->form, $form_state);
 
     // Check that the form returns an error when expected, and vice versa.
-    $errors = form_get_errors($form_state);
+    $errors = $form_state->getErrors();
     $valid_form = empty($errors);
     $args = array(
       '%values' => print_r($values, TRUE),

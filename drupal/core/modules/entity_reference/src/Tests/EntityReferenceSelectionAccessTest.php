@@ -7,27 +7,22 @@
 
 namespace Drupal\entity_reference\Tests;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\comment\CommentInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the Entity Reference Selection plugin.
+ * Tests for the base handlers provided by Entity Reference.
+ *
+ * @group entity_reference
  */
 class EntityReferenceSelectionAccessTest extends WebTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Reference handlers',
-      'description' => 'Tests for the base handlers provided by Entity Reference.',
-      'group' => 'Entity Reference',
-    );
-  }
-
   public static $modules = array('node', 'comment', 'entity_reference', 'entity_test');
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create an Article node type.
@@ -60,8 +55,8 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
    * Test the node-specific overrides of the entity handler.
    */
   public function testNodeHandler() {
-    // Create a field and instance.
-    $field = entity_create('field_config', array(
+    // Create a field.
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'entity_test',
       'translatable' => FALSE,
@@ -72,10 +67,9 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
       'type' => 'entity_reference',
       'cardinality' => '1',
     ));
-    $field->save();
-    $instance = entity_create('field_instance_config', array(
-      'field_name' => 'test_field',
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $field = entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'test_bundle',
       'settings' => array(
         'handler' => 'default',
@@ -84,7 +78,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     ));
-    $instance->save();
+    $field->save();
 
     // Build a set of test data.
     // Titles contain HTML-special characters to test escaping.
@@ -115,7 +109,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
       $node = entity_create('node', $values);
       $node->save();
       $nodes[$key] = $node;
-      $node_labels[$key] = check_plain($node->label());
+      $node_labels[$key] = String::checkPlain($node->label());
     }
 
     // Test as a non-admin.
@@ -168,7 +162,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'result' => array(),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'Node handler');
+    $this->assertReferenceable($field, $referenceable_tests, 'Node handler');
 
     // Test as an admin.
     $admin_user = $this->drupalCreateUser(array('access content', 'bypass node access'));
@@ -197,15 +191,15 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'Node handler (admin)');
+    $this->assertReferenceable($field, $referenceable_tests, 'Node handler (admin)');
   }
 
   /**
    * Test the user-specific overrides of the entity handler.
    */
   public function testUserHandler() {
-    // Create a field and instance.
-    $field = entity_create('field_config', array(
+    // Create a field.
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'entity_test',
       'translatable' => FALSE,
@@ -215,10 +209,9 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
       'type' => 'entity_reference',
       'cardinality' => '1',
     ));
-    $field->save();
-    $instance = entity_create('field_instance_config', array(
-      'field_name' => 'test_field',
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $field = entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'test_bundle',
       'settings' => array(
         'handler' => 'default',
@@ -227,7 +220,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     ));
-    $instance->save();
+    $field->save();
 
     // Build a set of test data.
     $user_values = array(
@@ -262,7 +255,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         $account = $values;
       }
       $users[$key] = $account;
-      $user_labels[$key] = check_plain($account->getUsername());
+      $user_labels[$key] = String::checkPlain($account->getUsername());
     }
 
     // Test as a non-admin.
@@ -303,7 +296,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'result' => array(),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'User handler');
+    $this->assertReferenceable($field, $referenceable_tests, 'User handler');
 
     \Drupal::currentUser()->setAccount($users['admin']);
     $referenceable_tests = array(
@@ -342,15 +335,15 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'User handler (admin)');
+    $this->assertReferenceable($field, $referenceable_tests, 'User handler (admin)');
   }
 
   /**
    * Test the comment-specific overrides of the entity handler.
    */
   public function testCommentHandler() {
-    // Create a field and instance.
-    $field = entity_create('field_config', array(
+    // Create a field.
+    $field_storage = entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'entity_test',
       'translatable' => FALSE,
@@ -361,10 +354,9 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
       'type' => 'entity_reference',
       'cardinality' => '1',
     ));
-    $field->save();
-    $instance = entity_create('field_instance_config', array(
-      'field_name' => 'test_field',
-      'entity_type' => 'entity_test',
+    $field_storage->save();
+    $field = entity_create('field_config', array(
+      'field_storage' => $field_storage,
       'bundle' => 'test_bundle',
       'settings' => array(
         'handler' => 'default',
@@ -373,7 +365,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     ));
-    $instance->save();
+    $field->save();
 
     // Build a set of test data.
     $node_values = array(
@@ -410,7 +402,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'pid' => 0,
         'status' => CommentInterface::PUBLISHED,
         'subject' => 'Comment Published <&>',
-        'language' => Language::LANGCODE_NOT_SPECIFIED,
+        'language' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       ),
       'published_unpublished' => array(
         'entity_id' => $nodes['published']->id(),
@@ -421,7 +413,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'pid' => 0,
         'status' => CommentInterface::NOT_PUBLISHED,
         'subject' => 'Comment Unpublished <&>',
-        'language' => Language::LANGCODE_NOT_SPECIFIED,
+        'language' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       ),
       'unpublished_published' => array(
         'entity_id' => $nodes['unpublished']->id(),
@@ -432,7 +424,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'pid' => 0,
         'status' => CommentInterface::NOT_PUBLISHED,
         'subject' => 'Comment Published on Unpublished node <&>',
-        'language' => Language::LANGCODE_NOT_SPECIFIED,
+        'language' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       ),
     );
 
@@ -442,7 +434,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
       $comment = entity_create('comment', $values);
       $comment->save();
       $comments[$key] = $comment;
-      $comment_labels[$key] = check_plain($comment->label());
+      $comment_labels[$key] = String::checkPlain($comment->label());
     }
 
     // Test as a non-admin.
@@ -454,7 +446,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
           array(NULL, 'CONTAINS'),
         ),
         'result' => array(
-          'node__comment' => array(
+          'comment' => array(
             $comments['published_published']->cid->value => $comment_labels['published_published'],
           ),
         ),
@@ -464,7 +456,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
           array('Published', 'CONTAINS'),
         ),
         'result' => array(
-          'node__comment' => array(
+          'comment' => array(
             $comments['published_published']->cid->value => $comment_labels['published_published'],
           ),
         ),
@@ -482,7 +474,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         'result' => array(),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'Comment handler');
+    $this->assertReferenceable($field, $referenceable_tests, 'Comment handler');
 
     // Test as a comment admin.
     $admin_user = $this->drupalCreateUser(array('access content', 'access comments', 'administer comments'));
@@ -493,14 +485,14 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
           array(NULL, 'CONTAINS'),
         ),
         'result' => array(
-          'node__comment' => array(
+          'comment' => array(
             $comments['published_published']->cid->value => $comment_labels['published_published'],
             $comments['published_unpublished']->cid->value => $comment_labels['published_unpublished'],
           ),
         ),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'Comment handler (comment admin)');
+    $this->assertReferenceable($field, $referenceable_tests, 'Comment handler (comment admin)');
 
     // Test as a node and comment admin.
     $admin_user = $this->drupalCreateUser(array('access content', 'access comments', 'administer comments', 'bypass node access'));
@@ -511,7 +503,7 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
           array(NULL, 'CONTAINS'),
         ),
         'result' => array(
-          'node__comment' => array(
+          'comment' => array(
             $comments['published_published']->cid->value => $comment_labels['published_published'],
             $comments['published_unpublished']->cid->value => $comment_labels['published_unpublished'],
             $comments['unpublished_published']->cid->value => $comment_labels['unpublished_published'],
@@ -519,6 +511,6 @@ class EntityReferenceSelectionAccessTest extends WebTestBase {
         ),
       ),
     );
-    $this->assertReferenceable($instance, $referenceable_tests, 'Comment handler (comment + node admin)');
+    $this->assertReferenceable($field, $referenceable_tests, 'Comment handler (comment + node admin)');
   }
 }

@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\views\filter;
 
 use Drupal\Component\Utility\String as UtilityString;
 use Drupal\Core\Database\Database;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Basic textfield filter to handle string filtering commands
@@ -183,7 +184,7 @@ class String extends FilterPluginBase {
   /**
    * Provide a simple textfield for equality
    */
-  protected function valueForm(&$form, &$form_state) {
+  protected function valueForm(&$form, FormStateInterface $form_state) {
     // We have to make some choices when creating this as an exposed
     // filter form. For example, if the operator is locked and thus
     // not rendered, we can't render dependencies; instead we only
@@ -192,7 +193,7 @@ class String extends FilterPluginBase {
     if (!empty($form['operator'])) {
       $source = ':input[name="options[operator]"]';
     }
-    if (!empty($form_state['exposed'])) {
+    if ($exposed = $form_state->get('exposed')) {
       $identifier = $this->options['expose']['identifier'];
 
       if (empty($this->options['expose']['use_operator']) || empty($this->options['expose']['operator_id'])) {
@@ -211,8 +212,10 @@ class String extends FilterPluginBase {
         '#size' => 30,
         '#default_value' => $this->value,
       );
-      if (!empty($form_state['exposed']) && !isset($form_state['input'][$identifier])) {
-        $form_state['input'][$identifier] = $this->value;
+      $user_input = $form_state->getUserInput();
+      if ($exposed && !isset($user_input[$identifier])) {
+        $user_input[$identifier] = $this->value;
+        $form_state->setUserInput($user_input);
       }
 
       if ($which == 'all') {

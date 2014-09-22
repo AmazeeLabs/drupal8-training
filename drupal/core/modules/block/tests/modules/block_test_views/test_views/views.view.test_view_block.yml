@@ -38,6 +38,7 @@ display:
     id: block_1
     display_title: Block
     position: null
+    provider: views
     display_options:
       field:
         title:

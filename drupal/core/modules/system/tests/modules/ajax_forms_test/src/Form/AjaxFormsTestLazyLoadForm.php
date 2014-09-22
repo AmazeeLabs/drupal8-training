@@ -8,6 +8,7 @@
 namespace Drupal\ajax_forms_test\Form;
 
 use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Form builder: Builds a form that triggers a simple AJAX callback.
@@ -24,7 +25,7 @@ class AjaxFormsTestLazyLoadForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     // We attach a JavaScript setting, so that one of the generated AJAX
     // commands will be a settings command. We can then check the settings
     // command to ensure that the 'currentPath' setting is not part
@@ -54,8 +55,8 @@ class AjaxFormsTestLazyLoadForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
-    if ($form_state['values']['add_files']) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    if ($form_state->getValue('add_files')) {
       $path = drupal_get_path('module', 'system');
       $attached = array(
         '#attached' => array(
@@ -72,8 +73,9 @@ class AjaxFormsTestLazyLoadForm extends FormBase {
         ),
       );
       drupal_render($attached);
+      drupal_process_attached($attached);
     }
-    $form_state['rebuild'] = TRUE;
+    $form_state->setRebuild();
   }
 
 }

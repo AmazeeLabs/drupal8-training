@@ -7,7 +7,7 @@
 
 namespace Drupal\language\Plugin\LanguageNegotiation;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
 use Drupal\Core\PathProcessor\OutboundPathProcessorInterface;
 use Drupal\language\LanguageNegotiationMethodBase;
@@ -19,7 +19,9 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @Plugin(
  *   id = \Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl::METHOD_ID,
- *   types = {\Drupal\Core\Language\Language::TYPE_INTERFACE, \Drupal\Core\Language\Language::TYPE_CONTENT, \Drupal\Core\Language\Language::TYPE_URL},
+ *   types = {\Drupal\Core\Language\LanguageInterface::TYPE_INTERFACE,
+ *   \Drupal\Core\Language\LanguageInterface::TYPE_CONTENT,
+ *   \Drupal\Core\Language\LanguageInterface::TYPE_URL},
  *   weight = -8,
  *   name = @Translation("URL"),
  *   description = @Translation("Language from the URL (Path prefix or domain)."),
@@ -129,7 +131,7 @@ class LanguageNegotiationUrl extends LanguageNegotiationMethodBase implements In
     $languages = array_flip(array_keys($this->languageManager->getLanguages()));
     // Language can be passed as an option, or we go for current URL language.
     if (!isset($options['language'])) {
-      $language_url = $this->languageManager->getCurrentLanguage(Language::TYPE_URL);
+      $language_url = $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL);
       $options['language'] = $language_url;
     }
     // We allow only added languages here.
@@ -139,7 +141,7 @@ class LanguageNegotiationUrl extends LanguageNegotiationMethodBase implements In
     $config = $this->config->get('language.negotiation')->get('url');
     if ($config['source'] == LanguageNegotiationUrl::CONFIG_PATH_PREFIX) {
       if (is_object($options['language']) && !empty($config['prefixes'][$options['language']->id])) {
-        return empty($path) ? $config['prefixes'][$options['language']->id] : $config['prefixes'][$options['language']->id] . '/' . $path;
+        $options['prefix'] = $config['prefixes'][$options['language']->id] . '/';
       }
     }
     elseif ($config['source'] ==  LanguageNegotiationUrl::CONFIG_DOMAIN) {
@@ -188,10 +190,10 @@ class LanguageNegotiationUrl extends LanguageNegotiationMethodBase implements In
   function getLanguageSwitchLinks(Request $request, $type, $path) {
     $links = array();
 
-    foreach ($this->languageManager->getLanguages() as $language) {
+    foreach ($this->languageManager->getNativeLanguages() as $language) {
       $links[$language->id] = array(
         'href' => $path,
-        'title' => $language->name,
+        'title' => $language->getName(),
         'language' => $language,
         'attributes' => array('class' => array('language-link')),
       );

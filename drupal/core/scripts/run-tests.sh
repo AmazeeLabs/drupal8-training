@@ -8,10 +8,10 @@
 use Drupal\Component\Utility\Timer;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Site\Settings;
-use Drupal\Core\Test\TestKernel;
+use Drupal\Core\Test\TestRunnerKernel;
 use Symfony\Component\HttpFoundation\Request;
 
-require_once __DIR__ . '/../vendor/autoload.php';
+$autoloader = require_once __DIR__ . '/../vendor/autoload.php';
 
 const SIMPLETEST_SCRIPT_COLOR_PASS = 32; // Green.
 const SIMPLETEST_SCRIPT_COLOR_FAIL = 31; // Red.
@@ -26,7 +26,10 @@ if ($args['help'] || $count == 0) {
 }
 
 simpletest_script_init();
-simpletest_script_bootstrap();
+
+$request = Request::createFromGlobals();
+$kernel = TestRunnerKernel::createFromRequest($request, $autoloader);
+$kernel->prepareLegacyRequest($request);
 
 if ($args['execute-test']) {
   simpletest_script_setup_database();
@@ -54,11 +57,11 @@ if ($args['list']) {
   // Display all available tests.
   echo "\nAvailable test groups & classes\n";
   echo   "-------------------------------\n\n";
-  $groups = simpletest_script_get_all_tests();
+  $groups = simpletest_test_get_all($args['module']);
   foreach ($groups as $group => $tests) {
     echo $group . "\n";
     foreach ($tests as $class => $info) {
-      echo " - " . $info['name'] . ' (' . $class . ')' . "\n";
+      echo " - $class\n";
     }
   }
   exit;
@@ -71,10 +74,13 @@ drupal_set_time_limit(0);
 
 simpletest_script_reporter_init();
 
-// Execute tests.
+$tests_to_run = array();
 for ($i = 0; $i < $args['repeat']; $i++) {
-  simpletest_script_execute_batch($test_list);
+  $tests_to_run = array_merge($tests_to_run, $test_list);
 }
+
+// Execute tests.
+simpletest_script_execute_batch($tests_to_run);
 
 // Stop the timer.
 simpletest_script_reporter_timer_stop();
@@ -184,7 +190,7 @@ All arguments are long options.
               as the names of test groups as shown at
               admin/config/development/testing.
               These group names typically correspond to module names like "User"
-              or "Profile" or "System", but there is also a group "XML-RPC".
+              or "Profile" or "System", but there is also a group "Database".
               If --class is specified then these are interpreted as the names of
               specific test classes whose test methods will be run. Tests must
               be separated by commas. Ignored if --all is specified.
@@ -350,50 +356,6 @@ function simpletest_script_init() {
   }
 
   chdir(realpath(__DIR__ . '/../..'));
-  require_once dirname(__DIR__) . '/includes/bootstrap.inc';
-}
-
-/**
- * Bootstraps a minimal Drupal environment.
- *
- * @see install_begin_request()
- */
-function simpletest_script_bootstrap() {
-  // Load legacy include files.
-  foreach (glob(DRUPAL_ROOT . '/core/includes/*.inc') as $include) {
-    require_once $include;
-  }
-
-  drupal_bootstrap(DRUPAL_BOOTSTRAP_CONFIGURATION);
-
-  // Remove Drupal's error/exception handlers; they are designed for HTML
-  // and there is no storage nor a (watchdog) logger here.
-  restore_error_handler();
-  restore_exception_handler();
-
-  // In addition, ensure that PHP errors are not hidden away in logs.
-  ini_set('display_errors', TRUE);
-
-  // Ensure that required Settings exist.
-  if (!Settings::getAll()) {
-    new Settings(array(
-      'hash_salt' => 'run-tests',
-    ));
-  }
-
-  $kernel = new TestKernel(drupal_classloader());
-  $kernel->boot();
-
-  $request = Request::createFromGlobals();
-  $container = $kernel->getContainer();
-  $container->enterScope('request');
-  $container->set('request', $request, 'request');
-  $container->get('request_stack')->push($request);
-
-  $module_handler = $container->get('module_handler');
-  $module_handler->loadAll();
-
-  simpletest_classloader_register();
 }
 
 /**
@@ -463,6 +425,9 @@ function simpletest_script_setup_database($new = FALSE) {
         'default' => $info['fragment'],
       ),
     );
+    if (isset($info['port'])) {
+      $databases['default']['default']['port'] = $info['port'];
+    }
   }
   // Otherwise, use the default database connection from settings.php.
   else {
@@ -532,34 +497,6 @@ function simpletest_script_setup_database($new = FALSE) {
     simpletest_script_print_error('Missing Simpletest database schema. Either install Simpletest module or use the --sqlite parameter.');
     exit(1);
   }
-}
-
-/**
- * Get all available tests from simpletest and PHPUnit.
- *
- * @param string $module
- *   Name of a module. If set then only tests belonging to this module are
- *   returned.
- *
- * @return
- *   An array of tests keyed with the groups specified in each of the tests
- *   getInfo() method and then keyed by the test class. An example of the array
- *   structure is provided below.
- *
- *   @code
- *     $groups['Block'] => array(
- *       'BlockTestCase' => array(
- *         'name' => 'Block functionality',
- *         'description' => 'Add, edit and delete custom block...',
- *         'group' => 'Block',
- *       ),
- *     );
- *   @endcode
- */
-function simpletest_script_get_all_tests($module = NULL) {
-  $tests = simpletest_test_get_all($module);
-  $tests['PHPUnit'] = simpletest_phpunit_get_available_tests($module);
-  return $tests;
 }
 
 /**
@@ -824,7 +761,7 @@ function simpletest_script_get_test_list() {
 
   $test_list = array();
   if ($args['all'] || $args['module']) {
-    $groups = simpletest_script_get_all_tests($args['module']);
+    $groups = simpletest_test_get_all($args['module']);
     $all_tests = array();
     foreach ($groups as $group => $tests) {
       $all_tests = array_merge($all_tests, array_keys($tests));
@@ -833,8 +770,21 @@ function simpletest_script_get_test_list() {
   }
   else {
     if ($args['class']) {
-      foreach ($args['test_names'] as $class_name) {
-        $test_list[] = $class_name;
+      $test_list = array();
+      foreach ($args['test_names'] as $test_class) {
+        if (class_exists($test_class)) {
+          $test_list[] = $test_class;
+        }
+        else {
+          $groups = simpletest_test_get_all();
+          $all_classes = array();
+          foreach ($groups as $group) {
+            $all_classes = array_merge($all_classes, array_keys($group));
+          }
+          simpletest_script_print_error('Test class not found: ' . $test_class);
+          simpletest_script_print_alternatives($test_class, $all_classes, 6);
+          exit(1);
+        }
       }
     }
     elseif ($args['file']) {
@@ -867,9 +817,16 @@ function simpletest_script_get_test_list() {
       }
     }
     else {
-      $groups = simpletest_script_get_all_tests();
+      $groups = simpletest_test_get_all();
       foreach ($args['test_names'] as $group_name) {
-        $test_list = array_merge($test_list, array_keys($groups[$group_name]));
+        if (isset($groups[$group_name])) {
+          $test_list = array_merge($test_list, array_keys($groups[$group_name]));
+        }
+        else {
+          simpletest_script_print_error('Test group not found: ' . $group_name);
+          simpletest_script_print_alternatives($group_name, array_keys($groups));
+          exit(1);
+        }
       }
     }
   }
@@ -1023,7 +980,7 @@ function simpletest_script_reporter_write_xml_results() {
 function simpletest_script_reporter_timer_stop() {
   echo "\n";
   $end = Timer::stop('run-tests');
-  echo "Test run duration: " . format_interval($end['time'] / 1000);
+  echo "Test run duration: " . \Drupal::service('date.formatter')->formatInterval($end['time'] / 1000);
   echo "\n\n";
 }
 
@@ -1124,4 +1081,38 @@ function simpletest_script_color_code($status) {
       return SIMPLETEST_SCRIPT_COLOR_EXCEPTION;
   }
   return 0; // Default formatting.
+}
+
+/**
+ * Prints alternative test names.
+ *
+ * Searches the provided array of string values for close matches based on the
+ * Levenshtein algorithm.
+ *
+ * @see http://php.net/manual/en/function.levenshtein.php
+ *
+ * @param string $string
+ *   A string to test.
+ * @param array $array
+ *   A list of strings to search.
+ * @param int $degree
+ *   The matching strictness. Higher values return fewer matches. A value of
+ *   4 means that the function will return strings from $array if the candidate
+ *   string in $array would be identical to $string by changing 1/4 or fewer of
+ *   its characters.
+ */
+function simpletest_script_print_alternatives($string, $array, $degree = 4) {
+  $alternatives = array();
+  foreach ($array as $item) {
+    $lev = levenshtein($string, $item);
+    if ($lev <= strlen($item) / $degree || FALSE !== strpos($string, $item)) {
+      $alternatives[] = $item;
+    }
+  }
+  if (!empty($alternatives)) {
+    simpletest_script_print("  Did you mean?\n", SIMPLETEST_SCRIPT_COLOR_FAIL);
+    foreach ($alternatives as $alternative) {
+      simpletest_script_print("  - $alternative\n", SIMPLETEST_SCRIPT_COLOR_FAIL);
+    }
+  }
 }

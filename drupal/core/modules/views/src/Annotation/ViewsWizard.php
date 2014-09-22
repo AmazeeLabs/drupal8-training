@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsWizard.
+ * Contains \Drupal\views\Annotation\ViewsWizard.
  */
 
 namespace Drupal\views\Annotation;
@@ -12,9 +12,12 @@ use Drupal\views\Annotation\ViewsPluginAnnotationBase;
 /**
  * Defines a Plugin annotation object for views wizard plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\wizard\WizardPluginBase
+ * @see \Drupal\views\Plugin\views\wizard\WizardInterface
+ *
+ * @ingroup views_wizard_plugins
+ *
+ * @Annotation
  */
 class ViewsWizard extends ViewsPluginAnnotationBase {
 

@@ -19,7 +19,13 @@
  * @ingroup themeable
  */
 #}
-<div{{ attributes }}>
-  <h4 class="label">{{ format.name|escape }}</h4>
+{%
+  set classes = [
+    'filter-guidelines-item',
+    'filter-guidelines-' ~ format.format,
+  ]
+%}
+<div{{ attributes.addClass(classes) }}>
+  <h4 class="label">{{ format.name }}</h4>
   {{ tips }}
 </div>

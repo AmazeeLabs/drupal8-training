@@ -8,7 +8,11 @@
 namespace Drupal\shortcut;
 
 use Drupal\Core\Entity\ContentEntityForm;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Path\PathValidatorInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form controller for the shortcut entity forms.
@@ -23,9 +27,37 @@ class ShortcutForm extends ContentEntityForm {
   protected $entity;
 
   /**
+   * The path validator.
+   *
+   * @var \Drupal\Core\Path\PathValidatorInterface
+   */
+  protected $pathValidator;
+
+  /**
+   * Constructs a new ShortcutForm instance.
+   *
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager
+   * @param \Drupal\Core\Path\PathValidatorInterface $path_validator
+   *   The path validator.
+   */
+  public function __construct(EntityManagerInterface $entity_manager, PathValidatorInterface $path_validator) {
+    parent::__construct($entity_manager);
+
+    $this->pathValidator = $path_validator;
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public static function create(ContainerInterface $container) {
+    return new static($container->get('entity.manager'), $container->get('path.validator'));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
 
     $form['path'] = array(
@@ -41,7 +73,7 @@ class ShortcutForm extends ContentEntityForm {
       '#title' => t('Language'),
       '#type' => 'language_select',
       '#default_value' => $this->entity->getUntranslated()->language()->id,
-      '#languages' => Language::STATE_ALL,
+      '#languages' => LanguageInterface::STATE_ALL,
     );
 
     return $form;
@@ -50,12 +82,12 @@ class ShortcutForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function buildEntity(array $form, array &$form_state) {
+  public function buildEntity(array $form, FormStateInterface $form_state) {
     $entity = parent::buildEntity($form, $form_state);
 
     // Set the computed 'path' value so it can used in the preSave() method to
     // derive the route name and parameters.
-    $entity->path->value = $form_state['values']['path'];
+    $entity->path->value = $form_state->getValue('path');
 
     return $entity;
   }
@@ -63,9 +95,9 @@ class ShortcutForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
-    if (!shortcut_valid_link($form_state['values']['path'])) {
-      $this->setFormError('path', $form_state, $this->t('The shortcut must correspond to a valid path on the site.'));
+  public function validate(array $form, FormStateInterface $form_state) {
+    if (!$this->pathValidator->isValid($form_state->getValue('path'))) {
+      $form_state->setErrorByName('path', $this->t('The shortcut must correspond to a valid path on the site.'));
     }
 
     parent::validate($form, $form_state);
@@ -74,7 +106,7 @@ class ShortcutForm extends ContentEntityForm {
   /**
    * {@inheritdoc}
    */
-  public function save(array $form, array &$form_state) {
+  public function save(array $form, FormStateInterface $form_state) {
     $entity = $this->entity;
     $entity->save();
 
@@ -86,9 +118,9 @@ class ShortcutForm extends ContentEntityForm {
     }
     drupal_set_message($message);
 
-    $form_state['redirect_route'] = array(
-      'route_name' => 'shortcut.set_customize',
-      'route_parameters' => array('shortcut_set' => $entity->bundle()),
+    $form_state->setRedirect(
+      'entity.shortcut_set.customize_form',
+      array('shortcut_set' => $entity->bundle())
     );
   }
 

@@ -10,7 +10,10 @@ namespace Drupal\system\Tests\Form;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests checkbox element.
+ * Tests form API checkbox handling of various combinations of #default_value
+ * and #return_value.
+ *
+ * @group Form
  */
 class CheckboxTest extends WebTestBase {
 
@@ -21,23 +24,15 @@ class CheckboxTest extends WebTestBase {
    */
   public static $modules = array('form_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Form API checkbox',
-      'description' => 'Tests form API checkbox handling of various combinations of #default_value and #return_value.',
-      'group' => 'Form API',
-    );
-  }
-
   function testFormCheckbox() {
     // Ensure that the checked state is determined and rendered correctly for
     // tricky combinations of default and return values.
     foreach (array(FALSE, NULL, TRUE, 0, '0', '', 1, '1', 'foobar', '1foobar') as $default_value) {
       // Only values that can be used for array indices are supported for
       // #return_value, with the exception of integer 0, which is not supported.
-      // @see form_process_checkbox().
+      // @see \Drupal\Core\Render\Element\Checkbox::processCheckbox().
       foreach (array('0', '', 1, '1', 'foobar', '1foobar') as $return_value) {
-        $form_array = \Drupal::formBuilder()->getForm('form_test_checkbox_type_juggling', $default_value, $return_value);
+        $form_array = \Drupal::formBuilder()->getForm('\Drupal\form_test\Form\FormTestCheckboxTypeJugglingForm', $default_value, $return_value);
         $form = drupal_render($form_array);
         if ($default_value === TRUE) {
           $checked = TRUE;
@@ -63,7 +58,7 @@ class CheckboxTest extends WebTestBase {
       }
     }
 
-    // Ensure that $form_state['values'] is populated correctly for a checkboxes
+    // Ensure that $form_state->getValues() is populated correctly for a checkboxes
     // group that includes a 0-indexed array of options.
     $results = json_decode($this->drupalPostForm('form-test/checkboxes-zero', array(), 'Save'));
     $this->assertIdentical($results->checkbox_off, array(0, 0, 0), 'All three in checkbox_off are zeroes: off.');

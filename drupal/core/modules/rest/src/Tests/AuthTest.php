@@ -10,7 +10,9 @@ namespace Drupal\rest\Tests;
 use Drupal\rest\Tests\RESTTestBase;
 
 /**
- * Tests authenticated operations on test entities.
+ * Tests authentication provider restrictions.
+ *
+ * @group rest
  */
 class AuthTest extends RESTTestBase {
 
@@ -20,17 +22,6 @@ class AuthTest extends RESTTestBase {
    * @var array
    */
   public static $modules = array('basic_auth', 'hal', 'rest', 'entity_test', 'comment');
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Resource authentication',
-      'description' => 'Tests authentication provider restrictions.',
-      'group' => 'REST',
-    );
-  }
 
   /**
    * Tests reading from an authenticated resource.
@@ -48,7 +39,7 @@ class AuthTest extends RESTTestBase {
     // Try to read the resource as an anonymous user, which should not work.
     $this->httpRequest($entity->getSystemPath(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse('401', 'HTTP response code is 401 when the request is not authenticated and the user is anonymous.');
-    $this->assertText('A fatal error occurred: No authentication credentials provided.');
+    $this->assertRaw(json_encode(['error' => 'A fatal error occurred: No authentication credentials provided.']));
 
     // Ensure that cURL settings/headers aren't carried over to next request.
     unset($this->curlHandle);

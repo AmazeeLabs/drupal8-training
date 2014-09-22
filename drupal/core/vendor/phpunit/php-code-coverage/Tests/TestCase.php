@@ -2,7 +2,7 @@
 /**
  * PHP_CodeCoverage
  *
- * Copyright (c) 2009-2013, Sebastian Bergmann <sebastian@phpunit.de>.
+ * Copyright (c) 2009-2014, Sebastian Bergmann <sebastian@phpunit.de>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@
  * @package    CodeCoverage
  * @subpackage Tests
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2009-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2009-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://github.com/sebastianbergmann/php-code-coverage
  * @since      File available since Release 1.0.0
@@ -51,7 +51,7 @@
  * @package    CodeCoverage
  * @subpackage Tests
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2009-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2009-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://github.com/sebastianbergmann/php-code-coverage
  * @since      Class available since Release 1.0.0
@@ -124,24 +124,44 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
         $coverage = new PHP_CodeCoverage($stub, new PHP_CodeCoverage_Filter);
 
         $coverage->start(
-          new BankAccountTest('testBalanceIsInitiallyZero'), TRUE
+          new BankAccountTest('testBalanceIsInitiallyZero'), true
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(6, 9))
+        );
 
         $coverage->start(
           new BankAccountTest('testBalanceCannotBecomeNegative')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(27, 32))
+        );
 
         $coverage->start(
           new BankAccountTest('testBalanceCannotBecomeNegative2')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(20, 25))
+        );
 
         $coverage->start(
           new BankAccountTest('testDepositWithdrawMoney')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(
+            TEST_FILES_PATH . 'BankAccount.php' => array_merge(
+              range(6, 9), range(20, 25), range(27, 32)
+            )
+          )
+        );
 
         return $coverage;
     }
@@ -160,14 +180,22 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
         $coverage = new PHP_CodeCoverage($stub, new PHP_CodeCoverage_Filter);
 
         $coverage->start(
-          new BankAccountTest('testBalanceIsInitiallyZero'), TRUE
+          new BankAccountTest('testBalanceIsInitiallyZero'), true
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(6, 9))
+        );
 
         $coverage->start(
           new BankAccountTest('testBalanceCannotBecomeNegative')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(27, 32))
+        );
 
         return $coverage;
     }
@@ -186,14 +214,26 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
         $coverage = new PHP_CodeCoverage($stub, new PHP_CodeCoverage_Filter);
 
         $coverage->start(
-          new BankAccountTest('testBalanceCannotBecomeNegative2'), TRUE
+          new BankAccountTest('testBalanceCannotBecomeNegative2')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(TEST_FILES_PATH . 'BankAccount.php' => range(20, 25))
+        );
 
         $coverage->start(
           new BankAccountTest('testDepositWithdrawMoney')
         );
-        $coverage->stop();
+
+        $coverage->stop(
+          true,
+          array(
+            TEST_FILES_PATH . 'BankAccount.php' => array_merge(
+              range(6, 9), range(20, 25), range(27, 32)
+            )
+          )
+        );
 
         return $coverage;
     }
@@ -206,7 +246,7 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
               0 => 'BankAccountTest::testBalanceIsInitiallyZero',
               1 => 'BankAccountTest::testDepositWithdrawMoney'
             ),
-            9 => NULL,
+            9 => null,
             13 => array(),
             14 => array(),
             15 => array(),
@@ -219,7 +259,7 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
             24 => array(
               0 => 'BankAccountTest::testDepositWithdrawMoney',
             ),
-            25 => NULL,
+            25 => null,
             29 => array(
               0 => 'BankAccountTest::testBalanceCannotBecomeNegative',
               1 => 'BankAccountTest::testDepositWithdrawMoney'
@@ -227,7 +267,7 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
             31 => array(
               0 => 'BankAccountTest::testDepositWithdrawMoney'
             ),
-            32 => NULL
+            32 => null
           )
         );
     }
@@ -239,7 +279,7 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
           new PHP_CodeCoverage_Filter
         );
 
-        $coverage->start('FileWithIgnoredLines', TRUE);
+        $coverage->start('FileWithIgnoredLines', true);
         $coverage->stop();
 
         return $coverage;
@@ -257,6 +297,43 @@ abstract class PHP_CodeCoverage_TestCase extends PHPUnit_Framework_TestCase
                    4 => -1,
                    6 => -1,
                    7 => 1
+                 )
+               )
+            ));
+
+        return $stub;
+    }
+
+    protected function getCoverageForClassWithAnonymousFunction()
+    {
+        $coverage = new PHP_CodeCoverage(
+          $this->setUpXdebugStubForClassWithAnonymousFunction(),
+          new PHP_CodeCoverage_Filter
+        );
+
+        $coverage->start('ClassWithAnonymousFunction', true);
+        $coverage->stop();
+
+        return $coverage;
+    }
+
+    protected function setUpXdebugStubForClassWithAnonymousFunction()
+    {
+        $stub = $this->getMock('PHP_CodeCoverage_Driver_Xdebug');
+        $stub->expects($this->any())
+             ->method('stop')
+             ->will($this->returnValue(
+               array(
+                 TEST_FILES_PATH . 'source_with_class_and_anonymous_function.php' => array(
+                    7  => 1,
+                    9  => 1,
+                    10 => -1,
+                    11 => 1,
+                    12 => 1,
+                    13 => 1,
+                    14 => 1,
+                    17 => 1,
+                    18 => 1
                  )
                )
             ));

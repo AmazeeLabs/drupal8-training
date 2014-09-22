@@ -12,17 +12,10 @@ use Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery;
 /**
  * Tests that a custom annotation class is used.
  *
+ * @group Plugin
  * @see \Drupal\plugin_test\Plugin\Annotation\PluginExample
  */
 class CustomAnnotationClassDiscoveryTest extends DiscoveryTestBase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Custom annotation class discovery',
-      'description' => 'Tests that a custom annotation class is used.',
-      'group' => 'Plugin API',
-    );
-  }
 
   protected function setUp() {
     parent::setUp();
@@ -41,13 +34,9 @@ class CustomAnnotationClassDiscoveryTest extends DiscoveryTestBase {
         'provider' => 'plugin_test',
       ),
     );
-    $root_namespaces = new \ArrayObject(array(
-      'Drupal\plugin_test' => array(
-        // @todo Remove lib/Drupal/$module, once the switch to PSR-4 is complete.
-        DRUPAL_ROOT . '/core/modules/system/tests/modules/plugin_test/lib/Drupal/plugin_test',
-        DRUPAL_ROOT . '/core/modules/system/tests/modules/plugin_test/src',
-      ),
-    ));
+
+    $base_directory = DRUPAL_ROOT . '/core/modules/system/tests/modules/plugin_test/src';
+    $root_namespaces = new \ArrayObject(array('Drupal\plugin_test' => $base_directory));
 
     $this->discovery = new AnnotatedClassDiscovery('Plugin/plugin_test/custom_annotation', $root_namespaces, 'Drupal\plugin_test\Plugin\Annotation\PluginExample');
     $this->emptyDiscovery = new AnnotatedClassDiscovery('Plugin/non_existing_module/non_existing_plugin_type', $root_namespaces, 'Drupal\plugin_test\Plugin\Annotation\PluginExample');

@@ -9,7 +9,9 @@ namespace Drupal\rdf\Tests\Field;
 use Drupal\rdf\Tests\Field\FieldRdfaTestBase;
 
 /**
- * Tests the placement of RDFa in text field formatters.
+ * Tests RDFa output by datetime field formatters.
+ *
+ * @group rdf
  */
 class DateTimeFieldRdfaTest extends FieldRdfaTestBase {
 
@@ -30,15 +32,7 @@ class DateTimeFieldRdfaTest extends FieldRdfaTestBase {
   */
   public static $modules = array('datetime');
 
-  public static function getInfo() {
-    return array(
-      'name'  => 'Field formatter: datetime',
-      'description'  => 'Tests RDFa output by datetime field formatters.',
-      'group' => 'RDF',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->createTestField();

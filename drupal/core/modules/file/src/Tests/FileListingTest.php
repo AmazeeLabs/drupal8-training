@@ -9,6 +9,8 @@ namespace Drupal\file\Tests;
 
 /**
  * Tests file listing page functionality.
+ *
+ * @group file
  */
 class FileListingTest extends FileFieldTestBase {
 
@@ -19,15 +21,7 @@ class FileListingTest extends FileFieldTestBase {
    */
   public static $modules = array('views', 'file', 'image');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'File listing',
-      'description' => 'Tests file listing page functionality.',
-      'group' => 'File',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->admin_user = $this->drupalCreateUser(array('access files overview', 'bypass node access'));

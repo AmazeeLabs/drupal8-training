@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests loading of text editors.
+ *
+ * @group editor
  */
 class EditorLoadingTest extends WebTestBase {
 
@@ -21,15 +23,7 @@ class EditorLoadingTest extends WebTestBase {
    */
   public static $modules = array('filter', 'editor', 'editor_test', 'node');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Text editor loading',
-      'description' => 'Tests loading of text editors.',
-      'group' => 'Text Editor',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Add text formats.
@@ -141,16 +135,17 @@ class EditorLoadingTest extends WebTestBase {
     $this->drupalCreateNode(array(
       'type' => 'article',
       'body' => array(
-        array('value' => $this->randomName(32), 'format' => 'full_html')
+        array('value' => $this->randomMachineName(32), 'format' => 'full_html')
       ),
     ));
 
     // The untrusted user tries to edit content that is written in a text format
-    // that (s)he is not allowed to use.
+    // that (s)he is not allowed to use. The editor is still loaded. CKEditor,
+    // for example, supports being loaded in a disabled state.
     $this->drupalGet('node/1/edit');
     list( , $editor_settings_present, $editor_js_present, $body, $format_selector) = $this->getThingsToCheck();
-    $this->assertFalse($editor_settings_present, 'No Text Editor module settings.');
-    $this->assertFalse($editor_js_present, 'No Text Editor JavaScript.');
+    $this->assertTrue($editor_settings_present, 'Text Editor module settings.');
+    $this->assertTrue($editor_js_present, 'Text Editor JavaScript.');
     $this->assertTrue(count($body) === 1, 'A body field exists.');
     $this->assertFieldByXPath('//textarea[@id="edit-body-0-value" and @disabled="disabled"]', t('This field has been disabled because you do not have sufficient permissions to edit it.'), 'Text format access denied message found.');
     $this->assertTrue(count($format_selector) === 0, 'No text format selector exists on the page.');

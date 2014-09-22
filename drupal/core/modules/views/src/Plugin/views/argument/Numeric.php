@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Plugin\views\argument;
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Basic argument handler for arguments that are numeric. Incorporates
  * break_phrase.
@@ -38,7 +40,7 @@ class Numeric extends ArgumentPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     // allow + for or, , for and
@@ -65,7 +67,9 @@ class Numeric extends ArgumentPluginBase {
     }
 
     if (!empty($this->options['break_phrase'])) {
-      $this->breakPhrase($this->argument, $this);
+      $break = static::breakString($this->argument, TRUE);
+      $this->value = $break->value;
+      $this->operator = $break->operator;
     }
     else {
       $this->value = array($this->argument);
@@ -96,7 +100,9 @@ class Numeric extends ArgumentPluginBase {
     $this->ensureMyTable();
 
     if (!empty($this->options['break_phrase'])) {
-      $this->breakPhrase($this->argument, $this);
+      $break = static::breakString($this->argument, TRUE);
+      $this->value = $break->value;
+      $this->operator = $break->operator;
     }
     else {
       $this->value = array($this->argument);

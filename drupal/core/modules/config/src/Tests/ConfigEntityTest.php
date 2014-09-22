@@ -12,11 +12,12 @@ use Drupal\Core\Entity\EntityMalformedException;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
 use Drupal\Core\Config\Entity\Exception\ConfigEntityIdLengthException;
-use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests configuration entities.
+ *
+ * @group config
  */
 class ConfigEntityTest extends WebTestBase {
 
@@ -32,14 +33,6 @@ class ConfigEntityTest extends WebTestBase {
    */
   public static $modules = array('config_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Configuration entities',
-      'description' => 'Tests configuration entities.',
-      'group' => 'Configuration',
-    );
-  }
-
   /**
    * Tests CRUD operations.
    */
@@ -47,11 +40,10 @@ class ConfigEntityTest extends WebTestBase {
     $default_langcode = \Drupal::languageManager()->getDefaultLanguage()->id;
     // Verify default properties on a newly created empty entity.
     $empty = entity_create('config_test');
-    $this->assertIdentical($empty->id, NULL);
-    $this->assertTrue($empty->uuid);
+    $this->assertTrue($empty->uuid());
     $this->assertIdentical($empty->label, NULL);
     $this->assertIdentical($empty->style, NULL);
-    $this->assertIdentical($empty->langcode, $default_langcode);
+    $this->assertIdentical($empty->language()->getId(), $default_langcode);
 
     // Verify ConfigEntity properties/methods on the newly created empty entity.
     $this->assertIdentical($empty->isNew(), TRUE);
@@ -65,7 +57,7 @@ class ConfigEntityTest extends WebTestBase {
     $this->assertTrue($empty->get('uuid'));
     $this->assertIdentical($empty->get('label'), NULL);
     $this->assertIdentical($empty->get('style'), NULL);
-    $this->assertIdentical($empty->get('langcode'), $default_langcode);
+    $this->assertIdentical($empty->language()->getId(), $default_langcode);
 
     // Verify Entity properties/methods on the newly created empty entity.
     $this->assertIdentical($empty->getEntityTypeId(), 'config_test');
@@ -102,16 +94,15 @@ class ConfigEntityTest extends WebTestBase {
 
     // Verify properties on a newly created entity.
     $config_test = entity_create('config_test', $expected = array(
-      'id' => $this->randomName(),
+      'id' => $this->randomMachineName(),
       'label' => $this->randomString(),
-      'style' => $this->randomName(),
+      'style' => $this->randomMachineName(),
     ));
-    $this->assertIdentical($config_test->id, $expected['id']);
-    $this->assertTrue($config_test->uuid);
-    $this->assertNotEqual($config_test->uuid, $empty->uuid);
+    $this->assertTrue($config_test->uuid());
+    $this->assertNotEqual($config_test->uuid(), $empty->uuid());
     $this->assertIdentical($config_test->label, $expected['label']);
     $this->assertIdentical($config_test->style, $expected['style']);
-    $this->assertIdentical($config_test->langcode, $default_langcode);
+    $this->assertIdentical($config_test->language()->getId(), $default_langcode);
 
     // Verify methods on the newly created entity.
     $this->assertIdentical($config_test->isNew(), TRUE);
@@ -155,12 +146,12 @@ class ConfigEntityTest extends WebTestBase {
 
     // Test with a short ID.
     $id_length_config_test = entity_create('config_test', array(
-      'id' => $this->randomName(8),
+      'id' => $this->randomMachineName(8),
     ));
     try {
       $id_length_config_test->save();
       $this->pass(String::format("config_test entity with ID length @length was saved.", array(
-        '@length' => strlen($id_length_config_test->id))
+        '@length' => strlen($id_length_config_test->id()))
       ));
     }
     catch (ConfigEntityIdLengthException $e) {
@@ -169,12 +160,12 @@ class ConfigEntityTest extends WebTestBase {
 
     // Test with an ID of the maximum allowed length.
     $id_length_config_test = entity_create('config_test', array(
-      'id' => $this->randomName(static::MAX_ID_LENGTH),
+      'id' => $this->randomMachineName(static::MAX_ID_LENGTH),
     ));
     try {
       $id_length_config_test->save();
       $this->pass(String::format("config_test entity with ID length @length was saved.", array(
-        '@length' => strlen($id_length_config_test->id),
+        '@length' => strlen($id_length_config_test->id()),
       )));
     }
     catch (ConfigEntityIdLengthException $e) {
@@ -183,18 +174,18 @@ class ConfigEntityTest extends WebTestBase {
 
     // Test with an ID exeeding the maximum allowed length.
     $id_length_config_test = entity_create('config_test', array(
-      'id' => $this->randomName(static::MAX_ID_LENGTH + 1),
+      'id' => $this->randomMachineName(static::MAX_ID_LENGTH + 1),
     ));
     try {
       $status = $id_length_config_test->save();
       $this->fail(String::format("config_test entity with ID length @length exceeding the maximum allowed length of @max saved successfully", array(
-        '@length' => strlen($id_length_config_test->id),
+        '@length' => strlen($id_length_config_test->id()),
         '@max' => static::MAX_ID_LENGTH,
       )));
     }
     catch (ConfigEntityIdLengthException $e) {
       $this->pass(String::format("config_test entity with ID length @length exceeding the maximum allowed length of @max failed to save", array(
-        '@length' => strlen($id_length_config_test->id),
+        '@length' => strlen($id_length_config_test->id()),
         '@max' => static::MAX_ID_LENGTH,
       )));
     }
@@ -213,7 +204,7 @@ class ConfigEntityTest extends WebTestBase {
     }
 
     // Verify that renaming the ID returns correct status and properties.
-    $ids = array($expected['id'], 'second_' . $this->randomName(4), 'third_' . $this->randomName(4));
+    $ids = array($expected['id'], 'second_' . $this->randomMachineName(4), 'third_' . $this->randomMachineName(4));
     for ($i = 1; $i < 3; $i++) {
       $old_id = $ids[$i - 1];
       $new_id = $ids[$i];
@@ -222,7 +213,7 @@ class ConfigEntityTest extends WebTestBase {
       $this->assertIdentical($config_test->getOriginalId(), $old_id);
 
       // Rename.
-      $config_test->id = $new_id;
+      $config_test->set('id', $new_id);
       $this->assertIdentical($config_test->id(), $new_id);
       $status = $config_test->save();
       $this->assertIdentical($status, SAVED_UPDATED);
@@ -243,10 +234,10 @@ class ConfigEntityTest extends WebTestBase {
    * Tests CRUD operations through the UI.
    */
   function testCRUDUI() {
-    $id = strtolower($this->randomName());
-    $label1 = $this->randomName();
-    $label2 = $this->randomName();
-    $label3 = $this->randomName();
+    $id = strtolower($this->randomMachineName());
+    $label1 = $this->randomMachineName();
+    $label2 = $this->randomMachineName();
+    $label3 = $this->randomMachineName();
     $message_insert = format_string('%label configuration has been created.', array('%label' => $label1));
     $message_update = format_string('%label configuration has been updated.', array('%label' => $label2));
     $message_delete = format_string('%label configuration has been deleted.', array('%label' => $label2));
@@ -300,7 +291,7 @@ class ConfigEntityTest extends WebTestBase {
 
     // Rename the configuration entity's ID/machine name.
     $edit = array(
-      'id' => strtolower($this->randomName()),
+      'id' => strtolower($this->randomMachineName()),
       'label' => $label3,
     );
     $this->drupalPostForm("admin/structure/config_test/manage/$id", $edit, 'Save');

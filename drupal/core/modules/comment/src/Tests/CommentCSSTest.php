@@ -7,23 +7,17 @@
 
 namespace Drupal\comment\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\comment\CommentInterface;
 
 /**
- * Tests comment CSS classes.
+ * Tests CSS classes on comments.
+ *
+ * @group comment
  */
 class CommentCSSTest extends CommentTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Comment CSS',
-      'description' => 'Tests CSS classes on comments.',
-      'group' => 'Comment',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Allow anonymous users to see comments.
@@ -58,9 +52,9 @@ class CommentCSSTest extends CommentTestBase {
         'field_name' => 'comment',
         'uid' => $case['comment_uid'],
         'status' => $case['comment_status'],
-        'subject' => $this->randomName(),
-        'language' => Language::LANGCODE_NOT_SPECIFIED,
-        'comment_body' => array(Language::LANGCODE_NOT_SPECIFIED => array($this->randomName())),
+        'subject' => $this->randomMachineName(),
+        'language' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
+        'comment_body' => array(LanguageInterface::LANGCODE_NOT_SPECIFIED => array($this->randomMachineName())),
       ));
       $comment->save();
 

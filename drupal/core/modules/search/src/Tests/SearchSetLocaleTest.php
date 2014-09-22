@@ -8,7 +8,9 @@
 namespace Drupal\search\Tests;
 
 /**
- * Tests searching with locale values set.
+ * Tests that search works with numeric locale settings.
+ *
+ * @group search
  */
 class SearchSetLocaleTest extends SearchTestBase {
 
@@ -26,15 +28,7 @@ class SearchSetLocaleTest extends SearchTestBase {
    */
   protected $nodeSearchPlugin;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Search with numeric locale set',
-      'description' => 'Check that search works with numeric locale settings',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a plugin instance.

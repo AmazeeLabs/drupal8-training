@@ -10,7 +10,9 @@ namespace Drupal\user\Tests;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test the create user administration page.
+ * Tests the create user administration page.
+ *
+ * @group user
  */
 class UserCreateTest extends WebTestBase {
 
@@ -19,15 +21,7 @@ class UserCreateTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('image', 'contact');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User create',
-      'description' => 'Test the create user administration page.',
-      'group' => 'User',
-    );
-  }
+  public static $modules = array('image');
 
   /**
    * Create a user through the administration interface and ensure that it
@@ -37,9 +31,12 @@ class UserCreateTest extends WebTestBase {
     $user = $this->drupalCreateUser(array('administer users'));
     $this->drupalLogin($user);
 
-    // Create a field and an instance.
+    $this->assertEqual($user->getCreatedTime(), REQUEST_TIME, 'Creating a user sets default "created" timestamp.');
+    $this->assertEqual($user->getChangedTime(), REQUEST_TIME, 'Creating a user sets default "changed" timestamp.');
+
+    // Create a field.
     $field_name = 'test_field';
-    $field = array(
+    entity_create('field_storage_config', array(
       'name' => $field_name,
       'entity_type' => 'user',
       'module' => 'image',
@@ -50,10 +47,9 @@ class UserCreateTest extends WebTestBase {
       'settings' => array(
         'uri_scheme' => 'public',
       ),
-    );
-    entity_create('field_config', $field)->save();
+    ))->save();
 
-    $instance = array(
+    entity_create('field_config', array(
       'field_name' => $field_name,
       'entity_type' => 'user',
       'label' => 'Picture',
@@ -69,14 +65,16 @@ class UserCreateTest extends WebTestBase {
         'max_resolution' => '85x85',
         'min_resolution' => '',
       ),
-    );
-    entity_create('field_instance_config', $instance)->save();
+    ))->save();
 
     // Test user creation page for valid fields.
     $this->drupalGet('admin/people/create');
     $this->assertFieldbyId('edit-status-0', 0, 'The user status option Blocked exists.', 'User login');
     $this->assertFieldbyId('edit-status-1', 1, 'The user status option Active exists.', 'User login');
     $this->assertFieldByXPath('//input[@type="radio" and @id="edit-status-1" and @checked="checked"]', NULL, 'Default setting for user status is active.');
+
+    // Test that browser autocomplete behavior does not occur.
+    $this->assertNoRaw('data-user-info-from-browser', 'Ensure form attribute, data-user-info-from-browser, does not exist.');
 
     // Test that the password strength indicator displays.
     $config = \Drupal::config('user.settings');
@@ -92,10 +90,10 @@ class UserCreateTest extends WebTestBase {
     // We create two users, notifying one and not notifying the other, to
     // ensure that the tests work in both cases.
     foreach (array(FALSE, TRUE) as $notify) {
-      $name = $this->randomName();
+      $name = $this->randomMachineName();
       $edit = array(
         'name' => $name,
-        'mail' => $this->randomName() . '@example.com',
+        'mail' => $this->randomMachineName() . '@example.com',
         'pass[pass1]' => $pass = $this->randomString(),
         'pass[pass2]' => $pass,
         'notify' => $notify,
@@ -103,12 +101,12 @@ class UserCreateTest extends WebTestBase {
       $this->drupalPostForm('admin/people/create', $edit, t('Create new account'));
 
       if ($notify) {
-        $this->assertText(t('A welcome message with further instructions has been e-mailed to the new user @name.', array('@name' => $edit['name'])), 'User created');
-        $this->assertEqual(count($this->drupalGetMails()), 1, 'Notification e-mail sent');
+        $this->assertText(t('A welcome message with further instructions has been emailed to the new user @name.', array('@name' => $edit['name'])), 'User created');
+        $this->assertEqual(count($this->drupalGetMails()), 1, 'Notification email sent');
       }
       else {
-        $this->assertText(t('Created a new user account for @name. No e-mail has been sent.', array('@name' => $edit['name'])), 'User created');
-        $this->assertEqual(count($this->drupalGetMails()), 0, 'Notification e-mail not sent');
+        $this->assertText(t('Created a new user account for @name. No email has been sent.', array('@name' => $edit['name'])), 'User created');
+        $this->assertEqual(count($this->drupalGetMails()), 0, 'Notification email not sent');
       }
 
       $this->drupalGet('admin/people');

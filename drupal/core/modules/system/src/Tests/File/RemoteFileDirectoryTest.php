@@ -8,7 +8,9 @@
 namespace Drupal\system\Tests\File;
 
 /**
- * Directory related tests.
+ * Tests operations dealing with directories.
+ *
+ * @group File
  */
 class RemoteFileDirectoryTest extends DirectoryTest {
 
@@ -33,13 +35,7 @@ class RemoteFileDirectoryTest extends DirectoryTest {
    */
   protected $classname = 'Drupal\file_test\DummyRemoteStreamWrapper';
 
-  public static function getInfo() {
-    $info = parent::getInfo();
-    $info['group'] = 'File API (remote)';
-    return $info;
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     \Drupal::config('system.file')->set('default_scheme', 'dummy-remote')->save();
   }

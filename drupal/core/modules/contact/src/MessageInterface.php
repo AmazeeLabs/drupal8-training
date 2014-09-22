@@ -10,17 +10,17 @@ namespace Drupal\contact;
 use Drupal\Core\Entity\ContentEntityInterface;
 
 /**
- * Provides an interface defining a contant message entity
+ * Provides an interface defining a contact message entity.
  */
 interface MessageInterface extends ContentEntityInterface {
 
   /**
-   * Returns the category this contact message belongs to.
+   * Returns the form this contact message belongs to.
    *
-   * @return \Drupal\contact\CategoryInterface
-   *   The contact category entity.
+   * @return \Drupal\contact\ContactFormInterface
+   *   The contact form entity.
    */
-  public function getCategory();
+  public function getContactForm();
 
   /**
    * Returns the name of the sender.
@@ -39,18 +39,18 @@ interface MessageInterface extends ContentEntityInterface {
   public function setSenderName($sender_name);
 
   /**
-   * Returns the e-mail address of the sender.
+   * Returns the email address of the sender.
    *
    * @return string
-   *   The e-mail address of the message sender.
+   *   The email address of the message sender.
    */
   public function getSenderMail();
 
   /**
-   * Sets the e-mail address of the sender.
+   * Sets the email address of the sender.
    *
    * @param string $sender_mail
-   *   The e-mail address of the message sender.
+   *   The email address of the message sender.
    */
   public function setSenderMail($sender_mail);
 
@@ -63,7 +63,7 @@ interface MessageInterface extends ContentEntityInterface {
   public function getSubject();
 
   /**
-   * Sets the subject for the e-mail.
+   * Sets the subject for the email.
    *
    * @param string $subject
    *   The message subject.
@@ -79,7 +79,7 @@ interface MessageInterface extends ContentEntityInterface {
   public function getMessage();
 
   /**
-   * Sets the e-mail message to send.
+   * Sets the email message to send.
    *
    * @param string $message
    *   The message body.
@@ -95,7 +95,7 @@ interface MessageInterface extends ContentEntityInterface {
   public function copySender();
 
   /**
-   * Sets if the sender should receive a copy of this e-mail or not.
+   * Sets if the sender should receive a copy of this email or not.
    *
    * @param bool $inform
    *   TRUE if a copy should be sent, FALSE if not.

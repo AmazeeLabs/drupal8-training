@@ -7,10 +7,13 @@
 
 namespace Drupal\system\Tests\Theme;
 
+use Drupal\Component\Utility\String;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests 'raw' Twig filter.
+ * Tests Twig 'raw' filter.
+ *
+ * @group Theme
  */
 class TwigRawTest extends WebTestBase {
 
@@ -20,14 +23,6 @@ class TwigRawTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('twig_theme_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Twig raw filter',
-      'description' => "Tests Twig 'raw' filter.",
-      'group' => 'Theme',
-    );
-  }
 
   /**
    * Tests the raw filter inside an autoescape tag.
@@ -40,6 +35,23 @@ class TwigRawTest extends WebTestBase {
     $rendered = drupal_render($test);
     $this->drupalSetContent($rendered);
     $this->assertRaw('<script>alert("This alert is real because I will put it through the raw filter!");</script>');
+  }
+
+  /**
+   * Tests autoescaping of unsafe content.
+   *
+   * This is one of the most important tests in Drupal itself in terms of
+   * security.
+   */
+  public function testAutoescape() {
+    $script = '<script>alert("This alert is unreal!");</script>';
+    $build = [
+      '#theme' => 'twig_autoescape_test',
+      '#script' => $script,
+    ];
+    $rendered = drupal_render($build);
+    $this->setRawContent($rendered);
+    $this->assertRaw(String::checkPlain($script));
   }
 
 }

@@ -7,6 +7,7 @@
 
 namespace Drupal\search\Plugin;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -104,16 +105,16 @@ abstract class SearchPluginBase extends PluginBase implements ContainerFactoryPl
   /**
    * {@inheritdoc}
    */
-  public function searchFormAlter(array &$form, array &$form_state) {
+  public function searchFormAlter(array &$form, FormStateInterface $form_state) {
     // Empty default implementation.
   }
 
   /*
    * {@inheritdoc}
    */
-  public function buildSearchUrlQuery($form_state) {
+  public function buildSearchUrlQuery(FormStateInterface $form_state) {
     // Grab the keywords entered in the form and put them as 'keys' in the GET.
-    $keys = trim($form_state['values']['keys']);
+    $keys = trim($form_state->getValue('keys'));
     $query = array('keys' => $keys);
 
     return $query;

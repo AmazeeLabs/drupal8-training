@@ -8,18 +8,23 @@
 namespace Drupal\file\Tests;
 
 /**
- *  This will run tests against the file validation functions (file_validate_*).
+ * Tests the functions used to validate uploaded files.
+ *
+ * @group file
  */
 class ValidatorTest extends FileManagedUnitTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'File validator tests',
-      'description' => 'Tests the functions used to validate uploaded files.',
-      'group' => 'File Managed API',
-    );
-  }
 
-  function setUp() {
+  /**
+   * @var \Drupal\file\Entity\File
+   */
+  protected $image;
+
+  /**
+   * @var \Drupal\file\Entity\File
+   */
+  protected $non_image;
+
+  protected function setUp() {
     parent::setUp();
 
     $this->image = entity_create('file');
@@ -91,6 +96,12 @@ class ValidatorTest extends FileManagedUnitTestBase {
       $this->assertTrue($image->getWidth() <= 10, 'Image scaled to correct width.', 'File');
       $this->assertTrue($image->getHeight() <= 5, 'Image scaled to correct height.', 'File');
 
+      // Once again, now with negative width and height to force an error.
+      copy('core/misc/druplicon.png', 'temporary://druplicon.png');
+      $this->image->setFileUri('temporary://druplicon.png');
+      $errors = file_validate_image_resolution($this->image, '-10x-5');
+      $this->assertEqual(count($errors), 1, 'An error reported for an oversized image that can not be scaled down.', 'File');
+
       drupal_unlink('temporary://druplicon.png');
     }
     else {
@@ -129,12 +140,6 @@ class ValidatorTest extends FileManagedUnitTestBase {
    * Test file_validate_size().
    */
   function testFileValidateSize() {
-    // Run these tests as a regular user.
-    $user = entity_create('user', array('uid' => 2, 'name' => $this->randomName()));
-    $user->enforceIsNew();
-    $user->save();
-    \Drupal::currentUser()->setAccount($user);
-
     // Create a file with a size of 1000 bytes, and quotas of only 1 byte.
     $file = entity_create('file', array('filesize' => 1000));
     $errors = file_validate_size($file, 0, 0);

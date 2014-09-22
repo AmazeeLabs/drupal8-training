@@ -7,16 +7,20 @@
 
 namespace Drupal\system;
 
-use Drupal\Core\Breadcrumb\BreadcrumbBuilderBase;
+use Drupal\Core\Access\AccessManagerInterface;
+use Drupal\Core\Breadcrumb\BreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
-use Drupal\Core\Access\AccessManager;
+use Drupal\Core\Link;
 use Drupal\Core\ParamConverter\ParamNotConvertedException;
 use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Component\Utility\Unicode;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Matcher\RequestMatcherInterface;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\Exception\MethodNotAllowedException;
@@ -25,7 +29,8 @@ use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 /**
  * Class to define the menu_link breadcrumb builder.
  */
-class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
+class PathBasedBreadcrumbBuilder implements BreadcrumbBuilderInterface {
+  use StringTranslationTrait;
 
   /**
    * The router request context.
@@ -37,7 +42,7 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
   /**
    * The menu link access service.
    *
-   * @var \Drupal\Core\Access\AccessManager
+   * @var \Drupal\Core\Access\AccessManagerInterface
    */
   protected $accessManager;
 
@@ -81,7 +86,7 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
    *
    * @param \Symfony\Component\Routing\RequestContext $context
    *   The router request context.
-   * @param \Drupal\Core\Access\AccessManager $access_manager
+   * @param \Drupal\Core\Access\AccessManagerInterface $access_manager
    *   The menu link access service.
    * @param \Symfony\Component\Routing\Matcher\RequestMatcherInterface $router
    *   The dynamic router service.
@@ -94,7 +99,7 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current user object.
    */
-  public function __construct(RequestContext $context, AccessManager $access_manager, RequestMatcherInterface $router, InboundPathProcessorInterface $path_processor, ConfigFactoryInterface $config_factory, TitleResolverInterface $title_resolver, AccountInterface $current_user) {
+  public function __construct(RequestContext $context, AccessManagerInterface $access_manager, RequestMatcherInterface $router, InboundPathProcessorInterface $path_processor, ConfigFactoryInterface $config_factory, TitleResolverInterface $title_resolver, AccountInterface $current_user) {
     $this->context = $context;
     $this->accessManager = $access_manager;
     $this->router = $router;
@@ -107,14 +112,14 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
   /**
    * {@inheritdoc}
    */
-  public function applies(array $attributes) {
+  public function applies(RouteMatchInterface $route_match) {
     return TRUE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function build(array $attributes) {
+  public function build(RouteMatchInterface $route_match) {
     $links = array();
 
     // General path-based breadcrumbs. Use the actual request path, prior to
@@ -134,11 +139,7 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
       // Copy the path elements for up-casting.
       $route_request = $this->getRequestForPath(implode('/', $path_elements), $exclude);
       if ($route_request) {
-        $route_name = $route_request->attributes->get(RouteObjectInterface::ROUTE_NAME);
-        // Note that the parameters don't really matter here since we're
-        // passing in the request which already has the upcast attributes.
-        $parameters = array();
-        $access = $this->accessManager->checkNamedRoute($route_name, $parameters, $this->currentUser, $route_request);
+        $access = $this->accessManager->checkRequest($route_request, $this->currentUser);
         if ($access) {
           $title = $this->titleResolver->getTitle($route_request, $route_request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
         }
@@ -148,16 +149,14 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
             // route is missing a _title or _title_callback attribute.
             $title = str_replace(array('-', '_'), ' ', Unicode::ucfirst(end($path_elements)));
           }
-          // @todo Replace with a #type => link render element so that the alter
-          // hook can work with the actual data.
-          $links[] = $this->l($title, $route_request->attributes->get(RouteObjectInterface::ROUTE_NAME), $route_request->attributes->get('_raw_variables')->all(), array('html' => TRUE));
+          $links[] = Link::createFromRoute($title, $route_request->attributes->get(RouteObjectInterface::ROUTE_NAME), $route_request->attributes->get('_raw_variables')->all());
         }
       }
 
     }
     if ($path && $path != $front) {
       // Add the Home link, except for the front page.
-      $links[] = $this->l($this->t('Home'), '<front>');
+      $links[] = Link::createFromRoute($this->t('Home'), '<front>');
     }
     return array_reverse($links);
   }
@@ -202,6 +201,9 @@ class PathBasedBreadcrumbBuilder extends BreadcrumbBuilderBase {
       return NULL;
     }
     catch (MethodNotAllowedException $e) {
+      return NULL;
+    }
+    catch (AccessDeniedHttpException $e) {
       return NULL;
     }
   }

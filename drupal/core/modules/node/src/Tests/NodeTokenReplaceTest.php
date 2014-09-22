@@ -11,7 +11,10 @@ use Drupal\system\Tests\System\TokenReplaceUnitTestBase;
 use Drupal\Component\Utility\String;
 
 /**
- * Test node token replacement in strings.
+ * Generates text using placeholders for dummy content to check node token
+ * replacement.
+ *
+ * @group node
  */
 class NodeTokenReplaceTest extends TokenReplaceUnitTestBase {
 
@@ -25,20 +28,9 @@ class NodeTokenReplaceTest extends TokenReplaceUnitTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Node token replacement',
-      'description' => 'Generates text using placeholders for dummy content to check node token replacement.',
-      'group' => 'Node',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('node', array('node', 'node_field_revision', 'node_field_data', 'node_revision'));
+    $this->installEntitySchema('node');
     $this->installConfig(array('filter'));
 
     $node_type = entity_create('node_type', array('type' => 'article', 'name' => 'Article'));
@@ -63,7 +55,7 @@ class NodeTokenReplaceTest extends TokenReplaceUnitTestBase {
       'tnid' => 0,
       'uid' => $account->id(),
       'title' => '<blink>Blinking Text</blink>',
-      'body' => array(array('value' => $this->randomName(32), 'summary' => $this->randomName(16), 'format' => 'plain_text')),
+      'body' => array(array('value' => $this->randomMachineName(32), 'summary' => $this->randomMachineName(16), 'format' => 'plain_text')),
     ));
     $node->save();
 
@@ -73,17 +65,17 @@ class NodeTokenReplaceTest extends TokenReplaceUnitTestBase {
     $tests['[node:vid]'] = $node->getRevisionId();
     $tests['[node:type]'] = 'article';
     $tests['[node:type-name]'] = 'Article';
-    $tests['[node:title]'] = check_plain($node->getTitle());
+    $tests['[node:title]'] = String::checkPlain($node->getTitle());
     $tests['[node:body]'] = $node->body->processed;
     $tests['[node:summary]'] = $node->body->summary_processed;
-    $tests['[node:langcode]'] = check_plain($node->language()->id);
+    $tests['[node:langcode]'] = String::checkPlain($node->language()->id);
     $tests['[node:url]'] = url('node/' . $node->id(), $url_options);
     $tests['[node:edit-url]'] = url('node/' . $node->id() . '/edit', $url_options);
     $tests['[node:author]'] = String::checkPlain($account->getUsername());
     $tests['[node:author:uid]'] = $node->getOwnerId();
     $tests['[node:author:name]'] = String::checkPlain($account->getUsername());
-    $tests['[node:created:since]'] = \Drupal::service('date')->formatInterval(REQUEST_TIME - $node->getCreatedTime(), 2, $this->interfaceLanguage->id);
-    $tests['[node:changed:since]'] = \Drupal::service('date')->formatInterval(REQUEST_TIME - $node->getChangedTime(), 2, $this->interfaceLanguage->id);
+    $tests['[node:created:since]'] = \Drupal::service('date.formatter')->formatInterval(REQUEST_TIME - $node->getCreatedTime(), 2, $this->interfaceLanguage->id);
+    $tests['[node:changed:since]'] = \Drupal::service('date.formatter')->formatInterval(REQUEST_TIME - $node->getChangedTime(), 2, $this->interfaceLanguage->id);
 
     // Test to make sure that we generated something for each token.
     $this->assertFalse(in_array(0, array_map('strlen', $tests)), 'No empty tokens generated.');
@@ -110,7 +102,7 @@ class NodeTokenReplaceTest extends TokenReplaceUnitTestBase {
       'type' => 'article',
       'uid' => $account->id(),
       'title' => '<blink>Blinking Text</blink>',
-      'body' => array(array('value' => $this->randomName(32), 'format' => 'plain_text')),
+      'body' => array(array('value' => $this->randomMachineName(32), 'format' => 'plain_text')),
     ));
     $node->save();
 

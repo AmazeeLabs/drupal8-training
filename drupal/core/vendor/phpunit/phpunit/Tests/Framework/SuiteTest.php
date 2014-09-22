@@ -2,7 +2,7 @@
 /**
  * PHPUnit
  *
- * Copyright (c) 2001-2013, Sebastian Bergmann <sebastian@phpunit.de>.
+ * Copyright (c) 2001-2014, Sebastian Bergmann <sebastian@phpunit.de>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,18 +36,19 @@
  *
  * @package    PHPUnit
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2001-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2001-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://www.phpunit.de/
  * @since      File available since Release 2.0.0
  */
 
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'BeforeAndAfterTest.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'BeforeClassAndAfterClassTest.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'InheritedTestCase.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'NoTestCaseClass.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'NoTestCases.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'NotPublicTestCase.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'NotVoidTestCase.php';
-require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'OneTestCase.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPARATOR . 'OverrideTestCase.php';
 
 /**
@@ -55,10 +56,11 @@ require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . '_files' . DIRECTORY_SEPAR
  *
  * @package    PHPUnit
  * @author     Sebastian Bergmann <sebastian@phpunit.de>
- * @copyright  2001-2013 Sebastian Bergmann <sebastian@phpunit.de>
+ * @copyright  2001-2014 Sebastian Bergmann <sebastian@phpunit.de>
  * @license    http://www.opensource.org/licenses/BSD-3-Clause  The BSD 3-Clause License
  * @link       http://www.phpunit.de/
  * @since      Class available since Release 2.0.0
+ * @covers     PHPUnit_Framework_TestSuite
  */
 class Framework_SuiteTest extends PHPUnit_Framework_TestCase {
     protected $result;
@@ -81,6 +83,8 @@ class Framework_SuiteTest extends PHPUnit_Framework_TestCase {
         $suite->addTest(new Framework_SuiteTest('testNotVoidTestCase'));
         $suite->addTest(new Framework_SuiteTest('testOneTestCase'));
         $suite->addTest(new Framework_SuiteTest('testShadowedTests'));
+        $suite->addTest(new Framework_SuiteTest('testBeforeClassAndAfterClassAnnotations'));
+        $suite->addTest(new Framework_SuiteTest('testBeforeAnnotation'));
 
         return $suite;
     }
@@ -182,4 +186,31 @@ class Framework_SuiteTest extends PHPUnit_Framework_TestCase {
 
         $this->assertEquals(1, count($this->result));
     }
+
+    public function testBeforeClassAndAfterClassAnnotations()
+    {
+        $suite = new PHPUnit_Framework_TestSuite(
+          'BeforeClassAndAfterClassTest'
+        );
+
+        BeforeClassAndAfterClassTest::resetProperties();
+        $suite->run($this->result);
+
+        $this->assertEquals(1, BeforeClassAndAfterClassTest::$beforeClassWasRun, "@beforeClass method was not run once for the whole suite.");
+        $this->assertEquals(1, BeforeClassAndAfterClassTest::$afterClassWasRun, "@afterClass method was not run once for the whole suite.");
+    }
+
+    public function testBeforeAnnotation()
+    {
+        $test = new PHPUnit_Framework_TestSuite(
+            'BeforeAndAfterTest'
+        );
+
+        BeforeAndAfterTest::resetProperties();
+        $result = $test->run();
+
+        $this->assertEquals(2, BeforeAndAfterTest::$beforeWasRun);
+        $this->assertEquals(2, BeforeAndAfterTest::$afterWasRun);
+    }
+
 }

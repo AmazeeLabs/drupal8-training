@@ -7,11 +7,15 @@
 
 namespace Drupal\simpletest;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Database\Database;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DrupalKernel;
+use Drupal\Core\Entity\Sql\SqlEntityStorageInterface;
 use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Site\Settings;
+use Symfony\Component\DependencyInjection\Parameter;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -28,8 +32,12 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @see \Drupal\simpletest\KernelTestBase::$modules
  * @see \Drupal\simpletest\KernelTestBase::enableModules()
+ *
+ * @ingroup testing
  */
-abstract class KernelTestBase extends UnitTestBase {
+abstract class KernelTestBase extends TestBase {
+
+  use AssertContentTrait;
 
   /**
    * Modules to enable.
@@ -39,8 +47,8 @@ abstract class KernelTestBase extends UnitTestBase {
    * this property. The values of all properties in all classes in the hierarchy
    * are merged.
    *
-   * Unlike UnitTestBase::setUp(), any modules specified in the $modules
-   * property are automatically loaded and set as the fixed module list.
+   * Any modules specified in the $modules property are automatically loaded and
+   * set as the fixed module list.
    *
    * Unlike WebTestBase::setUp(), the specified modules are loaded only, but not
    * automatically installed. Modules need to be installed manually, if needed.
@@ -101,6 +109,10 @@ abstract class KernelTestBase extends UnitTestBase {
    * Create and set new configuration directories.
    *
    * @see config_get_config_directory()
+   *
+   * @throws \RuntimeException
+   *   Thrown when CONFIG_ACTIVE_DIRECTORY or CONFIG_STAGING_DIRECTORY cannot
+   *   be created or made writable.
    */
   protected function prepareConfigDirectories() {
     $this->configDirectories = array();
@@ -124,27 +136,44 @@ abstract class KernelTestBase extends UnitTestBase {
   protected function setUp() {
     $this->keyValueFactory = new KeyValueMemoryFactory();
 
-    parent::setUp();
+    // Allow for test-specific overrides.
+    $settings_services_file = DRUPAL_ROOT . '/' . $this->originalSite . '/testing.services.yml';
+    if (file_exists($settings_services_file)) {
+      // Copy the testing-specific service overrides in place.
+      copy($settings_services_file, DRUPAL_ROOT . '/' . $this->siteDirectory . '/services.yml');
+    }
 
     // Create and set new configuration directories.
     $this->prepareConfigDirectories();
 
-    // Build a minimal, partially mocked environment for unit tests.
-    $this->containerBuild(\Drupal::getContainer());
-    // Make sure it survives kernel rebuilds.
+    // Add this test class as a service provider.
+    // @todo Remove the indirection; implement ServiceProviderInterface instead.
     $GLOBALS['conf']['container_service_providers']['TestServiceProvider'] = 'Drupal\simpletest\TestServiceProvider';
 
-    \Drupal::state()->set('system.module.files', $this->moduleFiles);
-    \Drupal::state()->set('system.theme.files', $this->themeFiles);
-
-    // Bootstrap the kernel.
-    // No need to dump it; this test runs in-memory.
-    $this->kernel = new DrupalKernel('unit_testing', drupal_classloader(), FALSE);
+    // Back up settings from TestBase::prepareEnvironment().
+    $settings = Settings::getAll();
+    // Bootstrap a new kernel. Don't use createFromRequest so we don't mess with settings.
+    $class_loader = require DRUPAL_ROOT . '/core/vendor/autoload.php';
+    $this->kernel = new DrupalKernel('testing', $class_loader, FALSE);
+    $request = Request::create('/');
+    $this->kernel->setSitePath(DrupalKernel::findSitePath($request));
     $this->kernel->boot();
 
-    $request = Request::create('/');
-    $this->container->set('request', $request);
+    // Restore and merge settings.
+    // DrupalKernel::boot() initializes new Settings, and the containerBuild()
+    // method sets additional settings.
+    new Settings($settings + Settings::getAll());
+
+    // Set the request scope.
+    $this->container = $this->kernel->getContainer();
     $this->container->get('request_stack')->push($request);
+
+    // Re-inject extension file listings into state, unless the key/value
+    // service was overridden (in which case its storage does not exist yet).
+    if ($this->container->get('keyvalue') instanceof KeyValueMemoryFactory) {
+      $this->container->get('state')->set('system.module.files', $this->moduleFiles);
+      $this->container->get('state')->set('system.theme.files', $this->themeFiles);
+    }
 
     // Create a minimal core.extension configuration object so that the list of
     // enabled modules can be maintained allowing
@@ -169,10 +198,10 @@ abstract class KernelTestBase extends UnitTestBase {
     // Modules have been collected in reverse class hierarchy order; modules
     // defined by base classes should be sorted first. Then, merge the results
     // together.
+    $modules = array_reverse($modules);
+    $modules = call_user_func_array('array_merge_recursive', $modules);
     if ($modules) {
-      $modules = array_reverse($modules);
-      $modules = call_user_func_array('array_merge_recursive', $modules);
-      $this->enableModules($modules, FALSE);
+      $this->enableModules($modules);
     }
     // In order to use theme functions default theme config needs to exist.
     \Drupal::config('system.theme')->set('default', 'stark');
@@ -181,9 +210,9 @@ abstract class KernelTestBase extends UnitTestBase {
     // StreamWrapper APIs.
     // @todo Move StreamWrapper management into DrupalKernel.
     // @see https://drupal.org/node/2028109
+    file_prepare_directory($this->public_files_directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+    $this->settingsSet('file_public_path', $this->public_files_directory);
     $this->streamWrappers = array();
-    // The public stream wrapper only depends on the file_public_path setting,
-    // which is provided by UnitTestBase::setUp().
     $this->registerStreamWrapper('public', 'Drupal\Core\StreamWrapper\PublicStream');
     // The temporary stream wrapper is able to operate both with and without
     // configuration.
@@ -231,11 +260,13 @@ abstract class KernelTestBase extends UnitTestBase {
     $container->register('cache_factory', 'Drupal\Core\Cache\MemoryBackendFactory');
 
     $container
-      ->register('config.storage.active', 'Drupal\Core\Config\DatabaseStorage')
+      ->register('config.storage', 'Drupal\Core\Config\DatabaseStorage')
       ->addArgument(Database::getConnection())
       ->addArgument('config');
 
-    $this->settingsSet('keyvalue_default', 'keyvalue.memory');
+    $keyvalue_options = $container->getParameter('factory.keyvalue') ?: array();
+    $keyvalue_options['default'] = 'keyvalue.memory';
+    $container->setParameter('factory.keyvalue', $keyvalue_options);
     $container->set('keyvalue.memory', $this->keyValueFactory);
     if (!$container->has('keyvalue')) {
       // TestBase::setUp puts a completely empty container in
@@ -255,7 +286,7 @@ abstract class KernelTestBase extends UnitTestBase {
       $container
         ->register('keyvalue', 'Drupal\Core\KeyValueStore\KeyValueFactory')
         ->addArgument(new Reference('service_container'))
-        ->addArgument(new Reference('settings'));
+        ->addArgument(new Parameter('factory.keyvalue'));
 
       $container->register('state', 'Drupal\Core\State\State')
         ->addArgument(new Reference('keyvalue'));
@@ -275,7 +306,7 @@ abstract class KernelTestBase extends UnitTestBase {
     }
 
     $request = Request::create('/');
-    $this->container->set('request', $request);
+    $container->get('request_stack')->push($request);
   }
 
   /**
@@ -283,6 +314,9 @@ abstract class KernelTestBase extends UnitTestBase {
    *
    * @param array $modules
    *   A list of modules for which to install default configuration.
+   *
+   * @throws \RuntimeException
+   *   Thrown when any module listed in $modules is not enabled.
    */
   protected function installConfig(array $modules) {
     foreach ($modules as $module) {
@@ -305,6 +339,10 @@ abstract class KernelTestBase extends UnitTestBase {
    *   The name of the module that defines the table's schema.
    * @param string|array $tables
    *   The name or an array of the names of the tables to install.
+   *
+   * @throws \RuntimeException
+   *   Thrown when $module is not enabled or when the table schema cannot be
+   *   found in the module specified.
    */
   protected function installSchema($module, $tables) {
     // drupal_get_schema_unprocessed() is technically able to install a schema
@@ -338,6 +376,45 @@ abstract class KernelTestBase extends UnitTestBase {
     )));
   }
 
+
+
+  /**
+   * Installs the storage schema for a specific entity type.
+   *
+   * @param string $entity_type_id
+   *   The ID of the entity type.
+   */
+  protected function installEntitySchema($entity_type_id) {
+    /** @var \Drupal\Core\Entity\EntityManagerInterface $entity_manager */
+    $entity_manager = $this->container->get('entity.manager');
+    $entity_type = $entity_manager->getDefinition($entity_type_id);
+    $entity_manager->onEntityTypeCreate($entity_type);
+
+    // For test runs, the most common storage backend is a SQL database. For
+    // this case, ensure the tables got created.
+    $storage = $entity_manager->getStorage($entity_type_id);
+    if ($storage instanceof SqlEntityStorageInterface) {
+      $tables = $storage->getTableMapping()->getTableNames();
+      $db_schema = $this->container->get('database')->schema();
+      $all_tables_exist = TRUE;
+      foreach ($tables as $table) {
+        if (!$db_schema->tableExists($table)) {
+          $this->fail(String::format('Installed entity type table for the %entity_type entity type: %table', array(
+            '%entity_type' => $entity_type_id,
+            '%table' => $table,
+          )));
+          $all_tables_exist = FALSE;
+        }
+      }
+      if ($all_tables_exist) {
+        $this->pass(String::format('Installed entity type tables for the %entity_type entity type: %tables', array(
+          '%entity_type' => $entity_type_id,
+          '%tables' => '{' . implode('}, {', $tables) . '}',
+        )));
+      }
+    }
+  }
+
   /**
    * Enables modules for this test.
    *
@@ -369,8 +446,7 @@ abstract class KernelTestBase extends UnitTestBase {
     // Ensure isLoaded() is TRUE in order to make _theme() work.
     // Note that the kernel has rebuilt the container; this $module_handler is
     // no longer the $module_handler instance from above.
-    $module_handler = $this->container->get('module_handler');
-    $module_handler->reload();
+    $this->container->get('module_handler')->reload();
     $this->pass(format_string('Enabled modules: %modules.', array(
       '%modules' => implode(', ', $modules),
     )));
@@ -423,7 +499,7 @@ abstract class KernelTestBase extends UnitTestBase {
    */
   protected function registerStreamWrapper($scheme, $class, $type = STREAM_WRAPPERS_LOCAL_NORMAL) {
     if (isset($this->streamWrappers[$scheme])) {
-      $this->unregisterStreamWrapper($scheme);
+      $this->unregisterStreamWrapper($scheme, $this->streamWrappers[$scheme]);
     }
     $this->streamWrappers[$scheme] = $type;
     if (($type & STREAM_WRAPPERS_LOCAL) == STREAM_WRAPPERS_LOCAL) {
@@ -466,6 +542,23 @@ abstract class KernelTestBase extends UnitTestBase {
         unset($wrappers[$filter][$scheme]);
       }
     }
+  }
+
+  /**
+   * Renders a render array.
+   *
+   * @param array $elements
+   *   The elements to render.
+   *
+   * @return string
+   *   The rendered string output (typically HTML).
+   */
+  protected function render(array &$elements) {
+    $content = drupal_render($elements);
+    drupal_process_attached($elements);
+    $this->setRawContent($content);
+    $this->verbose('<pre style="white-space: pre-wrap">' . String::checkPlain($content));
+    return $content;
   }
 
 }

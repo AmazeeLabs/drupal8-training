@@ -14,7 +14,9 @@ use Drupal\views\Views;
 use Drupal\Core\Template\Attribute;
 
 /**
- * Tests the handling of displays in the UI, adding removing etc.
+ * Tests the display UI.
+ *
+ * @group views_ui
  */
 class DisplayTest extends UITestBase {
 
@@ -31,14 +33,6 @@ class DisplayTest extends UITestBase {
    * @var array
    */
   public static $modules = array('contextual');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Display element tests',
-      'description' => 'Tests the display UI.',
-      'group' => 'Views UI',
-    );
-  }
 
   /**
    * Tests reordering of displays.
@@ -97,13 +91,13 @@ class DisplayTest extends UITestBase {
     $definitions = Views::pluginManager('display')->getDefinitions();
 
     $expected = array(
-      'route_name' => 'views_ui.edit',
+      'route_name' => 'entity.view.edit_form',
       'route_parameters_names' => array('view' => 'id'),
     );
 
     // Test the expected views_ui array exists on each definition.
     foreach ($definitions as $definition) {
-      $this->assertIdentical($definition['contextual links']['views_ui_edit'], $expected, 'Expected views_ui array found in plugin definition.');
+      $this->assertIdentical($definition['contextual links']['entity.view.edit_form'], $expected, 'Expected views_ui array found in plugin definition.');
     }
   }
 
@@ -167,6 +161,7 @@ class DisplayTest extends UITestBase {
 
     // Test the default link_url value for new display
     $this->drupalPostForm(NULL, array(), t('Add Block'));
+    $this->assertUrl('admin/structure/views/view/test_display/edit/block_2');
     $this->clickLink(t('Custom URL'));
     $this->assertFieldByName('link_url', 'a-custom-url');
   }
@@ -180,7 +175,7 @@ class DisplayTest extends UITestBase {
     $view->enable()->save();
 
     $this->drupalGet('test-display');
-    $id = 'views_ui_edit:view=test_display:location=page&name=test_display&display_id=page_1';
+    $id = 'entity.view.edit_form:view=test_display:location=page&name=test_display&display_id=page_1';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
     $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
 
@@ -190,7 +185,7 @@ class DisplayTest extends UITestBase {
     $response = $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => 'test-display')));
     $this->assertResponse(200);
     $json = Json::decode($response);
-    $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="views-uiedit"><a href="' . base_path() . 'admin/structure/views/view/test_display/edit/page_1">Edit view</a></li></ul>');
+    $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="entityviewedit-form"><a href="' . base_path() . 'admin/structure/views/view/test_display/edit/page_1">Edit view</a></li></ul>');
   }
 
   /**
@@ -226,7 +221,7 @@ class DisplayTest extends UITestBase {
 
     $placeholder = array('!display_title' => $display_title);
     // Ensure that the dropdown buttons are displayed correctly.
-    $this->assertFieldByXpath('//input[@type="submit"]', t('Clone !display_title', $placeholder));
+    $this->assertFieldByXpath('//input[@type="submit"]', t('Duplicate !display_title', $placeholder));
     $this->assertFieldByXpath('//input[@type="submit"]', t('Delete !display_title', $placeholder));
     $this->assertFieldByXpath('//input[@type="submit"]', t('Disable !display_title', $placeholder));
     $this->assertNoFieldByXpath('//input[@type="submit"]', t('Enable !display_title', $placeholder));

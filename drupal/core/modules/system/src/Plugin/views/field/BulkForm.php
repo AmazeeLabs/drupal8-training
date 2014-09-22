@@ -8,6 +8,7 @@
 namespace Drupal\system\Plugin\views\field;
 
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\views\Plugin\views\style\Table;
@@ -92,7 +93,7 @@ class BulkForm extends FieldPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['action_title'] = array(
       '#type' => 'textfield',
       '#title' => t('Action title'),
@@ -122,17 +123,18 @@ class BulkForm extends FieldPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function validateOptionsForm(&$form, &$form_state) {
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) {
     parent::validateOptionsForm($form, $form_state);
 
-    $form_state['values']['options']['selected_actions'] = array_filter($form_state['values']['options']['selected_actions']);
+    $selected_actions = $form_state->getValue(array('options', 'selected_actions'));
+    $form_state->getValue(array('options', 'selected_actions'), array_filter($selected_actions));
   }
 
   /**
    * {@inheritdoc}
    */
   public function render(ResultRow $values) {
-    return '<!--form-item-' . $this->options['id'] . '--' . $this->view->row_index . '-->';
+    return '<!--form-item-' . $this->options['id'] . '--' . $values->index . '-->';
   }
 
   /**
@@ -157,10 +159,10 @@ class BulkForm extends FieldPluginBase {
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   An associative array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    */
-  public function viewsForm(&$form, &$form_state) {
+  public function viewsForm(&$form, FormStateInterface $form_state) {
     // Add the tableselect javascript.
     $form['#attached']['library'][] = 'core/drupal.tableselect';
 
@@ -175,7 +177,7 @@ class BulkForm extends FieldPluginBase {
           // only output a generic label.
           '#title' => t('Update this item'),
           '#title_display' => 'invisible',
-          '#default_value' => !empty($form_state['values'][$this->options['id']][$row_index]) ? 1 : NULL,
+          '#default_value' => !empty($form_state->getValue($this->options['id'])[$row_index]) ? 1 : NULL,
         );
       }
 
@@ -245,28 +247,28 @@ class BulkForm extends FieldPluginBase {
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   An associative array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    */
-  public function viewsFormSubmit(&$form, &$form_state) {
-    if ($form_state['step'] == 'views_form_views_form') {
+  public function viewsFormSubmit(&$form, FormStateInterface $form_state) {
+    if ($form_state->get('step') == 'views_form_views_form') {
       // Filter only selected checkboxes.
-      $selected = array_filter($form_state['values'][$this->options['id']]);
+      $selected = array_filter($form_state->getValue($this->options['id']));
       $entities = array();
       foreach (array_intersect_key($this->view->result, $selected) as $row) {
         $entity = $this->getEntity($row);
         $entities[$entity->id()] = $entity;
       }
 
-      $action = $this->actions[$form_state['values']['action']];
+      $action = $this->actions[$form_state->getValue('action')];
       $action->execute($entities);
 
       $operation_definition = $action->getPluginDefinition();
-      if (!empty($operation_definition['confirm_form_path'])) {
-        $form_state['redirect'] = $operation_definition['confirm_form_path'];
+      if (!empty($operation_definition['confirm_form_route_name'])) {
+        $form_state->setRedirect($operation_definition['confirm_form_route_name']);
       }
 
-      $count = count(array_filter($form_state['values'][$this->options['id']]));
+      $count = count(array_filter($form_state->getValue($this->options['id'])));
       if ($count) {
         drupal_set_message($this->formatPlural($count, '%action was applied to @count item.', '%action was applied to @count items.', array(
           '%action' => $action->label(),
@@ -289,10 +291,10 @@ class BulkForm extends FieldPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function viewsFormValidate(&$form, &$form_state) {
-    $selected = array_filter($form_state['values'][$this->options['id']]);
+  public function viewsFormValidate(&$form, FormStateInterface $form_state) {
+    $selected = array_filter($form_state->getValue($this->options['id']));
     if (empty($selected)) {
-      form_set_error('', $form_state, $this->emptySelectedMessage());
+      $form_state->setErrorByName('', $this->emptySelectedMessage());
     }
   }
 

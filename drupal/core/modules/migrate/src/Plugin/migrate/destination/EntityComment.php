@@ -51,8 +51,8 @@ class EntityComment extends EntityContentBase {
    * @param \Drupal\Core\State\StateInterface $state
    *   The state storage object.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, MigrationInterface $migration, EntityStorageInterface $storage, array $bundles, MigratePluginManager $plugin_manager, EntityManagerInterface $entity_manager, StateInterface $state) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition, $migration, $storage, $bundles, $plugin_manager, $entity_manager);
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, MigrationInterface $migration, EntityStorageInterface $storage, array $bundles, EntityManagerInterface $entity_manager, StateInterface $state) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $migration, $storage, $bundles, $entity_manager);
     $this->state = $state;
   }
 
@@ -68,7 +68,6 @@ class EntityComment extends EntityContentBase {
       $migration,
       $container->get('entity.manager')->getStorage($entity_type),
       array_keys($container->get('entity.manager')->getBundleInfo($entity_type)),
-      $container->get('plugin.manager.migrate.entity_field'),
       $container->get('entity.manager'),
       $container->get('state')
     );
@@ -78,11 +77,11 @@ class EntityComment extends EntityContentBase {
    * {@inheritdoc}
    */
   public function import(Row $row, array $old_destination_id_values = array()) {
-    if (($stub = !$row->getSourceProperty('entity_type')) && ($state = $this->state->get('comment.maintain_entity_statistics', 0))) {
+    if ($row->stub() && ($state = $this->state->get('comment.maintain_entity_statistics', 0))) {
       $this->state->set('comment.maintain_entity_statistics', 0);
     }
     $return = parent::import($row, $old_destination_id_values);
-    if ($stub && $state) {
+    if ($row->stub() && $state) {
       $this->state->set('comment.maintain_entity_statistics', $state);
     }
     return $return;

@@ -7,11 +7,13 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\field\Entity\FieldConfig;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\field\Entity\FieldStorageConfig;
 
 /**
  * Tests a taxonomy term reference field that allows multiple vocabularies.
+ *
+ * @group taxonomy
  */
 class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
 
@@ -25,15 +27,7 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
   protected $vocabulary1;
   protected $vocabulary2;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Multiple vocabulary term reference field',
-      'description' => 'Tests term reference fields that allow multiple vocabularies.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $web_user = $this->drupalCreateUser(array('view test entity', 'administer entity_test content', 'administer taxonomy'));
@@ -41,13 +35,13 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
     $this->vocabulary1 = $this->createVocabulary();
     $this->vocabulary2 = $this->createVocabulary();
 
-    // Set up a field and instance.
-    $this->field_name = drupal_strtolower($this->randomName());
-    entity_create('field_config', array(
+    // Set up a field storage and a field.
+    $this->field_name = drupal_strtolower($this->randomMachineName());
+    entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'entity_test',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -61,7 +55,7 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
         ),
       )
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $this->field_name,
       'entity_type' => 'entity_test',
       'bundle' => 'entity_test',
@@ -92,8 +86,6 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
     // used to ignore the value check.
     $this->assertFieldByName("{$this->field_name}[]", NULL, 'Widget is displayed.');
     $edit = array(
-      'user_id' => mt_rand(0, 10),
-      'name' => $this->randomName(),
       "{$this->field_name}[]" => array($term1->id(), $term2->id()),
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -122,9 +114,9 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
     $this->assertText($term1->getName(), 'Term 1 name is displayed.');
     $this->assertNoText($term2->getName(), 'Term 2 name is not displayed.');
 
-    // Verify that field and instance settings are correct.
-    $field = FieldConfig::loadByName('entity_test', $this->field_name);
-    $this->assertEqual(count($field->getSetting('allowed_values')), 1, 'Only one vocabulary is allowed for the field.');
+    // Verify that field storage settings and field settings are correct.
+    $field_storage = FieldStorageConfig::loadByName('entity_test', $this->field_name);
+    $this->assertEqual(count($field_storage->getSetting('allowed_values')), 1, 'Only one vocabulary is allowed for the field.');
 
     // The widget should still be displayed.
     $this->drupalGet('entity_test/add');
@@ -134,8 +126,6 @@ class TermFieldMultipleVocabularyTest extends TaxonomyTestBase {
 
     // Term 1 should still pass validation.
     $edit = array(
-      'user_id' => mt_rand(0, 10),
-      'name' => $this->randomName(),
       "{$this->field_name}[]" => array($term1->id()),
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));

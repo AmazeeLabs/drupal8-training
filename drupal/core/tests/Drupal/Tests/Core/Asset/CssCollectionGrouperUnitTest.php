@@ -12,7 +12,7 @@ use Drupal\Core\Asset\CssCollectionGrouper;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the CssCollectionGrouper class.
+ * Tests the CSS asset collection grouper.
  *
  * @group Asset
  */
@@ -25,15 +25,7 @@ class CssCollectionGrouperUnitTest extends UnitTestCase {
    */
   protected $grouper;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'CSS asset collection grouper functionality',
-      'description' => 'Tests the CSS asset collection grouper.',
-      'group' => 'Asset handling',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->grouper = new CssCollectionGrouper();

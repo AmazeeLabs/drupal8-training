@@ -7,35 +7,29 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Component\Utility\Xss;
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Language\Language;
 use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
- * Test taxonomy token replacement in strings.
+ * Generates text using placeholders for dummy content to check taxonomy token
+ * replacement.
+ *
+ * @group taxonomy
  */
 class TokenReplaceTest extends TaxonomyTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Taxonomy token replacement',
-      'description' => 'Generates text using placeholders for dummy content to check taxonomy token replacement.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->admin_user = $this->drupalCreateUser(array('administer taxonomy', 'bypass node access'));
     $this->drupalLogin($this->admin_user);
     $this->vocabulary = $this->createVocabulary();
     $this->field_name = 'taxonomy_' . $this->vocabulary->id();
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -46,7 +40,7 @@ class TokenReplaceTest extends TaxonomyTestBase {
       ),
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'field_name' => $this->field_name,
       'bundle' => 'article',
       'entity_type' => 'node',

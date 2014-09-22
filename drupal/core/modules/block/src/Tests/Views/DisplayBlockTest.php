@@ -15,8 +15,9 @@ use Drupal\views\Tests\ViewTestData;
 use Drupal\Core\Template\Attribute;
 
 /**
- * Defines a test for block display.
+ * Tests the block display plugin.
  *
+ * @group block
  * @see \Drupal\block\Plugin\views\display\Block
  */
 class DisplayBlockTest extends ViewTestBase {
@@ -35,14 +36,6 @@ class DisplayBlockTest extends ViewTestBase {
    */
   public static $testViews = array('test_view_block', 'test_view_block2');
 
-  public static function getInfo() {
-    return array(
-      'name' => ' Display: Block',
-      'description' => 'Tests the block display plugin.',
-      'group' => 'Views module integration',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
 
@@ -59,7 +52,7 @@ class DisplayBlockTest extends ViewTestBase {
     // Create a new view in the UI.
     $edit = array();
     $edit['label'] = $this->randomString();
-    $edit['id'] = strtolower($this->randomName());
+    $edit['id'] = strtolower($this->randomMachineName());
     $edit['show[wizard_key]'] = 'standard:views_test_data';
     $edit['description'] = $this->randomString();
     $edit['block[create]'] = TRUE;
@@ -71,15 +64,18 @@ class DisplayBlockTest extends ViewTestBase {
     $arguments = array(
       ':id' => 'edit-category-lists-views',
       ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-1',
-      ':href' => url('admin/structure/block/add/views_block:' . $edit['id'] . '-block_1/stark'),
+      ':href' => \Drupal::Url('block.admin_add', array(
+        'plugin_id' => 'views_block:' . $edit['id'] . '-block_1',
+        'theme' => 'stark',
+      )),
       ':text' => $edit['label'],
     );
     $this->drupalGet('admin/structure/block');
     $elements = $this->xpath('//details[@id=:id]//li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
     $this->assertTrue(!empty($elements), 'The test block appears in the category for its base table.');
 
-    // Clone the block before changing the category.
-    $this->drupalPostForm('admin/structure/views/view/' . $edit['id'] . '/edit/block_1', array(), t('Clone @display_title', array('@display_title' => 'Block')));
+    // Duplicate the block before changing the category.
+    $this->drupalPostForm('admin/structure/views/view/' . $edit['id'] . '/edit/block_1', array(), t('Duplicate @display_title', array('@display_title' => 'Block')));
     $this->assertUrl('admin/structure/views/view/' . $edit['id'] . '/edit/block_2');
 
     // Change the block category to a random string.
@@ -91,8 +87,8 @@ class DisplayBlockTest extends ViewTestBase {
     $category = $this->randomString();
     $this->drupalPostForm(NULL, array('block_category' => $category), t('Apply'));
 
-    // Clone the block after changing the category.
-    $this->drupalPostForm(NULL, array(), t('Clone @display_title', array('@display_title' => 'Block')));
+    // Duplicate the block after changing the category.
+    $this->drupalPostForm(NULL, array(), t('Duplicate @display_title', array('@display_title' => 'Block')));
     $this->assertUrl('admin/structure/views/view/' . $edit['id'] . '/edit/block_3');
 
     $this->drupalPostForm(NULL, array(), t('Save'));
@@ -107,20 +103,26 @@ class DisplayBlockTest extends ViewTestBase {
     $arguments = array(
       ':id' => 'edit-category-lists-views',
       ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-2',
-      ':href' => url('admin/structure/block/add/views_block:' . $edit['id'] . '-block_2/stark'),
+      ':href' => \Drupal::Url('block.admin_add', array(
+        'plugin_id' => 'views_block:' . $edit['id'] . '-block_2',
+        'theme' => 'stark',
+      )),
       ':text' => $edit['label'],
     );
     $elements = $this->xpath('//details[@id=:id]//li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
-    $this->assertTrue(!empty($elements), 'The first cloned test block remains in the original category.');
+    $this->assertTrue(!empty($elements), 'The first duplicated test block remains in the original category.');
 
     $arguments = array(
       ':id' => $category_id,
       ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-3',
-      ':href' => url('admin/structure/block/add/views_block:' . $edit['id'] . '-block_3/stark'),
+      ':href' => \Drupal::Url('block.admin_add', array(
+        'plugin_id' => 'views_block:' . $edit['id'] . '-block_3',
+        'theme' => 'stark',
+      )),
       ':text' => $edit['label'],
     );
     $elements = $this->xpath('//details[@id=:id]//li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
-    $this->assertTrue(!empty($elements), 'The second cloned test block appears in the custom category.');
+    $this->assertTrue(!empty($elements), 'The second duplicated test block appears in the custom category.');
   }
 
   /**
@@ -273,8 +275,8 @@ class DisplayBlockTest extends ViewTestBase {
     $cached_block = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('cache' => array('max_age' => 3600)));
     $this->drupalGet('test-page');
 
-    $id = 'block:block=' . $block->id() . ':|views_ui_edit:view=test_view_block:location=block&name=test_view_block&display_id=block_1';
-    $cached_id = 'block:block=' . $cached_block->id() . ':|views_ui_edit:view=test_view_block:location=block&name=test_view_block&display_id=block_1';
+    $id = 'block:block=' . $block->id() . ':|entity.view.edit_form:view=test_view_block:location=block&name=test_view_block&display_id=block_1';
+    $cached_id = 'block:block=' . $cached_block->id() . ':|entity.view.edit_form:view=test_view_block:location=block&name=test_view_block&display_id=block_1';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
     $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
     $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $cached_id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $cached_id)));
@@ -285,8 +287,8 @@ class DisplayBlockTest extends ViewTestBase {
     $response = $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => 'test-page')));
     $this->assertResponse(200);
     $json = Json::decode($response);
-    $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="block-configure"><a href="' . base_path() . 'admin/structure/block/manage/' . $block->id() . '">Configure block</a></li><li class="views-uiedit"><a href="' . base_path() . 'admin/structure/views/view/test_view_block/edit/block_1">Edit view</a></li></ul>');
-    $this->assertIdentical($json[$cached_id], '<ul class="contextual-links"><li class="block-configure"><a href="' . base_path() . 'admin/structure/block/manage/' . $cached_block->id() . '">Configure block</a></li><li class="views-uiedit"><a href="' . base_path() . 'admin/structure/views/view/test_view_block/edit/block_1">Edit view</a></li></ul>');
+    $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="block-configure"><a href="' . base_path() . 'admin/structure/block/manage/' . $block->id() . '">Configure block</a></li><li class="entityviewedit-form"><a href="' . base_path() . 'admin/structure/views/view/test_view_block/edit/block_1">Edit view</a></li></ul>');
+    $this->assertIdentical($json[$cached_id], '<ul class="contextual-links"><li class="block-configure"><a href="' . base_path() . 'admin/structure/block/manage/' . $cached_block->id() . '">Configure block</a></li><li class="entityviewedit-form"><a href="' . base_path() . 'admin/structure/views/view/test_view_block/edit/block_1">Edit view</a></li></ul>');
   }
 
 }

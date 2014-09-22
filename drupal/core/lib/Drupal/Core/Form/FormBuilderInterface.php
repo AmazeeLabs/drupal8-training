@@ -10,20 +10,20 @@ namespace Drupal\Core\Form;
 /**
  * Provides an interface for form building and processing.
  */
-interface FormBuilderInterface extends FormErrorInterface {
+interface FormBuilderInterface {
 
   /**
    * Determines the ID of a form.
    *
    * @param \Drupal\Core\Form\FormInterface|string $form_arg
    *   The value is identical to that of self::getForm()'s $form_arg argument.
-   * @param array $form_state
-   *   An associative array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    *
    * @return string
    *   The unique string identifying the desired form.
    */
-  public function getFormId($form_arg, &$form_state);
+  public function getFormId($form_arg, FormStateInterface &$form_state);
 
   /**
    * Gets a renderable form array.
@@ -36,19 +36,18 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   The value must be one of the following:
    *   - The name of a class that implements \Drupal\Core\Form\FormInterface.
    *   - An instance of a class that implements \Drupal\Core\Form\FormInterface.
-   *   - The name of a function that builds the form.
    * @param ...
    *   Any additional arguments are passed on to the functions called by
    *   \Drupal::formBuilder()->getForm(), including the unique form constructor
    *   function. For example, the node_edit form requires that a node object is
    *   passed in here when it is called. These are available to implementations
    *   of hook_form_alter() and hook_form_FORM_ID_alter() as the array
-   *   $form_state['build_info']['args'].
+   *   $form_state->getBuildInfo()['args'].
    *
    * @return array
    *   The form array.
    *
-   * @see drupal_build_form()
+   * @see \Drupal\Core\Form\FormBuilderInterface::buildForm()
    */
   public function getForm($form_arg);
 
@@ -59,162 +58,12 @@ interface FormBuilderInterface extends FormErrorInterface {
    * previous page-load. The form is then passed on for processing, validation
    * and submission if there is proper input.
    *
-   * @param $form_id
-   *   The unique string identifying the desired form.
-   * @param array $form_state
-   *   An array which stores information about the form. This is passed as a
-   *   reference so that the caller can use it to examine what in the form
-   *   changed when the form submission process is complete. Furthermore, it may
-   *   be used to store information related to the processed data in the form,
-   *   which will persist across page requests when the 'cache' or 'rebuild'
-   *   flag is set. The following parameters may be set in $form_state to affect
-   *   how the form is rendered:
-   *   - build_info: Internal. An associative array of information stored by
-   *     Form API that is necessary to build and rebuild the form from cache
-   *     when the original context may no longer be available:
-   *     - callback: The actual callback to be used to retrieve the form array.
-   *       Can be any callable. If none is provided $form_id is used as the name
-   *       of a function to call instead.
-   *     - args: A list of arguments to pass to the form constructor.
-   *     - files: An optional array defining include files that need to be
-   *       loaded for building the form. Each array entry may be the path to a
-   *       file or another array containing values for the parameters 'type',
-   *       'module' and 'name' as needed by module_load_include(). The files
-   *       listed here are automatically loaded by form_get_cache(). By default
-   *       the current menu router item's 'file' definition is added, if any.
-   *       Use form_load_include() to add include files from a form constructor.
-   *     - form_id: Identification of the primary form being constructed and
-   *       processed.
-   *     - base_form_id: Identification for a base form, as declared in the form
-  *       class's \Drupal\Core\Form\BaseFormIdInterface::getBaseFormId() method.
-   *   - rebuild_info: Internal. Similar to 'build_info', but pertaining to
-   *     self::rebuildForm().
-   *   - rebuild: Normally, after the entire form processing is completed and
-   *     submit handlers have run, a form is considered to be done and
-   *     self::redirectForm() will redirect the user to a new page using a GET
-   *     request (so a browser refresh does not re-submit the form). However, if
-   *     'rebuild' has been set to TRUE, then a new copy of the form is
-   *     immediately built and sent to the browser, instead of a redirect. This
-   *     is used for multi-step forms, such as wizards and confirmation forms.
-   *     Normally, $form_state['rebuild'] is set by a submit handler, since its
-   *     is usually logic within a submit handler that determines whether a form
-   *     is done or requires another step. However, a validation handler may
-   *     already set $form_state['rebuild'] to cause the form processing to
-   *     bypass submit handlers and rebuild the form instead, even if there are
-   *     no validation errors.
-   *   - response: Used when a form needs to return some kind of a
-   *     \Symfony\Component\HttpFoundation\Response object, e.g., a
-   *     \Symfony\Component\HttpFoundation\BinaryFileResponse when triggering a
-   *     file download. If you use the $form_state['redirect'] key, it will be
-   *     used to build a \Symfony\Component\HttpFoundation\RedirectResponse and
-   *     will populate this key.
-   *   - redirect: Used to redirect the form on submission. It may either be a
-   *     string containing the destination URL, or an array of arguments
-   *     compatible with url(). See url() for complete information.
-   *   - no_redirect: If set to TRUE the form will NOT perform a redirect,
-   *     even if 'redirect' is set.
-   *   - method: The HTTP form method to use for finding the input for this
-   *     form. May be 'post' or 'get'. Defaults to 'post'. Note that 'get'
-   *     method forms do not use form ids so are always considered to be
-   *     submitted, which can have unexpected effects. The 'get' method should
-   *     only be used on forms that do not change data, as that is exclusively
-   *     the domain of 'post.'
-   *   - cache: If set to TRUE the original, unprocessed form structure will be
-   *     cached, which allows the entire form to be rebuilt from cache. A
-   *     typical form workflow involves two page requests; first, a form is
-   *     built and rendered for the user to fill in. Then, the user fills the
-   *     form in and submits it, triggering a second page request in which the
-   *     form must be built and processed. By default, $form and $form_state are
-   *     built from scratch during each of these page requests. Often, it is
-   *     necessary or desired to persist the $form and $form_state variables
-   *     from the initial page request to the one that processes the submission.
-   *     'cache' can be set to TRUE to do this. A prominent example is an
-   *     Ajax-enabled form, in which ajax_process_form() enables form caching
-   *     for all forms that include an element with the #ajax property. (The
-   *     Ajax handler has no way to build the form itself, so must rely on the
-   *     cached version.) Note that the persistence of $form and $form_state
-   *     happens automatically for (multi-step) forms having the 'rebuild' flag
-   *     set, regardless of the value for 'cache'.
-   *   - no_cache: If set to TRUE the form will NOT be cached, even if 'cache'
-   *     is set.
-   *   - values: An associative array of values submitted to the form. The
-   *     validation functions and submit functions use this array for nearly all
-   *     their decision making. (Note that #tree determines whether the values
-   *     are a flat array or an array whose structure parallels the $form array.
-   *     See the @link forms_api_reference.html Form API reference @endlink for
-   *     more information.)
-   *   - input: The array of values as they were submitted by the user. These
-   *     are raw and unvalidated, so should not be used without a thorough
-   *     understanding of security implications. In almost all cases, code
-   *     should use the data in the 'values' array exclusively. The most common
-   *     use of this key is for multi-step forms that need to clear some of the
-   *     user input when setting 'rebuild'. The values correspond to
-   *     \Drupal::request()->request or \Drupal::request()->query, depending on
-   *     the 'method' chosen.
-   *   - always_process: If TRUE and the method is GET, a form_id is not
-   *     necessary. This should only be used on RESTful GET forms that do NOT
-   *     write data, as this could lead to security issues. It is useful so that
-   *     searches do not need to have a form_id in their query arguments to
-   *     trigger the search.
-   *   - must_validate: Ordinarily, a form is only validated once, but there are
-   *     times when a form is resubmitted internally and should be validated
-   *     again. Setting this to TRUE will force that to happen. This is most
-   *     likely to occur during Ajax operations.
-   *   - programmed: If TRUE, the form was submitted programmatically, usually
-   *     invoked via self::submitForm(). Defaults to FALSE.
-   *   - programmed_bypass_access_check: If TRUE, programmatic form submissions
-   *     are processed without taking #access into account. Set this to FALSE
-   *     when submitting a form programmatically with values that may have been
-   *     input by the user executing the current request; this will cause
-   *     #access to be respected as it would on a normal form submission.
-   *     Defaults to TRUE.
-   *   - process_input: Boolean flag. TRUE signifies correct form submission.
-   *     This is always TRUE for programmed forms coming from self::submitForm()
-   *     (see 'programmed' key), or if the form_id coming from the
-   *     \Drupal::request()->request data is set and matches the current form_id.
-   *   - submitted: If TRUE, the form has been submitted. Defaults to FALSE.
-   *   - executed: If TRUE, the form was submitted and has been processed and
-   *     executed. Defaults to FALSE.
-   *   - triggering_element: (read-only) The form element that triggered
-   *     submission, which may or may not be a button (in the case of Ajax
-   *     forms). This key is often used to distinguish between various buttons
-   *     in a submit handler, and is also used in Ajax handlers.
-   *   - has_file_element: Internal. If TRUE, there is a file element and Form
-   *     API will set the appropriate 'enctype' HTML attribute on the form.
-   *   - groups: Internal. An array containing references to details elements to
-   *     render them within vertical tabs.
-   *   - storage: $form_state['storage'] is not a special key, and no specific
-   *     support is provided for it in the Form API. By tradition it was
-   *     the location where application-specific data was stored for
-   *     communication between the submit, validation, and form builder
-   *     functions, especially in a multi-step-style form. Form implementations
-   *     may use any key(s) within $form_state (other than the keys listed here
-   *     and other reserved ones used by Form API internals) for this kind of
-   *     storage. The recommended way to ensure that the chosen key doesn't
-   *     conflict with ones used by the Form API or other modules is to use the
-   *     module name as the key name or a prefix for the key name. For example,
-   *     the entity form classes use $this->entity in entity forms,
-   *     or $form_state['controller']->getEntity() outside the controller, to
-   *     store information about the entity being edited, and this information
-   *     stays available across successive clicks of the "Preview" button (if
-   *     available) as well as when the "Save" button is finally clicked.
-   *   - buttons: A list containing copies of all submit and button elements in
-   *     the form.
-   *   - complete_form: A reference to the $form variable containing the
-   *     complete form structure. #process, #after_build, #element_validate, and
-   *     other handlers being invoked on a form element may use this reference
-   *     to access other information in the form the element is contained in.
-   *   - temporary: An array holding temporary data accessible during the
-   *     current page request only. All $form_state properties that are not
-   *     reserved keys (see form_state_keys_no_cache()) persist throughout a
-   *     multistep form sequence. Form API provides this key for modules to
-   *     communicate information across form-related functions during a single
-   *     page request. It may be used to temporarily save data that does not
-   *     need to or should not be cached during the whole form workflow; e.g.,
-   *     data that needs to be accessed during the current form build process
-   *     only. There is no use-case for this functionality in Drupal core.
-   *   Information on how certain $form_state properties control redirection
-   *   behavior after form submission may be found in self::redirectForm().
+   * @param \Drupal\Core\Form\FormInterface|string $form_id
+   *   The value must be one of the following:
+   *   - The name of a class that implements \Drupal\Core\Form\FormInterface.
+   *   - An instance of a class that implements \Drupal\Core\Form\FormInterface.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    *
    * @return array
    *   The rendered form. This function may also perform a redirect and hence
@@ -222,12 +71,7 @@ interface FormBuilderInterface extends FormErrorInterface {
    *
    * @see self::redirectForm()
    */
-  public function buildForm($form_id, array &$form_state);
-
-  /**
-   * Retrieves default values for the $form_state array.
-   */
-  public function getFormStateDefaults();
+  public function buildForm($form_id, FormStateInterface &$form_state);
 
   /**
    * Constructs a new $form from the information in $form_state.
@@ -235,10 +79,10 @@ interface FormBuilderInterface extends FormErrorInterface {
    * This is the key function for making multi-step forms advance from step to
    * step. It is called by self::processForm() when all user input processing,
    * including calling validation and submission handlers, for the request is
-   * finished. If a validate or submit handler set $form_state['rebuild'] to
-   * TRUE, and if other conditions don't preempt a rebuild from happening, then
-   * this function is called to generate a new $form, the next step in the form
-   * workflow, to be returned for rendering.
+   * finished. If a validate or submit handler set $form_state->isRebuilding()
+   * to TRUE, and if other conditions don't preempt a rebuild from happening,
+   * then this function is called to generate a new $form, the next step in the
+   * form workflow, to be returned for rendering.
    *
    * Ajax form submissions are almost always multi-step workflows, so that is
    * one common use-case during which form rebuilding occurs. See
@@ -248,13 +92,13 @@ interface FormBuilderInterface extends FormErrorInterface {
    * @param string $form_id
    *   The unique string identifying the desired form. If a function with that
    *   name exists, it is called to build the form array.
-   * @param array $form_state
-   *   A keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    * @param array|null $old_form
    *   (optional) A previously built $form. Used to retain the #build_id and
    *   #action properties in Ajax callbacks and similar partial form rebuilds.
    *   The only properties copied from $old_form are the ones which both exist
-   *   in $old_form and for which $form_state['rebuild_info']['copy'][PROPERTY]
+   *   in $old_form and for which $form_state->getRebuildInfo()['copy'][PROPERTY]
    *   is TRUE. If $old_form is not passed, the entire $form is rebuilt freshly.
    *   'rebuild_info' needs to be a separate top-level property next to
    *   'build_info', since the contained data must not be cached.
@@ -265,17 +109,7 @@ interface FormBuilderInterface extends FormErrorInterface {
    * @see self::processForm()
    * @see \Drupal\system\FormAjaxController::content()
    */
-  public function rebuildForm($form_id, &$form_state, $old_form = NULL);
-
-  /**
-   * Fetches a form from the cache.
-   */
-  public function getCache($form_build_id, &$form_state);
-
-  /**
-   * Stores a form in the cache.
-   */
-  public function setCache($form_build_id, $form, $form_state);
+  public function rebuildForm($form_id, FormStateInterface &$form_state, $old_form = NULL);
 
   /**
    * Retrieves, populates, and processes a form.
@@ -285,17 +119,17 @@ interface FormBuilderInterface extends FormErrorInterface {
    * processes a form, but does not allow you to supply values.
    *
    * There is no return value, but you can check to see if there are errors
-   * by calling form_get_errors().
+   * by calling $form_state->getErrors().
    *
    * @param \Drupal\Core\Form\FormInterface|string $form_arg
    *   A form object to use to build the form, or the unique string identifying
    *   the desired form. If $form_arg is a string and a function with that
    *   name exists, it is called to build the form array.
    * @param $form_state
-   *   A keyed array containing the current state of the form. Most important is
-   *   the $form_state['values'] collection, a tree of data used to simulate the
+   *   The current state of the form. Most important is the
+   *   $form_state->getValues() collection, a tree of data used to simulate the
    *   incoming \Drupal::request()->request information from a user's form
-   *   submission. If a key is not filled in $form_state['values'], then the
+   *   submission. If a key is not filled in $form_state->getValues(), then the
    *   default value of the respective element is used. To submit an unchecked
    *   checkbox or other control that browsers submit by not having a
    *   \Drupal::request()->request entry, include the key, but set the value to
@@ -309,28 +143,29 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   $form_state build info array so that the reference can be preserved. For
    *   example, a form builder function with the following signature:
    *   @code
-   *   function mymodule_form($form, &$form_state, &$object) {
+   *   function mymodule_form($form, FormStateInterface &$form_state, &$object) {
    *   }
    *   @endcode
    *   would be called via self::submitForm() as follows:
    *   @code
-   *   $form_state['values'] = $my_form_values;
-   *   $form_state['build_info']['args'] = array(&$object);
+   *   $form_state->setValues($my_form_values);
+   *   $form_state->addBuildInfo('args', [&$object]);
    *   drupal_form_submit('mymodule_form', $form_state);
    *   @endcode
    * For example:
    * @code
    * // register a new user
-   * $form_state = array();
-   * $form_state['values']['name'] = 'robo-user';
-   * $form_state['values']['mail'] = 'robouser@example.com';
-   * $form_state['values']['pass']['pass1'] = 'password';
-   * $form_state['values']['pass']['pass2'] = 'password';
-   * $form_state['values']['op'] = t('Create new account');
+   * $form_state = new FormState();
+   * $values['name'] = 'robo-user';
+   * $values['mail'] = 'robouser@example.com';
+   * $values['pass']['pass1'] = 'password';
+   * $values['pass']['pass2'] = 'password';
+   * $values['op'] = t('Create new account');
+   * $form_state->setValues($values);
    * drupal_form_submit('user_register_form', $form_state);
    * @endcode
    */
-  public function submitForm($form_arg, &$form_state);
+  public function submitForm($form_arg, FormStateInterface &$form_state);
 
   /**
    * Retrieves the structured array that defines a given form.
@@ -338,14 +173,14 @@ interface FormBuilderInterface extends FormErrorInterface {
    * @param string $form_id
    *   The unique string identifying the desired form. If a function
    *   with that name exists, it is called to build the form array.
-   * @param array $form_state
-   *   A keyed array containing the current state of the form, including the
-   *   additional arguments to self::getForm() or self::submitForm() in the
-   *   'args' component of the array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form, including the additional arguments to
+   *   self::getForm() or self::submitForm() in the 'args' component of the
+   *   array.
    *
    * @return mixed|\Symfony\Component\HttpFoundation\Response
    */
-  public function retrieveForm($form_id, &$form_state);
+  public function retrieveForm($form_id, FormStateInterface &$form_state);
 
   /**
    * Processes a form submission.
@@ -357,16 +192,15 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   The unique string identifying the current form.
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A keyed array containing the current state of the form. This
-   *   includes the current persistent storage data for the form, and
-   *   any data passed along by earlier steps when displaying a
-   *   multi-step form. Additional information, like the sanitized
-   *   \Drupal::request()->request data, is also accumulated here.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form. This includes the current persistent
+   *   storage data for the form, and any data passed along by earlier steps
+   *   when displaying a multi-step form. Additional information, like the
+   *   sanitized \Drupal::request()->request data, is also accumulated here.
    *
    * @return \Symfony\Component\HttpFoundation\RedirectResponse|null
    */
-  public function processForm($form_id, &$form, &$form_state);
+  public function processForm($form_id, &$form, FormStateInterface &$form_state);
 
   /**
    * Prepares a structured form array.
@@ -379,11 +213,11 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   theming, and hook_form_alter functions.
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A keyed array containing the current state of the form. Passed
-   *   in here so that hook_form_alter() calls can use it, as well.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form. Passed in here so that hook_form_alter()
+   *   calls can use it, as well.
    */
-  public function prepareForm($form_id, &$form, &$form_state);
+  public function prepareForm($form_id, &$form, FormStateInterface &$form_state);
 
   /**
    * Builds and processes all elements in the structured form array.
@@ -459,8 +293,8 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   the next submission needs to be processed, a multi-step workflow is
    *   needed. This is most commonly implemented with a submit handler setting
    *   persistent data within $form_state based on *validated* values in
-   *   $form_state['values'] and setting $form_state['rebuild']. The form
-   *   building functions must then be implemented to use the $form_state data
+   *   $form_state->getValues() and checking $form_state->isRebuilding(). The
+   *   form building functions must then be implemented to use the $form_state
    *   to rebuild the form with the structure appropriate for the new state.
    * - Where user input must affect the rendering of the form without affecting
    *   its structure, the necessary conditional rendering logic should reside
@@ -472,43 +306,13 @@ interface FormBuilderInterface extends FormErrorInterface {
    *   theming, and hook_form_alter functions.
    * @param array $element
    *   An associative array containing the structure of the current element.
-   * @param array $form_state
-   *   A keyed array containing the current state of the form. In this
-   *   context, it is used to accumulate information about which button
-   *   was clicked when the form was submitted, as well as the sanitized
-   *   \Drupal::request()->request data.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form. In this context, it is used to accumulate
+   *   information about which button was clicked when the form was submitted,
+   *   as well as the sanitized \Drupal::request()->request data.
    *
    * @return array
    */
-  public function doBuildForm($form_id, &$element, &$form_state);
-
-  /**
-   * Changes submitted form values during form validation.
-   *
-   * Use this function to change the submitted value of a form element in a form
-   * validation function, so that the changed value persists in $form_state
-   * through to the submission handlers.
-   *
-   * Note that form validation functions are specified in the '#validate'
-   * component of the form array (the value of $form['#validate'] is an array of
-   * validation function names). If the form does not originate in your module,
-   * you can implement hook_form_FORM_ID_alter() to add a validation function
-   * to $form['#validate'].
-   *
-   * @param $element
-   *   The form element that should have its value updated; in most cases you
-   *   can just pass in the element from the $form array, although the only
-   *   component that is actually used is '#parents'. If constructing yourself,
-   *   set $element['#parents'] to be an array giving the path through the form
-   *   array's keys to the element whose value you want to update. For instance,
-   *   if you want to update the value of $form['elem1']['elem2'], which should
-   *   be stored in $form_state['values']['elem1']['elem2'], you would set
-   *   $element['#parents'] = array('elem1','elem2').
-   * @param $value
-   *   The new value for the form element.
-   * @param $form_state
-   *   Form state array where the value change should be recorded.
-   */
-  public function setValue($element, $value, &$form_state);
+  public function doBuildForm($form_id, &$element, FormStateInterface &$form_state);
 
 }

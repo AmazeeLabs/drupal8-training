@@ -51,16 +51,12 @@ body,
   padding: 35px 0 30px;
 }
 #footer-wrapper .section {
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
   box-sizing: border-box;
   padding: 0 15px;
 }
 .region-triptych-first,
 .region-triptych-middle,
 .region-triptych-last {
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
   box-sizing: border-box;
   padding: 0 20px 0;
 }
@@ -68,8 +64,6 @@ body,
 .region-footer-secondcolumn,
 .region-footer-thirdcolumn,
 .region-footer-fourthcolumn {
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
   box-sizing: border-box;
   padding: 0 10px;
 }
@@ -121,8 +115,6 @@ body,
   .region-triptych-first,
   .region-triptych-middle,
   .region-triptych-last {
-    -moz-box-sizing: border-box;
-    -webkit-box-sizing: border-box;
     box-sizing: border-box;
     padding: 20px 15px 30px;
     width: 33%;
@@ -132,16 +124,12 @@ body,
   }
   .region-footer-firstcolumn,
   .region-footer-secondcolumn {
-    -moz-box-sizing: border-box;
-    -webkit-box-sizing: border-box;
     box-sizing: border-box;
     padding: 0 10px;
     width: 50%;
   }
   .region-footer-thirdcolumn,
   .region-footer-fourthcolumn {
-    -moz-box-sizing: border-box;
-    -webkit-box-sizing: border-box;
     box-sizing: border-box;
     padding: 0 10px;
     width: 50%;
@@ -188,30 +176,30 @@ body,
   [dir="rtl"] .region-footer-fourthcolumn {
     float: right;
   }
-  .two-sidebars #content {
+  .layout-two-sidebars #content {
     margin-left: 25%;
     margin-right: 25%;
     width: 50%;
   }
-  .one-sidebar #content {
+  .layout-one-sidebar #content {
     width: 75%;
   }
-  .no-sidebars #content {
+  .layout-no-sidebars #content {
     width: 100%;
   }
-  .sidebar-first #content {
+  .layout-sidebar-first #content {
     margin-left: 25%; /* LTR */
     margin-right: 0; /* LTR */
   }
-  [dir="rtl"] .sidebar-first #content {
+  [dir="rtl"] .layout-sidebar-first #content {
     margin-left: 0;
     margin-right: 25%;
   }
-  .sidebar-second #content {
+  .layout-sidebar-second #content {
     margin-right: 25%; /* LTR */
     margin-left: 0; /* LTR */
   }
-  [dir="rtl"] .sidebar-second #content {
+  [dir="rtl"] .layout-sidebar-second #content {
     margin-right: 0;
     margin-left: 25%;
   }
@@ -239,8 +227,6 @@ body,
   .region-footer-secondcolumn,
   .region-footer-thirdcolumn,
   .region-footer-fourthcolumn {
-    -moz-box-sizing: border-box;
-    -webkit-box-sizing: border-box;
     box-sizing: border-box;
     padding: 0 10px;
     width: 25%;

@@ -6,10 +6,13 @@
 
 namespace Drupal\rdf\Tests\Field;
 
+use Drupal\Component\Utility\String;
 use Drupal\rdf\Tests\Field\FieldRdfaTestBase;
 
 /**
- * Tests the placement of RDFa in text field formatters.
+ * Tests RDFa output by text field formatters.
+ *
+ * @group rdf
  */
 class TextFieldRdfaTest extends FieldRdfaTestBase {
 
@@ -35,18 +38,12 @@ class TextFieldRdfaTest extends FieldRdfaTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = array('text');
+  public static $modules = array('text', 'filter');
 
-  public static function getInfo() {
-    return array(
-      'name'  => 'Field formatter: text',
-      'description'  => 'Tests RDFa output by text field formatters.',
-      'group' => 'RDF',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
+
+    $this->installConfig(array('filter'));
 
     $this->createTestField();
 
@@ -68,13 +65,13 @@ class TextFieldRdfaTest extends FieldRdfaTestBase {
    * @todo Check for the summary mapping.
    */
   public function testAllFormatters() {
+    $formatted_value = strip_tags($this->entity->{$this->fieldName}->processed);
+
     // Tests the default formatter.
-    $this->assertFormatterRdfa(array('type'=>'text_default'), 'http://schema.org/text', array('value' => $this->testValue));
-    // Tests the plain formatter.
-    $this->assertFormatterRdfa(array('type'=>'string'), 'http://schema.org/text', array('value' => $this->testValue));
+    $this->assertFormatterRdfa(array('type'=>'text_default'), 'http://schema.org/text', array('value' => $formatted_value));
     // Tests the summary formatter.
-    $this->assertFormatterRdfa(array('type'=>'text_summary_or_trimmed'), 'http://schema.org/text', array('value' => $this->testValue));
+    $this->assertFormatterRdfa(array('type'=>'text_summary_or_trimmed'), 'http://schema.org/text', array('value' => $formatted_value));
     // Tests the trimmed formatter.
-    $this->assertFormatterRdfa(array('type'=>'text_trimmed'), 'http://schema.org/text', array('value' => $this->testValue));
+    $this->assertFormatterRdfa(array('type'=>'text_trimmed'), 'http://schema.org/text', array('value' => $formatted_value));
   }
 }

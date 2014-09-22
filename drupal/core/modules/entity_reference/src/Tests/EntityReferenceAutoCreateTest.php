@@ -7,26 +7,19 @@
 
 namespace Drupal\entity_reference\Tests;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the Entity Reference auto-creation feature.
+ * Tests creating new entity (e.g. taxonomy-term) from an autocomplete widget.
+ *
+ * @group entity_reference
  */
 class EntityReferenceAutoCreateTest extends WebTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Reference auto-create and autocomplete UI',
-      'description' => 'Tests creating new entity (e.g. taxonomy-term) from an autocomplete widget.',
-      'group' => 'Entity Reference',
-    );
-  }
-
   public static $modules = array('entity_reference', 'node');
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create "referencing" and "referenced" node types.
@@ -36,7 +29,7 @@ class EntityReferenceAutoCreateTest extends WebTestBase {
     $referenced = $this->drupalCreateContentType();
     $this->referenced_type = $referenced->type;
 
-    entity_create('field_config', array(
+    entity_create('field_storage_config', array(
       'name' => 'test_field',
       'entity_type' => 'node',
       'translatable' => FALSE,
@@ -45,10 +38,10 @@ class EntityReferenceAutoCreateTest extends WebTestBase {
         'target_type' => 'node',
       ),
       'type' => 'entity_reference',
-      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
     ))->save();
 
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'label' => 'Entity reference field',
       'field_name' => 'test_field',
       'entity_type' => 'node',
@@ -87,7 +80,7 @@ class EntityReferenceAutoCreateTest extends WebTestBase {
     $this->drupalGet('node/add/' . $this->referencing_type);
     $this->assertFieldByXPath('//input[@id="edit-test-field-0-target-id" and contains(@class, "form-autocomplete")]', NULL, 'The autocomplete input element appears.');
 
-    $new_title = $this->randomName();
+    $new_title = $this->randomMachineName();
 
     // Assert referenced node does not exist.
     $base_query = \Drupal::entityQuery('node');
@@ -100,7 +93,7 @@ class EntityReferenceAutoCreateTest extends WebTestBase {
     $this->assertFalse($result, 'Referenced node does not exist yet.');
 
     $edit = array(
-      'title[0][value]' => $this->randomName(),
+      'title[0][value]' => $this->randomMachineName(),
       'test_field[0][target_id]' => $new_title,
     );
     $this->drupalPostForm("node/add/$this->referencing_type", $edit, 'Save');

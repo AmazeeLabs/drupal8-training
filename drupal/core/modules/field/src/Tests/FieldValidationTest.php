@@ -7,29 +7,36 @@
 
 namespace Drupal\field\Tests;
 
-use Drupal\field\Tests\FieldUnitTestBase;
-
 /**
- * Unit test class for field validation.
+ * Tests field validation.
+ *
+ * @group field
  */
 class FieldValidationTest extends FieldUnitTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Field validation',
-      'description' => 'Tests field validation.',
-      'group' => 'Field API',
-    );
-  }
+  /**
+   * @var string
+   */
+  private $entityType;
 
-  public function setUp() {
+  /**
+   * @var string
+   */
+  private $bundle;
+
+  /**
+   * @var \Drupal\Core\Entity\EntityInterface
+   */
+  private $entity;
+
+  protected function setUp() {
     parent::setUp();
 
-    // Create a field and instance of type 'test_field', on the 'entity_test'
+    // Create a field and storage of type 'test_field', on the 'entity_test'
     // entity type.
     $this->entityType = 'entity_test';
     $this->bundle = 'entity_test';
-    $this->createFieldWithInstance('', $this->entityType, $this->bundle);
+    $this->createFieldWithStorage('', $this->entityType, $this->bundle);
 
     // Create an 'entity_test' entity.
     $this->entity = entity_create($this->entityType, array(
@@ -41,27 +48,27 @@ class FieldValidationTest extends FieldUnitTestBase {
    * Tests that the number of values is validated against the field cardinality.
    */
   function testCardinalityConstraint() {
-    $cardinality = $this->field->cardinality;
+    $cardinality = $this->fieldTestData->field_storage->cardinality;
     $entity = $this->entity;
 
     for ($delta = 0; $delta < $cardinality + 1; $delta++) {
-      $entity->{$this->field_name}->get($delta)->set('value', 1);
+      $entity->{$this->fieldTestData->field_name}->get($delta)->set('value', 1);
     }
 
     // Validate the field.
-    $violations = $entity->{$this->field_name}->validate();
+    $violations = $entity->{$this->fieldTestData->field_name}->validate();
 
     // Check that the expected constraint violations are reported.
     $this->assertEqual(count($violations), 1);
     $this->assertEqual($violations[0]->getPropertyPath(), '');
-    $this->assertEqual($violations[0]->getMessage(), t('%name: this field cannot hold more than @count values.', array('%name' => $this->instance->getLabel(), '@count' => $cardinality)));
+    $this->assertEqual($violations[0]->getMessage(), t('%name: this field cannot hold more than @count values.', array('%name' => $this->fieldTestData->field->getLabel(), '@count' => $cardinality)));
   }
 
   /**
    * Tests that constraints defined by the field type are validated.
    */
   function testFieldConstraints() {
-    $cardinality = $this->field->getCardinality();
+    $cardinality = $this->fieldTestData->field_storage->getCardinality();
     $entity = $this->entity;
 
     // The test is only valid if the field cardinality is greater than 2.
@@ -76,13 +83,13 @@ class FieldValidationTest extends FieldUnitTestBase {
       }
       else {
         $value = -1;
-        $expected_violations[$delta . '.value'][] = t('%name does not accept the value -1.', array('%name' => $this->instance->getLabel()));
+        $expected_violations[$delta . '.value'][] = t('%name does not accept the value -1.', array('%name' => $this->fieldTestData->field->getLabel()));
       }
-      $entity->{$this->field_name}->get($delta)->set('value', $value);
+      $entity->{$this->fieldTestData->field_name}->get($delta)->set('value', $value);
     }
 
     // Validate the field.
-    $violations = $entity->{$this->field_name}->validate();
+    $violations = $entity->{$this->fieldTestData->field_name}->validate();
 
     // Check that the expected constraint violations are reported.
     $violations_by_path = array();

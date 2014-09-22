@@ -83,7 +83,7 @@ class TwigNodeTrans extends \Twig_Node {
     $compiler->raw(')');
 
     // Append translation debug markup, if necessary.
-    if (Settings::get('twig_debug', FALSE)) {
+    if ($compiler->getEnvironment()->isDebug()) {
       $compiler->raw(" . '\n<!-- TRANSLATION: ");
       $compiler->subcompile($singular);
       if (!empty($plural)) {
@@ -133,7 +133,13 @@ class TwigNodeTrans extends \Twig_Node {
           while ($n instanceof \Twig_Node_Expression_Filter) {
             $n = $n->getNode('node');
           }
-          $args = $n->getNode('arguments')->getNode(0);
+
+          $args = $n;
+
+          // Support twig_render_var function in chain.
+          if ($args instanceof \Twig_Node_Expression_Function) {
+            $args = $n->getNode('arguments')->getNode(0);
+          }
 
           // Detect if a token implements one of the filters reserved for
           // modifying the prefix of a token. The default prefix used for
@@ -153,8 +159,22 @@ class TwigNodeTrans extends \Twig_Node {
             $args = $args->getNode('node');
           }
           if ($args instanceof \Twig_Node_Expression_GetAttr) {
-            $argName = $args->getNode('attribute')->getAttribute('value');
-            $expr = $n;
+            $argName = array();
+            // Reuse the incoming expression.
+            $expr = $args;
+            // Assemble a valid argument name by walking through the expression.
+            $argName[] = $args->getNode('attribute')->getAttribute('value');
+            while ($args->hasNode('node')) {
+              $args = $args->getNode('node');
+              if ($args instanceof \Twig_Node_Expression_Name) {
+                $argName[] = $args->getAttribute('name');
+              }
+              else {
+                $argName[] = $args->getNode('attribute')->getAttribute('value');
+              }
+            }
+            $argName = array_reverse($argName);
+            $argName = implode('.', $argName);
           }
           else {
             $argName = $n->getAttribute('name');

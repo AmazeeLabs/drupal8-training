@@ -15,6 +15,8 @@ use Drupal\views\Tests\ViewUnitTestBase;
 
 /**
  * Tests the views integration of dblog module.
+ *
+ * @group dblog
  */
 class ViewsIntegrationTest extends ViewUnitTestBase {
 
@@ -30,15 +32,7 @@ class ViewsIntegrationTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('dblog_test_views');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Dblog Integration',
-      'description' => 'Tests the views integration of dblog module.',
-      'group' => 'Views module integration'
-    );
-  }
+  public static $modules = array('dblog', 'dblog_test_views');
 
   /**
    * {@inheritdoc}
@@ -46,7 +40,6 @@ class ViewsIntegrationTest extends ViewUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->enableModules(array('system', 'dblog'));
     $this->installSchema('dblog', array('watchdog'));
 
     ViewTestData::createTestViews(get_class($this), array('dblog_test_views'));
@@ -63,30 +56,32 @@ class ViewsIntegrationTest extends ViewUnitTestBase {
     $entries = array();
     // Setup a watchdog entry without tokens.
     $entries[] = array(
-      'message' => $this->randomName(),
-      'variables' => array(),
-      'link' => l('Link', 'node/1'),
+      'message' => $this->randomMachineName(),
+      'variables' => array('link' => l('Link', 'node/1')),
     );
     // Setup a watchdog entry with one token.
     $entries[] = array(
       'message' => '@token1',
-      'variables' => array('@token1' => $this->randomName()),
-      'link' => l('Link', 'node/2'),
+      'variables' => array('@token1' => $this->randomMachineName(), 'link' => l('Link', 'node/2')),
     );
     // Setup a watchdog entry with two tokens.
     $entries[] = array(
       'message' => '@token1 !token2',
-      'variables' => array('@token1' => $this->randomName(), '!token2' => $this->randomName()),
       // Setup a link with a tag which is filtered by
       // \Drupal\Component\Utility\Xss::filterAdmin().
-      'link' => l('<object>Link</object>', 'node/2', array('html' => TRUE)),
+      'variables' => array(
+        '@token1' => $this->randomMachineName(),
+        '!token2' => $this->randomMachineName(),
+        'link' => l('<object>Link</object>', 'node/2', array('html' => TRUE)),
+      ),
     );
+    $logger_factory = $this->container->get('logger.factory');
     foreach ($entries as $entry) {
       $entry += array(
         'type' => 'test-views',
         'severity' => WATCHDOG_NOTICE,
       );
-      watchdog($entry['type'], $entry['message'], $entry['variables'], $entry['severity'], $entry['link']);
+      $logger_factory->get($entry['type'])->log($entry['severity'], $entry['message'], $entry['variables']);
     }
 
     $view = Views::getView('test_dblog');
@@ -95,7 +90,7 @@ class ViewsIntegrationTest extends ViewUnitTestBase {
 
     foreach ($entries as $index => $entry) {
       $this->assertEqual($view->style_plugin->getField($index, 'message'), String::format($entry['message'], $entry['variables']));
-      $this->assertEqual($view->style_plugin->getField($index, 'link'), Xss::filterAdmin($entry['link']));
+      $this->assertEqual($view->style_plugin->getField($index, 'link'), Xss::filterAdmin($entry['variables']['link']));
     }
 
     // Disable replacing variables and check that the tokens aren't replaced.

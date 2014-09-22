@@ -8,15 +8,43 @@
 namespace Drupal\node\Controller;
 
 use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\Controller\ControllerBase;
-use Drupal\node\Controller\NodeViewController;
+use Drupal\Core\Datetime\DateFormatter;
+use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\node\NodeTypeInterface;
 use Drupal\node\NodeInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Returns responses for Node routes.
  */
-class NodeController extends ControllerBase {
+class NodeController extends ControllerBase implements ContainerInjectionInterface {
+
+  /**
+   * The date formatter service.
+   *
+   * @var \Drupal\Core\Datetime\DateFormatter
+   */
+  protected $dateFormatter;
+
+  /**
+   * Constructs a NodeController object.
+   *
+   * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
+   *   The date formatter service.
+   */
+  public function __construct(DateFormatter $date_formatter) {
+    $this->dateFormatter = $date_formatter;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static($container->get('date.formatter'));
+  }
+
 
   /**
    * Displays add content links for available content types.
@@ -36,7 +64,7 @@ class NodeController extends ControllerBase {
 
     // Only use node types the user has access to.
     foreach ($this->entityManager()->getStorage('node_type')->loadMultiple() as $type) {
-      if ($this->entityManager()->getAccessController('node')->createAccess($type->type)) {
+      if ($this->entityManager()->getAccessControlHandler('node')->createAccess($type->type)) {
         $content[$type->type] = $type;
       }
     }
@@ -63,14 +91,8 @@ class NodeController extends ControllerBase {
    *   A node submission form.
    */
   public function add(NodeTypeInterface $node_type) {
-    $account = $this->currentUser();
-    $langcode = $this->moduleHandler()->invoke('language', 'get_default_langcode', array('node', $node_type->type));
-
     $node = $this->entityManager()->getStorage('node')->create(array(
-      'uid' => $account->id(),
-      'name' => $account->getUsername() ?: '',
       'type' => $node_type->type,
-      'langcode' => $langcode ? $langcode : $this->languageManager()->getCurrentLanguage()->id,
     ));
 
     $form = $this->entityFormBuilder()->getForm($node);
@@ -110,11 +132,92 @@ class NodeController extends ControllerBase {
   }
 
   /**
-   * @todo Remove node_revision_overview().
+   * Generates an overview table of older revisions of a node.
+   *
+   * @param \Drupal\node\NodeInterface $node
+   *   A node object.
+   *
+   * @return array
+   *   An array as expected by drupal_render().
    */
   public function revisionOverview(NodeInterface $node) {
-    module_load_include('pages.inc', 'node');
-    return node_revision_overview($node);
+    $account = $this->currentUser();
+    $node_storage = $this->entityManager()->getStorage('node');
+    $type = $node->getType();
+
+    $build = array();
+    $build['#title'] = $this->t('Revisions for %title', array('%title' => $node->label()));
+    $header = array($this->t('Revision'), $this->t('Operations'));
+
+    $revert_permission = (($account->hasPermission("revert $type revisions") || $account->hasPermission('revert all revisions') || $account->hasPermission('administer nodes')) && $node->access('update'));
+    $delete_permission =  (($account->hasPermission("delete $type revisions") || $account->hasPermission('delete all revisions') || $account->hasPermission('administer nodes')) && $node->access('delete'));
+
+    $rows = array();
+
+    $vids = $node_storage->revisionIds($node);
+
+    foreach (array_reverse($vids) as $vid) {
+      if ($revision = $node_storage->loadRevision($vid)) {
+        $row = array();
+
+        $revision_author = $revision->uid->entity;
+
+        if ($vid == $node->getRevisionId()) {
+          $username = array(
+            '#theme' => 'username',
+            '#account' => $revision_author,
+          );
+          $row[] = array('data' => $this->t('!date by !username', array('!date' => $this->l($this->dateFormatter->format($revision->revision_timestamp->value, 'short'), 'entity.node.canonical', array('node' => $node->id())), '!username' => drupal_render($username)))
+            . (($revision->revision_log->value != '') ? '<p class="revision-log">' . Xss::filter($revision->revision_log->value) . '</p>' : ''),
+            'class' => array('revision-current'));
+          $row[] = array('data' => String::placeholder($this->t('current revision')), 'class' => array('revision-current'));
+        }
+        else {
+          $username = array(
+            '#theme' => 'username',
+            '#account' => $revision_author,
+          );
+          $row[] = $this->t('!date by !username', array('!date' => $this->l($this->dateFormatter->format($revision->revision_timestamp->value, 'short'), 'node.revision_show', array('node' => $node->id(), 'node_revision' => $vid)), '!username' => drupal_render($username)))
+            . (($revision->revision_log->value != '') ? '<p class="revision-log">' . Xss::filter($revision->revision_log->value) . '</p>' : '');
+
+          if ($revert_permission) {
+            $links['revert'] = array(
+              'title' => $this->t('Revert'),
+              'route_name' => 'node.revision_revert_confirm',
+              'route_parameters' => array('node' => $node->id(), 'node_revision' => $vid),
+            );
+          }
+
+          if ($delete_permission) {
+            $links['delete'] = array(
+              'title' => $this->t('Delete'),
+              'route_name' => 'node.revision_delete_confirm',
+              'route_parameters' => array('node' => $node->id(), 'node_revision' => $vid),
+            );
+          }
+
+          $row[] = array(
+            'data' => array(
+              '#type' => 'operations',
+              '#links' => $links,
+            ),
+          );
+        }
+
+        $rows[] = $row;
+      }
+    }
+
+    $build['node_revisions_table'] = array(
+      '#theme' => 'table',
+      '#rows' => $rows,
+      '#header' => $header,
+      '#attached' => array(
+        'library' => array('node/drupal.node.admin'),
+      ),
+    );
+
+    return $build;
   }
 
   /**

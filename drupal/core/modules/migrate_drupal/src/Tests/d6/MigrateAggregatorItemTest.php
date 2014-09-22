@@ -8,12 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\aggregator\Entity\Item;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Test Drupal 6 aggregator item migration to Drupal 8.
+ * Upgrade aggregator items.
+ *
+ * @group migrate_drupal
  */
 class MigrateAggregatorItemTest extends MigrateDrupalTestBase {
 
@@ -22,18 +24,7 @@ class MigrateAggregatorItemTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate aggregator items',
-      'description'  => 'Upgrade aggregator items',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Add some id mappings for the dependant migrations.
     $id_mappings = array(
@@ -41,7 +32,7 @@ class MigrateAggregatorItemTest extends MigrateDrupalTestBase {
         array(array(5), array(5)),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
 
     $entity = entity_create('aggregator_feed', array(
       'fid' => 5,
@@ -76,7 +67,7 @@ class MigrateAggregatorItemTest extends MigrateDrupalTestBase {
     $this->assertEqual($item->getDescription(), "<h2 id='new'>What's new with Drupal 8?</h2>");
     $this->assertEqual($item->getLink(), 'https://groups.drupal.org/node/395218');
     $this->assertEqual($item->getPostedTime(), 1389297196);
-    $this->assertEqual($item->language()->id, Language::LANGCODE_NOT_SPECIFIED);
+    $this->assertEqual($item->language()->id, 'en');
     $this->assertEqual($item->getGuid(), '395218 at https://groups.drupal.org');
 
   }

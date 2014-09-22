@@ -7,23 +7,16 @@
 
 namespace Drupal\Core\Config;
 
-use Drupal\Component\Plugin\Exception\PluginException;
-use Drupal\Component\Plugin\PluginManagerBase;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Config\Schema\ConfigSchemaDiscovery;
+use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\TypedData\TypedDataManager;
 
 /**
  * Manages config type plugins.
  */
-class TypedConfigManager extends PluginManagerBase implements TypedConfigManagerInterface {
-
-  /**
-   * The cache ID for the definitions.
-   *
-   * @var string
-   */
-  const CACHE_ID = 'typed_config_definitions';
+class TypedConfigManager extends TypedDataManager implements TypedConfigManagerInterface {
 
   /**
    * A storage instance for reading configuration data.
@@ -47,13 +40,6 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
   protected $definitions;
 
   /**
-   * Cache backend for the definitions.
-   *
-   * @var \Drupal\Core\Cache\CacheBackendInterface
-   */
-  protected $cache;
-
-  /**
    * Creates a new typed configuration manager.
    *
    * @param \Drupal\Core\Config\StorageInterface $configStorage
@@ -63,10 +49,13 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
    *   The cache backend to use for caching the definitions.
    */
-  public function __construct(StorageInterface $configStorage, StorageInterface $schemaStorage, CacheBackendInterface $cache) {
+  public function __construct(StorageInterface $configStorage, StorageInterface $schemaStorage, CacheBackendInterface $cache, ModuleHandlerInterface $module_handler) {
     $this->configStorage = $configStorage;
     $this->schemaStorage = $schemaStorage;
-    $this->cache = $cache;
+    $this->setCacheBackend($cache, 'typed_config_definitions');
+    $this->discovery = new ConfigSchemaDiscovery($schemaStorage);
+    $this->alterInfo('config_schema_info');
+    $this->moduleHandler = $module_handler;
   }
 
   /**
@@ -80,21 +69,20 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
    */
   public function get($name) {
     $data = $this->configStorage->read($name);
-    $definition = $this->getDefinition($name);
-    return $this->create($definition, $data);
+    $type_definition = $this->getDefinition($name);
+    $data_definition =  $this->buildDataDefinition($type_definition, $data);
+    return $this->create($data_definition, $data);
   }
 
   /**
-   * Overrides \Drupal\Core\TypedData\TypedDataManager::create()
-   *
-   * Fills in default type and does variable replacement.
+   * {@inheritdoc}
    */
-  public function create(array $definition, $value = NULL, $name = NULL, $parent = NULL) {
-    if (!isset($definition['type'])) {
-      // By default elements without a type are undefined.
-      $definition['type'] = 'undefined';
-    }
-    elseif (strpos($definition['type'], ']')) {
+  public function buildDataDefinition(array $definition, $value, $name = NULL, $parent = NULL) {
+    // Add default values for data type and replace variables.
+    $definition += array('type' => 'undefined');
+
+    $type = $definition['type'];
+    if (strpos($type, ']')) {
       // Replace variable names in definition.
       $replace = is_array($value) ? $value : array();
       if (isset($parent)) {
@@ -103,40 +91,23 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
       if (isset($name)) {
         $replace['%key'] = $name;
       }
-      $definition['type'] = $this->replaceName($definition['type'], $replace);
+      $type = $this->replaceName($type, $replace);
+      // Remove the type from the definition so that it is replaced with the
+      // concrete type from schema definitions.
+      unset($definition['type']);
     }
-    // Create typed config object.
-    $wrapper = $this->createInstance($definition['type'], $definition, $name, $parent);
-    if (isset($value)) {
-      $wrapper->setValue($value, FALSE);
-    }
-    return $wrapper;
-  }
+    // Add default values from type definition.
+    $definition += $this->getDefinition($type);
 
-  /**
-   * Overrides Drupal\Core\TypedData\TypedDataFactory::createInstance().
-   */
-  public function createInstance($plugin_id, array $configuration = array(), $name = NULL, $parent = NULL) {
-    $type_definition = $this->getDefinition($plugin_id);
-    if (!isset($type_definition)) {
-      throw new \InvalidArgumentException(String::format('Invalid data type %plugin_id has been given.', array('%plugin_id' => $plugin_id)));
-    }
+    $data_definition = $this->createDataDefinition($definition['type']);
 
-    $configuration += $type_definition;
-    // Allow per-data definition overrides of the used classes, i.e. take over
-    // classes specified in the data definition.
-    $key = empty($configuration['list']) ? 'class' : 'list class';
-    if (isset($configuration[$key])) {
-      $class = $configuration[$key];
+    // Pass remaining values from definition array to data definition.
+    foreach ($definition as $key => $value) {
+      if (!isset($data_definition[$key])) {
+        $data_definition[$key] = $value;
+      }
     }
-    elseif (isset($type_definition[$key])) {
-      $class = $type_definition[$key];
-    }
-
-    if (!isset($class)) {
-      throw new PluginException(sprintf('The plugin (%s) did not specify an instance class.', $plugin_id));
-    }
-    return new $class($configuration, $name, $parent);
+    return $data_definition;
   }
 
   /**
@@ -164,49 +135,32 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
       unset($definition['type']);
       $this->definitions[$type] = $definition;
     }
-    return $definition;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getDefinitions() {
-    if (!isset($this->definitions)) {
-      if ($cache = $this->cache->get($this::CACHE_ID)) {
-        $this->definitions = $cache->data;
-      }
-      else {
-        $this->definitions = array();
-        foreach ($this->schemaStorage->readMultiple($this->schemaStorage->listAll()) as $schema) {
-          foreach ($schema as $type => $definition) {
-            $this->definitions[$type] = $definition;
-          }
-        }
-        $this->cache->set($this::CACHE_ID, $this->definitions);
-      }
-    }
-    return $this->definitions;
+    // Add type and default definition class.
+    return $definition + array(
+      'definition_class' => '\Drupal\Core\TypedData\DataDefinition',
+      'type' => $type,
+    );
   }
 
   /**
    * {@inheritdoc}
    */
   public function clearCachedDefinitions() {
-    $this->definitions = NULL;
     $this->schemaStorage->reset();
-    $this->cache->delete($this::CACHE_ID);
+    parent::clearCachedDefinitions();
   }
 
   /**
-   * Gets fallback metadata name.
+   * Gets fallback configuration schema name.
    *
    * @param string $name
    *   Configuration name or key.
    *
    * @return null|string
-   *   Same name with the last part(s) replaced by the filesystem marker.
-   *   for example, breakpoint.breakpoint.module.toolbar.narrow check for
-   *   definition in below order:
+   *   The resolved schema name for the given configuration name or key. Returns
+   *   null if there is no schema name to fallback to. For example,
+   *   breakpoint.breakpoint.module.toolbar.narrow will check for definitions in
+   *   the following order:
    *     breakpoint.breakpoint.module.toolbar.*
    *     breakpoint.breakpoint.module.*.*
    *     breakpoint.breakpoint.module.*
@@ -214,12 +168,19 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
    *     breakpoint.breakpoint.*
    *     breakpoint.*.*.*.*
    *     breakpoint.*
-   *   Returns null, if no matching element.
+   *   Colons are also used, for example,
+   *   block.settings.system_menu_block:footer will check for definitions in the
+   *   following order:
+   *     block.settings.system_menu_block:*
+   *     block.settings.*:*
+   *     block.settings.*
+   *     block.*.*:*
+   *     block.*
    */
   protected function getFallbackName($name) {
     // Check for definition of $name with filesystem marker.
-    $replaced = preg_replace('/(\.[^\.]+)([\.\*]*)$/', '.*\2', $name);
-    if ($replaced != $name ) {
+    $replaced = preg_replace('/([^\.:]+)([\.:\*]*)$/', '*\2', $name);
+    if ($replaced != $name) {
       if (isset($this->definitions[$replaced])) {
         return $replaced;
       }
@@ -228,7 +189,7 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
         // wildcard to see if there is a greedy match. For example,
         // breakpoint.breakpoint.*.* becomes
         // breakpoint.breakpoint.*
-        $one_star = preg_replace('/\.([\.\*]*)$/', '.*', $replaced);
+        $one_star = preg_replace('/\.([:\.\*]*)$/', '.*', $replaced);
         if ($one_star != $replaced && isset($this->definitions[$one_star])) {
           return $one_star;
         }
@@ -286,6 +247,8 @@ class TypedConfigManager extends PluginManagerBase implements TypedConfigManager
    *
    * @param string $value
    *   Variable value to be replaced.
+   * @param mixed $data
+   *   Configuration data for the element.
    *
    * @return string
    *   The replaced value if a replacement found or the original value if not.

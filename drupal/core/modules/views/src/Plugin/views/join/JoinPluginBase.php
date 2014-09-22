@@ -10,15 +10,22 @@ namespace Drupal\views\Plugin\views\join;
 use Drupal\Core\Plugin\PluginBase;
 
 /**
- * @defgroup views_join_handlers Views join handlers
+ * @defgroup views_join_handlers Views join handler plugins
  * @{
- * Handlers to tell Views how to join tables together.
+ * Handler plugins for Views table joins.
  *
- * Here is an example how to join from table one to example two so it produces
- * the following sql:
+ * Handler plugins help build the view query object. Join handler plugins
+ * handle table joins.
+ *
+ * Views join handlers extend \Drupal\views\Plugin\views\join\JoinPluginBase.
+ * They must be annotated with \Drupal\views\Annotation\ViewsJoin annotation,
+ * and they must be in namespace directory Plugin\views\join.
+ *
+ * Here is an example of how to join from table one to table two so it produces
+ * the following SQL:
  * @code
  * INNER JOIN {two} ON one.field_a = two.field_b
- * @code.
+ * @endcode
  * The required php code for this kind of functionality is the following:
  * @code
  * $configuration = array(
@@ -29,9 +36,9 @@ use Drupal\Core\Plugin\PluginBase;
  *   'operator' => '='
  * );
  * $join = Views::pluginManager('join')->createInstance('standard', $configuration);
+ * @endcode
  *
- * To do complex joins:
- *
+ * Here is an example of a more complex join:
  * @code
  * class JoinComplex extends JoinPluginBase {
  *   public function buildJoin($select_query, $table, $view_query) {
@@ -41,6 +48,9 @@ use Drupal\Core\Plugin\PluginBase;
  *   }
  * }
  * @endcode
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
@@ -48,7 +58,7 @@ use Drupal\Core\Plugin\PluginBase;
  *
  * Extensions of this class can be used to create more interesting joins.
  */
-class JoinPluginBase extends PluginBase {
+class JoinPluginBase extends PluginBase implements JoinPluginInterface {
 
   /**
    * The table to join (right table).
@@ -171,16 +181,7 @@ class JoinPluginBase extends PluginBase {
   }
 
   /**
-   * Builds the SQL for the join this object represents.
-   *
-   * When possible, try to use table alias instead of table names.
-   *
-   * @param $select_query
-   *   An select query object.
-   * @param $table
-   *   The base table to join.
-   * @param \Drupal\views\Plugin\views\query\QueryPluginBase $view_query
-   *   The source views query.
+   * {@inheritdoc}
    */
   public function buildJoin($select_query, $table, $view_query) {
     if (empty($this->configuration['table formula'])) {
@@ -207,6 +208,10 @@ class JoinPluginBase extends PluginBase {
       if (is_array($this->extra)) {
         $extras = array();
         foreach ($this->extra as $info) {
+          // Do not require 'value' to be set; allow for field syntax instead.
+          $info += array(
+            'value' => NULL,
+          );
           // Figure out the table name. Remember, only use aliases provided
           // if at all possible.
           $join_table = '';
@@ -250,8 +255,15 @@ class JoinPluginBase extends PluginBase {
           else {
             // With a single value, the '=' operator is implicit.
             $operator = !empty($info['operator']) ? $info['operator'] : '=';
-            $placeholder = ':views_join_condition_' . $select_query->nextPlaceholder();
-            $arguments[$placeholder] = $info['value'];
+            // Allow the value to be set either with the 'value' element or
+            // with 'left_field'.
+            if (isset($info['left_field'])) {
+              $placeholder = "$left[alias].$info[left_field]";
+            }
+            else {
+              $placeholder = ':views_join_condition_' . $select_query->nextPlaceholder();
+              $arguments[$placeholder] = $info['value'];
+            }
           }
 
           $extras[] = "$join_table$info[field] $operator $placeholder";

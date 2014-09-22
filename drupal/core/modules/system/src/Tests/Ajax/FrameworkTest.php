@@ -15,17 +15,11 @@ use Drupal\Core\Ajax\PrependCommand;
 use Drupal\Core\Ajax\SettingsCommand;
 
 /**
- * Tests primary Ajax framework functions.
+ * Performs tests on AJAX framework functions.
+ *
+ * @group Ajax
  */
 class FrameworkTest extends AjaxTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'AJAX framework',
-      'description' => 'Performs tests on AJAX framework functions.',
-      'group' => 'AJAX',
-    );
-  }
-
   /**
    * Ensures \Drupal\Core\Ajax\AjaxResponse::ajaxRender() returns JavaScript settings from the page request.
    */
@@ -56,6 +50,7 @@ class FrameworkTest extends AjaxTestBase {
       ),
     );
     drupal_render($attached);
+    drupal_process_attached($attached);
     $expected_commands[1] = new AddCssCommand(drupal_get_css(_drupal_add_css(), TRUE));
     drupal_static_reset('_drupal_add_js');
     $attached = array(
@@ -66,6 +61,7 @@ class FrameworkTest extends AjaxTestBase {
       ),
     );
     drupal_render($attached);
+    drupal_process_attached($attached);
     $expected_commands[2] = new PrependCommand('head', drupal_get_js('header', _drupal_add_js(), TRUE));
     drupal_static_reset('_drupal_add_js');
     $attached = array(
@@ -76,6 +72,7 @@ class FrameworkTest extends AjaxTestBase {
       ),
     );
     drupal_render($attached);
+    drupal_process_attached($attached);
     $expected_commands[3] = new AppendCommand('body', drupal_get_js('footer', _drupal_add_js(), TRUE));
     $expected_commands[4] = new HtmlCommand('body', 'Hello, world!');
 
@@ -221,7 +218,7 @@ class FrameworkTest extends AjaxTestBase {
   public function testLazyLoadOverriddenCSS() {
     // The test theme overrides system.module.css without an implementation,
     // thereby removing it.
-    theme_enable(array('test_theme'));
+    \Drupal::service('theme_handler')->install(array('test_theme'));
     \Drupal::config('system.theme')
       ->set('default', 'test_theme')
       ->save();

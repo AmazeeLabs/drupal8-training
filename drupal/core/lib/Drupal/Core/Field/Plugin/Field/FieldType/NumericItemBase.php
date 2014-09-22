@@ -8,6 +8,7 @@
 namespace Drupal\Core\Field\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\FieldItemBase;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Base class for numeric configurable field types.
@@ -17,35 +18,33 @@ abstract class NumericItemBase extends FieldItemBase {
   /**
    * {@inheritdoc}
    */
-  public static function defaultInstanceSettings() {
+  public static function defaultFieldSettings() {
     return array(
       'min' => '',
       'max' => '',
       'prefix' => '',
       'suffix' => '',
-    ) + parent::defaultInstanceSettings();
+    ) + parent::defaultFieldSettings();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function instanceSettingsForm(array $form, array &$form_state) {
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     $element = array();
     $settings = $this->getSettings();
 
     $element['min'] = array(
-      '#type' => 'textfield',
+      '#type' => 'number',
       '#title' => t('Minimum'),
       '#default_value' => $settings['min'],
       '#description' => t('The minimum value that should be allowed in this field. Leave blank for no minimum.'),
-      '#element_validate' => array('form_validate_number'),
     );
     $element['max'] = array(
-      '#type' => 'textfield',
+      '#type' => 'number',
       '#title' => t('Maximum'),
       '#default_value' => $settings['max'],
       '#description' => t('The maximum value that should be allowed in this field. Leave blank for no maximum.'),
-      '#element_validate' => array('form_validate_number'),
     );
     $element['prefix'] = array(
       '#type' => 'textfield',
@@ -110,6 +109,21 @@ abstract class NumericItemBase extends FieldItemBase {
     }
 
     return $constraints;
+  }
+
+  /**
+   * Helper method to truncate a decimal number to a given number of decimals.
+   *
+   * @param float $decimal
+   *   Decimal number to truncate.
+   * @param int $num
+   *   Number of digits the output will have.
+   *
+   * @return float
+   *   Decimal number truncated.
+   */
+  protected static function truncateDecimal($decimal, $num) {
+    return floor($decimal * pow(10, $num)) / pow(10, $num);
   }
 
 }

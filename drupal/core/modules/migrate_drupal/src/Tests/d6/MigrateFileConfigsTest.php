@@ -7,14 +7,19 @@
 
 namespace Drupal\migrate_drupal\Tests\d6;
 
+use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests migration of variables from the File module.
+ * Upgrade variables to file.settings.yml.
+ *
+ * @group migrate_drupal
  */
 class MigrateFileConfigsTest extends MigrateDrupalTestBase {
+
+  use SchemaCheckTestTrait;
 
   /**
    * Modules to enable.
@@ -26,18 +31,7 @@ class MigrateFileConfigsTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate variables to file.settings.yml',
-      'description'  => 'Upgrade variables to file.settings.yml',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $migration = entity_load('migration', 'd6_file_settings');
     $dumps = array(
@@ -56,5 +50,7 @@ class MigrateFileConfigsTest extends MigrateDrupalTestBase {
     $this->assertIdentical($config->get('description.type'), 'textfield');
     $this->assertIdentical($config->get('description.length'), 128);
     $this->assertIdentical($config->get('icon.directory'), 'sites/default/files/icons');
+    $this->assertConfigSchema(\Drupal::service('config.typed'), 'file.settings', $config->get());
   }
+
 }

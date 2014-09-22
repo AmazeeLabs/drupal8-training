@@ -1,16 +1,14 @@
 # Schema for configuration files of the Image module.
 
 image.style.*:
-  type: mapping
+  type: config_entity
   label: 'Image style'
   mapping:
     name:
       type: string
-    uuid:
-      type: string
-      label: 'UUID'
     label:
       type: label
+      label: 'Label'
     effects:
       type: sequence
       sequence:
@@ -24,12 +22,11 @@ image.style.*:
               type: integer
             uuid:
               type: string
-    langcode:
-      type: string
-      label: 'Default language'
-    status:
-      type: boolean
-      label: 'Enabled'
+    third_party_settings:
+      type: sequence
+      label: 'Third party settings'
+      sequence:
+        - type: image_style.third_party.[%key]
 
 image.effect.image_crop:
   type: image_size
@@ -80,30 +77,18 @@ image.settings:
       type: boolean
       label: 'Suppress the itok query string for image derivatives'
 
-field.image.settings:
-  type: mapping
+field.image.storage_settings:
+  type: field.file.storage_settings
   label: 'Image settings'
   mapping:
-    uri_scheme:
-      type: string
-      label: 'Upload destination'
     default_image:
       type: field_default_image
       label: 'Default value'
 
-field.image.instance_settings:
-  type: mapping
+field.image.field_settings:
+  type: base_file_field_field_settings
   label: 'Image settings'
   mapping:
-    file_directory:
-      type: string
-      label: 'Upload destination'
-    file_extensions:
-      type: string
-      label: 'Allowed file extensions'
-    max_filesize:
-      type: string
-      label: 'Maximum upload size'
     max_resolution:
       type: string
       label: 'Maximum image resolution'

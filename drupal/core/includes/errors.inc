@@ -5,10 +5,10 @@
  * Functions for error handling.
  */
 
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Page\DefaultHtmlPageRenderer;
 use Drupal\Core\Utility\Error;
-use Drupal\Component\Utility\String;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -119,17 +119,18 @@ function error_displayable($error = NULL) {
 function _drupal_log_error($error, $fatal = FALSE) {
   $is_installer = drupal_installation_attempted();
   // Initialize a maintenance theme if the bootstrap was not complete.
-  // Do it early because drupal_set_message() triggers a drupal_theme_initialize().
-  if ($fatal && (drupal_get_bootstrap_phase() != DRUPAL_BOOTSTRAP_FULL)) {
+  // Do it early because drupal_set_message() triggers a
+  // \Drupal\Core\Theme\ThemeManager::initTheme().
+  if ($fatal && drupal_get_bootstrap_phase() < DRUPAL_BOOTSTRAP_CODE) {
     // The installer initializes a maintenance theme at the earliest possible
     // point in time already. Do not unset that.
     if (!$is_installer) {
-      unset($GLOBALS['theme']);
+      \Drupal::theme()->setActiveTheme(NULL);
     }
     if (!defined('MAINTENANCE_MODE')) {
       define('MAINTENANCE_MODE', 'error');
     }
-    // No-op if $GLOBALS['theme'] is set already.
+    // No-op if the active theme is set already.
     drupal_maintenance_theme();
   }
 
@@ -156,9 +157,14 @@ function _drupal_log_error($error, $fatal = FALSE) {
     $number++;
   }
 
-  watchdog('php', '%type: !message in %function (line %line of %file).', $error, $error['severity_level']);
+  // Only call the logger if there is a logger factory available. This can occur
+  // if there is an error while rebuilding the container or during the
+  // installer.
+  if (\Drupal::hasService('logger.factory')) {
+    \Drupal::logger('php')->log($error['severity_level'], '%type: !message in %function (line %line of %file).', $error);
+  }
 
-  if (drupal_is_cli()) {
+  if (PHP_SAPI === 'cli') {
     if ($fatal) {
       // When called from CLI, simply output a plain text message.
       // Should not translate the string to avoid errors producing more errors.
@@ -179,7 +185,7 @@ function _drupal_log_error($error, $fatal = FALSE) {
   }
   else {
     // Display the message if the current error reporting level allows this type
-    // of message to be displayed, and unconditionnaly in update.php.
+    // of message to be displayed, and unconditionally in update.php.
     if (error_displayable($error)) {
       $class = 'error';
 
@@ -210,9 +216,9 @@ function _drupal_log_error($error, $fatal = FALSE) {
         // once more in the backtrace.
         array_shift($backtrace);
         // Generate a backtrace containing only scalar argument values.
-        $message .= '<pre class="backtrace">' . format_backtrace($backtrace) . '</pre>';
+        $message .= '<pre class="backtrace">' . Error::formatBacktrace($backtrace) . '</pre>';
       }
-      drupal_set_message($message, $class, TRUE);
+      drupal_set_message(SafeMarkup::set($message), $class, TRUE);
     }
 
     if ($fatal) {
@@ -244,9 +250,9 @@ function _drupal_log_error($error, $fatal = FALSE) {
 /**
  * Returns the current error level.
  *
- * This function should only be used to get the current error level pre
- * DRUPAL_BOOTSTRAP_KERNEL or before Drupal is installed. In all other
- * situations the following code is preferred:
+ * This function should only be used to get the current error level prior to
+ * DRUPAL_BOOTSTRAP_KERNEL or before Drupal is installed. In all other situations
+ * the following code is preferred:
  * @code
  * \Drupal::config('system.logging')->get('error_level');
  * @endcode
@@ -272,22 +278,4 @@ function _drupal_get_error_level() {
   // possibly in an edge-case error situation while trying to serve a regular
   // request on a public site, so use the non-verbose default value.
   return $error_level ?: ERROR_REPORTING_DISPLAY_ALL;
-}
-
-/**
- * Formats a backtrace into a plain-text string.
- *
- * The calls show values for scalar arguments and type names for complex ones.
- *
- * @param array $backtrace
- *   A standard PHP backtrace.
- *
- * @return string
- *   A plain-text line-wrapped string ready to be put inside <pre>.
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
- *   Use \Drupal\Core\Utility\Error::formatBacktrace().
- */
-function format_backtrace(array $backtrace) {
-  return Error::formatBacktrace($backtrace);
 }

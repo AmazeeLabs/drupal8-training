@@ -33,20 +33,11 @@ use Drupal\Core\Ajax\SetDialogTitleCommand;
 use Drupal\Core\Ajax\RedirectCommand;
 
 /**
- * Tests for all AJAX Commands.
+ * Tests that each AJAX command object can be created and rendered.
  *
- * @group Drupal
  * @group Ajax
  */
 class AjaxCommandsTest extends UnitTestCase {
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Ajax Command Objects',
-      'description' => 'Test that each AJAX command object can be created and rendered',
-      'group' => 'AJAX',
-    );
-  }
 
   /**
    * Tests that AddCssCommand objects can be constructed and rendered.
@@ -63,7 +54,7 @@ class AjaxCommandsTest extends UnitTestCase {
   }
 
   /**
-   * Tests that AfterCommand objecst can be constructed and rendered.
+   * Tests that AfterCommand objects can be constructed and rendered.
    */
   public function testAfterCommand() {
     $command = new AfterCommand('#page-title', '<p>New Text!</p>', array('my-setting' => 'setting'));

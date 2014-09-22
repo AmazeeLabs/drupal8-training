@@ -12,6 +12,8 @@ use Drupal\Tests\UnitTestCase;
 
 /**
  * Tests the orderBy() method of select queries.
+ *
+ * @group Database
  */
 class OrderByTest extends UnitTestCase {
 
@@ -25,18 +27,7 @@ class OrderByTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Order by',
-      'description' => 'Tests the orderBy() method of select queries.',
-      'group' => 'Database',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     $connection = $this->getMockBuilder('Drupal\Core\Database\Connection')
       ->disableOriginalConstructor()
       ->getMockForAbstractClass();

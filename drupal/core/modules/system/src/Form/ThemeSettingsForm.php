@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Form;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -65,12 +66,12 @@ class ThemeSettingsForm extends ConfigFormBase {
    * @param string $theme
    *   The theme name.
    */
-  public function buildForm(array $form, array &$form_state, $theme = '') {
+  public function buildForm(array $form, FormStateInterface $form_state, $theme = '') {
     $form = parent::buildForm($form, $form_state);
 
     $themes = list_themes();
 
-    // Deny access if the theme is disabled or not found.
+    // Deny access if the theme is not installed or not found.
     if (!empty($theme) && (empty($themes[$theme]) || !$themes[$theme]->status)) {
       throw new NotFoundHttpException();
     }
@@ -247,7 +248,7 @@ class ThemeSettingsForm extends ConfigFormBase {
           $local_file = drupal_get_path('theme', $theme) . '/' . $default;
         }
         else {
-          $local_file = path_to_theme() . '/' . $default;
+          $local_file = \Drupal::theme()->getActiveTheme()->getPath() . '/' . $default;
         }
 
         $element['#description'] = t('Examples: <code>@implicit-public-file</code> (for a file in the public filesystem), <code>@explicit-file</code>, or <code>@local-file</code>.', array(
@@ -283,8 +284,11 @@ class ThemeSettingsForm extends ConfigFormBase {
       // Save the name of the current theme (if any), so that we can temporarily
       // override the current theme and allow theme_get_setting() to work
       // without having to pass the theme name to it.
-      $default_theme = !empty($GLOBALS['theme_key']) ? $GLOBALS['theme_key'] : NULL;
-      $GLOBALS['theme_key'] = $theme;
+      $default_active_theme = \Drupal::theme()->getActiveTheme();
+      $default_theme = $default_active_theme->getName();
+      /** @var \Drupal\Core\Theme\ThemeInitialization $theme_initialization */
+      $theme_initialization = \Drupal::service('theme.initialization');
+      \Drupal::theme()->setActiveTheme($theme_initialization->getActiveThemeByName($theme));
 
       // Process the theme and all its base themes.
       foreach ($theme_keys as $theme) {
@@ -303,10 +307,10 @@ class ThemeSettingsForm extends ConfigFormBase {
 
       // Restore the original current theme.
       if (isset($default_theme)) {
-        $GLOBALS['theme_key'] = $default_theme;
+        \Drupal::theme()->setActiveTheme($default_active_theme);
       }
       else {
-        unset($GLOBALS['theme_key']);
+        \Drupal::theme()->resetActiveTheme();
       }
     }
 
@@ -316,7 +320,7 @@ class ThemeSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
     parent::validateForm($form, $form_state);
 
     if ($this->moduleHandler->moduleExists('file')) {
@@ -329,11 +333,11 @@ class ThemeSettingsForm extends ConfigFormBase {
         // File upload was attempted.
         if ($file) {
           // Put the temporary file in form_values so we can save it on submit.
-          $form_state['values']['logo_upload'] = $file;
+          $form_state->setValue('logo_upload', $file);
         }
         else {
           // File upload failed.
-          $this->setFormError('logo_upload', $form_state, $this->t('The logo could not be uploaded.'));
+          $form_state->setErrorByName('logo_upload', $this->t('The logo could not be uploaded.'));
         }
       }
 
@@ -345,26 +349,26 @@ class ThemeSettingsForm extends ConfigFormBase {
         // File upload was attempted.
         if ($file) {
           // Put the temporary file in form_values so we can save it on submit.
-          $form_state['values']['favicon_upload'] = $file;
+          $form_state->setValue('favicon_upload', $file);
         }
         else {
           // File upload failed.
-          $this->setFormError('favicon_upload', $form_state, $this->t('The favicon could not be uploaded.'));
+          $form_state->setErrorByName('favicon_upload', $this->t('The favicon could not be uploaded.'));
         }
       }
 
       // If the user provided a path for a logo or favicon file, make sure a file
       // exists at that path.
-      if ($form_state['values']['logo_path']) {
-        $path = $this->validatePath($form_state['values']['logo_path']);
+      if ($form_state->getValue('logo_path')) {
+        $path = $this->validatePath($form_state->getValue('logo_path'));
         if (!$path) {
-          $this->setFormError('logo_path', $form_state, $this->t('The custom logo path is invalid.'));
+          $form_state->setErrorByName('logo_path', $this->t('The custom logo path is invalid.'));
         }
       }
-      if ($form_state['values']['favicon_path']) {
-        $path = $this->validatePath($form_state['values']['favicon_path']);
+      if ($form_state->getValue('favicon_path')) {
+        $path = $this->validatePath($form_state->getValue('favicon_path'));
         if (!$path) {
-          $this->setFormError('favicon_path', $form_state, $this->t('The custom favicon path is invalid.'));
+          $form_state->setErrorByName('favicon_path', $this->t('The custom favicon path is invalid.'));
         }
       }
     }
@@ -373,17 +377,17 @@ class ThemeSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     parent::submitForm($form, $form_state);
 
-    $config = $this->config($form_state['values']['config_key']);
+    $config = $this->config($form_state->getValue('config_key'));
 
     // Exclude unnecessary elements before saving.
-    form_state_values_clean($form_state);
-    unset($form_state['values']['var']);
-    unset($form_state['values']['config_key']);
+    $form_state->cleanValues();
+    $form_state->unsetValue('var');
+    $form_state->unsetValue('config_key');
 
-    $values = $form_state['values'];
+    $values = $form_state->getValues();
 
     // If the user uploaded a new logo or favicon, save it to a permanent location
     // and use it in place of the default theme-provided file.
@@ -427,9 +431,6 @@ class ThemeSettingsForm extends ConfigFormBase {
     else {
       Cache::invalidateTags(array('theme_global_settings' => TRUE));
     }
-
-    // @todo Remove this in https://drupal.org/node/2124957.
-    Cache::invalidateTags(array('content' => TRUE));
   }
 
   /**

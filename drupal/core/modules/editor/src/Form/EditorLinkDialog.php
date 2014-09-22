@@ -8,6 +8,7 @@
 namespace Drupal\editor\Form;
 
 use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
@@ -32,10 +33,11 @@ class EditorLinkDialog extends FormBase {
    * @param \Drupal\filter\Entity\FilterFormat $filter_format
    *   The filter format for which this dialog corresponds.
    */
-  public function buildForm(array $form, array &$form_state, FilterFormat $filter_format = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, FilterFormat $filter_format = NULL) {
     // The default values are set directly from \Drupal::request()->request,
     // provided by the editor plugin opening the dialog.
-    $input = isset($form_state['input']['editor_object']) ? $form_state['input']['editor_object'] : array();
+    $user_input = $form_state->getUserInput();
+    $input = isset($user_input['editor_object']) ? $user_input['editor_object'] : array();
 
     $form['#tree'] = TRUE;
     $form['#attached']['library'][] = 'editor/drupal.editor.dialog';
@@ -67,7 +69,7 @@ class EditorLinkDialog extends FormBase {
       // No regular submit-handler. This form only works via JavaScript.
       '#submit' => array(),
       '#ajax' => array(
-        'callback' => array($this, 'submitForm'),
+        'callback' => '::submitForm',
         'event' => 'click',
       ),
     );
@@ -78,10 +80,10 @@ class EditorLinkDialog extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $response = new AjaxResponse();
 
-    if (form_get_errors($form_state)) {
+    if ($form_state->getErrors()) {
       unset($form['#prefix'], $form['#suffix']);
       $status_messages = array('#theme' => 'status_messages');
       $output = drupal_render($form);
@@ -89,7 +91,7 @@ class EditorLinkDialog extends FormBase {
       $response->addCommand(new HtmlCommand('#editor-link-dialog-form', $output));
     }
     else {
-      $response->addCommand(new EditorDialogSave($form_state['values']));
+      $response->addCommand(new EditorDialogSave($form_state->getValues()));
       $response->addCommand(new CloseModalDialogCommand());
     }
 

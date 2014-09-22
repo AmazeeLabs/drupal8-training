@@ -11,6 +11,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests administration of text editors.
+ *
+ * @group editor
  */
 class EditorAdminTest extends WebTestBase {
 
@@ -21,15 +23,7 @@ class EditorAdminTest extends WebTestBase {
    */
   public static $modules = array('filter', 'editor');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Text editor administration',
-      'description' => 'Tests administration of text editors.',
-      'group' => 'Text Editor',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Add text format.

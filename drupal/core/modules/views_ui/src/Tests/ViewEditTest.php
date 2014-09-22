@@ -13,6 +13,8 @@ use Drupal\views\Views;
 
 /**
  * Tests some general functionality of editing views, like deleting a view.
+ *
+ * @group views_ui
  */
 class ViewEditTest extends UITestBase {
 
@@ -22,14 +24,6 @@ class ViewEditTest extends UITestBase {
    * @var array
    */
   public static $testViews = array('test_view', 'test_display');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'General views edit test',
-      'description' => 'Tests some general functionality of editing views, like deleting a view.',
-      'group' => 'Views UI'
-    );
-  }
 
   /**
    * Tests the delete link on a views UI.
@@ -100,7 +94,7 @@ class ViewEditTest extends UITestBase {
     $this->drupalGet('admin/structure/views/view/test_view');
     $langcode_url = 'admin/structure/views/nojs/display/test_view/default/field_langcode';
     $this->assertLinkByHref($langcode_url);
-    $this->assertLink(t("Current user's language"));
+    $this->assertLink(t('Language selected for !type', array('!type' => t('Content'))));
     // Click the link and check the form before language is added.
     $this->drupalGet($langcode_url);
     $this->assertResponse(200);
@@ -112,7 +106,7 @@ class ViewEditTest extends UITestBase {
 
     $this->drupalGet('admin/structure/views/nojs/display/test_display/page_1/field_langcode');
     $this->assertResponse(200);
-    $this->assertFieldByName('field_langcode', '***CURRENT_LANGUAGE***');
+    $this->assertFieldByName('field_langcode', '***LANGUAGE_language_content***');
     $this->assertFieldByName('field_langcode_add_to_query', TRUE);
   }
 

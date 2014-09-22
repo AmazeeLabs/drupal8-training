@@ -14,7 +14,6 @@ use Drupal\Core\Session\SessionHandler;
 use Drupal\Core\Site\Settings;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Storage\Handler\WriteCheckSessionHandler;
-use Symfony\Component\HttpFoundation\Session\Storage\MetadataBag as SymfonyMetadataBag;
 use Symfony\Component\HttpFoundation\Session\Storage\NativeSessionStorage;
 
 /**
@@ -63,7 +62,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
    *
    * @var bool
    */
-  protected $lazySession;
+  protected $startedLazy;
 
   /**
    * Whether session management is enabled or temporarily disabled.
@@ -83,16 +82,23 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
    *   The request stack.
    * @param \Drupal\Core\Database\Connection $connection
    *   The database connection.
-   * @param \Symfony\Component\HttpFoundation\Session\Storage\MetadataBag $metadata_bag
+   * @param \Drupal\Core\Session\MetadataBag $metadata_bag
    *   The session metadata bag.
    * @param \Drupal\Core\Site\Settings $settings
    *   The settings instance.
    */
-  public function __construct(RequestStack $request_stack, Connection $connection, SymfonyMetadataBag $metadata_bag, Settings $settings) {
-    parent::__construct();
+  public function __construct(RequestStack $request_stack, Connection $connection, MetadataBag $metadata_bag, Settings $settings) {
+    $options = array();
     $this->requestStack = $request_stack;
     $this->connection = $connection;
-    $this->setMetadataBag($metadata_bag);
+
+    // Register the default session handler.
+    // @todo Extract session storage from session handler into a service.
+    $save_handler = new SessionHandler($this, $this->requestStack, $this->connection);
+    $write_check_handler = new WriteCheckSessionHandler($save_handler);
+    $this->setSaveHandler($write_check_handler);
+
+    parent::__construct($options, $write_check_handler, $metadata_bag);
 
     $this->setMixedMode($settings->get('mixed_mode_sessions', FALSE));
 
@@ -108,14 +114,12 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
   /**
    * {@inheritdoc}
    */
-  public function initialize() {
+  public function start() {
     global $user;
 
-    // Register the default session handler.
-    // @todo Extract session storage from session handler into a service.
-    $save_handler = new SessionHandler($this, $this->requestStack, $this->connection);
-    $write_check_handler = new WriteCheckSessionHandler($save_handler);
-    $this->setSaveHandler($write_check_handler);
+    if (($this->started || $this->startedLazy) && !$this->closed) {
+      return $this->started;
+    }
 
     $is_https = $this->requestStack->getCurrentRequest()->isSecure();
     $cookies = $this->requestStack->getCurrentRequest()->cookies;
@@ -125,44 +129,63 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
       // session is only started on demand in save(), making
       // anonymous users not use a session cookie unless something is stored in
       // $_SESSION. This allows HTTP proxies to cache anonymous pageviews.
-      $this->start();
-      if ($user->isAuthenticated() || !$this->isSessionObsolete()) {
-        drupal_page_is_cacheable(FALSE);
-      }
+      $result = $this->startNow();
     }
-    else {
-      // Set a session identifier for this request. This is necessary because
-      // we lazily start sessions at the end of this request, and some
-      // processes (like drupal_get_token()) needs to know the future
-      // session ID in advance.
-      $this->lazySession = TRUE;
+
+    if (empty($result)) {
       $user = new AnonymousUserSession();
+
+      // Randomly generate a session identifier for this request. This is
+      // necessary because \Drupal\user\TempStoreFactory::get() wants to know
+      // the future session ID of a lazily started session in advance.
+      //
+      // @todo: With current versions of PHP there is little reason to generate
+      //   the session id from within application code. Consider using the
+      //   default php session id instead of generating a custom one:
+      //   https://www.drupal.org/node/2238561
       $this->setId(Crypt::randomBytesBase64());
       if ($is_https && $this->isMixedMode()) {
         $session_id = Crypt::randomBytesBase64();
         $cookies->set($insecure_session_name, $session_id);
       }
+
+      // Initialize the session global and attach the Symfony session bags.
+      $_SESSION = array();
+      $this->loadSession();
+
+      // NativeSessionStorage::loadSession() sets started to TRUE, reset it to
+      // FALSE here.
+      $this->started = FALSE;
+      $this->startedLazy = TRUE;
+
+      $result = FALSE;
     }
     date_default_timezone_set(drupal_get_user_timezone());
 
-    return $this;
+    return $result;
   }
 
   /**
-   * {@inheritdoc}
+   * Forcibly start a PHP session.
+   *
+   * @return boolean
+   *   TRUE if the session is started.
    */
-  public function start() {
+  protected function startNow() {
     if (!$this->isEnabled() || $this->isCli()) {
-      return;
+      return FALSE;
     }
-    // Save current session data before starting it, as PHP will destroy it.
-    $session_data = isset($_SESSION) ? $_SESSION : NULL;
+
+    if ($this->startedLazy) {
+      // Save current session data before starting it, as PHP will destroy it.
+      $session_data = $_SESSION;
+    }
 
     $result = parent::start();
 
     // Restore session data.
-    if (!empty($session_data)) {
-      $_SESSION += $session_data;
+    if ($this->startedLazy) {
+      $_SESSION = $session_data;
     }
 
     return $result;
@@ -174,7 +197,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
   public function save() {
     global $user;
 
-    if (!$this->isEnabled()) {
+    if (!$this->isEnabled() || $this->isCli()) {
       // We don't have anything to do if we are not allowed to save the session.
       return;
     }
@@ -189,8 +212,8 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     else {
       // There is session data to store. Start the session if it is not already
       // started.
-      if (!$this->isStarted()) {
-        $this->start();
+      if (!$this->getSaveHandler()->isActive()) {
+        $this->startNow();
         if ($this->requestStack->getCurrentRequest()->isSecure() && $this->isMixedMode()) {
           $insecure_session_name = $this->getInsecureName();
           $params = session_get_cookie_params();
@@ -202,6 +225,8 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
       // Write the session data.
       parent::save();
     }
+
+    $this->startedLazy = FALSE;
   }
 
   /**
@@ -211,7 +236,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     global $user;
 
     // Nothing to do if we are not allowed to change the session.
-    if (!$this->isEnabled()) {
+    if (!$this->isEnabled() || $this->isCli()) {
       return;
     }
 
@@ -226,9 +251,6 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
 
     if ($is_https && $this->isMixedMode()) {
       $insecure_session_name = $this->getInsecureName();
-      if (!isset($this->lazySession) && $cookies->has($insecure_session_name)) {
-        $old_insecure_session_id = $cookies->get($insecure_session_name);
-      }
       $params = session_get_cookie_params();
       $session_id = Crypt::randomBytesBase64();
       // If a session cookie lifetime is set, the session will expire
@@ -244,12 +266,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     }
     session_id(Crypt::randomBytesBase64());
 
-    // @todo The token seed can be moved onto \Drupal\Core\Session\MetadataBag.
-    //   The session manager then needs to notify the metadata bag when the
-    //   token should be regenerated. https://drupal.org/node/2256257
-    if (!empty($_SESSION)) {
-      unset($_SESSION['csrf_token_seed']);
-    }
+    $this->getMetadataBag()->clearCsrfTokenSeed();
 
     if (isset($old_session_id)) {
       $params = session_get_cookie_params();
@@ -269,21 +286,13 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
         ->condition($is_https ? 'ssid' : 'sid', Crypt::hashBase64($old_session_id))
         ->execute();
     }
-    elseif (isset($old_insecure_session_id)) {
-      // If logging in to the secure site, and there was no active session on
-      // the secure site but a session was active on the insecure site, update
-      // the insecure session with the new session identifiers.
-      $this->connection->update('sessions')
-        ->fields(array('sid' => Crypt::hashBase64($session_id), 'ssid' => Crypt::hashBase64($this->getId())))
-        ->condition('sid', Crypt::hashBase64($old_insecure_session_id))
-        ->execute();
-    }
-    else {
+
+    if (!$this->isStarted()) {
       // Start the session when it doesn't exist yet.
       // Preserve the logged in user, as it will be reset to anonymous
       // by \Drupal\Core\Session\SessionHandler::read().
       $account = $user;
-      $this->start();
+      $this->startNow();
       $user = $account;
     }
     date_default_timezone_set(drupal_get_user_timezone());
@@ -294,7 +303,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
    */
   public function delete($uid) {
     // Nothing to do if we are not allowed to change the session.
-    if (!$this->isEnabled()) {
+    if (!$this->isEnabled() || $this->isCli()) {
       return;
     }
     $this->connection->delete('sessions')
@@ -387,18 +396,6 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
 
     // Ignore the metadata bag, it does not contain any user data.
     $mask[$this->metadataBag->getStorageKey()] = FALSE;
-
-    // Ignore the CSRF token seed.
-    //
-    // @todo Anonymous users should not get a CSRF token at any time, or if they
-    //   do, then the originating code is responsible for cleaning up the
-    //   session once obsolete. Since that is not guaranteed to be the case,
-    //   this check force-ignores the CSRF token, so as to avoid performance
-    //   regressions.
-    //   The token seed can be moved onto \Drupal\Core\Session\MetadataBag. This
-    //   will result in the CSRF token being ignored automatically.
-    //   https://drupal.org/node/2256257
-    $mask['csrf_token_seed'] = FALSE;
 
     // Ignore attribute bags when they do not contain any data.
     foreach ($this->bags as $bag) {

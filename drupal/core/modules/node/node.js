@@ -18,7 +18,7 @@
         // or if the checkbox doesn't exist, but the revision log does. For users
         // without the "Administer content" permission the checkbox won't appear,
         // but the revision log will if the content type is set to auto-revision.
-        if (revisionCheckbox.is(':checked') || (!revisionCheckbox.length && $context.find('.form-item-log textarea').length)) {
+        if (revisionCheckbox.is(':checked') || (!revisionCheckbox.length && $context.find('.form-item-revision-log textarea').length)) {
           return Drupal.t('New revision');
         }
 
@@ -27,8 +27,8 @@
 
       $context.find('.node-form-author').drupalSetSummary(function (context) {
         var $context = $(context);
-        var name = $context.find('.form-item-name input').val() || drupalSettings.anonymous,
-          date = $context.find('.form-item-date input').val();
+        var name = $context.find('.field-name-uid input').val(),
+          date = $context.find('.field-name-created input').val();
         return date ?
           Drupal.t('By @name on @date', { '@name': name, '@date': date }) :
           Drupal.t('By @name', { '@name': name });
@@ -39,7 +39,7 @@
         var vals = [];
 
         if ($context.find('input').is(':checked')) {
-          $context.find('input:checked').parent().each(function () {
+          $context.find('input:checked').next('label').each(function () {
             vals.push(Drupal.checkPlain($.trim($(this).text())));
           });
           return vals.join(', ');

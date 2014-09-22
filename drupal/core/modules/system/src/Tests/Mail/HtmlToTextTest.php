@@ -7,21 +7,16 @@
 
 namespace Drupal\system\Tests\Mail;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Site\Settings;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests for drupal_html_to_text().
+ *
+ * @group Mail
  */
 class HtmlToTextTest extends WebTestBase {
-  public static function getInfo() {
-    return array(
-      'name'  => 'HTML to text conversion',
-      'description' => 'Tests drupal_html_to_text().',
-      'group' => 'Mail',
-    );
-  }
-
   /**
    * Converts a string to its PHP source equivalent for display in test messages.
    *
@@ -37,7 +32,7 @@ class HtmlToTextTest extends WebTestBase {
       str_replace(
         array("\n", ' '),
         array('\n', '&nbsp;'),
-        check_plain($text)
+        String::checkPlain($text)
       ) . '"';
   }
 
@@ -59,7 +54,7 @@ class HtmlToTextTest extends WebTestBase {
     $tested_tags = implode(', ', array_unique($matches[1]));
     $message .= ' (' . $tested_tags . ')';
     $result = drupal_html_to_text($html, $allowed_tags);
-    $pass = $this->assertEqual($result, $text, check_plain($message));
+    $pass = $this->assertEqual($result, $text, String::checkPlain($message));
     $verbose = 'html = <pre>' . $this->stringToHtml($html)
       . '</pre><br />' . 'result = <pre>' . $this->stringToHtml($result)
       . '</pre><br />' . 'expected = <pre>' . $this->stringToHtml($text)

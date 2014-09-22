@@ -7,13 +7,17 @@
 
 namespace Drupal\Core\EventSubscriber;
 
+use Drupal\Component\Datetime\DateTimePlus;
 use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Language\Language;
-use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\PageCache\RequestPolicyInterface;
+use Drupal\Core\PageCache\ResponsePolicyInterface;
 use Drupal\Core\Site\Settings;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
@@ -25,9 +29,9 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 class FinishResponseSubscriber implements EventSubscriberInterface {
 
   /**
-   * The LanguageManager object for retrieving the correct language code.
+   * The language manager object for retrieving the correct language code.
    *
-   * @var LanguageManager
+   * @var \Drupal\Core\Language\LanguageManagerInterface
    */
   protected $languageManager;
 
@@ -39,16 +43,36 @@ class FinishResponseSubscriber implements EventSubscriberInterface {
   protected $config;
 
   /**
+   * A policy rule determining the cacheability of a request.
+   *
+   * @var \Drupal\Core\PageCache\RequestPolicyInterface
+   */
+  protected $requestPolicy;
+
+  /**
+   * A policy rule determining the cacheability of the response.
+   *
+   * @var \Drupal\Core\PageCache\ResponsePolicyInterface
+   */
+  protected $responsePolicy;
+
+  /**
    * Constructs a FinishResponseSubscriber object.
    *
-   * @param LanguageManager $language_manager
-   *  The LanguageManager object for retrieving the correct language code.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager object for retrieving the correct language code.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   A config factory for retrieving required config objects.
+   * @param \Drupal\Core\PageCache\RequestPolicyInterface $request_policy
+   *   A policy rule determining the cacheability of a request.
+   * @param \Drupal\Core\PageCache\ResponsePolicyInterface $response_policy
+   *   A policy rule determining the cacheability of a response.
    */
-  public function __construct(LanguageManager $language_manager, ConfigFactoryInterface $config_factory) {
+  public function __construct(LanguageManagerInterface $language_manager, ConfigFactoryInterface $config_factory, RequestPolicyInterface $request_policy, ResponsePolicyInterface $response_policy) {
     $this->languageManager = $language_manager;
     $this->config = $config_factory->get('system.performance');
+    $this->requestPolicy = $request_policy;
+    $this->responsePolicy = $response_policy;
   }
 
   /**
@@ -81,21 +105,30 @@ class FinishResponseSubscriber implements EventSubscriberInterface {
       $response->headers->set($name, $value, FALSE);
     }
 
-    $is_cacheable = drupal_page_is_cacheable();
+    $is_cacheable = ($this->requestPolicy->check($request) === RequestPolicyInterface::ALLOW) && ($this->responsePolicy->check($response, $request) !== ResponsePolicyInterface::DENY);
 
     // Add headers necessary to specify whether the response should be cached by
     // proxies and/or the browser.
     if ($is_cacheable && $this->config->get('cache.page.max_age') > 0) {
       if (!$this->isCacheControlCustomized($response)) {
+        // Only add the default Cache-Control header if the controller did not
+        // specify one on the response.
         $this->setResponseCacheable($response, $request);
       }
     }
     else {
+      // If either the policy forbids caching or the sites configuration does
+      // not allow to add a max-age directive, then enforce a Cache-Control
+      // header declaring the response as not cacheable.
       $this->setResponseNotCacheable($response, $request);
     }
 
-    // Store the response in the internal page cache.
-    if ($is_cacheable && $this->config->get('cache.page.use_internal')) {
+    // Currently it is not possible to cache some types of responses. Therefore
+    // exclude binary file responses (generated files, e.g. images with image
+    // styles) and streamed responses (files directly read from the disk).
+    // see: https://github.com/symfony/symfony/issues/9128#issuecomment-25088678
+    if ($is_cacheable && $this->config->get('cache.page.use_internal') && !($response instanceof BinaryFileResponse) && !($response instanceof StreamedResponse)) {
+      // Store the response in the internal page cache.
       drupal_page_set_cache($response, $request);
       $response->headers->set('X-Drupal-Cache', 'MISS');
       drupal_serve_page_from_cache($response, $request);
@@ -123,7 +156,7 @@ class FinishResponseSubscriber implements EventSubscriberInterface {
    * @param \Symfony\Component\HttpFoundation\Response $response
    *
    * @return bool
-   *   TRUE when Cache-Control header was set explicitely on the given response.
+   *   TRUE when Cache-Control header was set explicitly on the given response.
    */
   protected function isCacheControlCustomized(Response $response) {
     $cache_control = $response->headers->get('Cache-Control');
@@ -174,7 +207,7 @@ class FinishResponseSubscriber implements EventSubscriberInterface {
     // Last-Modified and an ETag header on the response.
     if (!$response->headers->has('Last-Modified')) {
       $timestamp = REQUEST_TIME;
-      $response->setLastModified(new \DateTime(gmdate(DATE_RFC1123, REQUEST_TIME)));
+      $response->setLastModified(new \DateTime(gmdate(DateTimePlus::RFC7231, REQUEST_TIME)));
     }
     else {
       $timestamp = $response->getLastModified()->getTimestamp();

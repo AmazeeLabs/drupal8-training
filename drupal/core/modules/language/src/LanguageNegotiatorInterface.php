@@ -8,7 +8,6 @@
 namespace Drupal\language;
 
 use Drupal\Core\Session\AccountInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Common interface for language negotiation services.
@@ -41,7 +40,7 @@ use Symfony\Component\HttpFoundation\Request;
  * configurable:
  * @code
  * function mymodule_language_types_info_alter(&$language_types) {
- *   unset($language_types[Language::TYPE_CONTENT]['fixed']);
+ *   unset($language_types[LanguageInterface::TYPE_CONTENT]['fixed']);
  * }
  * @endcode
  *
@@ -124,21 +123,15 @@ interface LanguageNegotiatorInterface {
   public function setCurrentUser(AccountInterface $current_user);
 
   /**
-   * Sets the active request and resets all language types.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The HttpRequest object representing the current request.
-   */
-  public function setRequest(Request $request);
-
-  /**
    * Initializes the specified language type.
    *
    * @param string $type
    *   The language type to be initialized.
    *
-   * @return \Drupal\Core\Language\Language
-   *   Return either the language of the specified type or the default language.
+   * @return \Drupal\Core\Language\LanguageInterface[]
+   *   Returns an array containing a single language keyed by the language
+   *   negotiation method ID used to determine the language of the specified
+   *   type. If negotiation is not possible the default language is returned.
    */
   public function initializeType($type);
 

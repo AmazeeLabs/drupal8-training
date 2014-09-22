@@ -12,18 +12,11 @@ use Drupal\simpletest\DrupalUnitTestBase;
 /**
  * Tests installation of configuration objects in installation functionality.
  *
+ * @group config
  * @see \Drupal\Core\Config\ConfigInstaller
  */
 class ConfigInstallTest extends DrupalUnitTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Installation functionality unit tests',
-      'description' => 'Tests installation of configuration objects in installation functionality.',
-      'group' => 'Configuration',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Ensure the global variable being asserted by this test does not exist;

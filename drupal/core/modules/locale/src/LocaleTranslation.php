@@ -10,7 +10,7 @@ namespace Drupal\locale;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\DestructableInterface;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\Core\StringTranslation\Translator\TranslatorInterface;
@@ -38,7 +38,7 @@ class LocaleTranslation implements TranslatorInterface, DestructableInterface {
   protected $configFactory;
 
   /**
-   * Cached translations
+   * Cached translations.
    *
    * @var array
    *   Array of \Drupal\locale\LocaleLookup objects indexed by language code
@@ -101,7 +101,7 @@ class LocaleTranslation implements TranslatorInterface, DestructableInterface {
    */
   public function getStringTranslation($langcode, $string, $context) {
     // If the language is not suitable for locale module, just return.
-    if ($langcode == Language::LANGCODE_SYSTEM || ($langcode == 'en' && !$this->canTranslateEnglish())) {
+    if ($langcode == LanguageInterface::LANGCODE_SYSTEM || ($langcode == 'en' && !$this->canTranslateEnglish())) {
       return FALSE;
     }
     // Strings are cached by langcode, context and roles, using instances of the

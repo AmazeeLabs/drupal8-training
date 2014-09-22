@@ -11,7 +11,7 @@ use Drupal\Component\Utility\String;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\Schema\ArrayElement;
-use Drupal\Core\Config\TypedConfigManager;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -31,7 +31,7 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
   /**
    * The typed config manager.
    *
-   * @var \Drupal\Core\Config\TypedConfigManager
+   * @var \Drupal\Core\Config\TypedConfigManagerInterface
    */
   protected $typedConfigManager;
 
@@ -61,21 +61,21 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
    *   The language manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
-   * @param \Drupal\Core\Config\TypedConfigManager $typed_config_manager
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config_manager
    *   The typed config manager.
    */
-  public function __construct(CacheBackendInterface $cache_backend, LanguageManagerInterface $language_manager, ModuleHandlerInterface $module_handler, TypedConfigManager $typed_config_manager, ThemeHandlerInterface $theme_handler) {
+  public function __construct(CacheBackendInterface $cache_backend, LanguageManagerInterface $language_manager, ModuleHandlerInterface $module_handler, TypedConfigManagerInterface $typed_config_manager, ThemeHandlerInterface $theme_handler) {
     $this->typedConfigManager = $typed_config_manager;
 
     // Look at all themes and modules.
-    // @todo If the list of enabled modules and themes is changed, new
+    // @todo If the list of installed modules and themes is changed, new
     //   definitions are not picked up immediately and obsolete definitions are
     //   not removed, because the list of search directories is only compiled
     //   once in this constructor. The current code only works due to
-    //   coincidence: The request that enables e.g. a new theme does not
+    //   coincidence: The request that installs e.g. a new theme does not
     //   instantiate this plugin manager at the beginning of the request; when
     //   routes are being rebuilt at the end of the request, this service only
-    //   happens to get instantiated with the updated list of enabled themes.
+    //   happens to get instantiated with the updated list of installed themes.
     $directories = array();
     foreach ($module_handler->getModuleList() as $name => $module) {
       $directories[$name] = $module->getPath();
@@ -90,14 +90,16 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
     $this->discovery = new InfoHookDecorator($this->discovery, 'config_translation_info');
     $this->discovery = new ContainerDerivativeDiscoveryDecorator($this->discovery);
 
-    $this->factory = new ContainerFactory($this);
+    $this->factory = new ContainerFactory($this, '\Drupal\config_translation\ConfigMapperInterface');
 
     // Let others alter definitions with hook_config_translation_info_alter().
     $this->moduleHandler = $module_handler;
     $this->themeHandler = $theme_handler;
 
     $this->alterInfo('config_translation_info');
-    $this->setCacheBackend($cache_backend, $language_manager, 'config_translation_info_plugins');
+    // Config translation only uses an info hook discovery, cache by language.
+    $cache_key = 'config_translation_info_plugins' . ':' . $language_manager->getCurrentLanguage()->getId();
+    $this->setCacheBackend($cache_backend, $cache_key, array('config_translation_info_plugins' => TRUE));
   }
 
   /**
@@ -129,6 +131,13 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
   /**
    * {@inheritdoc}
    */
+  public function buildDataDefinition(array $definition, $value = NULL, $name = NULL, $parent = NULL) {
+    return $this->typedConfigManager->buildDataDefinition($definition, $value, $name, $parent);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function findDefinitions() {
     $definitions = $this->discovery->getDefinitions();
     foreach ($definitions as $plugin_id => &$definition) {
@@ -141,7 +150,7 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
     // If this plugin was provided by a module that does not exist, remove the
     // plugin definition.
     foreach ($definitions as $plugin_id => $plugin_definition) {
-      if (isset($plugin_definition['provider']) && !in_array($plugin_definition['provider'], array('Core', 'Component')) && (!$this->moduleHandler->moduleExists($plugin_definition['provider']) && !in_array($plugin_definition['provider'], array_keys($this->themeHandler->listInfo())))) {
+      if (isset($plugin_definition['provider']) && !in_array($plugin_definition['provider'], array('core', 'component')) && (!$this->moduleHandler->moduleExists($plugin_definition['provider']) && !in_array($plugin_definition['provider'], array_keys($this->themeHandler->listInfo())))) {
         unset($definitions[$plugin_id]);
       }
     }

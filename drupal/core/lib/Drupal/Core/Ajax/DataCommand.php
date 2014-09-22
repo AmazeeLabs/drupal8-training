@@ -17,6 +17,8 @@ use Drupal\Core\Ajax\CommandInterface;
  *
  * This command is implemented by Drupal.AjaxCommands.prototype.data() defined
  * in misc/ajax.js.
+ *
+ * @ingroup ajax
  */
 class DataCommand implements CommandInterface {
 
@@ -38,7 +40,7 @@ class DataCommand implements CommandInterface {
   protected $name;
 
   /**
-   * The value of the data to be atached to elements matched by the selector.
+   * The value of the data to be attached to elements matched by the selector.
    *
    * The data is not limited to strings; it can be any format.
    *

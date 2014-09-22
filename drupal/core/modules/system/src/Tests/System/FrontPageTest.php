@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\System;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test front page functionality and administration.
+ * Tests front page functionality and administration.
+ *
+ * @group system
  */
 class FrontPageTest extends WebTestBase {
 
@@ -21,20 +23,13 @@ class FrontPageTest extends WebTestBase {
    */
   public static $modules = array('node', 'system_test', 'views');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Front page',
-      'description' => 'Tests front page functionality and administration.',
-      'group' => 'System',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create admin user, log in admin user, and create one node.
     $this->admin_user = $this->drupalCreateUser(array('access content', 'administer site configuration'));
     $this->drupalLogin($this->admin_user);
+    $this->drupalCreateContentType(array('type' => 'page'));
     $this->node_path = "node/" . $this->drupalCreateNode(array('promote' => 1))->id();
 
     // Configure 'node' as front page.
@@ -49,10 +44,10 @@ class FrontPageTest extends WebTestBase {
   public function testDrupalFrontPage() {
     // Create a promoted node to test the <title> tag on the front page view.
     $settings = array(
-      'title' => $this->randomName(8),
+      'title' => $this->randomMachineName(8),
       'promote' => 1,
     );
-    $node = $this->drupalCreateNode($settings);
+    $this->drupalCreateNode($settings);
     $this->drupalGet('');
     $this->assertTitle('Home | Drupal');
 

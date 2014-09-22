@@ -7,14 +7,11 @@
 
 namespace Drupal\Core\Menu;
 
-use Drupal\Core\Access\AccessManager;
+use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Menu\LocalActionInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
-use Drupal\Component\Plugin\Discovery\ProcessDecorator;
 use Drupal\Core\Plugin\Discovery\ContainerDerivativeDiscoveryDecorator;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\Plugin\Factory\ContainerFactory;
@@ -24,14 +21,9 @@ use Symfony\Component\HttpKernel\Controller\ControllerResolverInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
- * Manages discovery and instantiation of menu local action plugins.
- *
- * Menu local actions are links that lead to actions like "add new". The plugin
- * format allows them (if needed) to dynamically generate a title or the path
- * they link to. The annotation on the plugin provides the default title,
- * and the list of routes where the action should be rendered.
+ * Provides the default local action manager using YML as primary definition.
  */
-class LocalActionManager extends DefaultPluginManager {
+class LocalActionManager extends DefaultPluginManager implements LocalActionManagerInterface {
 
   /**
    * Provides some default values for all local action plugins.
@@ -81,7 +73,7 @@ class LocalActionManager extends DefaultPluginManager {
   /**
    * The access manager.
    *
-   * @var \Drupal\Core\Access\AccessManager
+   * @var \Drupal\Core\Access\AccessManagerInterface
    */
   protected $accessManager;
 
@@ -114,17 +106,17 @@ class LocalActionManager extends DefaultPluginManager {
    *   Cache backend instance to use.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
-   * @param \Drupal\Core\Access\AccessManager $access_manager
+   * @param \Drupal\Core\Access\AccessManagerInterface $access_manager
    *   The access manager.
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The current user.
    */
-  public function __construct(ControllerResolverInterface $controller_resolver, RequestStack $request_stack, RouteProviderInterface $route_provider, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache_backend, LanguageManagerInterface $language_manager, AccessManager $access_manager, AccountInterface $account) {
+  public function __construct(ControllerResolverInterface $controller_resolver, RequestStack $request_stack, RouteProviderInterface $route_provider, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache_backend, LanguageManagerInterface $language_manager, AccessManagerInterface $access_manager, AccountInterface $account) {
     // Skip calling the parent constructor, since that assumes annotation-based
     // discovery.
-    $this->discovery = new YamlDiscovery('local_actions', $module_handler->getModuleDirectories());
+    $this->discovery = new YamlDiscovery('links.action', $module_handler->getModuleDirectories());
     $this->discovery = new ContainerDerivativeDiscoveryDecorator($this->discovery);
-    $this->factory = new ContainerFactory($this);
+    $this->factory = new ContainerFactory($this, 'Drupal\Core\Menu\LocalActionInterface');
     $this->controllerResolver = $controller_resolver;
     $this->requestStack = $request_stack;
     $this->routeProvider = $route_provider;
@@ -132,20 +124,11 @@ class LocalActionManager extends DefaultPluginManager {
     $this->moduleHandler = $module_handler;
     $this->account = $account;
     $this->alterInfo('menu_local_actions');
-    $this->setCacheBackend($cache_backend, $language_manager, 'local_action_plugins', array('local_action' => TRUE));
+    $this->setCacheBackend($cache_backend, 'local_action_plugins:' . $language_manager->getCurrentLanguage()->getId(), array('local_action' => TRUE));
   }
 
   /**
-   * Gets the title for a local action.
-   *
-   * @param \Drupal\Core\Menu\LocalActionInterface $local_action
-   *   An object to get the title from.
-   *
-   * @return string
-   *   The title (already localized).
-   *
-   * @throws \BadMethodCallException
-   *   If the plugin does not implement the getTitle() method.
+   * {@inheritdoc}
    */
   public function getTitle(LocalActionInterface $local_action) {
     $controller = array($local_action, 'getTitle');
@@ -154,13 +137,7 @@ class LocalActionManager extends DefaultPluginManager {
   }
 
   /**
-   * Finds all local actions that appear on a named route.
-   *
-   * @param string $route_appears
-   *   The route name for which to find local actions.
-   *
-   * @return array
-   *   An array of link render arrays.
+   * {@inheritdoc}
    */
   public function getActionsForRoute($route_appears) {
     if (!isset($this->instances[$route_appears])) {

@@ -7,10 +7,12 @@
 
 namespace Drupal\views\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
  * Tests search integration filters with multilingual nodes.
+ *
+ * @group views
  */
 class SearchMultilingualTest extends ViewTestBase {
 
@@ -29,17 +31,6 @@ class SearchMultilingualTest extends ViewTestBase {
   public static $testViews = array('test_search');
 
   /**
-   * {inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Search multilingual tests',
-      'description' => 'Tests search filters of views with multilingual nodes.',
-      'group' => 'Views',
-    );
-  }
-
-  /**
    * Tests search with multilingual nodes.
    */
   public function testMultilingualSearchFilter() {
@@ -49,7 +40,7 @@ class SearchMultilingualTest extends ViewTestBase {
     $this->drupalLogin($user);
 
     // Add Spanish language programmatically.
-    language_save(new Language(array('id' => 'es')));
+    ConfigurableLanguage::createFromLangcode('es')->save();
 
     // Create a content type and make it translatable.
     $type = $this->drupalCreateContentType();

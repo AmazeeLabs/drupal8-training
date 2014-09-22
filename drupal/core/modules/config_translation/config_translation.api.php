@@ -36,13 +36,13 @@ function hook_config_translation_info(&$info) {
   $route_provider = \Drupal::service('router.route_provider');
 
   // If field UI is not enabled, the base routes of the type
-  // "field_ui.instance_edit_$entity_type" are not defined.
+  // "field_ui.field_edit_$entity_type" are not defined.
   if (\Drupal::moduleHandler()->moduleExists('field_ui')) {
     // Add fields entity mappers to all fieldable entity types defined.
     foreach ($entity_manager->getDefinitions() as $entity_type_id => $entity_type) {
       $base_route = NULL;
       try {
-        $base_route = $route_provider->getRouteByName('field_ui.instance_edit_' . $entity_type_id);
+        $base_route = $route_provider->getRouteByName('field_ui.field_edit_' . $entity_type_id);
       }
       catch (RouteNotFoundException $e) {
         // Ignore non-existent routes.
@@ -51,10 +51,10 @@ function hook_config_translation_info(&$info) {
       // Make sure entity type is fieldable and has a base route.
       if ($entity_type->isFieldable() && !empty($base_route)) {
         $info[$entity_type_id . '_fields'] = array(
-          'base_route_name' => 'field_ui.instance_edit_' . $entity_type_id,
-          'entity_type' => 'field_instance_config',
+          'base_route_name' => 'field_ui.field_edit_' . $entity_type_id,
+          'entity_type' => 'field_config',
           'title' => t('!label field'),
-          'class' => '\Drupal\config_translation\ConfigFieldInstanceMapper',
+          'class' => '\Drupal\config_translation\ConfigFieldMapper',
           'base_entity_type' => $entity_type_id,
           'weight' => 10,
         );
@@ -86,25 +86,6 @@ function hook_config_translation_info_alter(&$info) {
   // stored in this config file using regular form altering on the original
   // configuration form.)
   $info['system.site_information_settings']['names'][] = 'example.site.setting';
-}
-
-/**
- * Alter config typed data definitions.
- *
- * Used to automatically generate translation forms, you can alter the typed
- * data types representing each configuration schema type to change default
- * labels or form element renderers.
- *
- * @param $definitions
- *   Associative array of configuration type definitions keyed by schema type
- *   names. The elements are themselves array with information about the type.
- */
-function hook_config_translation_type_info_alter(&$definitions) {
-  // Enhance the text and date type definitions with classes to generate proper
-  // form elements in ConfigTranslationFormBase. Other translatable types will
-  // appear as a one line textfield.
-  $definitions['text']['form_element_class'] = '\Drupal\config_translation\FormElement\Textarea';
-  $definitions['date_format']['form_element_class'] = '\Drupal\config_translation\FormElement\DateFormat';
 }
 
 /**

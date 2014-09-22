@@ -5,16 +5,18 @@
  * Provides discussion forums.
  */
 
+use Drupal\comment\CommentInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Component\Utility\String;
-use Symfony\Component\HttpFoundation\Request;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 
 /**
  * Implements hook_help().
  */
-function forum_help($route_name, Request $request) {
+function forum_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.forum':
       $output = '';
@@ -95,9 +97,6 @@ function forum_theme() {
       'template' => 'forum-submitted',
       'variables' => array('topic' => NULL),
     ),
-    'forum_form' => array(
-      'render element' => 'form',
-    ),
   );
 }
 
@@ -109,14 +108,13 @@ function forum_menu_local_tasks(&$data, $route_name) {
 
   // Add action link to 'node/add/forum' on 'forum' sub-pages.
   if (in_array($route_name, array('forum.index', 'forum.page'))) {
-    $request = \Drupal::request();
-    $forum_term = $request->attributes->get('taxonomy_term');
+    $forum_term = \Drupal::routeMatch()->getParameter('taxonomy_term');
     $vid = \Drupal::config('forum.settings')->get('vocabulary');
     $links = array();
     // Loop through all bundles for forum taxonomy vocabulary field.
     $field_map = \Drupal::entityManager()->getFieldMap();
     foreach ($field_map['node']['taxonomy_forums']['bundles'] as $type) {
-      if (\Drupal::entityManager()->getAccessController('node')->createAccess($type)) {
+      if (\Drupal::entityManager()->getAccessControlHandler('node')->createAccess($type)) {
         $links[$type] = array(
           '#theme' => 'menu_local_action',
           '#link' => array(
@@ -201,7 +199,7 @@ function forum_uri($forum) {
  * Checks in particular that the node is assigned only a "leaf" term in the
  * forum taxonomy.
  */
-function forum_node_validate(EntityInterface $node, $form, &$form_state) {
+function forum_node_validate(EntityInterface $node, $form, FormStateInterface $form_state) {
   if (\Drupal::service('forum_manager')->checkNodeType($node)) {
     // vocabulary is selected, not a "container" term.
     if (!$node->taxonomy_forums->isEmpty()) {
@@ -215,7 +213,7 @@ function forum_node_validate(EntityInterface $node, $form, &$form_state) {
         }
         $term = $item->entity;
         if (!$term) {
-          form_set_error('taxonomy_forums', $form_state, t('Select a forum.'));
+          $form_state->setErrorByName('taxonomy_forums', t('Select a forum.'));
           continue;
         }
         $used = \Drupal::entityQuery('taxonomy_term')
@@ -225,7 +223,7 @@ function forum_node_validate(EntityInterface $node, $form, &$form_state) {
           ->count()
           ->execute();
         if ($used && !empty($term->forum_container->value)) {
-          form_set_error('taxonomy_forums', $form_state, t('The item %forum is a forum container, not a forum. Select one of the forums below instead.', array('%forum' => $term->getName())));
+          $form_state->setErrorByName('taxonomy_forums', t('The item %forum is a forum container, not a forum. Select one of the forums below instead.', array('%forum' => $term->getName())));
         }
       }
     }
@@ -233,7 +231,7 @@ function forum_node_validate(EntityInterface $node, $form, &$form_state) {
 }
 
 /**
- * Implements hook_node_presave().
+ * Implements hook_ENTITY_TYPE_presave() for node entities.
  *
  * Assigns the forum taxonomy when adding a topic from within a forum.
  */
@@ -245,7 +243,7 @@ function forum_node_presave(EntityInterface $node) {
       $node->forum_tid = $node->taxonomy_forums->target_id;
       // Only do a shadow copy check if this is not a new node.
       if (!$node->isNew()) {
-        $old_tid = db_query_range("SELECT f.tid FROM {forum} f INNER JOIN {node} n ON f.vid = n.vid WHERE n.nid = :nid ORDER BY f.vid DESC", 0, 1, array(':nid' => $node->id()))->fetchField();
+        $old_tid = \Drupal::service('forum.index_storage')->getOriginalTermId($node);
         if ($old_tid && isset($node->forum_tid) && ($node->forum_tid != $old_tid) && !empty($node->shadow)) {
           // A shadow copy needs to be created. Retain new term and add old term.
           $node->taxonomy_forums[count($node->taxonomy_forums)] = array('target_id' => $old_tid);
@@ -256,136 +254,81 @@ function forum_node_presave(EntityInterface $node) {
 }
 
 /**
- * Implements hook_node_update().
+ * Implements hook_ENTITY_TYPE_update() for node entities.
  */
 function forum_node_update(EntityInterface $node) {
   if (\Drupal::service('forum_manager')->checkNodeType($node)) {
     // If this is not a new revision and does exist, update the forum record,
     // otherwise insert a new one.
-    if ($node->getRevisionId() == $node->original->getRevisionId() && db_query('SELECT tid FROM {forum} WHERE nid=:nid', array(':nid' => $node->id()))->fetchField()) {
+    /** @var \Drupal\forum\ForumIndexStorageInterface $forum_index_storage */
+    $forum_index_storage = \Drupal::service('forum.index_storage');
+    if ($node->getRevisionId() == $node->original->getRevisionId() && $forum_index_storage->getOriginalTermId($node)) {
       if (!empty($node->forum_tid)) {
-        db_update('forum')
-          ->fields(array('tid' => $node->forum_tid))
-          ->condition('vid', $node->getRevisionId())
-          ->execute();
+        $forum_index_storage->update($node);
       }
       // The node is removed from the forum.
       else {
-        db_delete('forum')
-          ->condition('nid', $node->id())
-          ->execute();
+        $forum_index_storage->delete($node);
       }
     }
     else {
       if (!empty($node->forum_tid)) {
-        db_insert('forum')
-          ->fields(array(
-            'tid' => $node->forum_tid,
-            'vid' => $node->getRevisionId(),
-            'nid' => $node->id(),
-          ))
-          ->execute();
+        $forum_index_storage->create($node);
       }
     }
     // If the node has a shadow forum topic, update the record for this
     // revision.
     if (!empty($node->shadow)) {
-      db_delete('forum')
-        ->condition('nid', $node->id())
-        ->condition('vid', $node->getRevisionId())
-        ->execute();
-      db_insert('forum')
-        ->fields(array(
-          'nid' => $node->id(),
-          'vid' => $node->getRevisionId(),
-          'tid' => $node->forum_tid,
-        ))
-        ->execute();
+      $forum_index_storage->deleteRevision($node);
+      $forum_index_storage->create($node);
     }
 
     // If the node is published, update the forum index.
     if ($node->isPublished()) {
-      db_delete('forum_index')->condition('nid', $node->id())->execute();
-      $query = db_insert('forum_index')->fields(array('nid', 'title', 'tid', 'sticky', 'created', 'comment_count', 'last_comment_timestamp'));
-      foreach ($node->getTranslationLanguages() as $langcode => $language) {
-        $translation = $node->getTranslation($langcode);
-        foreach ($translation->taxonomy_forums as $item) {
-          $query->values(array(
-            'nid' => $node->id(),
-            'title' => $translation->label(),
-            'tid' => $item->target_id,
-            'sticky' => (int) $node->isSticky(),
-            'created' => $node->getCreatedTime(),
-            'comment_count' => 0,
-            'last_comment_timestamp' => $node->getCreatedTime(),
-          ));
-        }
-      }
-      $query->execute();
-      // The logic for determining last_comment_count is fairly complex, so
-      // update the index too.
-      \Drupal::service('forum_manager')->updateIndex($node->id());
+      $forum_index_storage->deleteIndex($node);
+      $forum_index_storage->createIndex($node);
     }
     // When a forum node is unpublished, remove it from the forum_index table.
     else {
-      db_delete('forum_index')->condition('nid', $node->id())->execute();
+      $forum_index_storage->deleteIndex($node);
     }
   }
 }
 
 /**
- * Implements hook_node_insert().
+ * Implements hook_ENTITY_TYPE_insert() for node entities.
  */
 function forum_node_insert(EntityInterface $node) {
   if (\Drupal::service('forum_manager')->checkNodeType($node)) {
+    /** @var \Drupal\forum\ForumIndexStorageInterface $forum_index_storage */
+    $forum_index_storage = \Drupal::service('forum.index_storage');
     if (!empty($node->forum_tid)) {
-      db_insert('forum')
-        ->fields(array(
-          'tid' => $node->forum_tid,
-          'vid' => $node->getRevisionId(),
-          'nid' => $node->id(),
-        ))
-        ->execute();
+      $forum_index_storage->create($node);
     }
 
     // If the node is published, update the forum index.
     if ($node->isPublished()) {
-      $query = db_insert('forum_index')->fields(array('nid', 'title', 'tid', 'sticky', 'created', 'comment_count', 'last_comment_timestamp'));
-      foreach ($node->getTranslationLanguages() as $langcode => $language) {
-        $translation = $node->getTranslation($langcode);
-        $query->values(array(
-          'nid' => $node->id(),
-          'title' => $translation->label(),
-          'tid' => $translation->taxonomy_forums->target_id,
-          'sticky' => (int) $node->isSticky(),
-          'created' => $node->getCreatedTime(),
-          'comment_count' => 0,
-          'last_comment_timestamp' => $node->getCreatedTime(),
-        ));
-      }
-      $query->execute();
+      $forum_index_storage->createIndex($node);
     }
   }
 }
 
 /**
- * Implements hook_node_predelete().
+ * Implements hook_ENTITY_TYPE_predelete() for node entities.
  */
 function forum_node_predelete(EntityInterface $node) {
   if (\Drupal::service('forum_manager')->checkNodeType($node)) {
-    db_delete('forum')
-      ->condition('nid', $node->id())
-      ->execute();
-    db_delete('forum_index')
-      ->condition('nid', $node->id())
-      ->execute();
+    /** @var \Drupal\forum\ForumIndexStorageInterface $forum_index_storage */
+    $forum_index_storage = \Drupal::service('forum.index_storage');
+    $forum_index_storage->delete($node);
+    $forum_index_storage->deleteIndex($node);
   }
 }
 
 /**
- * Implements hook_node_load().
+ * Implements hook_ENTITY_TYPE_storage_load() for node entities.
  */
-function forum_node_load($nodes) {
+function forum_node_storage_load($nodes) {
   $node_vids = array();
   foreach ($nodes as $node) {
     if (\Drupal::service('forum_manager')->checkNodeType($node)) {
@@ -393,11 +336,7 @@ function forum_node_load($nodes) {
     }
   }
   if (!empty($node_vids)) {
-    $query = db_select('forum', 'f');
-    $query
-      ->fields('f', array('nid', 'tid'))
-      ->condition('f.vid', $node_vids);
-    $result = $query->execute();
+    $result = \Drupal::service('forum.index_storage')->read($node_vids);
     foreach ($result as $record) {
       $nodes[$record->nid]->forum_tid = $record->tid;
     }
@@ -405,67 +344,38 @@ function forum_node_load($nodes) {
 }
 
 /**
- * Implements hook_permission().
+ * Implements hook_ENTITY_TYPE_update() for comment entities.
  */
-function forum_permission() {
-  $perms = array(
-    'administer forums' => array(
-      'title' => t('Administer forums'),
-    ),
-  );
-  return $perms;
-}
-
-/**
- * Implements hook_comment_publish().
- *
- * This actually handles the insertion and update of published nodes since
- * $comment->save() calls hook_comment_publish() for all published comments.
- */
-function forum_comment_publish($comment) {
+function forum_comment_update(CommentInterface $comment) {
   if ($comment->getCommentedEntityTypeId() == 'node') {
-    \Drupal::service('forum_manager')->updateIndex($comment->getCommentedEntityId());
+    \Drupal::service('forum.index_storage')->updateIndex($comment->getCommentedEntity());
   }
 }
 
 /**
- * Implements hook_comment_update().
- *
- * The Comment module doesn't call hook_comment_unpublish() when saving
- * individual comments, so we need to check for those here.
+ * Implements hook_ENTITY_TYPE_insert() for comment entities.
  */
-function forum_comment_update($comment) {
-  // $comment->save() calls hook_comment_publish() for all published comments,
-  // so we need to handle all other values here.
-  if (!$comment->isPublished() && $comment->getCommentedEntityTypeId() == 'node') {
-    \Drupal::service('forum_manager')->updateIndex($comment->getCommentedEntityId());
+function forum_comment_insert(CommentInterface $comment) {
+  if ($comment->getCommentedEntityTypeId() == 'node') {
+    \Drupal::service('forum.index_storage')->updateIndex($comment->getCommentedEntity());
   }
 }
 
 /**
- * Implements hook_comment_unpublish().
+ * Implements hook_ENTITY_TYPE_delete() for comment entities.
  */
-function forum_comment_unpublish($comment) {
+function forum_comment_delete(CommentInterface $comment) {
   if ($comment->getCommentedEntityTypeId() == 'node') {
-    \Drupal::service('forum_manager')->updateIndex($comment->getCommentedEntityId());
-  }
-}
-
-/**
- * Implements hook_comment_delete().
- */
-function forum_comment_delete($comment) {
-  if ($comment->getCommentedEntityTypeId() == 'node') {
-    \Drupal::service('forum_manager')->updateIndex($comment->getCommentedEntityId());
+    \Drupal::service('forum.index_storage')->updateIndex($comment->getCommentedEntity());
   }
 }
 
 /**
  * Implements hook_form_BASE_FORM_ID_alter().
  */
-function forum_form_taxonomy_vocabulary_form_alter(&$form, &$form_state, $form_id) {
+function forum_form_taxonomy_vocabulary_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   $vid = \Drupal::config('forum.settings')->get('vocabulary');
-  $vocabulary = $form_state['controller']->getEntity();
+  $vocabulary = $form_state->getFormObject()->getEntity();
   if ($vid == $vocabulary->id()) {
     $form['help_forum_vocab'] = array(
       '#markup' => t('This is the designated forum vocabulary. Some of the normal vocabulary options have been removed.'),
@@ -485,7 +395,7 @@ function forum_form_taxonomy_vocabulary_form_alter(&$form, &$form_state, $form_i
 /**
  * Implements hook_form_FORM_ID_alter() for taxonomy_term_form().
  */
-function forum_form_taxonomy_term_form_alter(&$form, &$form_state, $form_id) {
+function forum_form_taxonomy_term_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   $vid = \Drupal::config('forum.settings')->get('vocabulary');
   if (isset($form['vid']['#value']) && $form['vid']['#value'] == $vid) {
     // Hide multiple parents select from forum terms.
@@ -496,8 +406,8 @@ function forum_form_taxonomy_term_form_alter(&$form, &$form_state, $form_id) {
 /**
  * Implements hook_form_BASE_FORM_ID_alter() for node_form().
  */
-function forum_form_node_form_alter(&$form, &$form_state, $form_id) {
-  $node = $form_state['controller']->getEntity();
+function forum_form_node_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $node = $form_state->getFormObject()->getEntity();
   if (isset($node->taxonomy_forums) && !$node->isNew()) {
     $forum_terms = $node->taxonomy_forums;
     // If editing, give option to leave shadows.
@@ -649,8 +559,11 @@ function template_preprocess_forums(&$variables) {
         $variables['topics'][$id]->new_url = '';
 
         if ($topic->new_replies) {
+          $page_number = \Drupal::entityManager()->getStorage('comment')
+            ->getNewCommentPageNumber($topic->comment_count, $topic->new_replies, $topic, 'comment_forum');
+          $query = $page_number ? array('page' => $page_number) : NULL;
           $variables['topics'][$id]->new_text = format_plural($topic->new_replies, '1 new post<span class="visually-hidden"> in topic %title</span>', '@count new posts<span class="visually-hidden"> in topic %title</span>', array('%title' => $variables['topics'][$id]->label()));
-          $variables['topics'][$id]->new_url = url('node/' . $topic->id(), array('query' => comment_new_page_count($topic->comment_count, $topic->new_replies, $topic, 'comment_node_forum'), 'fragment' => 'new'));
+          $variables['topics'][$id]->new_url = url('node/' . $topic->id(), array('query' => $query, 'fragment' => 'new'));
         }
 
         // Build table rows from topics.
@@ -810,21 +723,5 @@ function template_preprocess_forum_submitted(&$variables) {
     $username = array('#theme' => 'username', '#account' => user_load($variables['topic']->uid));
     $variables['author'] = drupal_render($username);
   }
-  $variables['time'] = isset($variables['topic']->created) ? format_interval(REQUEST_TIME - $variables['topic']->created) : '';
-}
-
-/**
- * Returns HTML for a forum form.
- *
- * By default this does not alter the appearance of a form at all, but is
- * provided as a convenience for themers.
- *
- * @param $variables
- *   An associative array containing:
- *   - form: A render element representing the form.
- *
- * @ingroup themeable
- */
-function theme_forum_form(array $variables) {
-  return drupal_render_children($variables['form']);
+  $variables['time'] = isset($variables['topic']->created) ? \Drupal::service('date.formatter')->formatInterval(REQUEST_TIME - $variables['topic']->created) : '';
 }

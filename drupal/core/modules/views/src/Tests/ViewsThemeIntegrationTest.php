@@ -8,9 +8,11 @@
 namespace Drupal\views\Tests;
 
 /**
- * As views uses a lot of theme related functionality we need to test these too.
+ * Tests the Views theme integration.
  *
  * We test against test_basetheme and test_subtheme provided by theme_test
+ *
+ * @group views
  */
 class ViewsThemeIntegrationTest extends ViewTestBase {
 
@@ -36,17 +38,6 @@ class ViewsThemeIntegrationTest extends ViewTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Views theme integration test',
-      'description' => 'Tests the Views theme integration.',
-      'group' => 'Views',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
 
@@ -59,7 +50,7 @@ class ViewsThemeIntegrationTest extends ViewTestBase {
    */
   public function testThemedViewPage() {
 
-    \Drupal::service('theme_handler')->enable(array('test_basetheme', 'test_subtheme'));
+    \Drupal::service('theme_handler')->install(array('test_basetheme', 'test_subtheme'));
 
     // Make base theme default then test for hook invocations.
     \Drupal::config('system.theme')

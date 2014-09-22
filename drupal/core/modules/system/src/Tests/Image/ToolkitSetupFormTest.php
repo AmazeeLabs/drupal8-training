@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Image;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Functional tests for the Image toolkit setup form.
+ * Tests image toolkit setup form.
+ *
+ * @group Image
  */
 class ToolkitSetupFormTest extends WebTestBase {
 
@@ -31,21 +33,10 @@ class ToolkitSetupFormTest extends WebTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Image toolkit setup form tests',
-      'description' => 'Check image toolkit setup form.',
-      'group' => 'Image',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $this->admin_user = $this->drupalCreateUser(array(
-      'access administration pages',
+      'administer site configuration',
     ));
     $this->drupalLogin($this->admin_user);
   }
@@ -72,8 +63,16 @@ class ToolkitSetupFormTest extends WebTestBase {
     $this->assertFieldByName('test[test_parameter]', '10');
 
     // Test changing the test toolkit parameter.
+    $edit = array('test[test_parameter]' => '0');
+    $this->drupalPostForm(NULL, $edit, 'Save configuration');
+    $this->assertText(t('Test parameter should be different from 0.'), 'Validation error displayed.');
     $edit = array('test[test_parameter]' => '20');
     $this->drupalPostForm(NULL, $edit, 'Save configuration');
     $this->assertEqual(\Drupal::config('system.image.test_toolkit')->get('test_parameter'), '20');
+
+    // Test access without the permission 'administer site configuration'.
+    $this->drupalLogin($this->drupalCreateUser(array('access administration pages')));
+    $this->drupalGet('admin/config/media/image-toolkit');
+    $this->assertResponse(403);
   }
 }

@@ -9,7 +9,8 @@ namespace Drupal\language\Form;
 
 use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityForm;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -48,16 +49,17 @@ abstract class LanguageFormBase extends EntityForm {
    * Common elements of the language addition and editing form.
    */
   public function commonForm(array &$form) {
+    /** @var $language \Drupal\language\Entity\ConfigurableLanguage */
     $language = $this->entity;
-    if (isset($language->id)) {
+    if ($language->id()) {
       $form['langcode_view'] = array(
         '#type' => 'item',
         '#title' => $this->t('Language code'),
-        '#markup' => $language->id
+        '#markup' => $language->id()
       );
       $form['langcode'] = array(
         '#type' => 'value',
-        '#value' => $language->id
+        '#value' => $language->id()
       );
     }
     else {
@@ -71,11 +73,11 @@ abstract class LanguageFormBase extends EntityForm {
         '#description' => $this->t('Use language codes as <a href="@w3ctags">defined by the W3C</a> for interoperability. <em>Examples: "en", "en-gb" and "zh-hant".</em>', array('@w3ctags' => 'http://www.w3.org/International/articles/language-tags/')),
       );
     }
-    $form['name'] = array(
+    $form['label'] = array(
       '#type' => 'textfield',
       '#title' => $this->t('Language name in English'),
       '#maxlength' => 64,
-      '#default_value' => $language->label,
+      '#default_value' => $language->label(),
       '#required' => TRUE,
     );
     $form['direction'] = array(
@@ -83,10 +85,10 @@ abstract class LanguageFormBase extends EntityForm {
       '#title' => $this->t('Direction'),
       '#required' => TRUE,
       '#description' => $this->t('Direction that text in this language is presented.'),
-      '#default_value' => $language->direction,
+      '#default_value' => $language->getDirection(),
       '#options' => array(
-        Language::DIRECTION_LTR => $this->t('Left to right'),
-        Language::DIRECTION_RTL => $this->t('Right to left'),
+        LanguageInterface::DIRECTION_LTR => $this->t('Left to right'),
+        LanguageInterface::DIRECTION_RTL => $this->t('Right to left'),
       ),
     );
 
@@ -96,13 +98,13 @@ abstract class LanguageFormBase extends EntityForm {
   /**
    * Validates the language editing element.
    */
-  public function validateCommon(array $form, array &$form_state) {
+  public function validateCommon(array $form, FormStateInterface $form_state) {
     // Ensure sane field values for langcode and name.
-    if (!isset($form['langcode_view']) && preg_match('@[^a-zA-Z_-]@', $form_state['values']['langcode'])) {
-      $this->setFormError('langcode', $form_state, $this->t('%field may only contain characters a-z, underscores, or hyphens.', array('%field' => $form['langcode']['#title'])));
+    if (!isset($form['langcode_view']) && preg_match('@[^a-zA-Z_-]@', $form_state->getValue('langcode'))) {
+      $form_state->setErrorByName('langcode', $this->t('%field may only contain characters a-z, underscores, or hyphens.', array('%field' => $form['langcode']['#title'])));
     }
-    if ($form_state['values']['name'] != String::checkPlain($form_state['values']['name'])) {
-      $this->setFormError('name', $form_state, $this->t('%field cannot contain any markup.', array('%field' => $form['name']['#title'])));
+    if ($form_state->getValue('label') != String::checkPlain($form_state->getValue('label'))) {
+      $form_state->setErrorByName('label', $this->t('%field cannot contain any markup.', array('%field' => $form['label']['#title'])));
     }
   }
 

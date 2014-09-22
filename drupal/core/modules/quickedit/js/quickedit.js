@@ -394,18 +394,25 @@
       var metadata = Drupal.quickedit.metadata.get(fieldModel.get('fieldID'));
       if (metadata.access && _.indexOf(loadedEditors, metadata.editor) === -1) {
         missingEditors.push(metadata.editor);
+        // Set a stub, to prevent subsequent calls to loadMissingEditors() from
+        // loading the same in-place editor again. Loading an in-place editor
+        // requires talking to a server, to download its JavaScript, then
+        // executing its JavaScript, and only then its Drupal.quickedit.editors
+        // entry will be set.
+        Drupal.quickedit.editors[metadata.editor] = false;
       }
     });
     missingEditors = _.uniq(missingEditors);
     if (missingEditors.length === 0) {
       callback();
+      return;
     }
 
     // @todo Simplify this once https://drupal.org/node/1533366 lands.
     // @see https://drupal.org/node/2029999.
     var id = 'quickedit-load-editors';
     // Create a temporary element to be able to use Drupal.ajax.
-    var $el = $('<div id="' + id + '" class="element-hidden"></div>').appendTo('body');
+    var $el = $('<div id="' + id + '" class="hidden"></div>').appendTo('body');
     // Create a Drupal.ajax instance to load the form.
     var loadEditorsAjax = new Drupal.ajax(id, $el, {
       url: Drupal.url('quickedit/attachments'),
@@ -434,7 +441,7 @@
    * @param Object contextualLink
    *   An object with the following properties:
    *     - String entityID: a Quick Edit entity identifier, e.g. "node/1" or
-   *       "custom_block/5".
+   *       "block_content/5".
    *     - String entityInstanceID: a Quick Edit entity instance identifier,
    *       e.g. 0, 1 or n (depending on whether it's the first, second, or n+1st
    *       instance of this entity).
@@ -563,6 +570,7 @@
       function hasOtherRegion(contextualLink) {
         return contextualLink.region !== entityElement;
       }
+
       contextualLinksQueue = _.filter(contextualLinksQueue, hasOtherRegion);
     });
 
@@ -576,6 +584,7 @@
       function hasOtherFieldElement(field) {
         return field.el !== fieldElement;
       }
+
       fieldsMetadataQueue = _.filter(fieldsMetadataQueue, hasOtherFieldElement);
       fieldsAvailableQueue = _.filter(fieldsAvailableQueue, hasOtherFieldElement);
     });

@@ -1,6 +1,106 @@
 CHANGELOG
 =========
 
+4.1.7 (2014-08-07)
+------------------
+
+* Fixed an error in the HistoryPlugin that caused the same request and response
+  to be logged multiple times when an HTTP protocol error occurs.
+* Ensuring that cURL does not add a default Content-Type when no Content-Type
+  has been supplied by the user. This prevents the adapter layer from modifying
+  the request that is sent over the wire after any listeners may have already
+  put the request in a desired state (e.g., signed the request).
+* Throwing an exception when you attempt to send requests that have the
+  "stream" set to true in parallel using the MultiAdapter.
+* Only calling curl_multi_select when there are active cURL handles. This was
+  previously changed and caused performance problems on some systems due to PHP
+  always selecting until the maximum select timeout.
+* Fixed a bug where multipart/form-data POST fields were not correctly
+  aggregated (e.g., values with "&").
+
+4.1.6 (2014-08-03)
+------------------
+
+* Added helper methods to make it easier to represent messages as strings,
+  including getting the start line and getting headers as a string.
+
+4.1.5 (2014-08-02)
+------------------
+
+* Automatically retrying cURL "Connection died, retrying a fresh connect"
+  errors when possible.
+* cURL implementation cleanup
+* Allowing multiple event subscriber listeners to be registered per event by
+  passing an array of arrays of listener configuration.
+
+4.1.4 (2014-07-22)
+------------------
+
+* Fixed a bug that caused multi-part POST requests with more than one field to
+  serialize incorrectly.
+* Paths can now be set to "0"
+* `ResponseInterface::xml` now accepts a `libxml_options` option and added a
+  missing default argument that was required when parsing XML response bodies.
+* A `save_to` stream is now created lazily, which means that files are not
+  created on disk unless a request succeeds.
+
+4.1.3 (2014-07-15)
+------------------
+
+* Various fixes to multipart/form-data POST uploads
+* Wrapping function.php in an if-statement to ensure Guzzle can be used
+  globally and in a Composer install
+* Fixed an issue with generating and merging in events to an event array
+* POST headers are only applied before sending a request to allow you to change
+  the query aggregator used before uploading
+* Added much more robust query string parsing
+* Fixed various parsing and normalization issues with URLs
+* Fixing an issue where multi-valued headers were not being utilized correctly
+  in the StreamAdapter
+
+4.1.2 (2014-06-18)
+------------------
+
+* Added support for sending payloads with GET requests
+
+4.1.1 (2014-06-08)
+------------------
+
+* Fixed an issue related to using custom message factory options in subclasses
+* Fixed an issue with nested form fields in a multi-part POST
+* Fixed an issue with using the `json` request option for POST requests
+* Added `ToArrayInterface` to `GuzzleHttp\Cookie\CookieJar`
+
+4.1.0 (2014-05-27)
+------------------
+
+* Added a `json` request option to easily serialize JSON payloads.
+* Added a `GuzzleHttp\json_decode()` wrapper to safely parse JSON.
+* Added `setPort()` and `getPort()` to `GuzzleHttp\Message\RequestInterface`.
+* Added the ability to provide an emitter to a client in the client constructor.
+* Added the ability to persist a cookie session using $_SESSION.
+* Added a trait that can be used to add event listeners to an iterator.
+* Removed request method constants from RequestInterface.
+* Fixed warning when invalid request start-lines are received.
+* Updated MessageFactory to work with custom request option methods.
+* Updated cacert bundle to latest build.
+
+4.0.2 (2014-04-16)
+------------------
+
+* Proxy requests using the StreamAdapter now properly use request_fulluri (#632)
+* Added the ability to set scalars as POST fields (#628)
+
+4.0.1 (2014-04-04)
+------------------
+
+* The HTTP status code of a response is now set as the exception code of
+  RequestException objects.
+* 303 redirects will now correctly switch from POST to GET requests.
+* The default parallel adapter of a client now correctly uses the MultiAdapter.
+* HasDataTrait now initializes the internal data array as an empty array so
+  that the toArray() method always returns an array.
+
 4.0.0 (2014-03-29)
 ------------------
 
@@ -18,7 +118,7 @@ CHANGELOG
 -----------------------
 
 * Removed `getConfig()` and `setConfig()` from clients to avoid confusion
-  around whether things like base_url, message_factory, etc should be able to
+  around whether things like base_url, message_factory, etc. should be able to
   be retrieved or modified.
 * Added `getDefaultOption()` and `setDefaultOption()` to ClientInterface
 * functions.php functions were renamed using snake_case to match PHP idioms
@@ -150,11 +250,11 @@ CHANGELOG
 * See UPGRADING.md for more information on how to upgrade.
 * Requests now support the ability to specify an array of $options when creating a request to more easily modify a
   request. You can pass a 'request.options' configuration setting to a client to apply default request options to
-  every request created by a client (e.g. default query string variables, headers, curl options, etc).
+  every request created by a client (e.g. default query string variables, headers, curl options, etc.).
 * Added a static facade class that allows you to use Guzzle with static methods and mount the class to `\Guzzle`.
   See `Guzzle\Http\StaticClient::mount`.
 * Added `command.request_options` to `Guzzle\Service\Command\AbstractCommand` to pass request options to requests
-      created by a command (e.g. custom headers, query string variables, timeout settings, etc).
+      created by a command (e.g. custom headers, query string variables, timeout settings, etc.).
 * Stream size in `Guzzle\Stream\PhpStreamRequestFactory` will now be set if Content-Length is returned in the
   headers of a response
 * Added `Guzzle\Common\Collection::setPath($path, $value)` to set a value into an array using a nested key
@@ -251,7 +351,7 @@ CHANGELOG
 * Removed Guzzle\Parser\ParserRegister::get(). Use getParser()
 * Removed Guzzle\Parser\ParserRegister::set(). Use registerParser().
 * All response header helper functions return a string rather than mixing Header objects and strings inconsistently
-* Removed cURL blacklist support. This is no longer necessary now that Expect, Accept, etc are managed by Guzzle
+* Removed cURL blacklist support. This is no longer necessary now that Expect, Accept, etc. are managed by Guzzle
   directly via interfaces
 * Removed the injecting of a request object onto a response object. The methods to get and set a request still exist
   but are a no-op until removed.
@@ -508,7 +608,7 @@ CHANGELOG
 3.0.1 (2012-10-22)
 ------------------
 
-* Models can now be used like regular collection objects by calling filter, map, etc
+* Models can now be used like regular collection objects by calling filter, map, etc.
 * Models no longer require a Parameter structure or initial data in the constructor
 * Added a custom AppendIterator to get around a PHP bug with the `\AppendIterator`
 
@@ -800,6 +900,6 @@ CHANGELOG
 * Emitting an event each time a client is generated by a ServiceBuilder
 * Using an ApiParams object instead of a Collection for parameters of an ApiCommand
 * cache.* request parameters should be renamed to params.cache.*
-* Added the ability to set arbitrary curl options on requests (disable_wire, progress, etc). See CurlHandle.
+* Added the ability to set arbitrary curl options on requests (disable_wire, progress, etc.). See CurlHandle.
 * Added the ability to disable type validation of service descriptions
 * ServiceDescriptions and ServiceBuilders are now Serializable

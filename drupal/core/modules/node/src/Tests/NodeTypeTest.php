@@ -6,10 +6,12 @@
  */
 
 namespace Drupal\node\Tests;
-use Drupal\field\Entity\FieldInstanceConfig;
+use Drupal\field\Entity\FieldConfig;
 
 /**
- * Tests related to node types.
+ * Ensures that node type functions work correctly.
+ *
+ * @group node
  */
 class NodeTypeTest extends NodeTestBase {
 
@@ -19,14 +21,6 @@ class NodeTypeTest extends NodeTestBase {
    * @var array
    */
   public static $modules = array('field_ui');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Node types',
-      'description' => 'Ensures that node type functions work correctly.',
-      'group' => 'Node',
-    );
-  }
 
   /**
    * Ensures that node type functions (node_type_get_*) work correctly.
@@ -84,8 +78,8 @@ class NodeTypeTest extends NodeTestBase {
     $web_user = $this->drupalCreateUser(array('bypass node access', 'administer content types', 'administer node fields'));
     $this->drupalLogin($web_user);
 
-    $instance = FieldInstanceConfig::loadByName('node', 'page', 'body');
-    $this->assertEqual($instance->getLabel(), 'Body', 'Body field was found.');
+    $field = FieldConfig::loadByName('node', 'page', 'body');
+    $this->assertEqual($field->getLabel(), 'Body', 'Body field was found.');
 
     // Verify that title and body fields are displayed.
     $this->drupalGet('node/add/page');
@@ -191,6 +185,9 @@ class NodeTypeTest extends NodeTestBase {
     $this->assertText(t('This action cannot be undone.'), 'The node type deletion confirmation form is available.');
     // Test that forum node type could not be deleted while forum active.
     $this->container->get('module_handler')->install(array('forum'));
+    // Call to flush all caches after installing the forum module in the same
+    // way installing a module through the UI does.
+    $this->resetAll();
     $this->drupalGet('admin/structure/types/manage/forum');
     $this->assertNoLink(t('Delete'));
     $this->drupalGet('admin/structure/types/manage/forum/delete');

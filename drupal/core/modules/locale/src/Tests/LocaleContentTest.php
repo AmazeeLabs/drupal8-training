@@ -8,9 +8,13 @@
 namespace Drupal\locale\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
- * Functional tests for multilingual support on nodes.
+ * Tests you can enable multilingual support on content types and configure a
+ * language for a node.
+ *
+ * @group locale
  */
 class LocaleContentTest extends WebTestBase {
 
@@ -21,18 +25,10 @@ class LocaleContentTest extends WebTestBase {
    */
   public static $modules = array('node', 'locale');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Content language settings',
-      'description' => 'Checks you can enable multilingual support on content types and configure a language for a node.',
-      'group' => 'Locale',
-    );
-  }
-
   /**
    * Verifies that machine name fields are always LTR.
    */
-  function testMachineNameLTR() {
+  public function testMachineNameLTR() {
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'administer content types', 'access administration pages', 'administer site configuration'));
 
@@ -61,7 +57,7 @@ class LocaleContentTest extends WebTestBase {
   /**
    * Test if a content type can be set to multilingual and language is present.
    */
-  function testContentTypeLanguageConfiguration() {
+  public function testContentTypeLanguageConfiguration() {
     $type1 = $this->drupalCreateContentType();
     $type2 = $this->drupalCreateContentType();
 
@@ -75,12 +71,12 @@ class LocaleContentTest extends WebTestBase {
     // Code for the language.
     $langcode = 'xx';
     // The English name for the language.
-    $name = $this->randomName(16);
+    $name = $this->randomMachineName(16);
     $edit = array(
       'predefined_langcode' => 'custom',
       'langcode' => $langcode,
-      'name' => $name,
-      'direction' => '0',
+      'label' => $name,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
 
@@ -109,8 +105,8 @@ class LocaleContentTest extends WebTestBase {
     $this->assertText($name, 'Language present.');
 
     // Create a node.
-    $node_title = $this->randomName();
-    $node_body =  $this->randomName();
+    $node_title = $this->randomMachineName();
+    $node_body = $this->randomMachineName();
     $edit = array(
       'type' => $type2->type,
       'title' => $node_title,
@@ -135,7 +131,7 @@ class LocaleContentTest extends WebTestBase {
   /**
    * Test if a dir and lang tags exist in node's attributes.
    */
-  function testContentTypeDirLang() {
+  public function testContentTypeDirLang() {
     $type = $this->drupalCreateContentType();
 
     // User to add and remove language.
@@ -150,12 +146,12 @@ class LocaleContentTest extends WebTestBase {
     $edit = array();
     $edit['predefined_langcode'] = 'ar';
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
-    \Drupal::languageManager()->reset();
 
     // Install Spanish language.
     $edit = array();
     $edit['predefined_langcode'] = 'es';
     $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
+    \Drupal::languageManager()->reset();
 
     // Set the content type to use multilingual support.
     $this->drupalGet("admin/structure/types/manage/{$type->type}");
@@ -179,55 +175,28 @@ class LocaleContentTest extends WebTestBase {
       ));
     }
 
-
     // Check if English node does not have lang tag.
     $this->drupalGet('node/' . $nodes['en']->id());
-    $pattern = '|id="node-' . $nodes['en']->id() . '"[^<>]*lang="en"|';
-    $this->assertNoPattern($pattern, 'The lang tag has not been assigned to the English node.');
+    $element = $this->cssSelect('article.node[lang="en"]');
+    $this->assertTrue(empty($element), 'The lang tag has not been assigned to the English node.');
 
     // Check if English node does not have dir tag.
-    $pattern = '|id="node-' . $nodes['en']->id() . '"[^<>]*dir="ltr"|';
-    $this->assertNoPattern($pattern, 'The dir tag has not been assigned to the English node.');
+    $element = $this->cssSelect('article.node[dir="ltr"]');
+    $this->assertTrue(empty($element), 'The dir tag has not been assigned to the English node.');
 
     // Check if Arabic node has lang="ar" & dir="rtl" tags.
     $this->drupalGet('node/' . $nodes['ar']->id());
-    $pattern = '|id="node-' . $nodes['ar']->id() . '"[^<>]*lang="ar" dir="rtl"|';
-    $this->assertPattern($pattern, 'The lang and dir tags have been assigned correctly to the Arabic node.');
+    $element = $this->cssSelect('article.node[lang="ar"][dir="rtl"]');
+    $this->assertTrue(!empty($element), 'The lang and dir tags have been assigned correctly to the Arabic node.');
 
     // Check if Spanish node has lang="es" tag.
     $this->drupalGet('node/' . $nodes['es']->id());
-    $pattern = '|id="node-' . $nodes['es']->id() . '"[^<>]*lang="es"|';
-    $this->assertPattern($pattern, 'The lang tag has been assigned correctly to the Spanish node.');
+    $element = $this->cssSelect('article.node[lang="es"]');
+    $this->assertTrue(!empty($element), 'The lang tag has been assigned correctly to the Spanish node.');
 
     // Check if Spanish node does not have dir="ltr" tag.
-    $pattern = '|id="node-' . $nodes['es']->id() . '"[^<>]*lang="es" dir="ltr"|';
-    $this->assertNoPattern($pattern, 'The dir tag has not been assigned to the Spanish node.');
-  }
-
-
-  /**
-   *  Test filtering Node content by language.
-   */
-  function testNodeAdminLanguageFilter() {
-    \Drupal::moduleHandler()->install(array('views'));
-    // User to add and remove language.
-    $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'access content overview', 'administer nodes', 'bypass node access'));
-
-    // Log in as admin.
-    $this->drupalLogin($admin_user);
-
-    // Enable multiple languages.
-    $this->drupalPostForm('admin/config/regional/language/edit/en', array('locale_translate_english' => TRUE), t('Save language'));
-    $this->drupalPostForm('admin/config/regional/language/add', array('predefined_langcode' => 'zh-hant'), t('Add language'));
-
-    // Create two nodes: English and Chinese.
-    $node_en = $this->drupalCreateNode(array('langcode' => 'en'));
-    $node_zh_hant = $this->drupalCreateNode(array('langcode' => 'zh-hant'));
-
-    // Verify filtering by language.
-    $this->drupalGet('admin/content', array('query' => array('langcode' => 'zh-hant')));
-    $this->assertLinkByHref('node/' . $node_zh_hant->id() . '/edit');
-    $this->assertNoLinkByHref('node/' . $node_en->id() . '/edit');
+    $element = $this->cssSelect('article.node[lang="es"][dir="ltr"]');
+    $this->assertTrue(empty($element), 'The dir tag has not been assigned to the Spanish node.');
   }
 
 }

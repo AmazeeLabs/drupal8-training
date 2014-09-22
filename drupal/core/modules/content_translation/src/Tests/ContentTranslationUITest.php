@@ -10,6 +10,7 @@ namespace Drupal\content_translation\Tests;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Tests the Content Translation UI.
@@ -119,7 +120,13 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
 
     foreach ($this->langcodes as $langcode) {
       if ($entity->hasTranslation($langcode)) {
-        $this->assertText($entity->getTranslation($langcode)->label(), format_string('Label correctly shown for %language translation', array('%language' => $langcode)));
+        $language = new Language(array('id' => $langcode));
+        $view_path = \Drupal::urlGenerator()->generateFromPath($entity->getSystemPath(), array('language' => $language));
+        $elements = $this->xpath('//table//a[@href=:href]', array(':href' => $view_path));
+        $this->assertEqual((string) $elements[0], $entity->getTranslation($langcode)->label(), format_string('Label correctly shown for %language translation.', array('%language' => $langcode)));
+        $edit_path = \Drupal::urlGenerator()->generateFromPath($entity->getSystemPath('edit-form'), array('language' => $language));
+        $elements = $this->xpath('//table//ul[@class="dropbutton"]/li/a[@href=:href]', array(':href' => $edit_path));
+        $this->assertEqual((string) $elements[0], t('Edit'), format_string('Edit link correct for %language translation.', array('%language' => $langcode)));
       }
     }
   }
@@ -213,7 +220,7 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
     $langcode = 'en';
     $edit = array(
       // User names have by default length 8.
-      'content_translation[name]' => $this->randomName(12),
+      'content_translation[name]' => $this->randomMachineName(12),
       'content_translation[created]' => '19/11/1978',
     );
     $this->drupalPostForm($path, $edit, $this->getFormSubmitAction($entity, $langcode));
@@ -243,7 +250,7 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
    * Returns an array of entity field values to be tested.
    */
   protected function getNewEntityValues($langcode) {
-    return array($this->fieldName => array(array('value' => $this->randomName(16))));
+    return array($this->fieldName => array(array('value' => $this->randomMachineName(16))));
   }
 
   /**
@@ -251,7 +258,7 @@ abstract class ContentTranslationUITest extends ContentTranslationTestBase {
    */
   protected function getEditValues($values, $langcode, $new = FALSE) {
     $edit = $values[$langcode];
-    $langcode = $new ? Language::LANGCODE_NOT_SPECIFIED : $langcode;
+    $langcode = $new ? LanguageInterface::LANGCODE_NOT_SPECIFIED : $langcode;
     foreach ($values[$langcode] as $property => $value) {
       if (is_array($value)) {
         $edit["{$property}[0][value]"] = $value[0]['value'];

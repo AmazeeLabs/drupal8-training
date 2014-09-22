@@ -12,12 +12,8 @@ use Drupal\Core\Access\RouteProcessorCsrf;
 use Symfony\Component\Routing\Route;
 
 /**
- * Tests the CSRF route processor.
- *
- * @see Drupal
- * @see Routing
- *
- * @see \Drupal\Core\Access\RouteProcessorCsrf
+ * @coversDefaultClass \Drupal\Core\Access\RouteProcessorCsrf
+ * @group Access
  */
 class RouteProcessorCsrfTest extends UnitTestCase {
 
@@ -35,15 +31,7 @@ class RouteProcessorCsrfTest extends UnitTestCase {
    */
   protected $processor;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'CSRF access checker',
-      'description' => 'Tests CSRF access control for routes.',
-      'group' => 'Routing',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     $this->csrfToken = $this->getMockBuilder('Drupal\Core\Access\CsrfTokenGenerator')
       ->disableOriginalConstructor()
       ->getMock();

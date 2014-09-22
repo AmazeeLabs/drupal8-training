@@ -16,9 +16,7 @@ use Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage;
 
 /**
  * @coversDefaultClass \Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage
- *
- * @group Drupal
- * @group KeyValueEntityStorage
+ * @group Entity
  */
 class KeyValueEntityStorageTest extends UnitTestCase {
 
@@ -79,17 +77,6 @@ class KeyValueEntityStorageTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'KeyValueEntityStorage',
-      'description' => 'Tests \Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage',
-      'group' => 'Entity',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp() {
     parent::setUp();
     $this->entityType = $this->getMock('Drupal\Core\Entity\EntityTypeInterface');
@@ -126,9 +113,13 @@ class KeyValueEntityStorageTest extends UnitTestCase {
     $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
     $this->uuidService = $this->getMock('Drupal\Component\Uuid\UuidInterface');
     $this->languageManager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
+    $language = new Language(array('langcode' => 'en'));
     $this->languageManager->expects($this->any())
       ->method('getDefaultLanguage')
-      ->will($this->returnValue(new Language(array('langcode' => 'en'))));
+      ->will($this->returnValue($language));
+    $this->languageManager->expects($this->any())
+      ->method('getCurrentLanguage')
+      ->will($this->returnValue($language));
 
     $this->entityStorage = new KeyValueEntityStorage($this->entityType, $this->keyValueStore, $this->uuidService, $this->languageManager);
     $this->entityStorage->setModuleHandler($this->moduleHandler);

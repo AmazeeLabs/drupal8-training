@@ -7,6 +7,7 @@
 
 namespace Drupal\comment\Plugin\views\argument;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Database\Connection;
 use Drupal\views\Plugin\views\argument\ArgumentPluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -58,13 +59,13 @@ class UserUid extends ArgumentPluginBase {
       $title = \Drupal::config('user.settings')->get('anonymous');
     }
     else {
-      $title = $this->database->query('SELECT u.name FROM {users} u WHERE u.uid = :uid', array(':uid' => $this->argument))->fetchField();
+      $title = $this->database->query('SELECT name FROM {users_field_data} WHERE uid = :uid AND default_langcode = 1', array(':uid' => $this->argument))->fetchField();
     }
     if (empty($title)) {
       return t('No user');
     }
 
-    return check_plain($title);
+    return String::checkPlain($title);
   }
 
   protected function defaultActions($which = NULL) {

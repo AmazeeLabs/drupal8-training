@@ -7,10 +7,13 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests the functionality of field access.
+ * Tests Field level access hooks.
+ *
+ * @group Entity
  */
 class FieldAccessTest extends DrupalUnitTestBase {
 
@@ -31,21 +34,14 @@ class FieldAccessTest extends DrupalUnitTestBase {
    */
   protected $activeUid;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Field access tests',
-      'description' => 'Test Field level access hooks.',
-      'group' => 'Entity API',
-    );
-  }
-
   protected function setUp() {
     parent::setUp();
     // Install field configuration.
     $this->installConfig(array('field'));
     // The users table is needed for creating dummy user accounts.
-    $this->installSchema('user', array('users'));
+    $this->installEntitySchema('user');
     // Register entity_test text field.
+    module_load_install('entity_test');
     entity_test_install();
   }
 
@@ -57,7 +53,7 @@ class FieldAccessTest extends DrupalUnitTestBase {
    */
   function testFieldAccess() {
     $values = array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'user_id' => 1,
       'field_test_text' => array(
         'value' => 'no access value',
@@ -71,11 +67,15 @@ class FieldAccessTest extends DrupalUnitTestBase {
     $account = entity_create('user', $values);
 
     $this->assertFalse($entity->field_test_text->access('view', $account), 'Access to the field was denied.');
+    $expected = AccessResult::forbidden()->cacheUntilEntityChanges($entity);
+    $this->assertEqual($expected, $entity->field_test_text->access('view', $account, TRUE), 'Access to the field was denied.');
 
     $entity->field_test_text = 'access alter value';
     $this->assertFalse($entity->field_test_text->access('view', $account), 'Access to the field was denied.');
+    $this->assertEqual($expected, $entity->field_test_text->access('view', $account, TRUE), 'Access to the field was denied.');
 
     $entity->field_test_text = 'standard value';
     $this->assertTrue($entity->field_test_text->access('view', $account), 'Access to the field was granted.');
+    $this->assertEqual(AccessResult::allowed(), $entity->field_test_text->access('view', $account, TRUE), 'Access to the field was granted.');
   }
 }

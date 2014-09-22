@@ -37,7 +37,7 @@ interface EntityInterface extends AccessibleInterface {
   /**
    * Returns the language of the entity.
    *
-   * @return \Drupal\Core\Language\Language
+   * @return \Drupal\Core\Language\LanguageInterface
    *   The language object.
    */
   public function language();
@@ -65,7 +65,7 @@ interface EntityInterface extends AccessibleInterface {
    *   (optional) Whether the entity should be forced to be new. Defaults to
    *   TRUE.
    *
-   * @return self
+   * @return $this
    *
    * @see \Drupal\Core\Entity\EntityInterface::isNew()
    */
@@ -103,9 +103,9 @@ interface EntityInterface extends AccessibleInterface {
    * example:
    * @code
    * links = {
-   *   "canonical" = "node.view",
-   *   "edit-form" = "node.page_edit",
-   *   "version-history" = "node.revision_overview"
+   *   "canonical" = "entity.node.canonical",
+   *   "edit-form" = "entity.node.edit_form",
+   *   "version-history" = "entity.node.version_history"
    * }
    * @endcode
    * or specified in a callback function set like:

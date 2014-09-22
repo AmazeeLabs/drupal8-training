@@ -8,6 +8,7 @@
 namespace Drupal\dblog\Form;
 
 use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Provides the database logging filter form.
@@ -24,7 +25,7 @@ class DblogFilterForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $filters = dblog_filters();
 
     $form['filters'] = array(
@@ -58,7 +59,7 @@ class DblogFilterForm extends FormBase {
         '#type' => 'submit',
         '#value' => $this->t('Reset'),
         '#limit_validation_errors' => array(),
-        '#submit' => array(array($this, 'resetForm')),
+        '#submit' => array('::resetForm'),
       );
     }
     return $form;
@@ -67,20 +68,20 @@ class DblogFilterForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
-    if (empty($form_state['values']['type']) && empty($form_state['values']['severity'])) {
-      $this->setFormError('type', $form_state, $this->t('You must select something to filter by.'));
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    if ($form_state->isValueEmpty('type') && $form_state->isValueEmpty('severity')) {
+      $form_state->setErrorByName('type', $this->t('You must select something to filter by.'));
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $filters = dblog_filters();
     foreach ($filters as $name => $filter) {
-      if (isset($form_state['values'][$name])) {
-        $_SESSION['dblog_overview_filter'][$name] = $form_state['values'][$name];
+      if ($form_state->hasValue($name)) {
+        $_SESSION['dblog_overview_filter'][$name] = $form_state->getValue($name);
       }
     }
   }
@@ -88,7 +89,7 @@ class DblogFilterForm extends FormBase {
   /**
    * Resets the filter form.
    */
-  public function resetForm(array &$form, array &$form_state) {
+  public function resetForm(array &$form, FormStateInterface $form_state) {
     $_SESSION['dblog_overview_filter'] = array();
   }
 

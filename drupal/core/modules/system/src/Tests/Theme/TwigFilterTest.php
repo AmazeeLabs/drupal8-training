@@ -12,6 +12,8 @@ use Drupal\Core\Template\Attribute;
 
 /**
  * Tests Drupal's Twig filters.
+ *
+ * @group Theme
  */
 class TwigFilterTest extends WebTestBase {
 
@@ -21,17 +23,6 @@ class TwigFilterTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('twig_theme_test');
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Twig Filters',
-      'description' => 'Test Drupal\'s Twig filters.',
-      'group' => 'Theme',
-    );
-  }
 
   /**
    * Test Twig "without" filter.
@@ -113,12 +104,16 @@ class TwigFilterTest extends WebTestBase {
         'message' => 'Without string attribute in the front.',
       ),
       array(
-        'expected' => '<div><span checked>Without either nor class attributes.</span></div>',
-        'message' => 'Attributes printed without id nor class attributes.',
+        'expected' => '<div><span checked>Without id and class attributes.</span></div>',
+        'message' => 'Attributes printed without id and class attributes.',
       ),
       array(
         'expected' => '<div><span id="quotes" checked class="red green blue">All attributes again.</span></div>',
         'message' => 'All attributes printed again.',
+      ),
+      array(
+        'expected' => '<div id="quotes-here"><span class="gray-like-a-bunny bem__ized--top-feature" id="quotes-here">ID and class. Having the same ID twice is not valid markup but we want to make sure the filter doesn\'t use drupal_html_id().</span></div>',
+        'message' => 'Class and ID filtered.',
       ),
     );
 

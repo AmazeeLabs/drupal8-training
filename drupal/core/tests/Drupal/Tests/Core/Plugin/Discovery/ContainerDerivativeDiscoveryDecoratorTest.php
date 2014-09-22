@@ -12,19 +12,10 @@ use Drupal\Tests\UnitTestCase;
 
 /**
  * Tests the container aware derivative discovery decorator.
+ *
+ * @group Plugin
  */
 class ContainerDerivativeDiscoveryDecoratorTest extends UnitTestCase {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Container aware derivative discovery decorator.',
-      'description' => 'Tests the container aware derivative discovery decorator.',
-      'group' => 'Plugin',
-    );
-  }
 
   /**
    * Tests the getDerivativeFetcher method.
@@ -46,11 +37,11 @@ class ContainerDerivativeDiscoveryDecoratorTest extends UnitTestCase {
     $definitions = array();
     $definitions['container_aware_discovery'] = array(
       'id' => 'container_aware_discovery',
-      'derivative' => '\Drupal\Tests\Core\Plugin\Discovery\TestContainerDerivativeDiscovery',
+      'deriver' => '\Drupal\Tests\Core\Plugin\Discovery\TestContainerDerivativeDiscovery',
     );
     $definitions['non_container_aware_discovery'] = array(
       'id' => 'non_container_aware_discovery',
-      'derivative' => '\Drupal\Tests\Core\Plugin\Discovery\TestDerivativeDiscovery',
+      'deriver' => '\Drupal\Tests\Core\Plugin\Discovery\TestDerivativeDiscovery',
     );
 
     $discovery_main = $this->getMock('Drupal\Component\Plugin\Discovery\DiscoveryInterface');

@@ -7,6 +7,7 @@
 
 namespace Drupal\text;
 
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
@@ -34,7 +35,7 @@ class TextProcessed extends TypedData {
     parent::__construct($definition, $name, $parent);
 
     if ($definition->getSetting('text source') === NULL) {
-      throw new \InvalidArgumentException("The definition's 'source' key has to specify the name of the text property to be processed.");
+      throw new \InvalidArgumentException("The definition's 'text source' key has to specify the name of the text property to be processed.");
     }
   }
 
@@ -49,17 +50,13 @@ class TextProcessed extends TypedData {
     $item = $this->getParent();
     $text = $item->{($this->definition->getSetting('text source'))};
 
-    // Avoid running check_markup() or check_plain() on empty strings.
+    // Avoid running check_markup() or
+    // \Drupal\Component\Utility\String::checkPlain() on empty strings.
     if (!isset($text) || $text === '') {
       $this->processed = '';
     }
-    elseif ($item->getFieldDefinition()->getSetting('text_processing')) {
-      $this->processed = check_markup($text, $item->format, $item->getLangcode());
-    }
     else {
-      // Escape all HTML and retain newlines.
-      // @see \Drupal\Core\Field\Plugin\Field\FieldFormatter\StringFormatter
-      $this->processed = nl2br(String::checkPlain($text));
+      $this->processed = check_markup($text, $item->format, $item->getLangcode());
     }
     return $this->processed;
   }

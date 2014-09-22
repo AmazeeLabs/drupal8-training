@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\views\filter;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
 
@@ -131,12 +132,12 @@ class BooleanOperator extends FilterPluginBase {
     return $options;
   }
 
-  protected function valueForm(&$form, &$form_state) {
+  protected function valueForm(&$form, FormStateInterface $form_state) {
     if (empty($this->value_options)) {
       // Initialize the array of possible values for this filter.
       $this->getValueOptions();
     }
-    if (!empty($form_state['exposed'])) {
+    if ($exposed = $form_state->get('exposed')) {
       // Exposed filter: use a select box to save space.
       $filter_form_type = 'select';
     }
@@ -152,19 +153,21 @@ class BooleanOperator extends FilterPluginBase {
     );
     if (!empty($this->options['exposed'])) {
       $identifier = $this->options['expose']['identifier'];
-      if (!empty($form_state['exposed']) && !isset($form_state['input'][$identifier])) {
-        $form_state['input'][$identifier] = $this->value;
+      $user_input = $form_state->getUserInput();
+      if ($exposed && !isset($user_input[$identifier])) {
+        $user_input[$identifier] = $this->value;
+        $form_state->setUserInput($user_input);
       }
       // If we're configuring an exposed filter, add an - Any - option.
-      if (empty($form_state['exposed']) || empty($this->options['expose']['required'])) {
+      if (!$exposed || empty($this->options['expose']['required'])) {
         $form['value']['#options'] = array('All' => t('- Any -')) + $form['value']['#options'];
       }
     }
   }
 
-  protected function valueValidate($form, &$form_state) {
-    if (isset($form_state['values']['options']['value']) && $form_state['values']['options']['value'] == 'All' && !empty($form_state['values']['options']['expose']['required'])) {
-      form_set_error('value', $form_state, t('You must select a value unless this is an non-required exposed filter.'));
+  protected function valueValidate($form, FormStateInterface $form_state) {
+    if ($form_state->getValue(array('options', 'value')) == 'All' && !$form_state->isValueEmpty(array('options', 'expose', 'required'))) {
+      $form_state->setErrorByName('value', t('You must select a value unless this is an non-required exposed filter.'));
     }
   }
 

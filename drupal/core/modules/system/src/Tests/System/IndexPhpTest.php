@@ -10,18 +10,12 @@ namespace Drupal\system\Tests\System;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test the handling of requests containing 'index.php'.
+ * Tests the handling of requests containing 'index.php'.
+ *
+ * @group system
  */
 class IndexPhpTest extends WebTestBase {
-  public static function getInfo() {
-    return array(
-      'name' => 'Index.php handling',
-      'description' => "Test the handling of requests containing 'index.php'.",
-      'group' => 'System',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
   }
 

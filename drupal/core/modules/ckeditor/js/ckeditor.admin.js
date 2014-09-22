@@ -1355,14 +1355,13 @@
           click: function () {
             closeDialog('apply', this);
           },
-          'class': 'button-primary button'
+          primary: true
         },
         {
           text: Drupal.t('Cancel'),
           click: function () {
             closeDialog('cancel');
-          },
-          'class': 'button'
+          }
         }
       ],
       open: function () {

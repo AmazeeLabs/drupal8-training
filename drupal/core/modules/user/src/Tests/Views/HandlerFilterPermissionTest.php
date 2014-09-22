@@ -14,6 +14,7 @@ use Drupal\views\Views;
 /**
  * Tests the permissions filter handler.
  *
+ * @group user
  * @see \Drupal\user\Plugin\views\filter\Permissions
  */
 class HandlerFilterPermissionTest extends UserUnitTestBase {
@@ -26,14 +27,6 @@ class HandlerFilterPermissionTest extends UserUnitTestBase {
   public static $testViews = array('test_filter_permission');
 
   protected $columnMap;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User: Permissions Filter',
-      'description' => 'Tests the permission filter handler.',
-      'group' => 'Views module integration',
-    );
-  }
 
   /**
    * Tests the permission filter handler.
@@ -86,10 +79,16 @@ class HandlerFilterPermissionTest extends UserUnitTestBase {
 
     // Test the value options.
     $value_options = $view->filter['permission']->getValueOptions();
+
+    $permisssion_by_module = [];
+    $permissions = \Drupal::service('user.permissions')->getPermissions();
+    foreach ($permissions as $name => $permission) {
+      $permisssion_by_module[$permission['provider']][$name] = $permission;
+    }
     foreach (array('system' => 'System', 'user' => 'User') as $module => $title) {
       $expected = array_map(function ($permission) {
         return String::checkPlain(strip_tags($permission['title']));
-      }, $this->container->get('module_handler')->invoke($module, 'permission'));
+      }, $permisssion_by_module[$module]);
 
       $this->assertEqual($expected, $value_options[$title], 'Ensure the all permissions are available');
     }

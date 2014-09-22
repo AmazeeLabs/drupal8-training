@@ -8,7 +8,9 @@
 namespace Drupal\file\Tests;
 
 /**
- * Tests the file_save_upload() function on remote filesystems.
+ * Tests the file uploading functions.
+ *
+ * @group file
  */
 class RemoteFileSaveUploadTest extends SaveUploadTest {
 
@@ -19,13 +21,7 @@ class RemoteFileSaveUploadTest extends SaveUploadTest {
    */
   public static $modules = array('file_test');
 
-  public static function getInfo() {
-    $info = parent::getInfo();
-    $info['group'] = 'File Managed API (remote)';
-    return $info;
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     \Drupal::config('system.file')->set('default_scheme', 'dummy-remote')->save();
   }

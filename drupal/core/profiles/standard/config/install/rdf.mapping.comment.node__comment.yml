@@ -1,6 +1,6 @@
-id: comment.node__comment
+id: comment.comment
 targetEntityType: comment
-bundle: node__comment
+bundle: comment
 types:
   - 'schema:Comment'
 fieldMappings:
@@ -11,12 +11,12 @@ fieldMappings:
     properties:
       - 'schema:dateCreated'
     datatype_callback:
-      callable: 'date_iso8601'
+      callable: 'Drupal\rdf\CommonDataConverter::dateIso8601Value'
   changed:
     properties:
       - 'schema:dateModified'
     datatype_callback:
-      callable: 'date_iso8601'
+      callable: 'Drupal\rdf\CommonDataConverter::dateIso8601Value'
   comment_body:
     properties:
       - 'schema:text'
@@ -27,3 +27,5 @@ fieldMappings:
 dependencies:
   module:
     - comment
+  entity:
+    - comment.type.comment

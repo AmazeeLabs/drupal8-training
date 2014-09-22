@@ -7,53 +7,33 @@
 
 namespace Drupal\comment;
 
-use Drupal\Core\Breadcrumb\BreadcrumbBuilderBase;
-use Drupal\Core\Entity\EntityManagerInterface;
-use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Drupal\Core\Breadcrumb\BreadcrumbBuilderInterface;
+use Drupal\Core\Link;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 
 /**
  * Class to define the comment breadcrumb builder.
  */
-class CommentBreadcrumbBuilder extends BreadcrumbBuilderBase {
+class CommentBreadcrumbBuilder implements BreadcrumbBuilderInterface {
+  use StringTranslationTrait;
 
   /**
-   * Stores the Entity manager service.
-   *
-   * @var \Drupal\Core\Entity\EntityManagerInterface
+   * {@inheritdoc}
    */
-  protected $entityManager;
-
-  /**
-   * Constructs a CommentBreadcrumbBuilder object.
-   *
-   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
-   *   The entity manager.
-   */
-  public function __construct(EntityManagerInterface $entity_manager) {
-    $this->entityManager = $entity_manager;
+  public function applies(RouteMatchInterface $route_match) {
+    return $route_match->getRouteName() == 'comment.reply' && $route_match->getParameter('entity');
   }
 
   /**
    * {@inheritdoc}
    */
-  public function applies(array $attributes) {
-    return isset($attributes[RouteObjectInterface::ROUTE_NAME]) && $attributes[RouteObjectInterface::ROUTE_NAME] == 'comment.reply'
-    && isset($attributes['entity_type'])
-    && isset($attributes['entity_id'])
-    && isset($attributes['field_name']);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function build(array $attributes) {
+  public function build(RouteMatchInterface $route_match) {
     $breadcrumb = array();
 
-    $breadcrumb[] = $this->l($this->t('Home'), '<front>');
-    $entity = $this->entityManager
-      ->getStorage($attributes['entity_type'])
-      ->load($attributes['entity_id']);
-    $breadcrumb[] = \Drupal::linkGenerator()->generateFromUrl($entity->label(), $entity->urlInfo());
+    $breadcrumb[] = Link::createFromRoute($this->t('Home'), '<front>');
+    $entity = $route_match->getParameter('entity');
+    $breadcrumb[] = new Link($entity->label(), $entity->urlInfo());
     return $breadcrumb;
   }
 

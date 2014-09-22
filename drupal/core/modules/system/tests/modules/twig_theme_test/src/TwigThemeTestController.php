@@ -16,7 +16,7 @@ class TwigThemeTestController {
    * Menu callback for testing PHP variables in a Twig template.
    */
   public function phpVariablesRender() {
-    return _theme('twig_theme_test_php_variables');
+    return \Drupal::theme()->render('twig_theme_test_php_variables', array());
   }
 
   /**
@@ -25,6 +25,15 @@ class TwigThemeTestController {
   public function transBlockRender() {
     return array(
       '#theme' => 'twig_theme_test_trans',
+    );
+  }
+
+  /**
+   * Renders for testing url_generator functions in a Twig template.
+   */
+  public function urlGeneratorRender() {
+    return array(
+      '#theme' => 'twig_theme_test_url_generator',
     );
   }
 

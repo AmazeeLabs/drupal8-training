@@ -11,19 +11,10 @@ use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
  * Tests site-specific service overrides.
+ *
+ * @group DrupalKernel
  */
 class DrupalKernelSiteTest extends DrupalUnitTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'DrupalKernel site service overrides',
-      'description' => 'Tests site-specific service overrides.',
-      'group' => 'DrupalKernel',
-    );
-  }
 
   /**
    * Tests services.yml in site directory.
@@ -48,7 +39,7 @@ EOD;
     file_put_contents($this->siteDirectory . '/services.yml', $doc);
 
     // Rebuild the container.
-    $this->kernel->updateModules(array());
+    $this->container->get('kernel')->rebuildContainer();
 
     $this->assertTrue($this->container->has('site.service.yml'));
     $this->assertIdentical(get_class($this->container->get('cache.backend.database')), 'Drupal\Core\Cache\MemoryBackendFactory');

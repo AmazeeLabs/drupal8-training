@@ -8,12 +8,14 @@
 namespace Drupal\dblog\Tests;
 
 use Drupal\Component\Utility\Xss;
-use Drupal\Core\Language\Language;
 use Drupal\dblog\Controller\DbLogController;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests logging messages to the database.
+ * Generate events and verify dblog entries; verify user access to log reports
+ * based on persmissions.
+ *
+ * @group dblog
  */
 class DbLogTest extends WebTestBase {
 
@@ -38,15 +40,7 @@ class DbLogTest extends WebTestBase {
    */
   protected $any_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'DbLog functionality',
-      'description' => 'Generate events and verify dblog entries; verify user access to log reports based on persmissions.',
-      'group' => 'DbLog',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create users with specific permissions.
@@ -70,6 +64,7 @@ class DbLogTest extends WebTestBase {
     $this->verifyCron($row_limit);
     $this->verifyEvents();
     $this->verifyReports();
+    $this->verifyBreadcrumbs();
 
     // Login the regular user.
     $this->drupalLogin($this->any_user);
@@ -138,7 +133,7 @@ class DbLogTest extends WebTestBase {
       'user'        => $this->big_user,
       'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
-      'referer'     => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
+      'referer'     => \Drupal::request()->server->get('HTTP_REFERER'),
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
       );
@@ -186,11 +181,23 @@ class DbLogTest extends WebTestBase {
 
     // View the database log event page.
     $wid = db_query('SELECT MIN(wid) FROM {watchdog}')->fetchField();
-    $this->drupalGet('admin/reports/event/' . $wid);
+    $this->drupalGet('admin/reports/dblog/event/' . $wid);
     $this->assertResponse($response);
     if ($response == 200) {
       $this->assertText(t('Details'), 'DBLog event node was displayed');
     }
+
+  }
+
+  /**
+   * Generates and then verifies breadcrumbs.
+   */
+  private function verifyBreadcrumbs() {
+    // View the database log event page.
+    $wid = db_query('SELECT MIN(wid) FROM {watchdog}')->fetchField();
+    $this->drupalGet('admin/reports/dblog/event/' . $wid);
+    $xpath = '//nav[@class="breadcrumb"]/ol/li[last()]/a';
+    $this->assertEqual(current($this->xpath($xpath)), 'Recent log messages', 'DBLogs link displayed at breadcrumb in event page.');
   }
 
   /**
@@ -215,7 +222,7 @@ class DbLogTest extends WebTestBase {
    */
   private function doUser() {
     // Set user variables.
-    $name = $this->randomName();
+    $name = $this->randomMachineName();
     $pass = user_password();
     // Add a user using the form to generate an add user event (which is not
     // triggered by drupalCreateUser).
@@ -274,7 +281,7 @@ class DbLogTest extends WebTestBase {
       foreach ($links->attributes() as $attr => $value) {
         if ($attr == 'href') {
           // Extract link to details page.
-          $link = drupal_substr($value, strpos($value, 'admin/reports/event/'));
+          $link = drupal_substr($value, strpos($value, 'admin/reports/dblog/event/'));
           $this->drupalGet($link);
           // Check for full message text on the details page.
           $this->assertRaw($message, 'DBLog event details was found: [delete user]');
@@ -284,7 +291,7 @@ class DbLogTest extends WebTestBase {
     }
     $this->assertTrue($link, 'DBLog event was recorded: [delete user]');
     // Visit random URL (to generate page not found event).
-    $not_found_url = $this->randomName(60);
+    $not_found_url = $this->randomMachineName(60);
     $this->drupalGet($not_found_url);
     $this->assertResponse(404);
     // View the database log page-not-found report page.
@@ -370,16 +377,16 @@ class DbLogTest extends WebTestBase {
     switch ($type) {
       case 'forum':
         $content = array(
-          'title[0][value]' => $this->randomName(8),
+          'title[0][value]' => $this->randomMachineName(8),
           'taxonomy_forums' => array(1),
-          'body[0][value]' => $this->randomName(32),
+          'body[0][value]' => $this->randomMachineName(32),
         );
         break;
 
       default:
         $content = array(
-          'title[0][value]' => $this->randomName(8),
-          'body[0][value]' => $this->randomName(32),
+          'title[0][value]' => $this->randomMachineName(8),
+          'body[0][value]' => $this->randomMachineName(32),
         );
         break;
     }
@@ -397,7 +404,7 @@ class DbLogTest extends WebTestBase {
    */
   private function getContentUpdate($type) {
     $content = array(
-      'body[0][value]' => $this->randomName(32),
+      'body[0][value]' => $this->randomMachineName(32),
     );
     return $content;
   }
@@ -421,7 +428,7 @@ class DbLogTest extends WebTestBase {
       'user'        => $this->big_user,
       'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
-      'referer'     => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
+      'referer'     => \Drupal::request()->server->get('HTTP_REFERER'),
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
     );
@@ -433,6 +440,8 @@ class DbLogTest extends WebTestBase {
     $this->drupalLogin($this->big_user);
     // Post in order to clear the database table.
     $this->drupalPostForm('admin/reports/dblog', array(), t('Clear log messages'));
+    // Confirm that the logs should be cleared.
+    $this->drupalPostForm(NULL, array(), 'Confirm');
     // Count the rows in watchdog that previously related to the deleted user.
     $count = db_query('SELECT COUNT(*) FROM {watchdog}')->fetchField();
     $this->assertEqual($count, 0, format_string('DBLog contains :count records after a clear.', array(':count' => $count)));
@@ -451,7 +460,7 @@ class DbLogTest extends WebTestBase {
     $type_names = array();
     $types = array();
     for ($i = 0; $i < 3; $i++) {
-      $type_names[] = $type_name = $this->randomName();
+      $type_names[] = $type_name = $this->randomMachineName();
       $severity = WATCHDOG_EMERGENCY;
       for ($j = 0; $j < 3; $j++) {
         $types[] = $type = array(
@@ -511,6 +520,8 @@ class DbLogTest extends WebTestBase {
 
     // Clear all logs and make sure the confirmation message is found.
     $this->drupalPostForm('admin/reports/dblog', array(), t('Clear log messages'));
+    // Confirm that the logs should be cleared.
+    $this->drupalPostForm(NULL, array(), 'Confirm');
     $this->assertText(t('Database log cleared.'), 'Confirmation message found');
   }
 

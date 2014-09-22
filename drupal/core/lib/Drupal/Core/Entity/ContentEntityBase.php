@@ -10,27 +10,29 @@ namespace Drupal\Core\Entity;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
-use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * Implements Entity Field API specific enhancements to the Entity class.
+ *
+ * @ingroup entity_api
  */
 abstract class ContentEntityBase extends Entity implements \IteratorAggregate, ContentEntityInterface {
 
   /**
-   * Status code indentifying a removed translation.
+   * Status code identifying a removed translation.
    */
   const TRANSLATION_REMOVED = 0;
 
   /**
-   * Status code indentifying an existing translation.
+   * Status code identifying an existing translation.
    */
   const TRANSLATION_EXISTING = 1;
 
   /**
-   * Status code indentifying a newly created translation.
+   * Status code identifying a newly created translation.
    */
   const TRANSLATION_CREATED = 2;
 
@@ -38,8 +40,8 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * The plain data values of the contained fields.
    *
    * This always holds the original, unchanged values of the entity. The values
-   * are keyed by language code, whereas Language::LANGCODE_DEFAULT is used for
-   * values in default language.
+   * are keyed by language code, whereas LanguageInterface::LANGCODE_DEFAULT
+   * is used for values in default language.
    *
    * @todo: Add methods for getting original fields and for determining
    * changes.
@@ -80,7 +82,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    *
    * @var string
    */
-  protected $activeLangcode = Language::LANGCODE_DEFAULT;
+  protected $activeLangcode = LanguageInterface::LANGCODE_DEFAULT;
 
   /**
    * Local cache for the default language code.
@@ -93,7 +95,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * An array of entity translation metadata.
    *
    * An associative array keyed by translation language code. Every value is an
-   * array containg the translation status and the translation object, if it has
+   * array containing the translation status and the translation object, if it has
    * already been instantiated.
    *
    * @var array
@@ -141,22 +143,29 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
   public function __construct(array $values, $entity_type, $bundle = FALSE, $translations = array()) {
     $this->entityTypeId = $entity_type;
     $this->entityKeys['bundle'] = $bundle ? $bundle : $this->entityTypeId;
-    $this->languages = $this->languageManager()->getLanguages(Language::STATE_ALL);
+    $this->languages = $this->languageManager()->getLanguages(LanguageInterface::STATE_ALL);
 
     foreach ($values as $key => $value) {
       // If the key matches an existing property set the value to the property
       // to set properties like isDefaultRevision.
       // @todo: Should this be converted somehow?
-      if (property_exists($this, $key) && isset($value[Language::LANGCODE_DEFAULT])) {
-        $this->$key = $value[Language::LANGCODE_DEFAULT];
+      if (property_exists($this, $key) && isset($value[LanguageInterface::LANGCODE_DEFAULT])) {
+        $this->$key = $value[LanguageInterface::LANGCODE_DEFAULT];
       }
     }
 
     $this->values = $values;
     foreach ($this->getEntityType()->getKeys() as $key => $field_name) {
       if (isset($this->values[$field_name])) {
-        if (is_array($this->values[$field_name]) && isset($this->values[$field_name][Language::LANGCODE_DEFAULT])) {
-          $this->entityKeys[$key] = $this->values[$field_name][Language::LANGCODE_DEFAULT];
+        if (is_array($this->values[$field_name]) && isset($this->values[$field_name][LanguageInterface::LANGCODE_DEFAULT])) {
+          if (is_array($this->values[$field_name][LanguageInterface::LANGCODE_DEFAULT])) {
+            if (isset($this->values[$field_name][LanguageInterface::LANGCODE_DEFAULT][0]['value'])) {
+              $this->entityKeys[$key] = $this->values[$field_name][LanguageInterface::LANGCODE_DEFAULT][0]['value'];
+            }
+          }
+          else {
+            $this->entityKeys[$key] = $this->values[$field_name][LanguageInterface::LANGCODE_DEFAULT];
+          }
         }
       }
     }
@@ -164,11 +173,11 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
     // Initialize translations. Ensure we have at least an entry for the default
     // language.
     $data = array('status' => static::TRANSLATION_EXISTING);
-    $this->translations[Language::LANGCODE_DEFAULT] = $data;
+    $this->translations[LanguageInterface::LANGCODE_DEFAULT] = $data;
     $this->setDefaultLangcode();
     if ($translations) {
       foreach ($translations as $langcode) {
-        if ($langcode != $this->defaultLangcode && $langcode != Language::LANGCODE_DEFAULT) {
+        if ($langcode != $this->defaultLangcode && $langcode != LanguageInterface::LANGCODE_DEFAULT) {
           $this->translations[$langcode] = $data;
         }
       }
@@ -237,8 +246,10 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * {@inheritdoc}
    */
   public function isTranslatable() {
+    // Check that the bundle is translatable, the entity has a language defined
+    // and if we have more than one language on the site.
     $bundles = $this->entityManager()->getBundleInfo($this->entityTypeId);
-    return !empty($bundles[$this->bundle()]['translatable']);
+    return !empty($bundles[$this->bundle()]['translatable']) && empty($this->getUntranslated()->language()->locked) && $this->languageManager()->isMultilingual();
   }
 
   /**
@@ -427,14 +438,14 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
         throw new \InvalidArgumentException('Field ' . String::checkPlain($name) . ' is unknown.');
       }
       // Non-translatable fields are always stored with
-      // Language::LANGCODE_DEFAULT as key.
+      // LanguageInterface::LANGCODE_DEFAULT as key.
 
-      $default = $langcode == Language::LANGCODE_DEFAULT;
+      $default = $langcode == LanguageInterface::LANGCODE_DEFAULT;
       if (!$default && !$definition->isTranslatable()) {
-        if (!isset($this->fields[$name][Language::LANGCODE_DEFAULT])) {
-          $this->fields[$name][Language::LANGCODE_DEFAULT] = $this->getTranslatedField($name, Language::LANGCODE_DEFAULT);
+        if (!isset($this->fields[$name][LanguageInterface::LANGCODE_DEFAULT])) {
+          $this->fields[$name][LanguageInterface::LANGCODE_DEFAULT] = $this->getTranslatedField($name, LanguageInterface::LANGCODE_DEFAULT);
         }
-        $this->fields[$name][$langcode] = &$this->fields[$name][Language::LANGCODE_DEFAULT];
+        $this->fields[$name][$langcode] = &$this->fields[$name][LanguageInterface::LANGCODE_DEFAULT];
       }
       else {
         $value = NULL;
@@ -446,7 +457,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
           // $this->defaultLangcode might not be set if we are initializing the
           // default language code cache, in which case there is no valid
           // langcode to assign.
-          $field_langcode = isset($this->defaultLangcode) ? $this->defaultLangcode : Language::LANGCODE_NOT_SPECIFIED;
+          $field_langcode = isset($this->defaultLangcode) ? $this->defaultLangcode : LanguageInterface::LANGCODE_NOT_SPECIFIED;
         }
         else {
           $field_langcode = $langcode;
@@ -504,7 +515,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    */
   public function getFieldDefinitions() {
     if (!isset($this->fieldDefinitions)) {
-      $this->fieldDefinitions = \Drupal::entityManager()->getFieldDefinitions($this->entityTypeId, $this->bundle());
+      $this->fieldDefinitions = $this->entityManager()->getFieldDefinitions($this->entityTypeId, $this->bundle());
     }
     return $this->fieldDefinitions;
   }
@@ -538,15 +549,15 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
   /**
    * {@inheritdoc}
    */
-  public function access($operation, AccountInterface $account = NULL) {
+  public function access($operation, AccountInterface $account = NULL, $return_as_object = FALSE) {
     if ($operation == 'create') {
       return $this->entityManager()
-        ->getAccessController($this->entityTypeId)
-        ->createAccess($this->bundle(), $account);
+        ->getAccessControlHandler($this->entityTypeId)
+        ->createAccess($this->bundle(), $account, [], $return_as_object);
     }
     return $this->entityManager()
-      ->getAccessController($this->entityTypeId)
-      ->access($this, $operation, $this->activeLangcode, $account);
+      ->getAccessControlHandler($this->entityTypeId)
+      ->access($this, $operation, $this->activeLangcode, $account, $return_as_object);
   }
 
   /**
@@ -554,13 +565,18 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    */
   public function language() {
     $language = NULL;
-    if ($this->activeLangcode != Language::LANGCODE_DEFAULT) {
+    if ($this->activeLangcode != LanguageInterface::LANGCODE_DEFAULT) {
       if (!isset($this->languages[$this->activeLangcode])) {
-        $this->languages += $this->languageManager()->getLanguages(Language::STATE_ALL);
+        $this->languages += $this->languageManager()->getLanguages(LanguageInterface::STATE_ALL);
       }
       $language = $this->languages[$this->activeLangcode];
     }
     else {
+      // @todo Avoid this check by getting the language from the language
+      //   manager directly in https://www.drupal.org/node/2303877.
+      if (!isset($this->languages[$this->defaultLangcode])) {
+        $this->languages += $this->languageManager()->getLanguages(LanguageInterface::STATE_ALL);
+      }
       $language = $this->languages[$this->defaultLangcode];
     }
     return $language;
@@ -574,27 +590,31 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
     if ($this->hasField('langcode') && ($item = $this->get('langcode')) && isset($item->language)) {
       $this->defaultLangcode = $item->language->id;
     }
+
     if (empty($this->defaultLangcode)) {
-      // Make sure we return a proper language object.
-      $this->defaultLangcode = Language::LANGCODE_NOT_SPECIFIED;
+      // Make sure we return a proper language object, if the entity has a
+      // langcode field, default to the site's default language.
+      if ($this->hasField('langcode')) {
+        $this->defaultLangcode = $this->languageManager()->getDefaultLanguage()->getId();
+      }
+      else {
+        $this->defaultLangcode = LanguageInterface::LANGCODE_NOT_SPECIFIED;
+      }
     }
     // This needs to be initialized manually as it is skipped when instantiating
     // the language field object to avoid infinite recursion.
     if (!empty($this->fields['langcode'])) {
-      $this->fields['langcode'][Language::LANGCODE_DEFAULT]->setLangcode($this->defaultLangcode);
+      $this->fields['langcode'][LanguageInterface::LANGCODE_DEFAULT]->setLangcode($this->defaultLangcode);
     }
   }
 
   /**
    * Updates language for already instantiated fields.
-   *
-   * @return \Drupal\Core\Language\Language
-   *   A language object.
    */
   protected function updateFieldLangcodes($langcode) {
     foreach ($this->fields as $name => $items) {
-      if (!empty($items[Language::LANGCODE_DEFAULT])) {
-        $items[Language::LANGCODE_DEFAULT]->setLangcode($langcode);
+      if (!empty($items[LanguageInterface::LANGCODE_DEFAULT])) {
+        $items[LanguageInterface::LANGCODE_DEFAULT]->setLangcode($langcode);
       }
     }
   }
@@ -630,8 +650,8 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
   public function getTranslation($langcode) {
     // Ensure we always use the default language code when dealing with the
     // original entity language.
-    if ($langcode != Language::LANGCODE_DEFAULT && $langcode == $this->defaultLangcode) {
-      $langcode = Language::LANGCODE_DEFAULT;
+    if ($langcode != LanguageInterface::LANGCODE_DEFAULT && $langcode == $this->defaultLangcode) {
+      $langcode = LanguageInterface::LANGCODE_DEFAULT;
     }
 
     // Populate entity translation object cache so it will be available for all
@@ -674,7 +694,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * {@inheritdoc}
    */
   public function getUntranslated() {
-    return $this->getTranslation(Language::LANGCODE_DEFAULT);
+    return $this->getTranslation(LanguageInterface::LANGCODE_DEFAULT);
   }
 
   /**
@@ -721,7 +741,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    */
   public function hasTranslation($langcode) {
     if ($langcode == $this->defaultLangcode) {
-      $langcode = Language::LANGCODE_DEFAULT;
+      $langcode = LanguageInterface::LANGCODE_DEFAULT;
     }
     return !empty($this->translations[$langcode]['status']);
   }
@@ -766,7 +786,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * {@inheritdoc}
    */
   public function removeTranslation($langcode) {
-    if (isset($this->translations[$langcode]) && $langcode != Language::LANGCODE_DEFAULT && $langcode != $this->defaultLangcode) {
+    if (isset($this->translations[$langcode]) && $langcode != LanguageInterface::LANGCODE_DEFAULT && $langcode != $this->defaultLangcode) {
       foreach ($this->getFieldDefinitions() as $name => $definition) {
         if ($definition->isTranslatable()) {
           unset($this->values[$name][$langcode]);
@@ -785,7 +805,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    * {@inheritdoc}
    */
   public function initTranslation($langcode) {
-    if ($langcode != Language::LANGCODE_DEFAULT && $langcode != $this->defaultLangcode) {
+    if ($langcode != LanguageInterface::LANGCODE_DEFAULT && $langcode != $this->defaultLangcode) {
       $this->translations[$langcode]['status'] = static::TRANSLATION_EXISTING;
     }
   }
@@ -795,7 +815,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
    */
   public function getTranslationLanguages($include_default = TRUE) {
     $translations = array_filter($this->translations, function($translation) { return $translation['status']; });
-    unset($translations[Language::LANGCODE_DEFAULT]);
+    unset($translations[LanguageInterface::LANGCODE_DEFAULT]);
 
     if ($include_default) {
       $translations[$this->defaultLangcode] = TRUE;
@@ -834,8 +854,8 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
   /**
    * Implements the magic method for getting object properties.
    *
-   * @todo: A lot of code still uses non-fields (e.g. $entity->content in render
-   *   controllers) by reference. Clean that up.
+   * @todo: A lot of code still uses non-fields (e.g. $entity->content in view
+   *   builders) by reference. Clean that up.
    */
   public function &__get($name) {
     // If this is an entity field, handle it accordingly. We first check whether
@@ -957,7 +977,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
         // we retain just the original value, as references will be recreated
         // later as needed.
         if (!$definitions[$name]->isTranslatable() && count($values) > 1) {
-          $values = array_intersect_key($values, array(Language::LANGCODE_DEFAULT => TRUE));
+          $values = array_intersect_key($values, array(LanguageInterface::LANGCODE_DEFAULT => TRUE));
         }
         foreach ($values as $langcode => $items) {
           $this->fields[$name][$langcode] = clone $items;
@@ -1022,7 +1042,7 @@ abstract class ContentEntityBase extends Entity implements \IteratorAggregate, C
     if (!isset($this->entityKeys[$key]) || !array_key_exists($key, $this->entityKeys)) {
       if ($this->getEntityType()->hasKey($key)) {
         $field_name = $this->getEntityType()->getKey($key);
-        $property = $this->getFieldDefinition($field_name)->getMainPropertyName();
+        $property = $this->getFieldDefinition($field_name)->getFieldStorageDefinition()->getMainPropertyName();
         $this->entityKeys[$key] = $this->get($field_name)->$property;
       }
       else {

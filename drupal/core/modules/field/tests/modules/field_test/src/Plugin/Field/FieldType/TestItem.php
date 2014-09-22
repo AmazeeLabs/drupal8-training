@@ -8,7 +8,7 @@
 namespace Drupal\field_test\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Field\PrepareCacheInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\Field\FieldItemBase;
 
@@ -23,27 +23,27 @@ use Drupal\Core\Field\FieldItemBase;
  *   default_formatter = "field_test_default"
  * )
  */
-class TestItem extends FieldItemBase implements PrepareCacheInterface {
+class TestItem extends FieldItemBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function defaultSettings() {
+  public static function defaultStorageSettings() {
     return array(
-      'test_field_setting' => 'dummy test string',
-      'changeable' => 'a changeable field setting',
-      'unchangeable' => 'an unchangeable field setting',
-    ) + parent::defaultSettings();
+      'test_field_storage_setting' => 'dummy test string',
+      'changeable' => 'a changeable field storage setting',
+      'unchangeable' => 'an unchangeable field storage setting',
+    ) + parent::defaultStorageSettings();
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function defaultInstanceSettings() {
+  public static function defaultFieldSettings() {
     return array(
-      'test_instance_setting' => 'dummy test string',
+      'test_field_setting' => 'dummy test string',
       'test_cached_data' => FALSE,
-    ) + parent::defaultInstanceSettings();
+    ) + parent::defaultFieldSettings();
   }
 
   /**
@@ -77,7 +77,22 @@ class TestItem extends FieldItemBase implements PrepareCacheInterface {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state, $has_data) {
+  public function storageSettingsForm(array &$form, FormStateInterface $form_state, $has_data) {
+    $form['test_field_storage_setting'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Field test field storage setting'),
+      '#default_value' => $this->getSetting('test_field_storage_setting'),
+      '#required' => FALSE,
+      '#description' => t('A dummy form element to simulate field storage setting.'),
+    );
+
+    return $form;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     $form['test_field_setting'] = array(
       '#type' => 'textfield',
       '#title' => t('Field test field setting'),
@@ -87,35 +102,6 @@ class TestItem extends FieldItemBase implements PrepareCacheInterface {
     );
 
     return $form;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function instanceSettingsForm(array $form, array &$form_state) {
-    $form['test_instance_setting'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Field test field instance setting'),
-      '#default_value' => $this->getSetting('test_instance_setting'),
-      '#required' => FALSE,
-      '#description' => t('A dummy form element to simulate field instance setting.'),
-    );
-
-    return $form;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getCacheData() {
-    // To keep the test non-intrusive, only act for instances with the
-    // 'test_cached_data' setting explicitly set to TRUE. Also don't add
-    // anything on empty values.
-    if ($this->getSetting('test_cached_data') && !$this->isEmpty()) {
-      // Set the additional value so that getValue() will return it.
-      $this->additional_key = 'additional_value';
-    }
-    return $this->getValue();
   }
 
   /**

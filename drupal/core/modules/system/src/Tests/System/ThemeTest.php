@@ -11,7 +11,10 @@ use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the theme interface functionality.
+ * Tests the theme interface functionality by enabling and switching themes, and
+ * using an administration theme.
+ *
+ * @group system
  */
 class ThemeTest extends WebTestBase {
 
@@ -22,15 +25,7 @@ class ThemeTest extends WebTestBase {
    */
   public static $modules = array('node', 'block', 'file');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Theme interface functionality',
-      'description' => 'Tests the theme interface functionality by enabling and switching themes, and using an administration theme.',
-      'group' => 'System',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
@@ -46,8 +41,8 @@ class ThemeTest extends WebTestBase {
   function testThemeSettings() {
     // Ensure invalid theme settings form URLs return a proper 404.
     $this->drupalGet('admin/appearance/settings/bartik');
-    $this->assertResponse(404, 'The theme settings form URL for a disabled theme could not be found.');
-    $this->drupalGet('admin/appearance/settings/' . $this->randomName());
+    $this->assertResponse(404, 'The theme settings form URL for a uninstalled theme could not be found.');
+    $this->drupalGet('admin/appearance/settings/' . $this->randomMachineName());
     $this->assertResponse(404, 'The theme settings form URL for a non-existent theme could not be found.');
 
     // Specify a filesystem path to be used for the logo.
@@ -184,9 +179,9 @@ class ThemeTest extends WebTestBase {
    * Test the administration theme functionality.
    */
   function testAdministrationTheme() {
-    $this->container->get('theme_handler')->enable(array('seven'));
+    $this->container->get('theme_handler')->install(array('seven'));
 
-    // Enable an administration theme and show it on the node admin pages.
+    // Install an administration theme and show it on the node admin pages.
     $edit = array(
       'admin_theme' => 'seven',
       'use_admin_theme' => TRUE,
@@ -214,6 +209,14 @@ class ThemeTest extends WebTestBase {
     $this->drupalGet('admin/config');
     $this->assertRaw('core/themes/seven', 'Administration theme used on an administration page.');
 
+    // Ensure that the admin theme is also visible on the 403 page.
+    $normal_user = $this->drupalCreateUser(['view the administration theme']);
+    $this->drupalLogin($normal_user);
+    $this->drupalGet('admin/config');
+    $this->assertResponse(403);
+    $this->assertRaw('core/themes/seven', 'Administration theme used on an administration page.');
+    $this->drupalLogin($this->admin_user);
+
     $this->drupalGet('node/add');
     $this->assertRaw('core/themes/stark', 'Site default theme used on the add content page.');
 
@@ -235,8 +238,8 @@ class ThemeTest extends WebTestBase {
    * Test switching the default theme.
    */
   function testSwitchDefaultTheme() {
-    // Enable Bartik and set it as the default theme.
-    theme_enable(array('bartik'));
+    // Install Bartik and set it as the default theme.
+    \Drupal::service('theme_handler')->install(array('bartik'));
     $this->drupalGet('admin/appearance');
     $this->clickLink(t('Set as default'));
     $this->assertEqual(\Drupal::config('system.theme')->get('default'), 'bartik');
@@ -254,7 +257,7 @@ class ThemeTest extends WebTestBase {
   }
 
   /**
-   * Test that themes can't be enabled when the base theme or engine is missing.
+   * Test themes can't be installed when the base theme or engine is missing.
    */
   function testInvalidTheme() {
     // theme_page_test_system_info_alter() un-hides all hidden themes.

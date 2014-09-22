@@ -12,9 +12,7 @@ use Drupal\Tests\UnitTestCase;
 /**
  * Tests the Drupal class.
  *
- * @group Drupal
- *
- * @see \Drupal
+ * @group DrupalTest
  */
 class DrupalTest extends UnitTestCase {
 
@@ -25,15 +23,7 @@ class DrupalTest extends UnitTestCase {
    */
   protected $container;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Drupal test',
-      'description' => 'Tests the Drupal class.',
-      'group' => 'System'
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     $this->container = $this->getMockBuilder('Symfony\Component\DependencyInjection\ContainerBuilder')
       ->setMethods(array('get'))
       ->getMock();
@@ -53,14 +43,6 @@ class DrupalTest extends UnitTestCase {
   public function testService() {
     $this->setMockContainerService('test_service');
     $this->assertNotNull(\Drupal::service('test_service'));
-  }
-
-  /**
-   * Tests the service() method.
-   */
-  public function testRequest() {
-    $this->setMockContainerService('request');
-    $this->assertNotNull(\Drupal::request());
   }
 
   /**
@@ -335,6 +317,30 @@ class DrupalTest extends UnitTestCase {
   public function testFormBuilder() {
     $this->setMockContainerService('form_builder');
     $this->assertNotNull(\Drupal::formBuilder());
+  }
+
+  /**
+   * Tests the menuTree() method.
+   */
+  public function testMenuTree() {
+    $this->setMockContainerService('menu.link_tree');
+    $this->assertNotNull(\Drupal::menuTree());
+  }
+
+  /**
+   * Tests the pathValidator() method.
+   */
+  public function testPathValidator() {
+    $this->setMockContainerService('path.validator');
+    $this->assertNotNull(\Drupal::pathValidator());
+  }
+
+  /**
+   * Tests the accessManager() method.
+   */
+  public function testAccessManager() {
+    $this->setMockContainerService('access_manager');
+    $this->assertNotNull(\Drupal::accessManager());
   }
 
   /**

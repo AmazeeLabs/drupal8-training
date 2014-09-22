@@ -7,15 +7,17 @@
 
 namespace Drupal\field_ui;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityListBuilderInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldTypePluginManagerInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\field_ui\OverviewBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\field\Entity\FieldConfig;
-use Drupal\field\FieldInstanceConfigInterface;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\FieldConfigInterface;
 
 /**
  * Field UI field overview form.
@@ -76,12 +78,12 @@ class FieldOverview extends OverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, $entity_type_id = NULL, $bundle = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, $entity_type_id = NULL, $bundle = NULL) {
     parent::buildForm($form, $form_state, $entity_type_id, $bundle);
 
     // Gather bundle information.
-    $instances = array_filter(\Drupal::entityManager()->getFieldDefinitions($this->entity_type, $this->bundle), function ($field_definition) {
-      return $field_definition instanceof FieldInstanceConfigInterface;
+    $fields = array_filter(\Drupal::entityManager()->getFieldDefinitions($this->entity_type, $this->bundle), function ($field_definition) {
+      return $field_definition instanceof FieldConfigInterface;
     });
     $field_types = $this->fieldTypeManager->getDefinitions();
 
@@ -91,7 +93,7 @@ class FieldOverview extends OverviewBase {
     $form += array(
       '#entity_type' => $this->entity_type,
       '#bundle' => $this->bundle,
-      '#fields' => array_keys($instances),
+      '#fields' => array_keys($fields),
     );
 
     $table = array(
@@ -114,26 +116,26 @@ class FieldOverview extends OverviewBase {
     );
 
     // Fields.
-    foreach ($instances as $name => $instance) {
-      $field = $instance->getField();
+    foreach ($fields as $name => $field) {
+      $field_storage = $field->getFieldStorageDefinition();
       $route_parameters = array(
         $this->bundleEntityType => $this->bundle,
-        'field_instance_config' => $instance->id(),
+        'field_config' => $field->id(),
       );
       $table[$name] = array(
         '#attributes' => array(
           'id' => drupal_html_class($name),
         ),
         'label' => array(
-          '#markup' => check_plain($instance->getLabel()),
+          '#markup' => String::checkPlain($field->getLabel()),
         ),
         'field_name' => array(
-          '#markup' => $instance->getName(),
+          '#markup' => $field->getName(),
         ),
         'type' => array(
           '#type' => 'link',
-          '#title' => $field_types[$field->getType()]['label'],
-          '#route_name' => 'field_ui.field_edit_' . $this->entity_type,
+          '#title' => $field_types[$field_storage->getType()]['label'],
+          '#route_name' => 'field_ui.storage_edit_' . $this->entity_type,
           '#route_parameters' => $route_parameters,
           '#options' => array('attributes' => array('title' => $this->t('Edit field settings.'))),
         ),
@@ -141,10 +143,10 @@ class FieldOverview extends OverviewBase {
 
       $table[$name]['operations']['data'] = array(
         '#type' => 'operations',
-        '#links' => $this->entityManager->getListBuilder('field_instance_config')->getOperations($instance),
+        '#links' => $this->entityManager->getListBuilder('field_config')->getOperations($field),
       );
 
-      if (!empty($field->locked)) {
+      if (!empty($field_storage->locked)) {
         $table[$name]['operations'] = array('#markup' => $this->t('Locked'));
         $table[$name]['#attributes']['class'][] = 'menu-disabled';
       }
@@ -185,7 +187,7 @@ class FieldOverview extends OverviewBase {
           '#description' => $this->t('A unique machine-readable name containing letters, numbers, and underscores.'),
           // Calculate characters depending on the length of the field prefix
           // setting. Maximum length is 32.
-          '#maxlength' => FieldConfig::NAME_MAX_LENGTH - strlen($field_prefix),
+          '#maxlength' => FieldStorageConfig::NAME_MAX_LENGTH - strlen($field_prefix),
           '#prefix' => '<div class="add-new-placeholder">&nbsp;</div>',
           '#machine_name' => array(
             'source' => array('fields', $name, 'label'),
@@ -210,7 +212,7 @@ class FieldOverview extends OverviewBase {
         // contrib modules can form_alter() the value for newly created fields.
         'translatable' => array(
           '#type' => 'value',
-          '#value' => FALSE,
+          '#value' => TRUE,
         ),
       );
     }
@@ -280,7 +282,7 @@ class FieldOverview extends OverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
     $this->validateAddNew($form, $form_state);
     $this->validateAddExisting($form, $form_state);
   }
@@ -290,24 +292,24 @@ class FieldOverview extends OverviewBase {
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A reference to a keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    *
    * @see \Drupal\field_ui\FieldOverview::validateForm()
    */
-  protected function validateAddNew(array $form, array &$form_state) {
-    $field = $form_state['values']['fields']['_add_new_field'];
+  protected function validateAddNew(array $form, FormStateInterface $form_state) {
+    $field = $form_state->getValue(array('fields', '_add_new_field'));
 
     // Validate if any information was provided in the 'add new field' row.
     if (array_filter(array($field['label'], $field['field_name'], $field['type']))) {
       // Missing label.
       if (!$field['label']) {
-        $this->setFormError('fields][_add_new_field][label', $form_state, $this->t('Add new field: you need to provide a label.'));
+        $form_state->setErrorByName('fields][_add_new_field][label', $this->t('Add new field: you need to provide a label.'));
       }
 
       // Missing field name.
       if (!$field['field_name']) {
-        $this->setFormError('fields][_add_new_field][field_name', $form_state, $this->t('Add new field: you need to provide a field name.'));
+        $form_state->setErrorByName('fields][_add_new_field][field_name', $this->t('Add new field: you need to provide a machine name for the field.'));
       }
       // Field name validation.
       else {
@@ -320,7 +322,7 @@ class FieldOverview extends OverviewBase {
 
       // Missing field type.
       if (!$field['type']) {
-        $this->setFormError('fields][_add_new_field][type', $form_state, $this->t('Add new field: you need to select a field type.'));
+        $form_state->setErrorByName('fields][_add_new_field][type', $this->t('Add new field: you need to select a field type.'));
       }
     }
   }
@@ -330,28 +332,26 @@ class FieldOverview extends OverviewBase {
    *
    * @param array $form
    *   An associative array containing the structure of the form.
-   * @param array $form_state
-   *   A reference to a keyed array containing the current state of the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    *
    * @see \Drupal\field_ui\FieldOverview::validate()
    */
-  protected function validateAddExisting(array $form, array &$form_state) {
+  protected function validateAddExisting(array $form, FormStateInterface $form_state) {
     // The form element might be absent if no existing fields can be added to
     // this bundle.
-    if (isset($form_state['values']['fields']['_add_existing_field'])) {
-      $field = $form_state['values']['fields']['_add_existing_field'];
-
+    if ($field = $form_state->getValue(array('fields', '_add_existing_field'))) {
       // Validate if any information was provided in the
       // 're-use existing field' row.
       if (array_filter(array($field['label'], $field['field_name']))) {
         // Missing label.
         if (!$field['label']) {
-          $this->setFormError('fields][_add_existing_field][label', $form_state, $this->t('Re-use existing field: you need to provide a label.'));
+          $form_state->setErrorByName('fields][_add_existing_field][label', $this->t('Re-use existing field: you need to provide a label.'));
         }
 
         // Missing existing field name.
         if (!$field['field_name']) {
-          $this->setFormError('fields][_add_existing_field][field_name', $form_state, $this->t('Re-use existing field: you need to select a field.'));
+          $form_state->setErrorByName('fields][_add_existing_field][field_name', $this->t('Re-use existing field: you need to select a field.'));
         }
       }
     }
@@ -360,33 +360,35 @@ class FieldOverview extends OverviewBase {
   /**
    * Overrides \Drupal\field_ui\OverviewBase::submitForm().
    */
-  public function submitForm(array &$form, array &$form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $error = FALSE;
-    $form_values = $form_state['values']['fields'];
+    $form_values = $form_state->getValue('fields');
     $destinations = array();
 
     // Create new field.
     if (!empty($form_values['_add_new_field']['field_name'])) {
       $values = $form_values['_add_new_field'];
 
-      $field = array(
+      $field_storage = array(
         'name' => $values['field_name'],
         'entity_type' => $this->entity_type,
         'type' => $values['type'],
         'translatable' => $values['translatable'],
       );
-      $instance = array(
+      $field = array(
         'field_name' => $values['field_name'],
         'entity_type' => $this->entity_type,
         'bundle' => $this->bundle,
         'label' => $values['label'],
+        // Field translatability should be explicitly enabled by the users.
+        'translatable' => FALSE,
       );
 
-      // Create the field and instance.
+      // Create the field storage and field.
       try {
-        $this->entityManager->getStorage('field_config')->create($field)->save();
-        $new_instance = $this->entityManager->getStorage('field_instance_config')->create($instance);
-        $new_instance->save();
+        $this->entityManager->getStorage('field_storage_config')->create($field_storage)->save();
+        $new_field = $this->entityManager->getStorage('field_config')->create($field);
+        $new_field->save();
 
         // Make sure the field is displayed in the 'default' form mode (using
         // default widget and settings). It stays hidden for other form modes
@@ -406,17 +408,17 @@ class FieldOverview extends OverviewBase {
         // configured for new fields.
         $route_parameters = array(
           $this->bundleEntityType => $this->bundle,
-          'field_instance_config' => $new_instance->id(),
+          'field_config' => $new_field->id(),
         );
+        $destinations[] = array('route_name' => 'field_ui.storage_edit_' . $this->entity_type, 'route_parameters' => $route_parameters);
         $destinations[] = array('route_name' => 'field_ui.field_edit_' . $this->entity_type, 'route_parameters' => $route_parameters);
-        $destinations[] = array('route_name' => 'field_ui.instance_edit_' . $this->entity_type, 'route_parameters' => $route_parameters);
 
         // Store new field information for any additional submit handlers.
-        $form_state['fields_added']['_add_new_field'] = $values['field_name'];
+        $form_state->set(['fields_added', '_add_new_field'], $values['field_name']);
       }
       catch (\Exception $e) {
         $error = TRUE;
-        drupal_set_message($this->t('There was a problem creating field %label: !message', array('%label' => $instance['label'], '!message' => $e->getMessage())), 'error');
+        drupal_set_message($this->t('There was a problem creating field %label: !message', array('%label' => $field['label'], '!message' => $e->getMessage())), 'error');
       }
     }
 
@@ -424,12 +426,12 @@ class FieldOverview extends OverviewBase {
     if (!empty($form_values['_add_existing_field']['field_name'])) {
       $values = $form_values['_add_existing_field'];
       $field_name = $values['field_name'];
-      $field = FieldConfig::loadByName($this->entity_type, $field_name);
-      if (!empty($field->locked)) {
+      $field_storage = FieldStorageConfig::loadByName($this->entity_type, $field_name);
+      if (!empty($field_storage->locked)) {
         drupal_set_message($this->t('The field %label cannot be added because it is locked.', array('%label' => $values['label'])), 'error');
       }
       else {
-        $instance = array(
+        $field = array(
           'field_name' => $field_name,
           'entity_type' => $this->entity_type,
           'bundle' => $this->bundle,
@@ -437,8 +439,8 @@ class FieldOverview extends OverviewBase {
         );
 
         try {
-          $new_instance = $this->entityManager->getStorage('field_instance_config')->create($instance);
-          $new_instance->save();
+          $new_field = $this->entityManager->getStorage('field_config')->create($field);
+          $new_field->save();
 
           // Make sure the field is displayed in the 'default' form mode (using
           // default widget and settings). It stays hidden for other form modes
@@ -455,18 +457,18 @@ class FieldOverview extends OverviewBase {
             ->save();
 
           $destinations[] = array(
-            'route_name' => 'field_ui.instance_edit_' . $this->entity_type,
+            'route_name' => 'field_ui.field_edit_' . $this->entity_type,
             'route_parameters' => array(
               $this->bundleEntityType => $this->bundle,
-              'field_instance_config' => $new_instance->id(),
+              'field_config' => $new_field->id(),
             ),
           );
           // Store new field information for any additional submit handlers.
-          $form_state['fields_added']['_add_existing_field'] = $instance['field_name'];
+          $form_state->set(['fields_added', '_add_existing_field'], $field['field_name']);
         }
         catch (\Exception $e) {
           $error = TRUE;
-          drupal_set_message($this->t('There was a problem creating field instance %label: @message.', array('%label' => $instance['label'], '@message' => $e->getMessage())), 'error');
+          drupal_set_message($this->t('There was a problem creating field %label: @message.', array('%label' => $field['label'], '@message' => $e->getMessage())), 'error');
         }
       }
     }
@@ -474,7 +476,7 @@ class FieldOverview extends OverviewBase {
     if ($destinations) {
       $destination = drupal_get_destination();
       $destinations[] = $destination['destination'];
-      $form_state['redirect_route'] = FieldUI::getNextDestination($destinations, $form_state);
+      $form_state->setRedirectUrl(FieldUI::getNextDestination($destinations, $form_state));
     }
     elseif (!$error) {
       drupal_set_message($this->t('Your settings have been saved.'));
@@ -490,35 +492,35 @@ class FieldOverview extends OverviewBase {
   protected function getExistingFieldOptions() {
     $options = array();
 
-    // Collect candidate field instances: all instances of fields for this
+    // Collect candidate fields: all fields of field storages for this
     // entity type that are not already present in the current bundle.
     $field_map = \Drupal::entityManager()->getFieldMap();
-    $instance_ids = array();
+    $field_ids = array();
     if (!empty($field_map[$this->entity_type])) {
       foreach ($field_map[$this->entity_type] as $field_name => $data) {
         if (!in_array($this->bundle, $data['bundles'])) {
           $bundle = reset($data['bundles']);
-          $instance_ids[] = $this->entity_type . '.' . $bundle . '.' . $field_name;
+          $field_ids[] = $this->entity_type . '.' . $bundle . '.' . $field_name;
         }
       }
     }
 
-    // Load the instances and build the list of options.
-    if ($instance_ids) {
+    // Load the fields and build the list of options.
+    if ($field_ids) {
       $field_types = $this->fieldTypeManager->getDefinitions();
-      $instances = $this->entityManager->getStorage('field_instance_config')->loadMultiple($instance_ids);
-      foreach ($instances as $instance) {
+      $fields = $this->entityManager->getStorage('field_config')->loadMultiple($field_ids);
+      foreach ($fields as $field) {
         // Do not show:
         // - locked fields,
         // - fields that should not be added via user interface.
-        $field_type = $instance->getType();
-        $field = $instance->getField();
-        if (empty($field->locked) && empty($field_types[$field_type]['no_ui'])) {
-          $options[$instance->getName()] = array(
+        $field_type = $field->getType();
+        $field_storage = $field->getFieldStorageDefinition();
+        if (empty($field_storage->locked) && empty($field_types[$field_type]['no_ui'])) {
+          $options[$field->getName()] = array(
             'type' => $field_type,
             'type_label' => $field_types[$field_type]['label'],
-            'field' => $instance->getName(),
-            'label' => $instance->getLabel(),
+            'field' => $field->getName(),
+            'label' => $field->getLabel(),
           );
         }
       }

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\views\Plugin\Annotation\ViewsRow.
+ * Contains \Drupal\views\Annotation\ViewsRow.
  */
 
 namespace Drupal\views\Annotation;
@@ -12,9 +12,11 @@ use Drupal\views\Annotation\ViewsPluginAnnotationBase;
 /**
  * Defines a Plugin annotation object for views row plugins.
  *
- * @Annotation
- *
  * @see \Drupal\views\Plugin\views\row\RowPluginBase
+ *
+ * @ingroup views_row_plugins
+ *
+ * @Annotation
  */
 class ViewsRow extends ViewsPluginAnnotationBase {
 

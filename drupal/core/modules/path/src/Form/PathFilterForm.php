@@ -8,7 +8,7 @@
 namespace Drupal\path\Form;
 
 use Drupal\Core\Form\FormBase;
-use Drupal\Core\Url;
+use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Provides the path admin overview filter form.
@@ -25,7 +25,7 @@ class PathFilterForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, $keys = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, $keys = NULL) {
     $form['#attributes'] = array('class' => array('search-form'));
     $form['basic'] = array(
       '#type' => 'details',
@@ -50,7 +50,7 @@ class PathFilterForm extends FormBase {
       $form['basic']['reset'] = array(
         '#type' => 'submit',
         '#value' => $this->t('Reset'),
-        '#submit' => array(array($this, 'resetForm')),
+        '#submit' => array('::resetForm'),
       );
     }
     return $form;
@@ -59,17 +59,17 @@ class PathFilterForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
-    $form_state['redirect_route'] = new Url('path.admin_overview_filter', array(
-      'keys' => trim($form_state['values']['filter']),
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $form_state->setRedirect('path.admin_overview_filter', array(
+      'keys' => trim($form_state->getValue('filter')),
     ));
   }
 
   /**
    * Resets the filter selections.
    */
-  public function resetForm(array &$form, array &$form_state) {
-    $form_state['redirect_route'] = new Url('path.admin_overview');
+  public function resetForm(array &$form, FormStateInterface $form_state) {
+    $form_state->setRedirect('path.admin_overview');
   }
 
 }

@@ -8,12 +8,13 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\aggregator\Entity\Feed;
-use Drupal\Core\Language\Language;
 use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests migration of aggregator feed entities.
+ * Upgrade variables to aggregator_feed entities.
+ *
+ * @group migrate_drupal
  */
 class MigrateAggregatorFeedTest extends MigrateDrupalTestBase {
 
@@ -22,18 +23,7 @@ class MigrateAggregatorFeedTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate variables to aggregator_feed entities.',
-      'description'  => 'Upgrade variables to aggregator_feed entities',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $migration = entity_load('migration', 'd6_aggregator_feed');
     $dumps = array(
@@ -52,7 +42,7 @@ class MigrateAggregatorFeedTest extends MigrateDrupalTestBase {
     $feed = entity_load('aggregator_feed', 5);
     $this->assertNotNull($feed->uuid());
     $this->assertEqual($feed->title->value, 'Know Your Meme');
-    $this->assertEqual($feed->language()->id, Language::LANGCODE_NOT_SPECIFIED);
+    $this->assertEqual($feed->language()->id, 'en');
     $this->assertEqual($feed->url->value, 'http://knowyourmeme.com/newsfeed.rss');
     $this->assertEqual($feed->refresh->value, 900);
     $this->assertEqual($feed->checked->value, 1387659487);

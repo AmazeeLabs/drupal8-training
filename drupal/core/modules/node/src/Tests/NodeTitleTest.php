@@ -8,7 +8,9 @@
 namespace Drupal\node\Tests;
 
 /**
- * Tests node title functionality.
+ * Tests node title.
+ *
+ * @group node
  */
 class NodeTitleTest extends NodeTestBase {
 
@@ -21,15 +23,7 @@ class NodeTitleTest extends NodeTestBase {
 
   protected $admin_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Node title',
-      'description' => 'Test node title.',
-      'group' => 'Node'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->admin_user = $this->drupalCreateUser(array('administer nodes', 'create article content', 'create page content', 'post comments'));
@@ -42,9 +36,10 @@ class NodeTitleTest extends NodeTestBase {
    */
   function testNodeTitle() {
     // Create "Basic page" content with title.
-    // Add the node to the frontpage so we can test if teaser links are clickable.
+    // Add the node to the frontpage so we can test if teaser links are
+    // clickable.
     $settings = array(
-      'title' => $this->randomName(8),
+      'title' => $this->randomMachineName(8),
       'promote' => 1,
     );
     $node = $this->drupalCreateNode($settings);
@@ -60,10 +55,22 @@ class NodeTitleTest extends NodeTestBase {
     $this->assertEqual(current($this->xpath($xpath)), $node->label(), 'Node breadcrumb is equal to node title.', 'Node');
 
     // Test node title in comment preview.
-    $this->assertEqual(current($this->xpath('//article[@id=:id]/h2/a/span', array(':id' => 'node-' . $node->id()))), $node->label(), 'Node preview title is equal to node title.', 'Node');
+    $this->assertEqual(current($this->xpath('//article[contains(concat(" ", normalize-space(@class), " "), :node-class)]/h2/a/span', array(':node-class' => ' node--type-' . $node->bundle() . ' '))), $node->label(), 'Node preview title is equal to node title.', 'Node');
 
     // Test node title is clickable on teaser list (/node).
     $this->drupalGet('node');
     $this->clickLink($node->label());
+
+    // Test edge case where node title is set to 0.
+    $settings = array(
+      'title' => 0,
+    );
+    $node = $this->drupalCreateNode($settings);
+    // Test that 0 appears as <title>.
+    $this->drupalGet('node/' . $node->id());
+    $this->assertTitle(0 . ' | Drupal', 'Page title is equal to 0.', 'Node');
+    // Test that 0 appears in the template <h1>.
+    $xpath = '//h1';
+    $this->assertEqual(current($this->xpath($xpath)), 0, 'Node title is displayed as 0.', 'Node');
   }
 }

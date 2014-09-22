@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\Field;
 
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\TypedData\ListDataDefinitionInterface;
 
 /**
@@ -27,20 +27,20 @@ use Drupal\Core\TypedData\ListDataDefinitionInterface;
  * It is up to the class implementing this interface to manage where the
  * information comes from. For example, field.module provides an implementation
  * based on two levels of configuration. It allows the site administrator to add
- * custom fields to any entity type and bundle via the "field_config" and
- * "field_instance_config" configuration entities. The former for storing
+ * custom fields to any entity type and bundle via the "field_storage_config"
+ * and "field_config" configuration entities. The former for storing
  * configuration that is independent of which entity type and bundle the field
  * is added to, and the latter for storing configuration that is specific to the
- * entity type and bundle. The class that implements "field_instance_config"
+ * entity type and bundle. The class that implements "field_config"
  * configuration entities also implements this interface, returning information
- * from either itself, or from the corresponding "field_config" configuration,
- * as appropriate.
+ * from either itself, or from the corresponding "field_storage_config"
+ * configuration, as appropriate.
  *
  * However, entity base fields, such as $node->title, are not managed by
- * field.module and its "field_config"/"field_instance_config" configuration
- * entities. Therefore, their definitions are provided by different objects
- * based on the class \Drupal\Core\Field\FieldDefinition, which implements this
- * interface as well.
+ * field.module and its "field_storage_config"/"field_config"
+ * configuration entities. Therefore, their definitions are provided by
+ * different objects based on the class \Drupal\Core\Field\BaseFieldDefinition,
+ * which implements this interface as well.
  *
  * Field definitions may fully define a concrete data object (e.g.,
  * $node_1->body), or may provide a best-guess definition for a data object that
@@ -52,7 +52,37 @@ use Drupal\Core\TypedData\ListDataDefinitionInterface;
  * based on that abstract definition, even though that abstract definition can
  * differ from the concrete definition of any particular node's body field.
  */
-interface FieldDefinitionInterface extends FieldStorageDefinitionInterface, ListDataDefinitionInterface {
+interface FieldDefinitionInterface extends ListDataDefinitionInterface {
+
+  /**
+   * Returns the machine name of the field.
+   *
+   * This defines how the field data is accessed from the entity. For example,
+   * if the field name is "foo", then $entity->foo returns its data.
+   *
+   * @return string
+   *   The field name.
+   */
+  public function getName();
+
+  /**
+   * Returns the field type.
+   *
+   * @return string
+   *   The field type, i.e. the id of a field type plugin. For example 'text'.
+   *
+   * @see \Drupal\Core\Field\FieldTypePluginManagerInterface
+   */
+  public function getType();
+
+  /**
+   * Gets the bundle the field is defined for.
+   *
+   * @return string|null
+   *   The bundle the field is defined for, or NULL if it is a base field; i.e.,
+   *   it is not bundle-specific.
+   */
+  public function getBundle();
 
   /**
    * Returns whether the display for the field can be configured.
@@ -91,6 +121,8 @@ interface FieldDefinitionInterface extends FieldStorageDefinitionInterface, List
    *     for the field type will be used.
    *   - settings: (array) Settings for the plugin specified above. The default
    *     settings for the plugin will be used for settings left unspecified.
+   *   - third_party_settings: (array) Settings provided by other extensions
+   *     through hook_field_formatter_third_party_settings_form().
    *   - weight: (float) The weight of the element. Not needed if 'type' is
    *     'hidden'.
    *   The defaults of the various display options above get applied by the used
@@ -114,19 +146,51 @@ interface FieldDefinitionInterface extends FieldStorageDefinitionInterface, List
   /**
    * Returns the default value for the field in a newly created entity.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity being created.
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+   *   The entity for which the default value is generated.
    *
    * @return mixed
    *   The default value for the field, as accepted by
-   *   Drupal\field\Plugin\Core\Entity\FieldConfig::setValue(). This can be
-   *   either:
+   *   \Drupal\field\Plugin\Core\Entity\FieldItemListInterface::setValue(). This
+   *   can be either:
    *   - a literal, in which case it will be assigned to the first property of
    *     the first item.
    *   - a numerically indexed array of items, each item being a property/value
    *     array.
    *   - NULL or array() for no default value.
    */
-  public function getDefaultValue(EntityInterface $entity);
+  public function getDefaultValue(ContentEntityInterface $entity);
+
+  /**
+   * Returns whether the field is translatable.
+   *
+   * @return bool
+   *   TRUE if the field is translatable.
+   */
+  public function isTranslatable();
+
+  /**
+   * Returns the field storage definition.
+   *
+   * @return \Drupal\Core\Field\FieldStorageDefinitionInterface
+   *   The field storage definition.
+   */
+  public function getFieldStorageDefinition();
+
+  /**
+   * Gets an object that can be saved in configuration.
+   *
+   * Base fields are defined in code. In order to configure field definition
+   * properties per bundle use this method to create an override that can be
+   * saved in configuration.
+   *
+   * @see \Drupal\Core\Field\Entity\BaseFieldBundleOverride
+   *
+   * @param string $bundle
+   *   The bundle to get the configurable field for.
+   *
+   * @return \Drupal\Core\Field\FieldConfigInterface
+   */
+  public function getConfig($bundle);
 
 }

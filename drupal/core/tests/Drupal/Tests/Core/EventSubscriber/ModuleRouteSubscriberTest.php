@@ -14,11 +14,8 @@ use Symfony\Component\Routing\RouteCollection;
 use Symfony\Component\Routing\Route;
 
 /**
- * Tests the ModuleRouteSubscriber class.
- *
- * @group Drupal
- *
- * @see \Drupal\Core\EventSubscriber\ModuleRouteSubscriber
+ * @coversDefaultClass \Drupal\Core\EventSubscriber\ModuleRouteSubscriber
+ * @group EventSubscriber
  */
 class ModuleRouteSubscriberTest extends UnitTestCase {
 
@@ -29,15 +26,7 @@ class ModuleRouteSubscriberTest extends UnitTestCase {
    */
   protected $moduleHandler;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Module route subscriber',
-      'description' => 'Unit test the \Drupal\Core\EventSubscriber\ModuleRouteSubscriber class.',
-      'group' => 'System'
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
 
     $value_map = array(
@@ -53,7 +42,8 @@ class ModuleRouteSubscriberTest extends UnitTestCase {
   /**
    * Tests that removeRoute() removes routes when the module is not enabled.
    *
-   * @dataProvider testRemoveRouteProvider
+   * @dataProvider providerTestRemoveRoute
+   * @covers ::onAlterRoutes
    *
    * @param string $route_name
    *   The machine name for the route.
@@ -82,7 +72,7 @@ class ModuleRouteSubscriberTest extends UnitTestCase {
   /**
    * Data provider for testRemoveRoute().
    */
-  public function testRemoveRouteProvider() {
+  public function providerTestRemoveRoute() {
     return array(
       array('enabled', array('_module_dependencies' => 'enabled'), FALSE),
       array('disabled', array('_module_dependencies' => 'disabled'), TRUE),

@@ -2,54 +2,34 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\pager\PagerPluginBase.
+ * Contains \Drupal\views\Plugin\views\pager\PagerPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\pager;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\ViewExecutable;
 
 /**
  * @defgroup views_pager_plugins Views pager plugins
  * @{
- * The base plugin to handler pagers of a view.
+ * Plugins to handle paging in views.
  *
- * The pager takes care about altering the query for its needs, altering some
- * global information of pagers and finally rendering itself.
+ * Pager plugins take care of everything regarding pagers, including figuring
+ * out the total number of items to render, setting up the query for paging,
+ * and setting up the pager.
+ *
+ * Pager plugins extend \Drupal\views\Plugin\views\pager\PagerPluginBase. They
+ * must be annotated with \Drupal\views\Annotation\ViewsPager annotation,
+ * and they must be in namespace directory Plugin\views\pager.
+ *
+ * @ingroup views_plugins
+ * @see plugin_api
  */
 
 /**
- * The base plugin to handle pager.
- *
- * Pager plugins take care of everything regarding pagers, including getting
- * and setting the total number of items to render the pager and setting the
- * global pager arrays.
- *
- * To define a pager type, extend this base class. The ViewsPluginManager (used
- * to create views plugins objects) adds annotated discovery for pager plugins.
- * Your pager plugin must have an annotation that includes the plugin's metadata,
- * for example:
- * @code
- * @ Plugin(
- *   id = "demo_pager",
- *   title = @ Translation("Display a demonstration pager"),
- *   help = @ Translation("Demonstrate pagination of views items."),
- *   theme = "views_demo_pager"
- * )
- * @endcode
- * Remove spaces after @ in your actual plugin - these are put into this sample
- * code so that it is not recognized as annotation.
- *
- * The plugin annotation contains these components:
- * - id: The unique identifier of your pager plugin.
- * - title: The "full" title for your pager type; used in the views UI.
- * - short_title: (optional) The "short" title for your pager type;
- *   used in the views UI when specified.
- * - help: (optional) A short help string; this is displayed in the views UI.
- * - theme: The theme function used to render the pager's output.
- *
- * @see \Drupal\views\Plugin\ViewsPluginManager
+ * Base class for views pager plugins.
  */
 abstract class PagerPluginBase extends PluginBase {
 
@@ -140,12 +120,12 @@ abstract class PagerPluginBase extends PluginBase {
   /**
    * Provide the default form form for validating options
    */
-  public function validateOptionsForm(&$form, &$form_state) { }
+  public function validateOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * Provide the default form form for submitting options
    */
-  public function submitOptionsForm(&$form, &$form_state) { }
+  public function submitOptionsForm(&$form, FormStateInterface $form_state) { }
 
   /**
    * Return a string to display as the clickable title for the
@@ -237,11 +217,11 @@ abstract class PagerPluginBase extends PluginBase {
       && $this->total_items > (intval($this->current_page) + 1) * $this->getItemsPerPage();
   }
 
-  public function exposedFormAlter(&$form, &$form_state) { }
+  public function exposedFormAlter(&$form, FormStateInterface $form_state) { }
 
-  public function exposedFormValidate(&$form, &$form_state) { }
+  public function exposedFormValidate(&$form, FormStateInterface $form_state) { }
 
-  public function exposedFormSubmit(&$form, &$form_state, &$exclude) { }
+  public function exposedFormSubmit(&$form, FormStateInterface $form_state, &$exclude) { }
 
   public function usesExposed() {
     return FALSE;

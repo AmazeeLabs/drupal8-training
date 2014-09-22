@@ -91,16 +91,18 @@ class CurlFactory
             $this->removeHeader('Accept-Encoding', $options);
         }
 
+        // cURL sometimes adds a content-type by default. Prevent this.
+        if (!$request->hasHeader('Content-Type')) {
+            $options[CURLOPT_HTTPHEADER][] = 'Content-Type:';
+        }
+
         return $options;
     }
 
     private function applyMethod(RequestInterface $request, array &$options)
     {
         $method = $request->getMethod();
-        if ($method == 'GET') {
-            $options[CURLOPT_HTTPGET] = true;
-            unset($options[CURLOPT_READFUNCTION]);
-        } elseif ($method == 'HEAD') {
+        if ($method == 'HEAD') {
             $options[CURLOPT_NOBODY] = true;
             unset($options[CURLOPT_WRITEFUNCTION], $options[CURLOPT_READFUNCTION]);
         } else {
@@ -276,6 +278,18 @@ class CurlFactory
         $options[CURLOPT_SSLKEY] = $value;
     }
 
+    private function add_stream()
+    {
+        throw new AdapterException('cURL adapters do not support the "stream"'
+            . ' request option. This error is typically encountered when trying'
+            . ' to send requests with the "stream" option set to true in '
+            . ' parallel. You will either need to send these one at a time or'
+            . ' implement a custom ParallelAdapterInterface that supports'
+            . ' sending these types of requests in parallel. This error can'
+            . ' also occur if the StreamAdapter is not available on your'
+            . ' system (e.g., allow_url_fopen is disabled in your php.ini).');
+    }
+
     private function add_save_to(
         RequestInterface $request,
         RequestMediator $mediator,
@@ -283,7 +297,7 @@ class CurlFactory
         $value
     ) {
         $mediator->setResponseBody(is_string($value)
-            ? Stream\create(fopen($value, 'w'))
+            ? new Stream\LazyOpenStream($value, 'w')
             : Stream\create($value));
     }
 

@@ -7,10 +7,12 @@
 
 namespace Drupal\file\Plugin\Field\FieldWidget;
 
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\WidgetBase;
-use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Field\WidgetBase;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 
 /**
@@ -38,7 +40,7 @@ class FileWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     $element['progress_indicator'] = array(
       '#type' => 'radios',
       '#title' => t('Progress indicator'),
@@ -68,22 +70,22 @@ class FileWidget extends WidgetBase {
    *
    * Special handling for draggable multiple widgets and 'add more' button.
    */
-  protected function formMultipleElements(FieldItemListInterface $items, array &$form, array &$form_state) {
+  protected function formMultipleElements(FieldItemListInterface $items, array &$form, FormStateInterface $form_state) {
     $field_name = $this->fieldDefinition->getName();
     $parents = $form['#parents'];
 
-    // Load the items for form rebuilds from the field state as they might not be
-    // in $form_state['values'] because of validation limitations. Also, they are
-    // only passed in as $items when editing existing entities.
-    $field_state = field_form_get_state($parents, $field_name, $form_state);
+    // Load the items for form rebuilds from the field state as they might not
+    // be in $form_state->getValues() because of validation limitations. Also,
+    // they are only passed in as $items when editing existing entities.
+    $field_state = static::getWidgetState($parents, $field_name, $form_state);
     if (isset($field_state['items'])) {
       $items->setValue($field_state['items']);
     }
 
     // Determine the number of widgets to display.
-    $cardinality = $this->fieldDefinition->getCardinality();
+    $cardinality = $this->fieldDefinition->getFieldStorageDefinition()->getCardinality();
     switch ($cardinality) {
-      case FieldDefinitionInterface::CARDINALITY_UNLIMITED:
+      case FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED:
         $max = count($items);
         $is_multiple = TRUE;
         break;
@@ -94,8 +96,8 @@ class FileWidget extends WidgetBase {
         break;
     }
 
-    $title = check_plain($this->fieldDefinition->getLabel());
-    $description = field_filter_xss($this->fieldDefinition->getDescription());
+    $title = String::checkPlain($this->fieldDefinition->getLabel());
+    $description = $this->fieldFilterXss($this->fieldDefinition->getDescription());
 
     $elements = array();
 
@@ -130,7 +132,7 @@ class FileWidget extends WidgetBase {
     }
 
     $empty_single_allowed = ($cardinality == 1 && $delta == 0);
-    $empty_multiple_allowed = ($cardinality == FieldDefinitionInterface::CARDINALITY_UNLIMITED || $delta < $cardinality) && empty($form_state['programmed']);
+    $empty_multiple_allowed = ($cardinality == FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED || $delta < $cardinality) && !$form_state->isProgrammed();
 
     // Add one more empty row for new uploads except when this is a programmed
     // multiple form as it is not necessary.
@@ -158,8 +160,8 @@ class FileWidget extends WidgetBase {
       $elements['#title'] = $title;
 
       $elements['#description'] = $description;
-      $elements['#field_name'] = $element['#field_name'];
-      $elements['#language'] = $element['#language'];
+      $elements['#field_name'] = $field_name;
+      $elements['#language'] = $items->getLangcode();
       $elements['#display_field'] = (bool) $this->getFieldSetting('display_field');
       // The field settings include defaults for the field type. However, this
       // widget is a base class for other widgets (e.g., ImageWidget) that may
@@ -185,7 +187,7 @@ class FileWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, array &$form_state) {
+  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
     $field_settings = $this->getFieldSettings();
 
     // The field settings include defaults for the field type. However, this
@@ -197,7 +199,7 @@ class FileWidget extends WidgetBase {
       'description_field' => NULL,
     );
 
-    $cardinality = $this->fieldDefinition->getCardinality();
+    $cardinality = $this->fieldDefinition->getFieldStorageDefinition()->getCardinality();
     $defaults = array(
       'fids' => array(),
       'display' => (bool) $field_settings['display_default'],
@@ -217,6 +219,8 @@ class FileWidget extends WidgetBase {
       // Allows this field to return an array instead of a single value.
       '#extended' => TRUE,
       // Add properties needed by value() and process() methods.
+      '#field_name' => $this->fieldDefinition->getName(),
+      '#entity_type' => $items->getEntity()->getEntityTypeId(),
       '#display_field' => (bool) $field_settings['display_field'],
       '#display_default' => $field_settings['display_default'],
       '#description_field' => $field_settings['description_field'],
@@ -253,7 +257,7 @@ class FileWidget extends WidgetBase {
   /**
    * {@inheritdoc}
    */
-  public function massageFormValues(array $values, array $form, array &$form_state) {
+  public function massageFormValues(array $values, array $form, FormStateInterface $form_state) {
     // Since file upload widget now supports uploads of more than one file at a
     // time it always returns an array of fids. We have to translate this to a
     // single fid, as field expects single value.
@@ -275,7 +279,7 @@ class FileWidget extends WidgetBase {
    *
    * This method is assigned as a #value_callback in formElement() method.
    */
-  public static function value($element, $input = FALSE, $form_state) {
+  public static function value($element, $input = FALSE, FormStateInterface $form_state) {
     if ($input) {
       // Checkboxes lose their value when empty.
       // If the display field is present make sure its unchecked value is saved.
@@ -303,30 +307,30 @@ class FileWidget extends WidgetBase {
    *
    * This validator is used only when cardinality not set to 1 or unlimited.
    */
-  public static function validateMultipleCount($element, &$form_state, $form) {
+  public static function validateMultipleCount($element, FormStateInterface $form_state, $form) {
     $parents = $element['#parents'];
-    $values = NestedArray::getValue($form_state['values'], $parents);
+    $values = NestedArray::getValue($form_state->getValues(), $parents);
 
     array_pop($parents);
     $current = count(Element::children(NestedArray::getValue($form, $parents))) - 1;
 
     $field_storage_definitions = \Drupal::entityManager()->getFieldStorageDefinitions($element['#entity_type']);
-    $field = $field_storage_definitions[$element['#field_name']];
+    $field_storage = $field_storage_definitions[$element['#field_name']];
     $uploaded = count($values['fids']);
     $count = $uploaded + $current;
-    if ($count > $field->getCardinality()) {
-      $keep = $uploaded - $count + $field->getCardinality();
+    if ($count > $field_storage->getCardinality()) {
+      $keep = $uploaded - $count + $field_storage->getCardinality();
       $removed_files = array_slice($values['fids'], $keep);
       $removed_names = array();
       foreach ($removed_files as $fid) {
         $file = file_load($fid);
         $removed_names[] = $file->getFilename();
       }
-      $args = array('%field' => $field->getFieldName(), '@max' => $field->getCardinality(), '@count' => $keep, '%list' => implode(', ', $removed_names));
+      $args = array('%field' => $field_storage->getFieldName(), '@max' => $field_storage->getCardinality(), '@count' => $keep, '%list' => implode(', ', $removed_names));
       $message = t('Field %field can only hold @max values but there were @count uploaded. The following files have been omitted as a result: %list.', $args);
       drupal_set_message($message, 'warning');
       $values['fids'] = array_slice($values['fids'], 0, $keep);
-      NestedArray::setValue($form_state['values'], $element['#parents'], $values);
+      NestedArray::setValue($form_state->getValues(), $element['#parents'], $values);
     }
   }
 
@@ -338,7 +342,7 @@ class FileWidget extends WidgetBase {
    *
    * This method is assigned as a #process callback in formElement() method.
    */
-  public static function process($element, &$form_state, $form) {
+  public static function process($element, FormStateInterface $form_state, $form) {
     $item = $element['#value'];
     $item['fids'] = $element['fids']['#value'];
 
@@ -416,7 +420,7 @@ class FileWidget extends WidgetBase {
    * This method on is assigned as a #process callback in formMultipleElements()
    * method.
    */
-  public static function processMultiple($element, &$form_state, $form) {
+  public static function processMultiple($element, FormStateInterface $form_state, $form) {
     $element_children = Element::children($element, TRUE);
     $count = count($element_children);
 
@@ -481,23 +485,22 @@ class FileWidget extends WidgetBase {
    *
    * @see file_managed_file_submit()
    */
-  public static function submit($form, &$form_state) {
+  public static function submit($form, FormStateInterface $form_state) {
     // During the form rebuild, formElement() will create field item widget
-    // elements using re-indexed deltas, so clear out $form_state['input'] to
+    // elements using re-indexed deltas, so clear out FormState::$input to
     // avoid a mismatch between old and new deltas. The rebuilt elements will
     // have #default_value set appropriately for the current state of the field,
     // so nothing is lost in doing this.
-    $parents = array_slice($form_state['triggering_element']['#parents'], 0, -2);
-    NestedArray::setValue($form_state['input'], $parents, NULL);
-
-    $button = $form_state['triggering_element'];
+    $button = $form_state->getTriggeringElement();
+    $parents = array_slice($button['#parents'], 0, -2);
+    NestedArray::setValue($form_state->getUserInput(), $parents, NULL);
 
     // Go one level up in the form, to the widgets container.
     $element = NestedArray::getValue($form, array_slice($button['#array_parents'], 0, -1));
     $field_name = $element['#field_name'];
     $parents = $element['#field_parents'];
 
-    $submitted_values = NestedArray::getValue($form_state['values'], array_slice($button['#parents'], 0, -2));
+    $submitted_values = NestedArray::getValue($form_state->getValues(), array_slice($button['#parents'], 0, -2));
     foreach ($submitted_values as $delta => $submitted_value) {
       if (empty($submitted_value['fids'])) {
         unset($submitted_values[$delta]);
@@ -524,12 +527,12 @@ class FileWidget extends WidgetBase {
     $submitted_values = array_values($new_values);
 
     // Update form_state values.
-    NestedArray::setValue($form_state['values'], array_slice($button['#parents'], 0, -2), $submitted_values);
+    NestedArray::setValue($form_state->getValues(), array_slice($button['#parents'], 0, -2), $submitted_values);
 
     // Update items.
-    $field_state = field_form_get_state($parents, $field_name, $form_state);
+    $field_state = static::getWidgetState($parents, $field_name, $form_state);
     $field_state['items'] = $submitted_values;
-    field_form_set_state($parents, $field_name, $form_state, $field_state);
+    static::setWidgetState($parents, $field_name, $form_state, $field_state);
   }
 
 }

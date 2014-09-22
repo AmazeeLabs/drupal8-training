@@ -8,7 +8,9 @@
 namespace Drupal\system\Tests\Entity;
 
 /**
- * Tests Entity API base functionality.
+ * Tests the Entity Validation API.
+ *
+ * @group Entity
  */
 class EntityValidationTest extends EntityUnitTestBase {
 
@@ -19,30 +21,30 @@ class EntityValidationTest extends EntityUnitTestBase {
    */
   public static $modules = array('filter', 'text');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Validation API',
-      'description' => 'Tests the Entity Validation API',
-      'group' => 'Entity API',
-    );
-  }
+  /**
+   * @var string
+   */
+  protected $entity_name;
+
+  /**
+   * @var \Drupal\user\Entity\User
+   */
+  protected $entity_user;
+
+  /**
+   * @var string
+   */
+  protected $entity_field_text;
 
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
-    $this->installSchema('user', array('users_data'));
-    $this->installSchema('entity_test', array(
-      'entity_test_mul',
-      'entity_test_mul_property_data',
-      'entity_test_rev',
-      'entity_test_rev_revision',
-      'entity_test_mulrev',
-      'entity_test_mulrev_revision',
-      'entity_test_mulrev_property_data',
-      'entity_test_mulrev_property_revision'
-    ));
+
+    $this->installEntitySchema('entity_test_rev');
+    $this->installEntitySchema('entity_test_mul');
+    $this->installEntitySchema('entity_test_mulrev');
 
     // Create the test field.
     entity_test_install();
@@ -61,9 +63,9 @@ class EntityValidationTest extends EntityUnitTestBase {
    *   The created test entity.
    */
   protected function createTestEntity($entity_type) {
-    $this->entity_name = $this->randomName();
+    $this->entity_name = $this->randomMachineName();
     $this->entity_user = $this->createUser();
-    $this->entity_field_text = $this->randomName();
+    $this->entity_field_text = $this->randomMachineName();
 
     // Pass in the value of the name field when creating. With the user
     // field we test setting a field after creation.

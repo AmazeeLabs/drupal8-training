@@ -7,10 +7,13 @@
 
 namespace Drupal\system\Tests\Common;
 
+use Drupal\Component\Utility\String;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests the Drupal CSS system.
+ * Tests adding various cascading stylesheets to the page.
+ *
+ * @group Common
  */
 class CascadingStylesheetsTest extends DrupalUnitTestBase {
 
@@ -21,15 +24,7 @@ class CascadingStylesheetsTest extends DrupalUnitTestBase {
    */
   public static $modules = array('language', 'system');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Cascading stylesheets',
-      'description' => 'Tests adding various cascading stylesheets to the page.',
-      'group' => 'Common',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
     // Reset _drupal_add_css() before each test.
     drupal_static_reset('_drupal_add_css');
@@ -74,11 +69,11 @@ class CascadingStylesheetsTest extends DrupalUnitTestBase {
   function testRenderFile() {
     $css = drupal_get_path('module', 'simpletest') . '/css/simpletest.module.css';
     _drupal_add_css($css);
-    $styles = drupal_get_css();
+    $styles = drupal_get_css(NULL, FALSE, FALSE);
     $this->assertTrue(strpos($styles, $css) > 0, 'Rendered CSS includes the added stylesheet.');
     // Verify that newlines are properly added inside style tags.
     $query_string = $this->container->get('state')->get('system.css_js_query_string') ?: '0';
-    $css_processed = '<link rel="stylesheet" href="' . check_plain(file_create_url($css)) . "?" . $query_string . '" media="all" />';
+    $css_processed = '<link rel="stylesheet" href="' . String::checkPlain(file_create_url($css)) . "?" . $query_string . '" media="all" />';
     $this->assertEqual(trim($styles), $css_processed, 'Rendered CSS includes newlines inside style tags for JavaScript use.');
   }
 
@@ -105,7 +100,7 @@ class CascadingStylesheetsTest extends DrupalUnitTestBase {
     $css = 'body { padding: 0px; }';
     $css_preprocessed = '<style media="all">' . "\n/* <![CDATA[ */\n" . "body{padding:0px;}\n" . "\n/* ]]> */\n" . '</style>';
     _drupal_add_css($css, array('type' => 'inline'));
-    $styles = drupal_get_css();
+    $styles = drupal_get_css(NULL, NULL, FALSE);
     $this->assertEqual(trim($styles), $css_preprocessed, 'Rendering preprocessed inline CSS adds it to the page.');
   }
 
@@ -137,7 +132,7 @@ class CascadingStylesheetsTest extends DrupalUnitTestBase {
       drupal_get_path('module', 'simpletest') . '/css/simpletest.module.css',
     );
 
-    $styles = drupal_get_css();
+    $styles = drupal_get_css(NULL, NULL, FALSE);
     // Stylesheet URL may be the href of a LINK tag or in an @import statement
     // of a STYLE tag.
     if (preg_match_all('/(href="|url\(")' . preg_quote($GLOBALS['base_url'] . '/', '/') . '([^?]+)\?/', $styles, $matches)) {

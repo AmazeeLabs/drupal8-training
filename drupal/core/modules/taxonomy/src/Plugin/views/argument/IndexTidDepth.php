@@ -7,6 +7,7 @@
 
 namespace Drupal\taxonomy\Plugin\views\argument;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\argument\ArgumentPluginBase;
 use Drupal\Component\Utility\String;
 
@@ -32,7 +33,7 @@ class IndexTidDepth extends ArgumentPluginBase {
     return $options;
   }
 
-  public function buildOptionsForm(&$form, &$form_state) {
+  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['depth'] = array(
       '#type' => 'weight',
       '#title' => t('Depth'),
@@ -72,21 +73,13 @@ class IndexTidDepth extends ArgumentPluginBase {
     $this->ensureMyTable();
 
     if (!empty($this->options['break_phrase'])) {
-      $tids = new \stdClass();
-      $tids->value = $this->argument;
-      $tids = $this->breakPhrase($this->argument, $tids);
-      if ($tids->value == array(-1)) {
+      $break = static::breakString($this->argument);
+      if ($break->value === array(-1)) {
         return FALSE;
       }
 
-      if (count($tids->value) > 1) {
-        $operator = 'IN';
-      }
-      else {
-        $operator = '=';
-      }
-
-      $tids = $tids->value;
+      $operator = (count($break->value) > 1) ? 'IN' : '=';
+      $tids = $break->value;
     }
     else {
       $operator = "=";

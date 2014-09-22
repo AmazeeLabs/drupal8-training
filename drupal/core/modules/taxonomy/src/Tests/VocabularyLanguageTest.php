@@ -7,24 +7,18 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
- * Tests for the language feature on vocabularies.
+ * Tests the language functionality for vocabularies.
+ *
+ * @group taxonomy
  */
 class VocabularyLanguageTest extends TaxonomyTestBase {
 
   public static $modules = array('language');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Vocabulary language',
-      'description' => 'Tests the language functionality for vocabularies.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create an administrative user.
@@ -32,17 +26,15 @@ class VocabularyLanguageTest extends TaxonomyTestBase {
     $this->drupalLogin($this->admin_user);
 
     // Add some custom languages.
-    $language = new Language(array(
+    ConfigurableLanguage::create(array(
       'id' => 'aa',
-      'name' => $this->randomName(),
-    ));
-    language_save($language);
+      'label' => $this->randomMachineName(),
+    ))->save();
 
-    $language = new Language(array(
+    ConfigurableLanguage::create(array(
       'id' => 'bb',
-      'name' => $this->randomName(),
-    ));
-    language_save($language);
+      'label' => $this->randomMachineName(),
+    ))->save();
   }
 
   /**
@@ -55,9 +47,9 @@ class VocabularyLanguageTest extends TaxonomyTestBase {
     $this->assertField('edit-langcode', 'The language selector field was found on the page.');
 
     // Create the vocabulary.
-    $vid = drupal_strtolower($this->randomName());
-    $edit['name'] = $this->randomName();
-    $edit['description'] = $this->randomName();
+    $vid = drupal_strtolower($this->randomMachineName());
+    $edit['name'] = $this->randomMachineName();
+    $edit['description'] = $this->randomMachineName();
     $edit['langcode'] = 'aa';
     $edit['vid'] = $vid;
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -83,8 +75,8 @@ class VocabularyLanguageTest extends TaxonomyTestBase {
     // Add a new vocabulary and check that the default language settings are for
     // the terms are saved.
     $edit = array(
-      'name' => $this->randomName(),
-      'vid' => drupal_strtolower($this->randomName()),
+      'name' => $this->randomMachineName(),
+      'vid' => drupal_strtolower($this->randomMachineName()),
       'default_language[langcode]' => 'bb',
       'default_language[language_show]' => TRUE,
     );
@@ -122,7 +114,7 @@ class VocabularyLanguageTest extends TaxonomyTestBase {
 
     // Check that language settings are changed after editing vocabulary.
     $edit = array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'default_language[langcode]' => 'authors_default',
       'default_language[language_show]' => FALSE,
     );

@@ -10,21 +10,14 @@ namespace Drupal\Tests\Core\ParamConverter;
 use Drupal\Core\ParamConverter\ParamConverterManager;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
- * Tests the typed data resolver manager.
- *
  * @coversDefaultClass \Drupal\Core\ParamConverter\ParamConverterManager
+ * @group ParamConverter
  */
 class ParamConverterManagerTest extends UnitTestCase {
-
-  /**
-   * @var \Symfony\Component\DependencyInjection\ContainerBuilder|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $container;
 
   /**
    * @var \Drupal\Core\ParamConverter\ParamConverterManager
@@ -34,43 +27,10 @@ class ParamConverterManagerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Parameter converter manager',
-      'description' => 'Tests the parameter converter manager.',
-      'group' => 'Routing',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    $this->container = $this->getMock('Drupal\Core\DependencyInjection\Container');
     $this->manager = new ParamConverterManager();
-    $this->manager->setContainer($this->container);
-  }
-
-  /**
-   * Tests \Drupal\Core\ParamConverter\ParamConverterManager::addConverter().
-   *
-   * @dataProvider providerTestAddConverter
-   *
-   * @covers ::addConverter()
-   * @covers ::getConverterIds()
-   */
-  public function testAddConverter($unsorted, $sorted) {
-    foreach ($unsorted as $data) {
-      $this->manager->addConverter($data['name'], $data['priority']);
-    }
-
-    // Test that ResolverManager::getTypedDataResolvers() returns the resolvers
-    // in the expected order.
-    foreach ($this->manager->getConverterIds() as $key => $converter) {
-      $this->assertEquals($sorted[$key], $converter);
-    }
   }
 
   /**
@@ -80,16 +40,12 @@ class ParamConverterManagerTest extends UnitTestCase {
    *
    * @covers ::getConverter()
    */
-  public function testGetConverter($name, $priority, $class) {
+  public function testGetConverter($name, $class) {
     $converter = $this->getMockBuilder('Drupal\Core\ParamConverter\ParamConverterInterface')
       ->setMockClassName($class)
       ->getMock();
 
-    $this->manager->addConverter($name, $priority);
-    $this->container->expects($this->once())
-      ->method('get')
-      ->with($name)
-      ->will($this->returnValue($converter));
+    $this->manager->addConverter($converter, $name);
 
     $this->assertInstanceOf($class, $this->manager->getConverter($name));
     // Assert that a second call to getConverter() does not use the container.
@@ -118,13 +74,13 @@ class ParamConverterManagerTest extends UnitTestCase {
    */
   public function providerTestAddConverter() {
     $converters[0]['unsorted'] = array(
-      array('name' => 'raspberry', 'priority' => 10),
-      array('name' => 'pear', 'priority' => 5),
-      array('name' => 'strawberry', 'priority' => 20),
-      array('name' => 'pineapple', 'priority' => 0),
-      array('name' => 'banana', 'priority' => -10),
-      array('name' => 'apple', 'priority' => -10),
-      array('name' => 'peach', 'priority' => 5),
+      array('name' => 'strawberry'),
+      array('name' => 'raspberry'),
+      array('name' => 'pear'),
+      array('name' => 'peach'),
+      array('name' => 'pineapple'),
+      array('name' => 'banana'),
+      array('name' => 'apple'),
     );
 
     $converters[0]['sorted'] = array(
@@ -133,13 +89,13 @@ class ParamConverterManagerTest extends UnitTestCase {
     );
 
     $converters[1]['unsorted'] = array(
-      array('name' => 'ape', 'priority' => 0),
-      array('name' => 'cat', 'priority' => -5),
-      array('name' => 'puppy', 'priority' => -10),
-      array('name' => 'llama', 'priority' => -15),
-      array('name' => 'giraffe', 'priority' => 10),
-      array('name' => 'zebra', 'priority' => 10),
-      array('name' => 'eagle', 'priority' => 5),
+      array('name' => 'giraffe'),
+      array('name' => 'zebra'),
+      array('name' => 'eagle'),
+      array('name' => 'ape'),
+      array('name' => 'cat'),
+      array('name' => 'puppy'),
+      array('name' => 'llama'),
     );
 
     $converters[1]['sorted'] = array(
@@ -161,13 +117,13 @@ class ParamConverterManagerTest extends UnitTestCase {
    */
   public function providerTestGetConverter() {
     return array(
-      array('ape', 0, 'ApeConverterClass'),
-      array('cat', -5, 'CatConverterClass'),
-      array('puppy', -10, 'PuppyConverterClass'),
-      array('llama', -15, 'LlamaConverterClass'),
-      array('giraffe', 10, 'GiraffeConverterClass'),
-      array('zebra', 10, 'ZebraConverterClass'),
-      array('eagle', 5, 'EagleConverterClass'),
+      array('ape', 'ApeConverterClass'),
+      array('cat', 'CatConverterClass'),
+      array('puppy', 'PuppyConverterClass'),
+      array('llama', 'LlamaConverterClass'),
+      array('giraffe', 'GiraffeConverterClass'),
+      array('zebra', 'ZebraConverterClass'),
+      array('eagle', 'EagleConverterClass'),
     );
   }
 
@@ -182,11 +138,7 @@ class ParamConverterManagerTest extends UnitTestCase {
       ->method('applies')
       ->with($this->anything(), 'id', $this->anything())
       ->will($this->returnValue(TRUE));
-    $this->manager->addConverter('applied');
-    $this->container->expects($this->any())
-      ->method('get')
-      ->with('applied')
-      ->will($this->returnValue($converter));
+    $this->manager->addConverter($converter, 'applied');
 
     $route = new Route($path);
     if ($parameters) {
@@ -246,15 +198,11 @@ class ParamConverterManagerTest extends UnitTestCase {
     $converter = $this->getMock('Drupal\Core\ParamConverter\ParamConverterInterface');
     $converter->expects($this->any())
       ->method('convert')
-      ->with(1, $this->isType('array'), 'id', $this->isType('array'), $this->isInstanceOf('Symfony\Component\HttpFoundation\Request'))
+      ->with(1, $this->isType('array'), 'id', $this->isType('array'))
       ->will($this->returnValue('something_better!'));
-    $this->manager->addConverter('test_convert');
-    $this->container->expects($this->once())
-      ->method('get')
-      ->with('test_convert')
-      ->will($this->returnValue($converter));
+    $this->manager->addConverter($converter, 'test_convert');
 
-    $result = $this->manager->convert($defaults, new Request());
+    $result = $this->manager->convert($defaults);
 
     $this->assertEquals($expected, $result);
   }
@@ -271,7 +219,7 @@ class ParamConverterManagerTest extends UnitTestCase {
 
     $expected = $defaults;
 
-    $result = $this->manager->convert($defaults, new Request());
+    $result = $this->manager->convert($defaults);
     $this->assertEquals($expected, $result);
   }
 
@@ -299,15 +247,11 @@ class ParamConverterManagerTest extends UnitTestCase {
     $converter = $this->getMock('Drupal\Core\ParamConverter\ParamConverterInterface');
     $converter->expects($this->any())
       ->method('convert')
-      ->with(1, $this->isType('array'), 'id', $this->isType('array'), $this->isInstanceOf('Symfony\Component\HttpFoundation\Request'))
+      ->with(1, $this->isType('array'), 'id', $this->isType('array'))
       ->will($this->returnValue(NULL));
-    $this->manager->addConverter('test_convert');
-    $this->container->expects($this->once())
-      ->method('get')
-      ->with('test_convert')
-      ->will($this->returnValue($converter));
+    $this->manager->addConverter($converter, 'test_convert');
 
-    $this->manager->convert($defaults, new Request());
+    $this->manager->convert($defaults);
   }
 
 }

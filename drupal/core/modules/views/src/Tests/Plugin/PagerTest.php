@@ -11,6 +11,8 @@ use Drupal\views\Views;
 
 /**
  * Tests the pluggable pager system.
+ *
+ * @group views
  */
 class PagerTest extends PluginTestBase {
 
@@ -27,14 +29,6 @@ class PagerTest extends PluginTestBase {
    * @var array
    */
   public static $modules = array('node', 'views_ui');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Pager',
-      'description' => 'Test the pluggable pager system.',
-      'group' => 'Views Plugins',
-    );
-  }
 
   /**
    * Pagers was sometimes not stored.
@@ -117,6 +111,7 @@ class PagerTest extends PluginTestBase {
   public function testNoLimit() {
     // Create 11 nodes and make sure that everyone is returned.
     // We create 11 nodes, because the default pager plugin had 10 items per page.
+    $this->drupalCreateContentType(array('type' => 'page'));
     for ($i = 0; $i < 11; $i++) {
       $this->drupalCreateNode();
     }
@@ -145,6 +140,7 @@ class PagerTest extends PluginTestBase {
   }
 
   public function testViewTotalRowsWithoutPager() {
+    $this->drupalCreateContentType(array('type' => 'page'));
     for ($i = 0; $i < 23; $i++) {
       $this->drupalCreateNode();
     }
@@ -162,6 +158,7 @@ class PagerTest extends PluginTestBase {
   public function testLimit() {
     // Create 11 nodes and make sure that everyone is returned.
     // We create 11 nodes, because the default pager plugin had 10 items per page.
+    $this->drupalCreateContentType(array('type' => 'page'));
     for ($i = 0; $i < 11; $i++) {
       $this->drupalCreateNode();
     }
@@ -195,6 +192,7 @@ class PagerTest extends PluginTestBase {
   public function testNormalPager() {
     // Create 11 nodes and make sure that everyone is returned.
     // We create 11 nodes, because the default pager plugin had 10 items per page.
+    $this->drupalCreateContentType(array('type' => 'page'));
     for ($i = 0; $i < 11; $i++) {
       $this->drupalCreateNode();
     }
@@ -249,6 +247,7 @@ class PagerTest extends PluginTestBase {
   public function testRenderNullPager() {
     // Create 11 nodes and make sure that everyone is returned.
     // We create 11 nodes, because the default pager plugin had 10 items per page.
+    $this->drupalCreateContentType(array('type' => 'page'));
     for ($i = 0; $i < 11; $i++) {
       $this->drupalCreateNode();
     }

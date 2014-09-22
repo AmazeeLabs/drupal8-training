@@ -8,7 +8,8 @@
 namespace Drupal\Core\Entity;
 
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
-use Drupal\entity\Entity\EntityFormDisplay;
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -47,7 +48,7 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
   /**
    * {@inheritdoc}
    */
-  public function form(array $form, array &$form_state) {
+  public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
     $this->getFormDisplay($form_state)->buildForm($this->entity, $form, $form_state);
     return $form;
@@ -56,21 +57,21 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, array &$form_state) {
+  public function validate(array $form, FormStateInterface $form_state) {
     $this->updateFormLangcode($form_state);
     $entity = $this->buildEntity($form, $form_state);
     $this->getFormDisplay($form_state)->validateFormValues($entity, $form, $form_state);
 
     // @todo Remove this.
     // Execute legacy global validation handlers.
-    unset($form_state['validate_handlers']);
+    $form_state->setValidateHandlers([]);
     form_execute_handlers('validate', $form, $form_state);
   }
 
   /**
    * Initialize the form state and the entity before the first form build.
    */
-  protected function init(array &$form_state) {
+  protected function init(FormStateInterface $form_state) {
     // Ensure we act on the translation object corresponding to the current form
     // language.
     $langcode = $this->getFormLangcode($form_state);
@@ -85,34 +86,34 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
   /**
    * {@inheritdoc}
    */
-  public function getFormLangcode(array &$form_state) {
-    if (empty($form_state['langcode'])) {
+  public function getFormLangcode(FormStateInterface $form_state) {
+    if (!$form_state->has('langcode')) {
       // Imply a 'view' operation to ensure users edit entities in the same
       // language they are displayed. This allows to keep contextual editing
       // working also for multilingual entities.
-      $form_state['langcode'] = $this->entityManager->getTranslationFromContext($this->entity)->language()->id;
+      $form_state->set('langcode', $this->entityManager->getTranslationFromContext($this->entity)->language()->id);
     }
-    return $form_state['langcode'];
+    return $form_state->get('langcode');
   }
 
   /**
    * {@inheritdoc}
    */
-  public function isDefaultFormLangcode(array $form_state) {
+  public function isDefaultFormLangcode(FormStateInterface $form_state) {
     return $this->getFormLangcode($form_state) == $this->entity->getUntranslated()->language()->id;
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function copyFormValuesToEntity(EntityInterface $entity, array $form, array &$form_state) {
+  protected function copyFormValuesToEntity(EntityInterface $entity, array $form, FormStateInterface $form_state) {
     // First, extract values from widgets.
     $extracted = $this->getFormDisplay($form_state)->extractFormValues($entity, $form, $form_state);
 
     // Then extract the values of fields that are not rendered through widgets,
     // by simply copying from top-level form values. This leaves the fields
     // that are not being edited within this form untouched.
-    foreach ($form_state['values'] as $name => $values) {
+    foreach ($form_state->getValues() as $name => $values) {
       if ($entity->hasField($name) && !isset($extracted[$name])) {
         $entity->set($name, $values);
       }
@@ -122,15 +123,15 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
   /**
    * {@inheritdoc}
    */
-  public function getFormDisplay(array $form_state) {
-    return isset($form_state['form_display']) ? $form_state['form_display'] : NULL;
+  public function getFormDisplay(FormStateInterface $form_state) {
+    return $form_state->get('form_display');
   }
 
   /**
    * {@inheritdoc}
    */
-  public function setFormDisplay(EntityFormDisplayInterface $form_display, array &$form_state) {
-    $form_state['form_display'] = $form_display;
+  public function setFormDisplay(EntityFormDisplayInterface $form_display, FormStateInterface $form_state) {
+    $form_state->set('form_display', $form_display);
     return $this;
   }
 

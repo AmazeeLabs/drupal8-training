@@ -7,7 +7,9 @@
 namespace Drupal\search\Tests;
 
 /**
- * Tests search index info is updated properly on node updates / deletions.
+ * Tests search index is updated properly when nodes are removed or updated.
+ *
+ * @group search
  */
 class SearchNodeUpdateAndDeletionTest extends SearchTestBase {
 
@@ -20,15 +22,7 @@ class SearchNodeUpdateAndDeletionTest extends SearchTestBase {
 
   public $test_user;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Search index synchronization on node updating / removal',
-      'description' => 'Tests search index is updated properly when nodes are removed or updated.',
-      'group' => 'Search',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a test user and log in.

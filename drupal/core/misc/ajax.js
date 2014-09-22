@@ -107,7 +107,8 @@
     // xmlhttp.responseText is going to throw an exception. So we'll catch it.
     try {
       responseText = "\n" + Drupal.t("ResponseText: !responseText", {'!responseText': $.trim(xmlhttp.responseText) });
-    } catch (e) {}
+    }
+    catch (e) {}
 
     // Make the responseText more readable by stripping HTML tags and newlines.
     responseText = responseText.replace(/<("[^"]*"|'[^']*'|[^'">])*>/gi, "");
@@ -466,6 +467,10 @@
       }
       $(this.element).after(this.progress.element);
     }
+    else if (this.progress.type === 'fullscreen') {
+      this.progress.element = $('<div class="ajax-progress ajax-progress-fullscreen">&nbsp;</div>');
+      $('body').after(this.progress.element);
+    }
   };
 
   /**
@@ -568,7 +573,7 @@
       var settings;
 
       // We don't know what response.data contains: it might be a string of text
-      // without HTML, so don't rely on jQuery correctly iterpreting
+      // without HTML, so don't rely on jQuery correctly interpreting
       // $(response.data) as new HTML rather than a CSS selector. Also, if
       // response.data contains top-level text nodes, they get lost with either
       // $(response.data) or $('<div></div>').replaceWith(response.data).

@@ -7,12 +7,15 @@
 
 namespace Drupal\system\Tests\System;
 
+use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Utility\Title;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests HTML output escaping of page title, site name, and slogan.
+ *
+ * @group system
  */
 class PageTitleTest extends WebTestBase {
 
@@ -27,20 +30,9 @@ class PageTitleTest extends WebTestBase {
   protected $saved_title;
 
   /**
-   * Implement getInfo().
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Page titles',
-      'description' => 'Tests correct escaping of page title, site name and slogan.',
-      'group' => 'System'
-    );
-  }
-
-  /**
    * Implement setUp().
    */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
@@ -56,8 +48,8 @@ class PageTitleTest extends WebTestBase {
     $title = "string with <em>HTML</em>";
     // Generate node content.
     $edit = array(
-      'title[0][value]' => '!SimpleTest! ' . $title . $this->randomName(20),
-      'body[0][value]' => '!SimpleTest! test body' . $this->randomName(200),
+      'title[0][value]' => '!SimpleTest! ' . $title . $this->randomMachineName(20),
+      'body[0][value]' => '!SimpleTest! test body' . $this->randomMachineName(200),
     );
     // Create the node with HTML in the title.
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
@@ -65,7 +57,7 @@ class PageTitleTest extends WebTestBase {
     $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $this->assertNotNull($node, 'Node created and found in database');
     $this->drupalGet("node/" . $node->id());
-    $this->assertText(check_plain($edit['title[0][value]']), 'Check to make sure tags in the node title are converted.');
+    $this->assertText(String::checkPlain($edit['title[0][value]']), 'Check to make sure tags in the node title are converted.');
   }
 
   /**
@@ -74,7 +66,7 @@ class PageTitleTest extends WebTestBase {
   function testTitleXSS() {
     // Set some title with JavaScript and HTML chars to escape.
     $title = '</title><script type="text/javascript">alert("Title XSS!");</script> & < > " \' ';
-    $title_filtered = check_plain($title);
+    $title_filtered = String::checkPlain($title);
 
     $slogan = '<script type="text/javascript">alert("Slogan XSS!");</script>';
     $slogan_filtered = Xss::filterAdmin($slogan);

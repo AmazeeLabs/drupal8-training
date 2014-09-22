@@ -8,25 +8,16 @@
 namespace Drupal\node\Tests;
 
 /**
- * Tests the node revision functionality.
+ * Tests the UI for controlling node revision behavior.
+ *
+ * @group node
  */
 class NodeRevisionsUiTest extends NodeTestBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Node revisions UI test',
-      'description' => 'Checks the UI for controlling node revision behavior.',
-      'group' => 'Node',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create and log in user.
@@ -48,7 +39,7 @@ class NodeRevisionsUiTest extends NodeTestBase {
     // Set page revision setting 'create new revision'. This will mean new
     // revisions are created by default when the node is edited.
     $type = entity_load('node_type', 'page');
-    $type->settings['node']['options']['revision'] = TRUE;
+    $type->setNewRevision(TRUE);
     $type->save();
 
     // Create the node.

@@ -39,6 +39,13 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
   protected $entity;
 
   /**
+   * TRUE if verbose debugging is enabled.
+   *
+   * @var bool
+   */
+  protected $debug = TRUE;
+
+  /**
    * Modules to enable.
    *
    * @var array
@@ -46,9 +53,14 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
   public static $modules = array('rdf');
 
   /**
+   * @var string
+   */
+  protected $testValue;
+
+  /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->installSchema('system', array('router'));
@@ -84,22 +96,35 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
     $build = entity_view($this->entity, 'default');
     $output = drupal_render($build);
     $graph = new \EasyRdf_Graph($this->uri, $output, 'rdfa');
+    $this->setRawContent($output);
+
+    // If verbose debugging is turned on, display the HTML and parsed RDF
+    // in the results.
+    if ($this->debug) {
+      debug($output);
+      debug($graph->toRdfPhp());
+    }
+
     $this->assertTrue($graph->hasProperty($this->uri, $property, $expected_rdf_value), "Formatter {$formatter['type']} exposes data correctly for {$this->fieldType} fields.");
   }
 
   /**
    * Creates the field for testing.
+   *
+   * @param array $field_settings
+   *   (optional) An array of field settings.
    */
-  protected function createTestField() {
-    entity_create('field_config', array(
+  protected function createTestField($field_settings = array()) {
+    entity_create('field_storage_config', array(
       'name' => $this->fieldName,
       'entity_type' => 'entity_test',
       'type' => $this->fieldType,
     ))->save();
-    entity_create('field_instance_config', array(
+    entity_create('field_config', array(
       'entity_type' => 'entity_test',
       'field_name' => $this->fieldName,
       'bundle' => 'entity_test',
+      'settings' => $field_settings,
     ))->save();
   }
 
@@ -114,6 +139,54 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
    */
   protected function getAbsoluteUri($entity) {
     return $entity->url('canonical', array('absolute' => TRUE));
+  }
+
+  /**
+   * Parses a content and return the html element.
+   *
+   * @param string $content
+   *   The html to parse.
+   *
+   * @return array
+   *   An array containing simplexml objects.
+   */
+  protected function parseContent($content) {
+    $htmlDom = new \DOMDocument();
+    @$htmlDom->loadHTML('<?xml encoding="UTF-8">' . $content);
+    $elements = simplexml_import_dom($htmlDom);
+
+    return $elements;
+  }
+
+  /**
+   * Performs an xpath search on a certain content.
+   *
+   * The search is relative to the root element of the $content variable.
+   *
+   * @param string $content
+   *   The html to parse.
+   * @param string $xpath
+   *   The xpath string to use in the search.
+   * @param array $arguments
+   *   Some arguments for the xpath.
+   *
+   * @return array|FALSE
+   *   The return value of the xpath search. For details on the xpath string
+   *   format and return values see the SimpleXML documentation,
+   *   http://php.net/manual/function.simplexml-element-xpath.php.
+   */
+  protected function xpathContent($content, $xpath, array $arguments = array()) {
+    if ($elements = $this->parseContent($content)) {
+      $xpath = $this->buildXPathQuery($xpath, $arguments);
+      $result = $elements->xpath($xpath);
+      // Some combinations of PHP / libxml versions return an empty array
+      // instead of the documented FALSE. Forcefully convert any falsish values
+      // to an empty array to allow foreach(...) constructions.
+      return $result ? $result : array();
+    }
+    else {
+      return FALSE;
+    }
   }
 
 }

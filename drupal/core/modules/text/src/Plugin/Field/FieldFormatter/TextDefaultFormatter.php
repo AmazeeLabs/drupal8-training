@@ -36,14 +36,10 @@ class TextDefaultFormatter extends FormatterBase {
 
     foreach ($items as $delta => $item) {
       $elements[$delta] = array(
-        '#markup' => $item->processed, 
-        '#cache' => array(
-          'tags' => array(
-            'filter_format' => array(
-              $item->format,
-            ),
-          ),
-        ),
+        '#type' => 'processed_text',
+        '#text' => $item->value,
+        '#format' => $item->format,
+        '#langcode' => $item->getLangcode(),
       );
     }
 

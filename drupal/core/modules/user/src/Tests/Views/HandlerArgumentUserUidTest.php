@@ -10,7 +10,9 @@ namespace Drupal\user\Tests\Views;
 use Drupal\views\Views;
 
 /**
- * Tests views user uid argument handler.
+ * Tests the handler of the user: uid Argument.
+ *
+ * @group user
  */
 class HandlerArgumentUserUidTest extends UserTestBase {
 
@@ -20,14 +22,6 @@ class HandlerArgumentUserUidTest extends UserTestBase {
    * @var array
    */
   public static $testViews = array('test_user_uid_argument');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'User: Uid Argument',
-      'description' => 'Tests the handler of the user: uid Argument.',
-      'group' => 'Views module integration',
-    );
-  }
 
   /**
    * Tests the generated title of an user: uid argument.
@@ -55,6 +49,11 @@ class HandlerArgumentUserUidTest extends UserTestBase {
     $view->getDisplay()->getHandler('argument', 'uid')->options['break_phrase'] = TRUE;
     $this->executeView($view, array($account->id() . ',0'));
     $this->assertEqual($view->getTitle(), $account->label() . ', ' . $anonymous);
+    $view->destroy();
+
+    $view->getDisplay()->getHandler('argument', 'uid')->options['break_phrase'] = TRUE;
+    $this->executeView($view, array('0,' . $account->id()));
+    $this->assertEqual($view->getTitle(), $anonymous . ', ' . $account->label());
     $view->destroy();
   }
 

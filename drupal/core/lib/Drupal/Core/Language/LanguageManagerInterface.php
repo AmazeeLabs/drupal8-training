@@ -23,11 +23,6 @@ interface LanguageManagerInterface {
   public function setTranslation(TranslationInterface $translation);
 
   /**
-   * Initializes each language type to a language object.
-   */
-  public function init();
-
-  /**
    * Returns whether or not the site has more than one language added.
    *
    * @return bool
@@ -39,29 +34,42 @@ interface LanguageManagerInterface {
    * Returns an array of the available language types.
    *
    * @return array
-   *   An array of language type names.
+   *   An array of language type machine names.
    */
   public function getLanguageTypes();
+
+  /**
+   * Returns information about all defined language types.
+   *
+   * @return array
+   *   An associative array of language type information arrays keyed by
+   *   language type machine name, in the format of
+   *   hook_language_types_info(). In some implementing classes, this is based
+   *   on information from hook_language_types_info() and
+   *   hook_language_types_info_alter().
+   */
+  public function getDefinedLanguageTypesInfo();
 
   /**
    * Returns the current language for the given type.
    *
    * @param string $type
-   *   (optional) The language type, e.g. the interface or the content language.
-   *   Defaults to \Drupal\Core\Language\Language::TYPE_INTERFACE.
+   *   (optional) The language type; e.g., the interface or the content
+   *   language. Defaults to
+   *   \Drupal\Core\Language\LanguageInterface::TYPE_INTERFACE.
    *
-   * @return \Drupal\Core\Language\Language
-   *   A language object for the given type.
+   * @return \Drupal\Core\Language\LanguageInterface
+   *   The current language object for the given type of language.
    */
-  public function getCurrentLanguage($type = Language::TYPE_INTERFACE);
+  public function getCurrentLanguage($type = LanguageInterface::TYPE_INTERFACE);
 
   /**
    * Resets the given language type or all types if none specified.
    *
    * @param string|null $type
    *   (optional) The language type to reset as a string, e.g.,
-   *   Language::TYPE_INTERFACE, or NULL to reset all language types. Defaults
-   *   to NULL.
+   *   LanguageInterface::TYPE_INTERFACE, or NULL to reset all language types.
+   *   Defaults to NULL.
    *
    * @return \Drupal\Core\Language\LanguageManagerInterface
    *   The language manager that has been reset.
@@ -71,7 +79,7 @@ interface LanguageManagerInterface {
   /**
    * Returns a language object representing the site's default language.
    *
-   * @return \Drupal\Core\Language\Language
+   * @return \Drupal\Core\Language\LanguageInterface
    *   A language object.
    */
   public function getDefaultLanguage();
@@ -81,13 +89,22 @@ interface LanguageManagerInterface {
    *
    * @param int $flags
    *   (optional) Specifies the state of the languages that have to be returned.
-   *   It can be: Language::STATE_CONFIGURABLE,
-   *   Language::STATE_LOCKED, Language::STATE_ALL.
+   *   It can be: LanguageInterface::STATE_CONFIGURABLE,
+   *   LanguageInterface::STATE_LOCKED, LanguageInterface::STATE_ALL.
    *
    * @return array
    *   An associative array of languages, keyed by the language code.
    */
-  public function getLanguages($flags = Language::STATE_CONFIGURABLE);
+  public function getLanguages($flags = LanguageInterface::STATE_CONFIGURABLE);
+
+  /**
+   * Returns a list of languages set up on the site in their native form.
+   *
+   * @return \Drupal\Core\Language\LanguageInterface[]
+   *   An associative array of languages, keyed by the language code, ordered
+   *   by weight ascending and name ascending.
+   */
+  public function getNativeLanguages();
 
   /**
    * Returns a language object from the given language code.
@@ -95,7 +112,7 @@ interface LanguageManagerInterface {
    * @param string $langcode
    *   The language code.
    *
-   * @return \Drupal\core\Language\Language|null
+   * @return \Drupal\core\Language\LanguageInterface|null
    *   A fully-populated language object or NULL.
    */
   public function getLanguage($langcode);
@@ -137,22 +154,27 @@ interface LanguageManagerInterface {
   /**
    * Returns the language fallback candidates for a given context.
    *
-   * @param string $langcode
-   *   (optional) The language of the current context. Defaults to NULL.
    * @param array $context
    *   (optional) An associative array of data that can be useful to determine
    *   the fallback sequence. The following keys are used in core:
-   *   - langcode: The desired language.
+   *   - langcode: Language code of the desired language.
    *   - operation: The name of the operation indicating the context where
-   *     language fallback is being applied, e.g. 'entity_view'.
-   *   - data: An arbitrary data structure that makes sense in the provided
-   *     context, e.g. an entity.
+   *     language fallback is being applied. The following operations are
+   *     defined in core, but more may be defined in contributed modules:
+   *       - entity_view: Invoked when an entity is about to be displayed.
+   *         The data key contains the loaded entity.
+   *       - views_query: Invoked when a field based views query is performed.
+   *         The data key contains a reference to the field object.
+   *       - locale_lookup: Invoked when a string translation was not found.
+   *         The data key contains the source string.
+   *   - data: A data structure that makes sense in the provided
+   *     context, see above.
    *
    * @return array
    *   An array of language codes sorted by priority: first values should be
    *   tried first.
    */
-  public function getFallbackCandidates($langcode = NULL, array $context = array());
+  public function getFallbackCandidates(array $context = array());
 
   /**
    * Returns the language switch links for the given language type.
@@ -170,17 +192,17 @@ interface LanguageManagerInterface {
   /**
    * Sets the configuration override language.
    *
-   * @param \Drupal\Core\Language\Language $language
+   * @param \Drupal\Core\Language\LanguageInterface $language
    *   The language to override configuration with.
    *
    * @return $this
    */
-  public function setConfigOverrideLanguage(Language $language = NULL);
+  public function setConfigOverrideLanguage(LanguageInterface $language = NULL);
 
   /**
    * Gets the current configuration override language.
    *
-   * @return \Drupal\Core\Language\Language $language
+   * @return \Drupal\Core\Language\LanguageInterface
    *   The current configuration override language.
    */
   public function getConfigOverrideLanguage();

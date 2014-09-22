@@ -8,7 +8,9 @@
 namespace Drupal\node\Tests;
 
 /**
- * Tests the availability of the syndicate block.
+ * Tests if the syndicate block is available.
+ *
+ * @group node
  */
 class NodeSyndicateBlockTest extends NodeTestBase {
 
@@ -19,15 +21,7 @@ class NodeSyndicateBlockTest extends NodeTestBase {
    */
   public static $modules = array('block');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Syndicate block',
-      'description' => 'Check if the syndicate block is available.',
-      'group' => 'Node',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a user and log in.

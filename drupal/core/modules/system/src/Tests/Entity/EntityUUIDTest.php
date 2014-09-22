@@ -9,30 +9,17 @@ namespace Drupal\system\Tests\Entity;
 
 /**
  * Tests creation, saving, and loading of entity UUIDs.
+ *
+ * @group Entity
  */
 class EntityUUIDTest extends EntityUnitTestBase {
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity UUIDs',
-      'description' => 'Tests creation, saving, and loading of entity UUIDs.',
-      'group' => 'Entity API',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('entity_test', array(
-      'entity_test_mul',
-      'entity_test_mul_property_data',
-      'entity_test_rev',
-      'entity_test_rev_revision',
-      'entity_test_mulrev',
-      'entity_test_mulrev_revision',
-      'entity_test_mulrev_property_data',
-      'entity_test_mulrev_property_revision',
-    ));
+    $this->installEntitySchema('entity_test_rev');
+    $this->installEntitySchema('entity_test_mul');
+    $this->installEntitySchema('entity_test_mulrev');
   }
 
   /**
@@ -56,7 +43,7 @@ class EntityUUIDTest extends EntityUnitTestBase {
     $uuid_service = $this->container->get('uuid');
     $uuid = $uuid_service->generate();
     $custom_entity = entity_create($entity_type, array(
-      'name' => $this->randomName(),
+      'name' => $this->randomMachineName(),
       'uuid' => $uuid,
     ));
     $this->assertIdentical($custom_entity->uuid(), $uuid);
@@ -64,7 +51,7 @@ class EntityUUIDTest extends EntityUnitTestBase {
     $custom_entity->save();
 
     // Verify that a new UUID is generated upon creating an entity.
-    $entity = entity_create($entity_type, array('name' => $this->randomName()));
+    $entity = entity_create($entity_type, array('name' => $this->randomMachineName()));
     $uuid = $entity->uuid();
     $this->assertTrue($uuid);
 

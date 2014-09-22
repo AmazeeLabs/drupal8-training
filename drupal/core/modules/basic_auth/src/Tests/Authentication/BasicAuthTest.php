@@ -7,10 +7,13 @@
 
 namespace Drupal\basic_auth\Tests\Authentication;
 
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Test for http basic authentication.
+ * Tests for BasicAuth authentication provider.
+ *
+ * @group basic_auth
  */
 class BasicAuthTest extends WebTestBase {
 
@@ -19,15 +22,7 @@ class BasicAuthTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('basic_auth', 'router_test');
-
-  public static function getInfo() {
-    return array(
-      'name' => 'BasicAuth authentication',
-      'description' => 'Tests for BasicAuth authentication provider.',
-      'group' => 'Authentication',
-    );
-  }
+  public static $modules = array('basic_auth', 'router_test', 'locale');
 
   /**
    * Test http basic authentication.
@@ -40,7 +35,7 @@ class BasicAuthTest extends WebTestBase {
     $this->assertResponse('200', 'HTTP response is OK');
     $this->curlClose();
 
-    $this->basicAuthGet('router_test/test11', $account->getUsername(), $this->randomName());
+    $this->basicAuthGet('router_test/test11', $account->getUsername(), $this->randomMachineName());
     $this->assertNoText($account->getUsername(), 'Bad basic auth credentials do not authenticate the user.');
     $this->assertResponse('403', 'Access is not granted.');
     $this->curlClose();
@@ -118,6 +113,21 @@ class BasicAuthTest extends WebTestBase {
     // any flood control.
     $this->basicAuthGet('router_test/test11', $user2->getUsername(), $user2->pass_raw);
     $this->assertResponse('200', 'Per user flood prevention does not block access for other users.');
+  }
+
+  /**
+   * Tests compatibility with locale/UI translation.
+   */
+  function testLocale() {
+    ConfigurableLanguage::createFromLangcode('de')->save();
+    \Drupal::config('system.site')->set('langcode', 'de')->save();
+
+    $account = $this->drupalCreateUser();
+
+    $this->basicAuthGet('router_test/test11', $account->getUsername(), $account->pass_raw);
+    $this->assertText($account->getUsername(), 'Account name is displayed.');
+    $this->assertResponse('200', 'HTTP response is OK');
+    $this->curlClose();
   }
 
   /**

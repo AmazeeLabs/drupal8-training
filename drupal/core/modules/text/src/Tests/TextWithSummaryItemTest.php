@@ -7,13 +7,14 @@
 
 namespace Drupal\text\Tests;
 
-use Drupal\Core\Language\Language;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\field\Tests\FieldUnitTestBase;
 
 /**
- * Tests for \Drupal\text\Plugin\Field\FieldType\TextWithSummaryItem.
+ * Tests using entity fields of the text summary field type.
+ *
+ * @group text
  */
 class TextWithSummaryItemTest extends FieldUnitTestBase {
 
@@ -25,32 +26,24 @@ class TextWithSummaryItemTest extends FieldUnitTestBase {
   public static $modules = array('filter');
 
   /**
+   * Field storage entity.
+   *
+   * @var \Drupal\field\Entity\FieldStorageConfig.
+   */
+  protected $fieldStorage;
+
+  /**
    * Field entity.
    *
-   * @var \Drupal\field\Entity\FieldConfig.
+   * @var \Drupal\field\Entity\FieldConfig
    */
   protected $field;
 
-  /**
-   * Field instance.
-   *
-   * @var \Drupal\field\Entity\FieldInstanceConfig
-   */
-  protected $instance;
 
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Text summary field item',
-      'description' => 'Tests using entity fields of the text summary field type.',
-      'group' => 'Field types',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('entity_test', array('entity_test_rev', 'entity_test_rev_revision'));
+    $this->installEntitySchema('entity_test_rev');
 
     // Create the necessary formats.
     $this->installConfig(array('filter'));
@@ -69,28 +62,18 @@ class TextWithSummaryItemTest extends FieldUnitTestBase {
 
     // Create an entity with a summary and no text format.
     $entity = entity_create($entity_type);
-    $entity->summary_field->value = $value = $this->randomName();
-    $entity->summary_field->summary = $summary = $this->randomName();
+    $entity->summary_field->value = $value = $this->randomMachineName();
+    $entity->summary_field->summary = $summary = $this->randomMachineName();
     $entity->summary_field->format = NULL;
-    $entity->name->value = $this->randomName();
+    $entity->name->value = $this->randomMachineName();
     $entity->save();
 
     $entity = entity_load($entity_type, $entity->id());
     $this->assertTrue($entity->summary_field instanceof FieldItemListInterface, 'Field implements interface.');
     $this->assertTrue($entity->summary_field[0] instanceof FieldItemInterface, 'Field item implements interface.');
     $this->assertEqual($entity->summary_field->value, $value);
-    $this->assertEqual($entity->summary_field->processed, $value);
     $this->assertEqual($entity->summary_field->summary, $summary);
-    $this->assertEqual($entity->summary_field->summary_processed, $summary);
     $this->assertNull($entity->summary_field->format);
-
-    // Enable text processing.
-    $this->instance->settings['text_processing'] = 1;
-    $this->instance->save();
-
-    // Re-load the entity.
-    $entity = entity_load($entity_type, $entity->id(), TRUE);
-
     // Even if no format is given, if text processing is enabled, the default
     // format is used.
     $this->assertEqual($entity->summary_field->processed, "<p>$value</p>\n");
@@ -100,82 +83,22 @@ class TextWithSummaryItemTest extends FieldUnitTestBase {
     $entity->summary_field->format = 'no_filters';
     $this->assertEqual($entity->summary_field->processed, $value);
     $this->assertEqual($entity->summary_field->summary_processed, $summary);
-  }
 
-  /**
-   * Tests that the processed values are cached.
-   */
-  function testProcessedCache() {
-    // Use an entity type that has caching enabled.
-    $entity_type = 'entity_test_rev';
-
-    $this->createField($entity_type);
-
-    // Create an entity with a summary and a text format.
+    // Test the generateSampleValue() method.
     $entity = entity_create($entity_type);
-    $entity->summary_field->value = $value = $this->randomName();
-    $entity->summary_field->summary = $summary = $this->randomName();
-    $entity->summary_field->format = 'plain_text';
-    $entity->name->value = $this->randomName();
-    $entity->save();
-
-    // Check that the processed values are correctly computed.
-    $this->assertEqual($entity->summary_field->processed, $value);
-    $this->assertEqual($entity->summary_field->summary_processed, $summary);
-
-    // Load the entity and check that the field cache contains the expected
-    // data.
-    $entity = entity_load($entity_type, $entity->id());
-    $cache = \Drupal::cache('entity')->get("field:$entity_type:" . $entity->id());
-    $this->assertEqual($cache->data, array(
-      Language::LANGCODE_NOT_SPECIFIED => array(
-        'summary_field' => array(
-          0 => array(
-            'value' => $value,
-            'summary' => $summary,
-            'format' => 'plain_text',
-            'processed' => $value,
-            'summary_processed' => $summary,
-          ),
-        ),
-      ),
-    ));
-
-    // Inject fake processed values into the cache to make sure that these are
-    // used as-is and not re-calculated when the entity is loaded.
-    $data = array(
-      Language::LANGCODE_NOT_SPECIFIED => array(
-        'summary_field' => array(
-          0 => array(
-            'value' => $value,
-            'summary' => $summary,
-            'format' => 'plain_text',
-            'processed' => 'Cached processed value',
-            'summary_processed' => 'Cached summary processed value',
-          ),
-        ),
-      ),
-    );
-    \Drupal::cache('entity')->set("field:$entity_type:" . $entity->id(), $data);
-    $entity = entity_load($entity_type, $entity->id(), TRUE);
-    $this->assertEqual($entity->summary_field->processed, 'Cached processed value');
-    $this->assertEqual($entity->summary_field->summary_processed, 'Cached summary processed value');
-
-    // Change the format, this should update the processed properties.
-    $entity->summary_field->format = 'no_filters';
-    $this->assertEqual($entity->summary_field->processed, $value);
-    $this->assertEqual($entity->summary_field->summary_processed, $summary);
+    $entity->summary_field->generateSampleItems();
+    $this->entityValidateAndSave($entity);
   }
 
   /**
-   * Creates a text_with_summary field and field instance.
+   * Creates a text_with_summary field storage and field.
    *
    * @param string $entity_type
    *   Entity type for which the field should be created.
    */
   protected function createField($entity_type) {
     // Create a field .
-    $this->field = entity_create('field_config', array(
+    $this->fieldStorage = entity_create('field_storage_config', array(
       'name' => 'summary_field',
       'entity_type' => $entity_type,
       'type' => 'text_with_summary',
@@ -183,16 +106,12 @@ class TextWithSummaryItemTest extends FieldUnitTestBase {
         'max_length' => 10,
       )
     ));
-    $this->field->save();
-    $this->instance = entity_create('field_instance_config', array(
-      'field_name' => $this->field->name,
-      'entity_type' => $entity_type,
+    $this->fieldStorage->save();
+    $this->field = entity_create('field_config', array(
+      'field_storage' => $this->fieldStorage,
       'bundle' => $entity_type,
-      'settings' => array(
-        'text_processing' => 0,
-      )
     ));
-    $this->instance->save();
+    $this->field->save();
   }
 
 }

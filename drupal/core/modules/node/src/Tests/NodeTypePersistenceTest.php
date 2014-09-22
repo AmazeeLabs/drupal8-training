@@ -8,19 +8,13 @@
 namespace Drupal\node\Tests;
 
 /**
- * Test node type customizations persistence.
+ * Ensures that node type customization survives module enabling and disabling.
+ *
+ * @group node
  */
 class NodeTypePersistenceTest extends NodeTestBase {
   // Enable the prerequisite modules for forum
   public static $modules = array('history', 'taxonomy', 'options', 'comment');
-  public static function getInfo() {
-    return array(
-      'name' => 'Node type persist',
-      'description' => 'Ensures that node type customization survives module enabling and disabling.',
-      'group' => 'Node',
-    );
-  }
-
   /**
    * Tests that node type customizations persist through disable and uninstall.
    */
@@ -29,7 +23,6 @@ class NodeTypePersistenceTest extends NodeTestBase {
     $this->drupalLogin($web_user);
     $forum_key = 'modules[Core][forum][enable]';
     $forum_enable = array($forum_key => "1");
-    $forum_disable = array($forum_key => FALSE);
 
     // Enable forum and verify that the node type exists and is not disabled.
     $this->drupalPostForm('admin/modules', $forum_enable, t('Save configuration'));
@@ -42,7 +35,7 @@ class NodeTypePersistenceTest extends NodeTestBase {
     $this->assertText('forum', 'forum type is found on node/add');
 
     // Customize forum description.
-    $description = $this->randomName();
+    $description = $this->randomMachineName();
     $edit = array('description' => $description);
     $this->drupalPostForm('admin/structure/types/manage/forum', $edit, t('Save content type'));
 

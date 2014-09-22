@@ -8,6 +8,8 @@ namespace Drupal\rdf\Tests\Field;
 
 /**
  * Tests the RDFa output of a text field formatter with a datatype callback.
+ *
+ * @group rdf
  */
 class FieldRdfaDatatypeCallbackTest extends FieldRdfaTestBase {
 
@@ -21,18 +23,12 @@ class FieldRdfaDatatypeCallbackTest extends FieldRdfaTestBase {
    */
   public static $modules = array('text', 'filter');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Field formatter: datatype callback',
-      'description' => 'Tests RDFa output for field formatters with a datatype callback.',
-      'group' => 'RDF',
-    );
-  }
-
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->createTestField();
+
+    $this->installConfig(array('filter'));
 
     // Add the mapping.
     $mapping = rdf_get_mapping('entity_test', 'entity_test');
@@ -44,9 +40,9 @@ class FieldRdfaDatatypeCallbackTest extends FieldRdfaTestBase {
     ))->save();
 
     // Set up test values.
-    $this->test_value = $this->randomName();
+    $this->testValue = $this->randomMachineName();
     $this->entity = entity_create('entity_test');
-    $this->entity->{$this->fieldName}->value = $this->test_value;
+    $this->entity->{$this->fieldName}->value = $this->testValue;
     $this->entity->save();
 
     $this->uri = $this->getAbsoluteUri($this->entity);
@@ -57,7 +53,7 @@ class FieldRdfaDatatypeCallbackTest extends FieldRdfaTestBase {
    */
   public function testDefaultFormatter() {
     // Expected value is the output of the datatype callback, not the raw value.
-    $this->assertFormatterRdfa(array('type'=>'text_default'), 'http://schema.org/interactionCount', array('value' => 'foo' . $this->test_value));
+    $this->assertFormatterRdfa(array('type'=>'text_default'), 'http://schema.org/interactionCount', array('value' => 'foo' . $this->testValue));
   }
 
 }

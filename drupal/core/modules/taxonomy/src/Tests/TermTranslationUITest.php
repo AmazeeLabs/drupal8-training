@@ -7,18 +7,15 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Language\Language;
 use Drupal\content_translation\Tests\ContentTranslationUITest;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Tests the Term Translation UI.
+ *
+ * @group taxonomy
  */
 class TermTranslationUITest extends ContentTranslationUITest {
-
-  /**
-   * The name of the test taxonomy term.
-   */
-  protected $name;
 
   /**
    * The vocabulary used for creating terms.
@@ -34,18 +31,9 @@ class TermTranslationUITest extends ContentTranslationUITest {
    */
   public static $modules = array('language', 'content_translation', 'taxonomy');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Taxonomy term translation UI',
-      'description' => 'Tests the basic term translation UI.',
-      'group' => 'Taxonomy',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     $this->entityTypeId = 'taxonomy_term';
     $this->bundle = 'tags';
-    $this->name = $this->randomName();
     parent::setUp();
   }
 
@@ -58,9 +46,9 @@ class TermTranslationUITest extends ContentTranslationUITest {
     // Create a vocabulary.
     $this->vocabulary = entity_create('taxonomy_vocabulary', array(
       'name' => $this->bundle,
-      'description' => $this->randomName(),
+      'description' => $this->randomMachineName(),
       'vid' => $this->bundle,
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       'weight' => mt_rand(0, 10),
     ));
     $this->vocabulary->save();
@@ -77,8 +65,7 @@ class TermTranslationUITest extends ContentTranslationUITest {
    * Overrides \Drupal\content_translation\Tests\ContentTranslationUITest::getNewEntityValues().
    */
   protected function getNewEntityValues($langcode) {
-    // Term name is not translatable hence we use a fixed value.
-    return array('name' => $this->name) + parent::getNewEntityValues($langcode);
+    return array('name' => $this->randomMachineName()) + parent::getNewEntityValues($langcode);
   }
 
   /**
@@ -121,19 +108,25 @@ class TermTranslationUITest extends ContentTranslationUITest {
     $this->admin_user = $this->drupalCreateUser(array_merge(parent::getTranslatorPermissions(), array('access administration pages', 'administer taxonomy')));
     $this->drupalLogin($this->admin_user);
 
-    $translatable_tid = $this->createEntity(array(), $this->langcodes[0], $this->vocabulary->id());
+    $values = array(
+      'name' => $this->randomMachineName(),
+    );
+    $translatable_tid = $this->createEntity($values, $this->langcodes[0], $this->vocabulary->id());
 
     // Create an untranslatable vocabulary.
     $untranslatable_vocabulary = entity_create('taxonomy_vocabulary', array(
       'name' => 'untranslatable_voc',
-      'description' => $this->randomName(),
+      'description' => $this->randomMachineName(),
       'vid' => 'untranslatable_voc',
-      'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
       'weight' => mt_rand(0, 10),
     ));
     $untranslatable_vocabulary->save();
 
-    $untranslatable_tid = $this->createEntity(array(), $this->langcodes[0], $untranslatable_vocabulary->id());
+    $values = array(
+      'name' => $this->randomMachineName(),
+    );
+    $untranslatable_tid = $this->createEntity($values, $this->langcodes[0], $untranslatable_vocabulary->id());
 
     // Verify translation links.
     $this->drupalGet('admin/structure/taxonomy/manage/' .  $this->vocabulary->id() . '/overview');

@@ -7,10 +7,13 @@
 
 namespace Drupal\field\Tests;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
  * Tests exposing field definitions for configurable fields.
+ *
+ * @group field
  */
 class ConfigFieldDefinitionTest extends FieldUnitTestBase {
 
@@ -22,31 +25,30 @@ class ConfigFieldDefinitionTest extends FieldUnitTestBase {
   protected $entityManager;
 
   /**
-   * {@inheritdoc}
+   * @var string
    */
-  public static function getInfo() {
-    return array(
-      'name' => 'Config field definitions',
-      'description' => 'Tests exposing field definitions for configurable fields.',
-      'group' => 'Field API',
-    );
-  }
+  private $entityType;
+
+  /**
+   * @var string
+   */
+  private $bundle;
 
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
 
-    // Create a field and instance of type 'test_field', on the 'entity_test'
+    // Create a field and a storage of type 'test_field', on the 'entity_test'
     // entity type.
     $this->entityType = 'entity_test';
     $this->bundle = 'entity_test';
-    $this->createFieldWithInstance('', $this->entityType, $this->bundle);
+    $this->createFieldWithStorage('', $this->entityType, $this->bundle);
     $this->entityManager = $this->container->get('entity.manager');
 
-    // Create a second instance on 'entity_test_rev'.
-    $this->createFieldWithInstance('_rev', 'entity_test_rev', 'entity_test_rev');
+    // Create a second field on 'entity_test_rev'.
+    $this->createFieldWithStorage('_rev', 'entity_test_rev', 'entity_test_rev');
   }
 
   /**
@@ -54,10 +56,10 @@ class ConfigFieldDefinitionTest extends FieldUnitTestBase {
    */
   public function testBundleFieldDefinition() {
     $definitions = $this->entityManager->getFieldDefinitions($this->entityType, $this->bundle);
-    $this->assertTrue(isset($definitions[$this->instance->getName()]));
-    $this->assertTrue($definitions[$this->instance->getName()] instanceof FieldStorageDefinitionInterface);
-    // Make sure no field for the instance on another entity type is exposed.
-    $this->assertFalse(isset($definitions[$this->instance_rev->getName()]));
+    $this->assertTrue(isset($definitions[$this->fieldTestData->field->getName()]));
+    $this->assertTrue($definitions[$this->fieldTestData->field->getName()] instanceof FieldDefinitionInterface);
+    // Make sure fields on other entity types are not exposed.
+    $this->assertFalse(isset($definitions[$this->fieldTestData->field_rev->getName()]));
   }
 
   /**
@@ -65,11 +67,10 @@ class ConfigFieldDefinitionTest extends FieldUnitTestBase {
    */
   public function testFieldStorageDefinition() {
     $field_storage_definitions = $this->entityManager->getFieldStorageDefinitions($this->entityType);
-    $this->assertTrue(isset($field_storage_definitions[$this->instance->getName()]));
-    $this->assertTrue($field_storage_definitions[$this->instance->getName()] instanceof FieldStorageDefinitionInterface);
-    // Make sure no storage field for the instance on another entity type is
-    // exposed.
-    $this->assertFalse(isset($field_storage_definitions[$this->instance_rev->getName()]));
+    $this->assertTrue(isset($field_storage_definitions[$this->fieldTestData->field->getName()]));
+    $this->assertTrue($field_storage_definitions[$this->fieldTestData->field->getName()] instanceof FieldStorageDefinitionInterface);
+    // Make sure storages on other entity types are not exposed.
+    $this->assertFalse(isset($field_storage_definitions[$this->fieldTestData->field_rev->getName()]));
   }
 
 }

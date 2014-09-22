@@ -11,7 +11,9 @@ use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
 
 /**
- * Tests the Drupal 6 user picture to Drupal 8 entity form display migration.
+ * User picture entity form display.
+ *
+ * @group migrate_drupal
  */
 class MigrateUserPictureEntityFormDisplayTest extends MigrateDrupalTestBase {
 
@@ -25,25 +27,14 @@ class MigrateUserPictureEntityFormDisplayTest extends MigrateDrupalTestBase {
   /**
    * {@inheritdoc}
    */
-  public static function getInfo() {
-    return array(
-      'name'  => 'Migrate user picture entity form display.',
-      'description'  => 'User picture entity form display',
-      'group' => 'Migrate Drupal',
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setUp() {
+  protected function setUp() {
     parent::setUp();
     $id_mappings = array(
       'd6_user_picture_field_instance' => array(
         array(array(1), array('user', 'user', 'user_picture')),
       ),
     );
-    $this->prepareIdMappings($id_mappings);
+    $this->prepareMigrations($id_mappings);
 
     $migration = entity_load('migration', 'd6_user_picture_entity_form_display');
     $executable = new MigrateExecutable($migration, $this);

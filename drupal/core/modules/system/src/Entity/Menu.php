@@ -17,8 +17,8 @@ use Drupal\system\MenuInterface;
  * @ConfigEntityType(
  *   id = "menu",
  *   label = @Translation("Menu"),
- *   controllers = {
- *     "access" = "Drupal\system\MenuAccessController"
+ *   handlers = {
+ *     "access" = "Drupal\system\MenuAccessControlHandler"
  *   },
  *   admin_permission = "administer menu",
  *   entity_keys = {
@@ -56,22 +56,6 @@ class Menu extends ConfigEntityBase implements MenuInterface {
    * @var bool
    */
   protected $locked = FALSE;
-
-  /**
-   * {@inheritdoc}
-   */
-  public function toArray() {
-    $properties = parent::toArray();
-    // @todo Make $description protected and include it here, see
-    //   https://drupal.org/node/2030645.
-    $names = array(
-      'locked',
-    );
-    foreach ($names as $name) {
-      $properties[$name] = $this->get($name);
-    }
-    return $properties;
-  }
 
   /**
    * {@inheritdoc}

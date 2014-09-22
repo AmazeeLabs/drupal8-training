@@ -81,6 +81,9 @@
           'focusin.dropbutton': $.proxy(this.focusIn, this)
         });
     }
+    else {
+      this.$dropbutton.addClass('dropbutton-single');
+    }
   }
 
   /**
@@ -140,7 +143,6 @@
       this.hoverIn.call(this, e);
     }
   });
-
 
   $.extend(Drupal.theme, {
     /**

@@ -9,6 +9,8 @@ namespace Drupal\image\Plugin\Field\FieldWidget;
 
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\file\Entity\File;
 use Drupal\file\Plugin\Field\FieldWidget\FileWidget;
 
 /**
@@ -37,7 +39,7 @@ class ImageWidget extends FileWidget {
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, FormStateInterface $form_state) {
     $element = parent::settingsForm($form, $form_state);
 
     $element['preview_image_style'] = array(
@@ -82,10 +84,10 @@ class ImageWidget extends FileWidget {
    *
    * Special handling for draggable multiple widgets and 'add more' button.
    */
-  protected function formMultipleElements(FieldItemListInterface $items, array &$form, array &$form_state) {
+  protected function formMultipleElements(FieldItemListInterface $items, array &$form, FormStateInterface $form_state) {
     $elements = parent::formMultipleElements($items, $form, $form_state);
 
-    $cardinality = $this->fieldDefinition->getCardinality();
+    $cardinality = $this->fieldDefinition->getFieldStorageDefinition()->getCardinality();
     $file_upload_help = array(
       '#theme' => 'file_upload_help',
       '#description' => '',
@@ -95,7 +97,7 @@ class ImageWidget extends FileWidget {
     if ($cardinality == 1) {
       // If there's only one field, return it as delta 0.
       if (empty($elements[0]['#default_value']['fids'])) {
-        $file_upload_help['#description'] = field_filter_xss($this->fieldDefinition->getDescription());
+        $file_upload_help['#description'] = $this->fieldFilterXss($this->fieldDefinition->getDescription());
         $elements[0]['#description'] = drupal_render($file_upload_help);
       }
     }
@@ -109,7 +111,7 @@ class ImageWidget extends FileWidget {
   /**
    * {@inheritdoc}
    */
-  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, array &$form_state) {
+  public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
     $element = parent::formElement($items, $delta, $element, $form, $form_state);
 
     $field_settings = $this->getFieldSettings();
@@ -134,6 +136,13 @@ class ImageWidget extends FileWidget {
     $element['#alt_field'] = $field_settings['alt_field'];
     $element['#alt_field_required'] = $field_settings['alt_field_required'];
 
+    // Default image.
+    $default_image = $field_settings['default_image'];
+    if (empty($default_image['fid'])) {
+      $default_image = $this->fieldDefinition->getFieldStorageDefinition()->getSetting('default_image');
+    }
+    $element['#default_image'] = !empty($default_image['fid']) ? $default_image : array();
+
     return $element;
   }
 
@@ -144,7 +153,7 @@ class ImageWidget extends FileWidget {
    *
    * This method is assigned as a #process callback in formElement() method.
    */
-  public static function process($element, &$form_state, $form) {
+  public static function process($element, FormStateInterface $form_state, $form) {
     $item = $element['#value'];
     $item['fids'] = $element['fids']['#value'];
 
@@ -166,7 +175,7 @@ class ImageWidget extends FileWidget {
       }
       else {
         $image = \Drupal::service('image.factory')->get($file->getFileUri());
-        if ($image->isExisting()) {
+        if ($image->isValid()) {
           $variables['width'] = $image->getWidth();
           $variables['height'] = $image->getHeight();
         }
@@ -176,6 +185,7 @@ class ImageWidget extends FileWidget {
       }
 
       $element['preview'] = array(
+        '#weight' => -10,
         '#theme' => 'image_style',
         '#width' => $variables['width'],
         '#height' => $variables['height'],
@@ -194,6 +204,20 @@ class ImageWidget extends FileWidget {
         '#value' => $variables['height'],
       );
     }
+    elseif (!empty($element['#default_image'])) {
+      $default_image = $element['#default_image'];
+      $file = File::load($default_image['fid']);
+      if (!empty($file)) {
+        $element['preview'] = array(
+          '#weight' => -10,
+          '#theme' => 'image_style',
+          '#width' => $default_image['width'],
+          '#height' => $default_image['height'],
+          '#style_name' => $element['#preview_image_style'],
+          '#uri' => $file->getFileUri(),
+        );
+      }
+    }
 
     // Add the additional alt and title fields.
     $element['alt'] = array(
@@ -203,7 +227,7 @@ class ImageWidget extends FileWidget {
       '#description' => t('This text will be used by screen readers, search engines, or when the image cannot be loaded.'),
       // @see http://www.gawds.org/show.php?contentid=28
       '#maxlength' => 512,
-      '#weight' => -2,
+      '#weight' => -12,
       '#access' => (bool) $item['fids'] && $element['#alt_field'],
       '#element_validate' => $element['#alt_field_required'] == 1 ? array(array(get_called_class(), 'validateRequiredFields')) : array(),
     );
@@ -213,12 +237,12 @@ class ImageWidget extends FileWidget {
       '#default_value' => isset($item['title']) ? $item['title'] : '',
       '#description' => t('The title is used as a tool tip when the user hovers the mouse over the image.'),
       '#maxlength' => 1024,
-      '#weight' => -1,
+      '#weight' => -11,
       '#access' => (bool) $item['fids'] && $element['#title_field'],
       '#element_validate' => $element['#title_field_required'] == 1 ? array(array(get_called_class(), 'validateRequiredFields')) : array(),
     );
 
-    return $element;
+    return parent::process($element, $form_state, $form);
   }
 
   /**
@@ -227,14 +251,14 @@ class ImageWidget extends FileWidget {
    * This is separated in a validate function instead of a #required flag to
    * avoid being validated on the process callback.
    */
-  public static function validateRequiredFields($element, &$form_state) {
+  public static function validateRequiredFields($element, FormStateInterface $form_state) {
     // Only do validation if the function is triggered from other places than
     // the image process form.
-    if (!in_array('file_managed_file_submit', $form_state['triggering_element']['#submit'])) {
+    if (!in_array('file_managed_file_submit', $form_state->getTriggeringElement()['#submit'])) {
       // If the image is not there, we do not check for empty values.
       $parents = $element['#parents'];
       $field = array_pop($parents);
-      $image_field = NestedArray::getValue($form_state['input'], $parents);
+      $image_field = NestedArray::getValue($form_state->getUserInput(), $parents);
       // We check for the array key, so that it can be NULL (like if the user
       // submits the form without using the "upload" button).
       if (!array_key_exists($field, $image_field)) {
@@ -242,7 +266,7 @@ class ImageWidget extends FileWidget {
       }
       // Check if field is left empty.
       elseif (empty($image_field[$field])) {
-        \Drupal::formBuilder()->setError($element, $form_state, t('The field !title is required', array('!title' => $element['#title'])));
+        $form_state->setError($element, t('The field !title is required', array('!title' => $element['#title'])));
         return;
       }
     }

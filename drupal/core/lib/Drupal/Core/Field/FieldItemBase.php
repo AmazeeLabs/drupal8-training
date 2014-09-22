@@ -8,6 +8,7 @@
 namespace Drupal\Core\Field;
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\Plugin\DataType\Map;
 use Drupal\Core\TypedData\TypedDataInterface;
@@ -20,20 +21,21 @@ use Drupal\user;
  * the static method propertyDefinitions().
  *
  * @see \Drupal\Core\Field\FieldItemInterface
+ * @ingroup field_types
  */
 abstract class FieldItemBase extends Map implements FieldItemInterface {
 
   /**
    * {@inheritdoc}
    */
-  public static function defaultSettings() {
+  public static function defaultStorageSettings() {
     return array();
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function defaultInstanceSettings() {
+  public static function defaultFieldSettings() {
     return array();
   }
 
@@ -238,20 +240,53 @@ abstract class FieldItemBase extends Map implements FieldItemInterface {
   /**
    * {@inheritdoc}
    */
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) { }
+
+  /**
+   * {@inheritdoc}
+   */
   public function deleteRevision() { }
 
   /**
    * {@inheritdoc}
    */
-  public function settingsForm(array $form, array &$form_state, $has_data) {
+  public function storageSettingsForm(array &$form, FormStateInterface $form_state, $has_data) {
     return array();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function instanceSettingsForm(array $form, array &$form_state) {
+  public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
     return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function storageSettingsToConfigData(array $settings) {
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function storageSettingsFromConfigData(array $settings) {
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function fieldSettingsToConfigData(array $settings) {
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function fieldSettingsFromConfigData(array $settings) {
+    return $settings;
   }
 
 }

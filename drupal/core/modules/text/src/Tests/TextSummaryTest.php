@@ -10,21 +10,15 @@ namespace Drupal\text\Tests;
 use Drupal\simpletest\DrupalUnitTestBase;
 
 /**
- * Tests the text field summary.
+ * Tests text_summary() with different strings and lengths.
+ *
+ * @group text
  */
 class TextSummaryTest extends DrupalUnitTestBase {
 
   public static $modules = array('system', 'user', 'filter', 'text');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Text summary',
-      'description' => 'Test text_summary() with different strings and lengths.',
-      'group' => 'Field types',
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->installSchema('system', 'url_alias');

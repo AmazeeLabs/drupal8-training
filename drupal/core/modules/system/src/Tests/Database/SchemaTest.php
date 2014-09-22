@@ -10,25 +10,19 @@ namespace Drupal\system\Tests\Database;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\SchemaObjectDoesNotExistException;
 use Drupal\Core\Database\SchemaObjectExistsException;
-use Drupal\simpletest\UnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
- * Tests the Schema API.
+ * Tests table creation and modification via the schema API.
+ *
+ * @group Database
  */
-class SchemaTest extends UnitTestBase {
+class SchemaTest extends KernelTestBase {
 
   /**
    * A global counter for table and field creation.
    */
   var $counter;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Schema API',
-      'description' => 'Tests table creation and modification via the schema API.',
-      'group' => 'Database',
-    );
-  }
 
   /**
    * Tests database interactions.

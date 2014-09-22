@@ -10,7 +10,9 @@ namespace Drupal\system\Tests\Batch;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests the Batch API Progress page.
+ * Tests the content of the progress page.
+ *
+ * @group Batch
  */
 class PageTest extends WebTestBase {
 
@@ -21,21 +23,13 @@ class PageTest extends WebTestBase {
    */
   public static $modules = array('batch_test');
 
-  public static function getInfo() {
-    return array(
-      'name' => 'Batch progress page',
-      'description' => 'Test the content of the progress page.',
-      'group' => 'Batch API',
-    );
-  }
-
   /**
    * Tests that the batch API progress page uses the correct theme.
    */
   function testBatchProgressPageTheme() {
     // Make sure that the page which starts the batch (an administrative page)
     // is using a different theme than would normally be used by the batch API.
-    $this->container->get('theme_handler')->enable(array('seven', 'bartik'));
+    $this->container->get('theme_handler')->install(array('seven', 'bartik'));
     $this->container->get('config.factory')->get('system.theme')
       ->set('default', 'bartik')
       ->set('admin', 'seven')

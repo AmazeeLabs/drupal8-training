@@ -2,8 +2,12 @@ services:
   ban.ip_manager:
     class: Drupal\ban\BanIpManager
     arguments: ['@database']
-  ban.subscriber:
-    class: Drupal\ban\EventSubscriber\BanSubscriber
     tags:
-      - { name: event_subscriber }
+      - { name: backend_overridable }
+  ban.middleware:
+    class: Drupal\ban\BanMiddleware
     arguments: ['@ban.ip_manager']
+    tags:
+      # Ensure to come before page caching, so you don't serve cached pages to
+      # banned users.
+      - { name: http_middleware, priority: 250 }

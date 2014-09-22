@@ -12,6 +12,8 @@ use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests the History endpoints.
+ *
+ * @group history
  */
 class HistoryTest extends WebTestBase {
 
@@ -36,15 +38,7 @@ class HistoryTest extends WebTestBase {
    */
   protected $test_node;
 
-  public static function getInfo() {
-    return array(
-      'name' => 'History endpoints',
-      'description' => 'Tests the History endpoints',
-      'group' => 'History'
-    );
-  }
-
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));

@@ -1,5 +1,7 @@
 id: d6_node
 label: Drupal 6 nodes
+migration_groups:
+  - Drupal 6
 source:
   plugin: d6_node
 process:
@@ -12,13 +14,14 @@ process:
   status: status
   created: created
   changed: changed
+  revision_timestamp: timestamp
   promote: promote
   sticky: sticky
-  body.format:
+  'body/format':
     plugin: migration
     migration: d6_filter_format
     source: format
-  body.value: body
+  'body/value': body
 
 #  unmapped d6 fields.
 #  tnid
@@ -31,8 +34,7 @@ destination:
 migration_dependencies:
   required:
     - d6_node_type
+    - d6_node_settings
     - d6_filter_format
-  optional:
     - d6_field_instance_widget_settings
     - d6_field_formatter_settings
-    - d6_node_settings

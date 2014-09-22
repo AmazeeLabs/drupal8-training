@@ -1,5 +1,7 @@
 id: d6_node_type
 label: Drupal 6 node type configuration
+migration_groups:
+  - Drupal 6
 source:
   plugin: d6_node_type
   constants:
@@ -11,11 +13,12 @@ process:
   module: module
   description: description
   help: help
-  has_title: has_title
   title_label: title_label
-  preview: constants.preview
-  submitted: submitted
-  options: options
+  'preview_mode': 'constants/preview'
+  'display_submitted': display_submitted
+  'new_revision': 'options/revision'
+  'settings/node/options': options
   create_body: has_body
+  create_body_label: body_label
 destination:
   plugin: entity:node_type
