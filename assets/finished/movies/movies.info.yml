@@ -12,6 +12,8 @@ stylesheets:
 
 # stylesheets-remove:
 #   - normalize.css
+libraries:
+  - movies/movies-corescripts
 
 regions:
   header: Header

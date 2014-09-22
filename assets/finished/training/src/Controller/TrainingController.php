@@ -19,7 +19,7 @@ class TrainingController {
    * Our router maps this method to the path 'upcoming-movies'.
    */
   public function upcomingMovies() {
-     
+
     // Render the output list.
     $build = array(
       '#theme' => 'item_list',
@@ -28,5 +28,6 @@ class TrainingController {
     );
 
     return $build;
+
   }
 }

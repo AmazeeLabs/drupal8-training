@@ -4,7 +4,4 @@ movies-corescripts:
     js/movies.behaviors.js: {}
   dependencies:
     - core/jquery
-    - core/drupal.ajax
     - core/drupal
-    - core/drupalSettings
-    - core/jquery.once

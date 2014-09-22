@@ -1,0 +1,24 @@
+{#
+/**
+ * @file
+ * Theme implementation to display a node in content type movie and viewmode
+ * teaser.
+#}
+<article id="node-{{ node.id }}" class="{{ attributes.class }} clearfix view-mode-teaser node-movie-review "{{ attributes|without('id', 'class') }}>
+
+  <div class="image">
+    {{ content.field_movie_image_ }}
+  </div>
+  <div class="content">
+    <h2{{ title_attributes }}>
+      <a href="{{ url }}" rel="bookmark">{{ label }}</a>
+    </h2>
+    {{ content.field_movie_rating }}
+    {{ content.body }}
+    <div class="bottom">
+      {# <div class="comment-count"><a href="node/{{ node.id }}#add-comment">{{ comment_count }}</a></div> #}
+      <a href="node/{{ node.id }}" class="green-button">{% trans %}Full Review{% endtrans %}</a>
+    </div>
+  </div>
+
+</article>

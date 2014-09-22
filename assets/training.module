@@ -1,8 +1,8 @@
 <?php
 /**
  * @file
- * Code or the training module 
- * 
+ * Code or the training module
+ *
  * Note: API key is ppznkqtt59k8kcmzratmjfk9
  */
 
@@ -35,12 +35,12 @@ function training_upcoming_movies() {
   foreach($response->movies as $movie) {
     // Some of the movies won't have ratings yet.
     if (empty($movie->ratings->critics_rating)) {
-	    $movie->ratings->critics_rating = 'No reviews yet!';
-	    $movie->ratings->critics_score = '0';
+      $movie->ratings->critics_rating = 'No reviews yet!';
+      $movie->ratings->critics_score = '0';
     }
     // Create each item as a translatable link.
     $list[] = t('!link: @score% @rating', array('!link' => l($movie->title, 'http://rottentomatoes.com/m/' . $movie->id), '@score' => $movie->ratings->critics_score, '@rating' => $movie->ratings->critics_rating));
   }
-    
+
   return $list;
 }

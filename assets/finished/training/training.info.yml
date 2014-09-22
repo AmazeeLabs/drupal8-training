@@ -1,5 +1,5 @@
 name: Training
 type: module
 description: 'Training code for Drupalistas'
-package: Custom
+package: Training
 core: 8.x
