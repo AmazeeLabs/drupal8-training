@@ -4,3 +4,12 @@
  * Contains theme override and preprocess functions.
  */
 
+/**
+ * Implements template_preprocess_HOOK() for node.
+ */
+function movies_preprocess_node(&$variables) {
+  if ($variables['view_mode'] == 'teaser') {
+    $comment_count = $variables['node']->get('field_movie_comment')->comment_count;
+    $variables['comment_count'] = format_plural($comment_count, '1 comment', '@count comments');
+  }
+}

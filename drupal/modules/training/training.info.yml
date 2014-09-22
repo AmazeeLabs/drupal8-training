@@ -1,0 +1,5 @@
+name: Training
+type: module
+description: 'Training code for Drupalistas'
+package: Training
+core: 8.x

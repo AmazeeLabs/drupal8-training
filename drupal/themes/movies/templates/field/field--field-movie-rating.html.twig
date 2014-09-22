@@ -1,0 +1,10 @@
+<div{{ attributes }}>
+  {% for i in 1..5 %}
+    {% if i <= items[0]['#markup'] %}
+      {% set color = 'bright' %}
+    {% else %}
+      {% set color = 'dark' %}
+    {% endif %}
+    <div class="star star-{{ i }} {{ color }}"></div>
+  {% endfor %}
+</div>

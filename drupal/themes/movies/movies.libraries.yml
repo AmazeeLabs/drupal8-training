@@ -1,1 +1,7 @@
-
+movies-corescripts:
+  version: 1.0
+  js:
+    js/movies.behaviors.js: {}
+  dependencies:
+    - core/jquery
+    - core/drupal
