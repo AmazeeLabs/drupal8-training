@@ -1,5 +1,5 @@
-template "/home/vagrant/public_html/drupal/sites/default/settings.local.php" do
-  source "settings.local.php.erb"
+template "/home/vagrant/public_html/drupal/sites/default/settings.php" do
+  source "settings.php.erb"
   variables({
      :database => 'drupal',
      :username => 'root',
@@ -17,12 +17,13 @@ end
 
 directory "/home/vagrant/public_html/drupal/sites/default/files" do
   mode "0777"
+  recursive true
 end
 
 
 %w[ files/config_vagrant files/config_vagrant/staging].each do |dir|
   directory "/home/vagrant/public_html/drupal/sites/default/#{dir}" do
-    mode 00755
+    mode 00777
   end
 end
 
