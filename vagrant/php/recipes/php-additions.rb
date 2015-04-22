@@ -9,8 +9,6 @@ package 'php-apc'
 package 'php5-xmlrpc'
 package 'php5-imagick'
 package 'php5-xdebug'
-
-
 package 'php-pear'
 package 'build-essential'
 
