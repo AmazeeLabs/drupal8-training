@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\file\Plugin\field\formatter\TableFormatter.
+ * Contains \Drupal\file\Plugin\Field\FieldFormatter\TableFormatter.
  */
 
 namespace Drupal\file\Plugin\Field\FieldFormatter;
@@ -28,22 +28,19 @@ class TableFormatter extends FileFormatterBase {
   public function viewElements(FieldItemListInterface $items) {
     $elements = array();
 
-    if (!$items->isEmpty()) {
-
+    if ($files = $this->getEntitiesToView($items)) {
       $header = array(t('Attachment'), t('Size'));
       $rows = array();
-      foreach ($items as $delta => $item) {
-        if ($item->isDisplayed() && $item->entity) {
-          $rows[] = array(
-            array(
-              'data' => array(
-                '#theme' => 'file_link',
-                '#file' => $item->entity,
-              ),
+      foreach ($files as $delta => $file) {
+        $rows[] = array(
+          array(
+            'data' => array(
+              '#theme' => 'file_link',
+              '#file' => $file,
             ),
-            array('data' => format_size($item->entity->getSize())),
-          );
-        }
+          ),
+          array('data' => format_size($file->getSize())),
+        );
       }
 
       $elements[0] = array();

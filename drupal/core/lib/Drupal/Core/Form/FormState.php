@@ -50,13 +50,19 @@ class FormState implements FormStateInterface {
    *     for building the form. Each array entry may be the path to a file or
    *     another array containing values for the parameters 'type', 'module' and
    *     'name' as needed by module_load_include(). The files listed here are
-   *     automatically loaded by form_get_cache(). By default the current menu
-   *     router item's 'file' definition is added, if any. Use
+   *     automatically loaded by \Drupal::formBuilder()->getCache(). By default
+   *     the current menu router item's 'file' definition is added, if any. Use
    *     self::loadInclude() to add include files from a form constructor.
    *   - form_id: Identification of the primary form being constructed and
    *     processed.
    *   - base_form_id: Identification for a base form, as declared in the form
    *     class's \Drupal\Core\Form\BaseFormIdInterface::getBaseFormId() method.
+   *   - immutable: If this flag is set to TRUE, a new form build id is
+   *     generated when the form is loaded from the cache. If it is subsequently
+   *     saved to the cache again, it will have another cache id and therefore
+   *     the original form and form-state will remain unaltered. This is
+   *     important when page caching is enabled in order to prevent form state
+   *     from leaking between anonymous users.
    *
    * @var array
    */
@@ -189,6 +195,24 @@ class FormState implements FormStateInterface {
    * @var array
    */
   protected $values = array();
+
+  /**
+   * An associative array of form value keys to be removed by cleanValues().
+   *
+   * Any values that are temporary but must still be displayed as values in
+   * the rendered form should be added to this array using addCleanValueKey().
+   * Initialized with internal Form API values.
+   *
+   * This property is uncacheable.
+   *
+   * @var array
+   */
+  protected $cleanValueKeys = [
+    'form_id',
+    'form_token',
+    'form_build_id',
+    'op',
+  ];
 
   /**
    * The array of values as they were submitted by the user.
@@ -348,7 +372,7 @@ class FormState implements FormStateInterface {
    *
    * @var array
    */
-  protected $temporary;
+  protected $temporary = [];
 
   /**
    * Tracks if the form has finished validation.
@@ -703,6 +727,31 @@ class FormState implements FormStateInterface {
    */
   public function getTemporary() {
     return $this->temporary;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function &getTemporaryValue($key) {
+    $value = &NestedArray::getValue($this->temporary, (array) $key);
+    return $value;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setTemporaryValue($key, $value) {
+    NestedArray::setValue($this->temporary, (array) $key, $value, TRUE);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasTemporaryValue($key) {
+    $exists = NULL;
+    NestedArray::getValue($this->temporary, (array) $key, $exists);
+    return $exists;
   }
 
   /**
@@ -1132,17 +1181,38 @@ class FormState implements FormStateInterface {
   /**
    * {@inheritdoc}
    */
+  public function getCleanValueKeys() {
+    return $this->cleanValueKeys;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setCleanValueKeys(array $cleanValueKeys) {
+    $this->cleanValueKeys = $cleanValueKeys;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function addCleanValueKey($cleanValueKey) {
+    $keys = $this->getCleanValueKeys();
+    $this->setCleanValueKeys(array_merge((array)$keys, [$cleanValueKey]));
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function cleanValues() {
-    // Remove internal Form API values.
-    $this
-      ->unsetValue('form_id')
-      ->unsetValue('form_token')
-      ->unsetValue('form_build_id')
-      ->unsetValue('op');
+    foreach ($this->getCleanValueKeys() as $value) {
+      $this->unsetValue($value);
+    }
 
     // Remove button values.
-    // form_builder() collects all button elements in a form. We remove the button
-    // value separately for each button element.
+    // \Drupal::formBuilder()->doBuildForm() collects all button elements in a
+    // form. We remove the button value separately for each button element.
     foreach ($this->getButtons() as $button) {
       // Remove this button's value from the submitted form values by finding
       // the value corresponding to this button.
@@ -1171,6 +1241,7 @@ class FormState implements FormStateInterface {
         unset($values[$last_parent]);
       }
     }
+    return $this;
   }
 
   /**

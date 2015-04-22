@@ -24,11 +24,14 @@ class StaticTest extends AccessPluginBase {
 
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['access'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['access'] = array('default' => FALSE);
 
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function access(AccountInterface $account) {
     return !empty($this->options['access']);
   }
@@ -40,6 +43,15 @@ class StaticTest extends AccessPluginBase {
     if (!empty($this->options['access'])) {
       $route->setRequirement('_access', 'TRUE');
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    return [
+      'content' => ['StaticTest'],
+    ];
   }
 
 }

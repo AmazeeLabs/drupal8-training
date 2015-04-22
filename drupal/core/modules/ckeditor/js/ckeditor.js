@@ -11,6 +11,12 @@
         format: format.format
       };
 
+      // Set a title on the CKEditor instance that includes the text field's
+      // label so that screen readers say something that is understandable
+      // for end users.
+      var label = $('label[for=' + element.getAttribute('id') + ']').text();
+      format.editorSettings.title = Drupal.t("Rich Text Editor, !label field", {'!label': label});
+
       // CKEditor initializes itself in a read-only state if the 'disabled'
       // attribute is set. It does not respect the 'readonly' attribute,
       // however, so we set the 'readOnly' configuration property manually in
@@ -114,7 +120,7 @@
     /**
      * Variable storing the current dialog's save callback.
      */
-    saveCallack: null,
+    saveCallback: null,
 
     /**
      * Open a dialog for a Drupal-based plugin.
@@ -160,7 +166,7 @@
         selector: '.ckeditor-dialog-loading-link',
         url: url,
         event: 'ckeditor-internal.ckeditor',
-        progress: { 'type': 'throbber' },
+        progress: {'type': 'throbber'},
         submit: {
           editor_object: existingValues
         }
@@ -171,7 +177,7 @@
 
       // After a short delay, show "Loading…" message.
       window.setTimeout(function () {
-        $content.find('span').animate({ top: '0px' });
+        $content.find('span').animate({top: '0px'});
       }, 1000);
 
       // Store the save callback to be executed when this dialog is closed.
@@ -181,7 +187,7 @@
 
   // Respond to new dialogs that are opened by CKEditor, closing the AJAX loader.
   $(window).on('dialog:beforecreate', function (e, dialog, $element, settings) {
-    $('.ckeditor-dialog-loading').animate({ top: '-40px' }, function () {
+    $('.ckeditor-dialog-loading').animate({top: '-40px'}, function () {
       $(this).remove();
     });
   });

@@ -2,9 +2,15 @@ name: Responsive Image
 type: module
 description: 'Provides an image formatter and breakpoint mappings to output responsive images using the HTML5 picture tag.'
 package: Core
-version: VERSION
-core: 8.x
+# version: VERSION
+# core: 8.x
 dependencies:
   - breakpoint
   - image
-configure: responsive_image.mapping_page
+configure: entity.responsive_image_style.collection
+
+# Information added by Drupal.org packaging script on 2015-03-25
+version: '8.0.0-beta9'
+core: '8.x'
+project: 'drupal'
+datestamp: 1427300653

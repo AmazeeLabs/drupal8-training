@@ -45,9 +45,9 @@ interface EntityStorageInterface {
    * @param $ids
    *   An array of entity IDs, or NULL to load all entities.
    *
-   * @return array
+   * @return \Drupal\Core\Entity\EntityInterface[]
    *   An array of entity objects indexed by their IDs. Returns an empty array
-   *   if no matching entities found.
+   *   if no matching entities are found.
    */
   public function loadMultiple(array $ids = NULL);
 
@@ -82,8 +82,8 @@ interface EntityStorageInterface {
    * @param int $revision_id
    *   The revision id.
    *
-   * @return \Drupal\Core\Entity\EntityInterface|false
-   *   The specified entity revision or FALSE if not found.
+   * @return \Drupal\Core\Entity\EntityInterface|null
+   *   The specified entity revision or NULL if not found.
    */
   public function loadRevision($revision_id);
 
@@ -104,7 +104,7 @@ interface EntityStorageInterface {
    *   An associative array where the keys are the property names and the
    *   values are the values those properties must have.
    *
-   * @return array
+   * @return \Drupal\Core\Entity\EntityInterface[]
    *   An array of entity objects indexed by their ids.
    */
   public function loadByProperties(array $values = array());
@@ -148,14 +148,6 @@ interface EntityStorageInterface {
   public function save(EntityInterface $entity);
 
   /**
-   * Gets the name of the service for the query for this entity storage.
-   *
-   * @return string
-   *   The name of the service for the query for this entity storage.
-   */
-  public function getQueryServicename();
-
-  /**
    * Returns an entity query instance.
    *
    * @param string $conjunction
@@ -166,9 +158,24 @@ interface EntityStorageInterface {
    * @return \Drupal\Core\Entity\Query\QueryInterface
    *   The query instance.
    *
-   * @see \Drupal\Core\Entity\EntityStorageInterface::getQueryServicename()
+   * @see \Drupal\Core\Entity\EntityStorageBase::getQueryServiceName()
    */
   public function getQuery($conjunction = 'AND');
+
+  /**
+   * Returns an aggregated query instance.
+   *
+   * @param string $conjunction
+   *   (optional) The logical operator for the query, either:
+   *   - AND: all of the conditions on the query need to match.
+   *   - OR: at least one of the conditions on the query need to match.
+   *
+   * @return \Drupal\Core\Entity\Query\QueryAggregateInterface
+   *   The aggregated query object that can query the given entity type.
+   *
+   * @see \Drupal\Core\Entity\EntityStorageBase::getQueryServiceName()
+   */
+  public function getAggregateQuery($conjunction = 'AND');
 
   /**
    * Returns the entity type ID.

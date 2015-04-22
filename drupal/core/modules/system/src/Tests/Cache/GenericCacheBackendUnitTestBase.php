@@ -9,7 +9,7 @@ namespace Drupal\system\Tests\Cache;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests any cache backend.
@@ -21,7 +21,7 @@ use Drupal\simpletest\DrupalUnitTestBase;
  * @see DatabaseBackendUnitTestCase
  *   For a full working implementation.
  */
-abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
+abstract class GenericCacheBackendUnitTestBase extends KernelTestBase {
 
   /**
    * Array of objects implementing Drupal\Core\Cache\CacheBackendInterface.
@@ -212,6 +212,20 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
     $cid = str_repeat('a', 300);
     $backend->set($cid, 'test');
     $this->assertEqual('test', $backend->get($cid)->data);
+
+    // Check that the cache key is case sensitive.
+    $backend->set('TEST8', 'value');
+    $this->assertEqual('value', $backend->get('TEST8')->data);
+    $this->assertFalse($backend->get('test8'));
+
+    // Calling ::set() with invalid cache tags.
+    try {
+      $backend->set('exception_test', 'value', Cache::PERMANENT, ['node' => [3, 5, 7]]);
+      $this->fail('::set() was called with invalid cache tags, no exception was thrown.');
+    }
+    catch (\LogicException $e) {
+      $this->pass('::set() was called with invalid cache tags, an exception was thrown.');
+    }
   }
 
   /**
@@ -376,7 +390,7 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
       'cid_2' => array('data' => 2),
       'cid_3' => array('data' => array(1, 2)),
       'cid_4' => array('data' => 1, 'expire' => $future_expiration),
-      'cid_5' => array('data' => 1, 'tags' => array('test' => array('a', 'b'))),
+      'cid_5' => array('data' => 1, 'tags' => array('test:a', 'test:b')),
     );
     $backend->setMultiple($items);
     $cids = array_keys($items);
@@ -397,7 +411,20 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
     $this->assertEqual($cached['cid_4']->expire, $future_expiration, 'Cache expiration has been correctly set.');
 
     $this->assertEqual($cached['cid_5']->data, $items['cid_5']['data'], 'New cache item set correctly.');
-    $this->assertEqual($cached['cid_5']->tags, array('test:a', 'test:b'));
+
+    // Calling ::setMultiple() with invalid cache tags.
+    try {
+      $items = [
+        'exception_test_1' => array('data' => 1, 'tags' => []),
+        'exception_test_2' => array('data' => 2, 'tags' => ['valid']),
+        'exception_test_3' => array('data' => 3, 'tags' => ['node' => [3, 5, 7]]),
+      ];
+      $backend->setMultiple($items);
+      $this->fail('::setMultiple() was called with invalid cache tags, no exception was thrown.');
+    }
+    catch (\LogicException $e) {
+      $this->pass('::setMultiple() was called with invalid cache tags, an exception was thrown.');
+    }
   }
 
   /**
@@ -446,82 +473,22 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
   }
 
   /**
-   * Tests Drupal\Core\Cache\CacheBackendInterface::deleteTags().
-   */
-  function testDeleteTags() {
-    $backend = $this->getCacheBackend();
-
-    // Create two cache entries with the same tag and tag value.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => 2));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => 2));
-    $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Two cache items were created.');
-
-    // Delete test_tag of value 1. This should delete both entries.
-    $backend->deleteTags(array('test_tag' => 2));
-    $this->assertFalse($backend->get('test_cid_invalidate1') || $backend->get('test_cid_invalidate2'), 'Two cache items invalidated after deleting a cache tag.');
-    $this->assertFalse($backend->get('test_cid_invalidate1', TRUE) || $backend->get('test_cid_invalidate2', TRUE), 'Two cache items deleted after deleting a cache tag.');
-
-    // Create two cache entries with the same tag and an array tag value.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
-    $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Two cache items were created.');
-
-    // Delete test_tag of value 1. This should delete both entries.
-    $backend->deleteTags(array('test_tag' => array(1)));
-    $this->assertFalse($backend->get('test_cid_invalidate1') || $backend->get('test_cid_invalidate2'), 'Two cache items invalidated after deleted a cache tag.');
-    $this->assertFalse($backend->get('test_cid_invalidate1', TRUE) || $backend->get('test_cid_invalidate2', TRUE), 'Two cache items deleted after deleting a cache tag.');
-
-    // Create three cache entries with a mix of tags and tag values.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(2)));
-    $backend->set('test_cid_invalidate3', $this->defaultValue, Cache::PERMANENT, array('test_tag_foo' => array(3)));
-    $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2') && $backend->get('test_cid_invalidate3'), 'Three cached items were created.');
-    $backend->deleteTags(array('test_tag_foo' => array(3)));
-    $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Cached items not matching the tag were not deleted.');
-    $this->assertFalse($backend->get('test_cid_invalidated3', TRUE), 'Cache item matching the tag was deleted.');
-
-    // Create cache entry in multiple bins. Two cache entries
-    // (test_cid_invalidate1 and test_cid_invalidate2) still exist from previous
-    // tests.
-    $tags = array('test_tag' => array(1, 2, 3));
-    $bins = array('path', 'bootstrap', 'page');
-    foreach ($bins as $bin) {
-      $this->getCacheBackend($bin)->set('test', $this->defaultValue, Cache::PERMANENT, $tags);
-      $this->assertTrue($this->getCacheBackend($bin)->get('test'), 'Cache item was set in bin.');
-    }
-
-    // Delete tag in mulitple bins.
-    foreach ($bins as $bin) {
-      $this->getCacheBackend($bin)->deleteTags(array('test_tag' => array(2)));
-    }
-
-    // Test that cache entry has been deleted in multple bins.
-    foreach ($bins as $bin) {
-      $this->assertFalse($this->getCacheBackend($bin)->get('test', TRUE), 'Tag deletion affected item in bin.');
-    }
-    // Test that the cache entry with a matching tag has been invalidated.
-    $this->assertFalse($this->getCacheBackend($bin)->get('test_cid_invalidate2', TRUE), 'Cache items matching tag were deleted.');
-    // Test that the cache entry with without a matching tag still exists.
-    $this->assertTrue($this->getCacheBackend($bin)->get('test_cid_invalidate1'), 'Cache items not matching tag were not invalidated.');
-  }
-
-  /**
    * Test Drupal\Core\Cache\CacheBackendInterface::deleteAll().
    */
   public function testDeleteAll() {
-    $backend = $this->getCacheBackend();
-    $unrelated = $this->getCacheBackend('bootstrap');
+    $backend_a = $this->getCacheBackend();
+    $backend_b = $this->getCacheBackend('bootstrap');
 
     // Set both expiring and permanent keys.
-    $backend->set('test1', 1, Cache::PERMANENT);
-    $backend->set('test2', 3, time() + 1000);
-    $unrelated->set('test3', 4, Cache::PERMANENT);
+    $backend_a->set('test1', 1, Cache::PERMANENT);
+    $backend_a->set('test2', 3, time() + 1000);
+    $backend_b->set('test3', 4, Cache::PERMANENT);
 
-    $backend->deleteAll();
+    $backend_a->deleteAll();
 
-    $this->assertFalse($backend->get('test1'), 'First key has been deleted.');
-    $this->assertFalse($backend->get('test2'), 'Second key has been deleted.');
-    $this->assertTrue($unrelated->get('test3'), 'Item in other bin is preserved.');
+    $this->assertFalse($backend_a->get('test1'), 'First key has been deleted.');
+    $this->assertFalse($backend_a->get('test2'), 'Second key has been deleted.');
+    $this->assertTrue($backend_b->get('test3'), 'Item in other bin is preserved.');
   }
 
   /**
@@ -564,48 +531,45 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
     $backend = $this->getCacheBackend();
 
     // Create two cache entries with the same tag and tag value.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => 2));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => 2));
+    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag:2'));
+    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag:2'));
     $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Two cache items were created.');
 
     // Invalidate test_tag of value 1. This should invalidate both entries.
-    $backend->invalidateTags(array('test_tag' => 2));
+    Cache::invalidateTags(array('test_tag:2'));
     $this->assertFalse($backend->get('test_cid_invalidate1') || $backend->get('test_cid_invalidate2'), 'Two cache items invalidated after invalidating a cache tag.');
     $this->assertTrue($backend->get('test_cid_invalidate1', TRUE) && $backend->get('test_cid_invalidate2', TRUE), 'Cache items not deleted after invalidating a cache tag.');
 
     // Create two cache entries with the same tag and an array tag value.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
+    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag:1'));
+    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag:1'));
     $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Two cache items were created.');
 
     // Invalidate test_tag of value 1. This should invalidate both entries.
-    $backend->invalidateTags(array('test_tag' => array(1)));
+    Cache::invalidateTags(array('test_tag:1'));
     $this->assertFalse($backend->get('test_cid_invalidate1') || $backend->get('test_cid_invalidate2'), 'Two caches removed after invalidating a cache tag.');
     $this->assertTrue($backend->get('test_cid_invalidate1', TRUE) && $backend->get('test_cid_invalidate2', TRUE), 'Cache items not deleted after invalidating a cache tag.');
 
     // Create three cache entries with a mix of tags and tag values.
-    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(1)));
-    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag' => array(2)));
-    $backend->set('test_cid_invalidate3', $this->defaultValue, Cache::PERMANENT, array('test_tag_foo' => array(3)));
+    $backend->set('test_cid_invalidate1', $this->defaultValue, Cache::PERMANENT, array('test_tag:1'));
+    $backend->set('test_cid_invalidate2', $this->defaultValue, Cache::PERMANENT, array('test_tag:2'));
+    $backend->set('test_cid_invalidate3', $this->defaultValue, Cache::PERMANENT, array('test_tag_foo:3'));
     $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2') && $backend->get('test_cid_invalidate3'), 'Three cached items were created.');
-    $backend->invalidateTags(array('test_tag_foo' => array(3)));
+    Cache::invalidateTags(array('test_tag_foo:3'));
     $this->assertTrue($backend->get('test_cid_invalidate1') && $backend->get('test_cid_invalidate2'), 'Cache items not matching the tag were not invalidated.');
     $this->assertFalse($backend->get('test_cid_invalidated3'), 'Cached item matching the tag was removed.');
 
     // Create cache entry in multiple bins. Two cache entries
     // (test_cid_invalidate1 and test_cid_invalidate2) still exist from previous
     // tests.
-    $tags = array('test_tag' => array(1, 2, 3));
+    $tags = array('test_tag:1', 'test_tag:2', 'test_tag:3');
     $bins = array('path', 'bootstrap', 'page');
     foreach ($bins as $bin) {
       $this->getCacheBackend($bin)->set('test', $this->defaultValue, Cache::PERMANENT, $tags);
       $this->assertTrue($this->getCacheBackend($bin)->get('test'), 'Cache item was set in bin.');
     }
 
-    // Invalidate tag in mulitple bins.
-    foreach ($bins as $bin) {
-      $this->getCacheBackend($bin)->invalidateTags(array('test_tag' => array(2)));
-    }
+    Cache::invalidateTags(array('test_tag:2'));
 
     // Test that cache entry has been invalidated in multple bins.
     foreach ($bins as $bin) {
@@ -621,21 +585,40 @@ abstract class GenericCacheBackendUnitTestBase extends DrupalUnitTestBase {
    * Test Drupal\Core\Cache\CacheBackendInterface::invalidateAll().
    */
   public function testInvalidateAll() {
-    $backend = $this->getCacheBackend();
-    $unrelated = $this->getCacheBackend('bootstrap');
+    $backend_a = $this->getCacheBackend();
+    $backend_b = $this->getCacheBackend('bootstrap');
 
     // Set both expiring and permanent keys.
-    $backend->set('test1', 1, Cache::PERMANENT);
-    $backend->set('test2', 3, time() + 1000);
-    $unrelated->set('test3', 4, Cache::PERMANENT);
+    $backend_a->set('test1', 1, Cache::PERMANENT);
+    $backend_a->set('test2', 3, time() + 1000);
+    $backend_b->set('test3', 4, Cache::PERMANENT);
 
-    $backend->invalidateAll();
+    $backend_a->invalidateAll();
 
-    $this->assertFalse($backend->get('test1'), 'First key has been invalidated.');
-    $this->assertFalse($backend->get('test2'), 'Second key has been invalidated.');
-    $this->assertTrue($unrelated->get('test3'), 'Item in other bin is preserved.');
-    $this->assertTrue($backend->get('test1', TRUE), 'First key has not been deleted.');
-    $this->assertTrue($backend->get('test2', TRUE), 'Second key has not been deleted.');
+    $this->assertFalse($backend_a->get('test1'), 'First key has been invalidated.');
+    $this->assertFalse($backend_a->get('test2'), 'Second key has been invalidated.');
+    $this->assertTrue($backend_b->get('test3'), 'Item in other bin is preserved.');
+    $this->assertTrue($backend_a->get('test1', TRUE), 'First key has not been deleted.');
+    $this->assertTrue($backend_a->get('test2', TRUE), 'Second key has not been deleted.');
+  }
+
+  /**
+   * Tests Drupal\Core\Cache\CacheBackendInterface::removeBin().
+   */
+  public function testRemoveBin() {
+    $backend_a = $this->getCacheBackend();
+    $backend_b = $this->getCacheBackend('bootstrap');
+
+    // Set both expiring and permanent keys.
+    $backend_a->set('test1', 1, Cache::PERMANENT);
+    $backend_a->set('test2', 3, time() + 1000);
+    $backend_b->set('test3', 4, Cache::PERMANENT);
+
+    $backend_a->removeBin();
+
+    $this->assertFalse($backend_a->get('test1'), 'First key has been deleted.');
+    $this->assertFalse($backend_a->get('test2', TRUE), 'Second key has been deleted.');
+    $this->assertTrue($backend_b->get('test3'), 'Item in other bin is preserved.');
   }
 
 }

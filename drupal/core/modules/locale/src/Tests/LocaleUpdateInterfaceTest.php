@@ -7,6 +7,8 @@
 
 namespace Drupal\locale\Tests;
 
+use Drupal\Component\Utility\String;
+
 /**
  * Tests for the user interface of project interface translations.
  *
@@ -43,14 +45,12 @@ class LocaleUpdateInterfaceTest extends LocaleUpdateBase {
     $this->assertNoText(t('Translation update status'), 'No status message');
 
     $this->drupalGet('admin/reports/translations');
-    $this->assertRaw(t('No translatable languages available. <a href="@add_language">Add a language</a> first.', array('@add_language' => url('admin/config/regional/language'))), 'Language message');
+    $this->assertRaw(t('No translatable languages available. <a href="@add_language">Add a language</a> first.', array('@add_language' => \Drupal::url('entity.configurable_language.collection'))), 'Language message');
 
     // Add German language.
     $this->addLanguage('de');
 
-    // Drupal core is probably in 8.x, but tests may also be executed with
-    // stable releases. As this is an uncontrolled factor in the test, we will
-    // mark Drupal core as translated and continue with the prepared modules.
+    // Override Drupal core translation status as 'up-to-date'.
     $status = locale_translation_get_status();
     $status['drupal']['de']->type = 'current';
     \Drupal::state()->set('locale.translation_status', $status);
@@ -70,7 +70,7 @@ class LocaleUpdateInterfaceTest extends LocaleUpdateBase {
     // Check if updates are available for German.
     $this->drupalGet('admin/reports/status');
     $this->assertText(t('Translation update status'), 'Status message');
-    $this->assertRaw(t('Updates available for: @languages. See the <a href="@updates">Available translation updates</a> page for more information.', array('@languages' => t('German'), '@updates' => url('admin/reports/translations'))), 'Updates available message');
+    $this->assertRaw(t('Updates available for: @languages. See the <a href="@updates">Available translation updates</a> page for more information.', array('@languages' => t('German'), '@updates' => \Drupal::url('locale.translate_status'))), 'Updates available message');
     $this->drupalGet('admin/reports/translations');
     $this->assertText(t('Updates for: @modules', array('@modules' => 'Locale test translate')), 'Translations avaiable');
 
@@ -84,11 +84,37 @@ class LocaleUpdateInterfaceTest extends LocaleUpdateBase {
     // Check if no updates were found.
     $this->drupalGet('admin/reports/status');
     $this->assertText(t('Translation update status'), 'Status message');
-    $this->assertRaw(t('Missing translations for: @languages. See the <a href="@updates">Available translation updates</a> page for more information.', array('@languages' => t('German'), '@updates' => url('admin/reports/translations'))), 'Missing translations message');
+    $this->assertRaw(t('Missing translations for: @languages. See the <a href="@updates">Available translation updates</a> page for more information.', array('@languages' => t('German'), '@updates' => \Drupal::url('locale.translate_status'))), 'Missing translations message');
     $this->drupalGet('admin/reports/translations');
     $this->assertText(t('Missing translations for one project'), 'No translations found');
-    $this->assertText(t('@module (@version).', array('@module' => 'Locale test translate', '@version' => '1.3-dev')), 'Release details');
+    $this->assertText(String::format('@module (@version). !info', array('@module' => 'Locale test translate', '@version' => '1.3-dev', '!info' => t('No translation files are provided for development releases.'))), 'Release details');
     $this->assertText(t('No translation files are provided for development releases.'), 'Release info');
+
+    // Override Drupal core translation status as 'no translations found'.
+    $status = locale_translation_get_status();
+    $status['drupal']['de']->type = '';
+    $status['drupal']['de']->timestamp = 0;
+    $status['drupal']['de']->version = '8.1.1';
+    \Drupal::state()->set('locale.translation_status', $status);
+
+    // Check if Drupal core is not translated.
+    $this->drupalGet('admin/reports/translations');
+    $this->assertText(t('Missing translations for 2 projects'), 'No translations found');
+    $this->assertText(t('@module (@version).', array('@module' => t('Drupal core'), '@version' => '8.1.1')), 'Release details');
+
+    // Override Drupal core translation status as 'translations available'.
+    $status = locale_translation_get_status();
+    $status['drupal']['de']->type = 'local';
+    $status['drupal']['de']->files['local']->timestamp = REQUEST_TIME;
+    $status['drupal']['de']->files['local']->info['version'] = '8.1.1';
+    \Drupal::state()->set('locale.translation_status', $status);
+
+    // Check if translations are available for Drupal core.
+    $this->drupalGet('admin/reports/translations');
+    $this->assertText(t('Updates for: !project', array('!project' => t('Drupal core'))), 'Translations found');
+    $this->assertText(String::format('@module (@date)', array('@module' => t('Drupal core'), '@date' => format_date(REQUEST_TIME, 'html_date'))), 'Core translation update');
+    $update_button = $this->xpath('//input[@type="submit"][@value="' . t('Update translations') . '"]');
+    $this->assertTrue($update_button, 'Update translations button');
   }
 
 }

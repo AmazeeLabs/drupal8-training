@@ -62,8 +62,9 @@ class FormModeAccessCheck implements AccessInterface {
    *   The access result.
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, $form_mode_name = 'default', $bundle = NULL) {
+    $access = AccessResult::neutral();
     if ($entity_type_id = $route->getDefault('entity_type_id')) {
-      if (!isset($bundle)) {
+      if (empty($bundle)) {
         $entity_type = $this->entityManager->getDefinition($entity_type_id);
         $bundle = $route_match->getRawParameter($entity_type->getBundleEntityType());
       }
@@ -76,21 +77,16 @@ class FormModeAccessCheck implements AccessInterface {
         $visibility = $entity_display->status();
       }
 
-      $access = AccessResult::create();
       if ($form_mode_name != 'default' && $entity_display) {
         $access->cacheUntilEntityChanges($entity_display);
       }
 
       if ($visibility) {
         $permission = $route->getRequirement('_field_ui_form_mode_access');
-        $access->allowIfHasPermission($account, $permission);
+        $access = $access->orIf(AccessResult::allowedIfHasPermission($account, $permission));
       }
-      return $access;
     }
-    else {
-      // No opinion.
-      return AccessResult::create();
-    }
+    return $access;
   }
 
 }

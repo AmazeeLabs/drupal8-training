@@ -9,6 +9,9 @@ namespace Drupal\Component\Plugin\Context;
 
 /**
  * Interface for context definitions.
+ *
+ * @todo WARNING: This interface is going to receive some additions as part of
+ * https://www.drupal.org/node/2346999.
  */
 interface ContextDefinitionInterface {
 
@@ -147,7 +150,7 @@ interface ContextDefinitionInterface {
    * Returns a validation constraint.
    *
    * @param string $constraint_name
-   *   The name of the the constraint, i.e. its plugin id.
+   *   The name of the constraint, i.e. its plugin id.
    *
    * @return array
    *   A validation constraint definition which can be used for instantiating a

@@ -43,8 +43,8 @@ class FieldNormalizer extends NormalizerBase {
     // to the field item values.
     else {
       foreach ($entity->getTranslationLanguages() as $language) {
-        $context['langcode'] = $language->id;
-        $translation = $entity->getTranslation($language->id);
+        $context['langcode'] = $language->getId();
+        $translation = $entity->getTranslation($language->getId());
         $translated_field = $translation->get($field_name);
         $normalized_field_items = array_merge($normalized_field_items, $this->normalizeFieldItems($translated_field, $format, $context));
       }
@@ -68,19 +68,18 @@ class FieldNormalizer extends NormalizerBase {
       throw new InvalidArgumentException('The field passed in via $context[\'target_instance\'] must have a parent set.');
     }
 
-    $field = $context['target_instance'];
-    foreach ($data as $field_item_data) {
-      $count = $field->count();
-      // Get the next field item instance. The offset will serve as the field
-      // item name.
-      $field_item = $field->get($count);
-      $field_item_class = get_class($field_item);
-      // Pass in the empty field item object as the target instance.
-      $context['target_instance'] = $field_item;
-      $this->serializer->denormalize($field_item_data, $field_item_class, $format, $context);
+    $items = $context['target_instance'];
+    $item_class = $items->getItemDefinition()->getClass();
+    foreach ($data as $item_data) {
+      // Create a new item and pass it as the target for the unserialization of
+      // $item_data. Note: if $item_data is about a different language than the
+      // default, FieldItemNormalizer::denormalize() will dismiss this item and
+      // create a new one for the right language.
+      $context['target_instance'] = $items->appendItem();
+      $this->serializer->denormalize($item_data, $item_class, $format, $context);
     }
 
-    return $field;
+    return $items;
 
   }
 

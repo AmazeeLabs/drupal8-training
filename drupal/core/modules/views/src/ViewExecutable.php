@@ -7,11 +7,16 @@
 
 namespace Drupal\views;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\Form\FormState;
+use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
+use Drupal\views\Plugin\views\display\DisplayRouterInterface;
 use Drupal\views\Plugin\views\query\QueryPluginBase;
-use Drupal\views\ViewStorageInterface;
+use Drupal\views\ViewEntityInterface;
 use Drupal\Component\Utility\Tags;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,7 +27,7 @@ use Symfony\Component\HttpFoundation\Response;
  * An object to contain all of the data to generate a view, plus the member
  * functions to build the view query, execute the query and render the output.
  */
-class ViewExecutable {
+class ViewExecutable implements \Serializable {
   use DependencySerializationTrait;
 
   /**
@@ -87,21 +92,21 @@ class ViewExecutable {
    *
    * @var int
    */
-  public $current_page = NULL;
+  protected $current_page = NULL;
 
   /**
    * The number of items per page.
    *
    * @var int
    */
-  public $items_per_page = NULL;
+  protected $items_per_page = NULL;
 
   /**
    * The pager offset.
    *
    * @var int
    */
-  public $offset = NULL;
+  protected $offset = NULL;
 
   /**
    * The total number of rows returned from the query.
@@ -124,6 +129,13 @@ class ViewExecutable {
    */
   public $attachment_after = array();
 
+  /**
+   * Feed icons attached to the view.
+   *
+   * @var array
+   */
+  public $feedIcons = array();
+
   // Exposed widget input
 
   /**
@@ -138,7 +150,7 @@ class ViewExecutable {
    *
    * @var array
    */
-  public $exposed_input = array();
+  protected $exposed_input = array();
 
   /**
    * Exposed widget input directly from the $form_state->getValues().
@@ -150,14 +162,14 @@ class ViewExecutable {
   /**
    * Used to store views that were previously running if we recurse.
    *
-   * @var array
+   * @var \Drupal\views\ViewExecutable[]
    */
   public $old_view = array();
 
   /**
    * To avoid recursion in views embedded into areas.
    *
-   * @var array
+   * @var \Drupal\views\ViewExecutable[]
    */
   public $parent_views = array();
 
@@ -202,7 +214,7 @@ class ViewExecutable {
    * An array containing Drupal\views\Plugin\views\display\DisplayPluginBase
    * objects.
    *
-   * @var \Drupal\views\DisplayBag
+   * @var \Drupal\views\DisplayPluginCollection
    */
   public $displayHandlers;
 
@@ -230,9 +242,9 @@ class ViewExecutable {
   /**
    * Allow to override the url of the current view.
    *
-   * @var string
+   * @var \Drupal\Core\Url
    */
-  public $override_url = NULL;
+  public $override_url;
 
   /**
    * Allow to override the path used for generated urls.
@@ -253,67 +265,49 @@ class ViewExecutable {
   /**
    * Stores the field handlers which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\field\FieldPluginBase
-   * objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\field\FieldPluginBase[]
    */
   public $field;
 
   /**
    * Stores the argument handlers which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\argument\ArgumentPluginBase
-   * objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\argument\ArgumentPluginBase[]
    */
   public $argument;
 
   /**
    * Stores the sort handlers which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\sort\SortPluginBase objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\sort\SortPluginBase[]
    */
   public $sort;
 
   /**
    * Stores the filter handlers which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\filter\FilterPluginBase
-   * objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\filter\FilterPluginBase[]
    */
   public $filter;
 
   /**
    * Stores the relationship handlers which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\relationship\RelationshipPluginBase
-   * objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\relationship\RelationshipPluginBase[]
    */
   public $relationship;
 
   /**
    * Stores the area handlers for the header which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\area\AreaPluginBase objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\area\AreaPluginBase[]
    */
   public $header;
 
   /**
    * Stores the area handlers for the footer which are initialized on this view.
    *
-   * An array containing Drupal\views\Plugin\views\area\AreaPluginBase objects.
-   *
-   * @var array
+   * @var \Drupal\views\Plugin\views\area\AreaPluginBase[]
    */
   public $footer;
 
@@ -322,7 +316,7 @@ class ViewExecutable {
    *
    * An array containing Drupal\views\Plugin\views\area\AreaPluginBase objects.
    *
-   * @var array
+   * @var \Drupal\views\Plugin\views\area\AreaPluginBase[]
    */
   public $empty;
 
@@ -398,20 +392,20 @@ class ViewExecutable {
   /**
    * A render array container to store render related information.
    *
-   * For example you can alter the array and attach some css/js via the
-   * #attached key. This is the required way to add custom css/js.
+   * For example you can alter the array and attach some asset library or JS
+   * settings via the #attached key. This is the required way to add custom
+   * CSS or JS.
    *
    * @var array
    *
    * @see drupal_process_attached
    */
-  public $element = array(
-    '#attached' => array(
-      'css' => array(),
-      'js' => array(),
-      'library' => array(),
-    ),
-  );
+  public $element = [
+    '#attached' => [
+      'library' => [],
+      'drupalSettings' => [],
+    ]
+  ];
 
   /**
    * The current user.
@@ -428,25 +422,56 @@ class ViewExecutable {
   protected $showAdminLinks;
 
   /**
+   * The views data.
+   *
+   * @var \Drupal\views\ViewsData
+   */
+  protected $viewsData;
+
+  /**
+   * The route provider.
+   *
+   * @var \Drupal\Core\Routing\RouteProviderInterface
+   */
+  protected $routeProvider;
+
+  /**
    * Constructs a new ViewExecutable object.
    *
-   * @param \Drupal\views\ViewStorageInterface $storage
+   * @param \Drupal\views\ViewEntityInterface $storage
    *   The view config entity the actual information is stored on.
    * @param \Drupal\Core\Session\AccountInterface $user
    *   The current user.
+   * @param \Drupal\views\ViewsData $views_data
+   *   The views data.
+   * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
+   *   The route provider.
    */
-  public function __construct(ViewStorageInterface $storage, AccountInterface $user) {
+  public function __construct(ViewEntityInterface $storage, AccountInterface $user, ViewsData $views_data, RouteProviderInterface $route_provider) {
     // Reference the storage and the executable to each other.
     $this->storage = $storage;
     $this->storage->set('executable', $this);
     $this->user = $user;
+    $this->viewsData = $views_data;
+    $this->routeProvider = $route_provider;
 
     // Add the default css for a view.
     $this->element['#attached']['library'][] = 'views/views.module';
   }
 
   /**
-   * @todo.
+   * Returns the identifier.
+   *
+   * @return string|null
+   *   The entity identifier, or NULL if the object does not yet have an
+   *   identifier.
+   */
+  public function id() {
+    return $this->storage->id();
+  }
+
+  /**
+   * Saves the view.
    */
   public function save() {
     $this->storage->save();
@@ -586,6 +611,9 @@ class ViewExecutable {
     // Fill our input either from \Drupal::request()->query or from something
     // previously set on the view.
     if (empty($this->exposed_input)) {
+      // Ensure that we can call the method at any point in time.
+      $this->initDisplay();
+
       $this->exposed_input = \Drupal::request()->query->all();
       // unset items that are definitely not our input:
       foreach (array('page', 'q') as $key) {
@@ -619,7 +647,7 @@ class ViewExecutable {
     }
 
     // Initialize the display cache array.
-    $this->displayHandlers = new DisplayBag($this, Views::pluginManager('display'));
+    $this->displayHandlers = new DisplayPluginCollection($this, Views::pluginManager('display'));
 
     $this->current_display = 'default';
     $this->display_handler = $this->displayHandlers->get('default');
@@ -893,7 +921,7 @@ class ViewExecutable {
    */
   protected function _initHandler($key, $info) {
     // Load the requested items from the display onto the object.
-    $this->$key = $this->display_handler->getHandlers($key);
+    $this->$key = &$this->display_handler->getHandlers($key);
 
     // This reference deals with difficult PHP indirection.
     $handlers = &$this->$key;
@@ -965,7 +993,7 @@ class ViewExecutable {
 
         // Add this argument's substitution
         $substitutions['%' . ($position + 1)] = $arg_title;
-        $substitutions['!' . ($position + 1)] = strip_tags(decode_entities($arg));
+        $substitutions['!' . ($position + 1)] = strip_tags(String::decodeEntities($arg));
 
         // Test to see if we should use this argument's title
         if (!empty($argument->options['title_enable']) && !empty($argument->options['title'])) {
@@ -1371,6 +1399,7 @@ class ViewExecutable {
       }
 
       $this->display_handler->output = $this->display_handler->render();
+
       if ($cache) {
         $cache->cacheSet('output');
       }
@@ -1394,6 +1423,49 @@ class ViewExecutable {
     }
 
     return $this->display_handler->output;
+  }
+
+  /**
+   * Gets the cache tags associated with the executed view.
+   *
+   * Note: The cache plugin controls the used tags, so you can override it, if
+   *   needed.
+   *
+   * @return string[]
+   *   An array of cache tags.
+   */
+  public function getCacheTags() {
+    $this->initDisplay();
+    /** @var \Drupal\views\Plugin\views\cache\CachePluginBase $cache */
+    $cache = $this->display_handler->getPlugin('cache');
+    return $cache->getCacheTags();
+  }
+
+  /**
+   * Builds the render array outline for the given display.
+   *
+   * This render array has a #pre_render callback which will call
+   * ::executeDisplay in order to actually execute the view and then build the
+   * final render array structure.
+   *
+   * @param string $display_id
+   *   The display ID.
+   * @param array $args
+   *   An array of arguments passed along to the view.
+   *
+   * @return array|null
+   *   A renderable array with #type 'view' or NULL if the display ID was
+   *   invalid.
+   */
+  public function buildRenderable($display_id = NULL, $args = array()) {
+    // @todo Extract that into a generic method.
+    if (empty($this->current_display) || $this->current_display != $this->chooseDisplay($display_id)) {
+      if (!$this->setDisplay($display_id)) {
+        return NULL;
+      }
+    }
+
+    return $this->display_handler->buildRenderable($args);
   }
 
   /**
@@ -1506,10 +1578,12 @@ class ViewExecutable {
     $this->is_attachment = TRUE;
     // Find out which other displays attach to the current one.
     foreach ($this->display_handler->getAttachedDisplays() as $id) {
-      // Create a clone for the attachments to manipulate. 'static' refers to the current class name.
-      $cloned_view = new static($this->storage, $this->user);
-      $cloned_view->setRequest($this->getRequest());
-      $this->displayHandlers->get($id)->attachTo($cloned_view, $this->current_display, $this->element);
+      $display_handler = $this->displayHandlers->get($id);
+      // Only attach enabled attachments.
+      if ($display_handler->isEnabled()) {
+        $cloned_view = Views::executableFactory()->get($this->storage);
+        $display_handler->attachTo($cloned_view, $this->current_display, $this->element);
+      }
     }
     $this->is_attachment = FALSE;
   }
@@ -1664,11 +1738,46 @@ class ViewExecutable {
   }
 
   /**
+   * Determines whether you can link to the view or a particular display.
+   *
+   * Some displays (e.g. block displays) do not have their own route, but may
+   * optionally provide a link to another display that does have a route.
+   *
+   * @param array $args
+   *   (optional) The arguments.
+   * @param string $display_id
+   *   (optional) The display ID. The current display will be used by default.
+   *
+   * @return bool
+   */
+  public function hasUrl($args = NULL, $display_id = NULL) {
+    if (!empty($this->override_url)) {
+      return TRUE;
+    }
+
+    // If the display has a valid route available (either its own or for a
+    // linked display), then we can provide a URL for it.
+    $display_handler = $this->displayHandlers->get($display_id ?: $this->current_display)->getRoutedDisplay();
+    if (!$display_handler instanceof DisplayRouterInterface) {
+      return FALSE;
+    }
+
+    return TRUE;
+  }
+
+  /**
    * Get the URL for the current view.
    *
    * This URL will be adjusted for arguments.
+   *
+   * @param array $args
+   *   (optional) Passed in arguments.
+   * @param string $display_id
+   *   (optional) Specify the display ID to link to, fallback to the current ID.
+   *
+   * @return \Drupal\Core\Url
    */
-  public function getUrl($args = NULL, $path = NULL) {
+  public function getUrl($args = NULL, $display_id = NULL) {
     if (!empty($this->override_url)) {
       return $this->override_url;
     }
@@ -1676,6 +1785,12 @@ class ViewExecutable {
     if (!isset($path)) {
       $path = $this->getPath();
     }
+
+    $display_handler = $this->displayHandlers->get($display_id ?: $this->current_display)->getRoutedDisplay();
+    if (!$display_handler instanceof DisplayRouterInterface) {
+      throw new \InvalidArgumentException('You cannot create a URL to a display without routes.');
+    }
+
     if (!isset($args)) {
       $args = $this->args;
 
@@ -1692,41 +1807,61 @@ class ViewExecutable {
     }
     // Don't bother working if there's nothing to do:
     if (empty($path) || (empty($args) && strpos($path, '%') === FALSE)) {
-      return $path;
+      return $display_handler->getUrlInfo();
     }
 
-    $pieces = array();
     $argument_keys = isset($this->argument) ? array_keys($this->argument) : array();
     $id = current($argument_keys);
-    foreach (explode('/', $path) as $piece) {
-      if ($piece != '%') {
-        $pieces[] = $piece;
-      }
-      else {
-        if (empty($args)) {
-          // Try to never put % in a url; use the wildcard instead.
-          if ($id && !empty($this->argument[$id]->options['exception']['value'])) {
-            $pieces[] = $this->argument[$id]->options['exception']['value'];
-          }
-          else {
-            $pieces[] = '*'; // gotta put something if there just isn't one.
-          }
 
+    /** @var \Drupal\Core\Url $url */
+    $url = $display_handler->getUrlInfo();
+    $route = $this->routeProvider->getRouteByName($url->getRouteName());
+
+    $variables = $route->compile()->getVariables();
+    $parameters = $url->getRouteParameters();
+
+    foreach ($variables as $variable_name) {
+      if (empty($args)) {
+        // Try to never put % in a URL; use the wildcard instead.
+        if ($id && !empty($this->argument[$id]->options['exception']['value'])) {
+          $parameters[$variable_name] = $this->argument[$id]->options['exception']['value'];
         }
         else {
-          $pieces[] = array_shift($args);
+          // Provide some fallback in case no exception value could be found.
+          $parameters[$variable_name] = '*';
         }
+      }
+      else {
+        $parameters[$variable_name] = array_shift($args);
+      }
 
-        if ($id) {
-          $id = next($argument_keys);
-        }
+      if ($id) {
+        $id = next($argument_keys);
       }
     }
 
-    if (!empty($args)) {
-      $pieces = array_merge($pieces, $args);
+    $url->setRouteParameters($parameters);
+    return $url;
+  }
+
+  /**
+   * Gets the Url object associated with the display handler.
+   *
+   * @param string $display_id
+   *   (Optional) The display id. ( Used only to detail an exception. )
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown when the display plugin does not have a URL to return.
+   *
+   * @return \Drupal\Core\Url
+   *   The display handlers URL object.
+   */
+  public function getUrlInfo($display_id = '') {
+    $this->initDisplay();
+    if (!$this->display_handler instanceof DisplayRouterInterface) {
+      throw new \InvalidArgumentException(String::format('You cannot generate a URL for the display @display_id', ['@display_id' => $display_id]));
     }
-    return implode('/', $pieces);
+    return $this->display_handler->getUrlInfo();
   }
 
   /**
@@ -1748,7 +1883,7 @@ class ViewExecutable {
   /**
    * Gets the current user.
    *
-   * Views plugins can recieve the current user in order to not need dependency
+   * Views plugins can receive the current user in order to not need dependency
    * injection.
    *
    * @return \Drupal\Core\Session\AccountInterface
@@ -1788,7 +1923,7 @@ class ViewExecutable {
     $defaults = $reflection->getDefaultProperties();
     // The external dependencies should not be reset. This is not generated by
     // the execution of a view.
-    unset($defaults['storage'], $defaults['user'], $defaults['request']);
+    unset($defaults['storage'], $defaults['user'], $defaults['request'], $defaults['routeProvider']);
 
     foreach ($defaults as $property => $default) {
       $this->{$property} = $default;
@@ -1880,6 +2015,7 @@ class ViewExecutable {
     $types = $this::getHandlerTypes();
     $this->setDisplay($display_id);
 
+    $data = $this->viewsData->get($table);
     $fields = $this->displayHandlers->get($display_id)->getOption($types[$type]['plural']);
 
     if (empty($id)) {
@@ -1895,13 +2031,16 @@ class ViewExecutable {
       'field' => $field,
     ) + $options;
 
+    if (isset($data['table']['entity type'])) {
+      $fields[$id]['entity_type'] = $data['table']['entity type'];
+    }
+    if (isset($data[$field]['entity field'])) {
+      $fields[$id]['entity_field'] = $data[$field]['entity field'];
+    }
+
     // Load the plugin ID if available.
-    $data = Views::viewsData()->get($table);
     if (isset($data[$field][$handler_type]['id'])) {
       $fields[$id]['plugin_id'] = $data[$field][$handler_type]['id'];
-      if ($definition = Views::pluginManager($handler_type)->getDefinition($fields[$id]['plugin_id'], FALSE)) {
-        $fields[$id]['provider'] = isset($definition['provider']) ? $definition['provider'] : 'views';
-      }
     }
 
     $this->displayHandlers->get($display_id)->setOption($types[$type]['plural'], $fields);
@@ -1948,6 +2087,8 @@ class ViewExecutable {
    *   An array of handler instances of a given type for this display.
    */
   public function getHandlers($type, $display_id = NULL) {
+    $old_display_id = !empty($this->current_display) ? $this->current_display : 'default';
+
     $this->setDisplay($display_id);
 
     if (!isset($display_id)) {
@@ -1956,7 +2097,14 @@ class ViewExecutable {
 
     // Get info about the types so we can get the right data.
     $types = static::getHandlerTypes();
-    return $this->displayHandlers->get($display_id)->getOption($types[$type]['plural']);
+
+    $handlers = $this->displayHandlers->get($display_id)->getOption($types[$type]['plural']);
+
+    // Restore initial display id (if any) or set to 'default'.
+    if ($display_id != $old_display_id) {
+      $this->setDisplay($old_display_id);
+    }
+    return $handlers;
   }
 
   /**
@@ -2083,6 +2231,9 @@ class ViewExecutable {
    *  Returns TRUE if admin links should be rendered, else FALSE.
    */
   public function getShowAdminLinks() {
+    if (!isset($this->showAdminLinks)) {
+      return $this->getDisplay()->getOption('show_admin_links');
+    }
     return $this->showAdminLinks;
   }
 
@@ -2164,6 +2315,51 @@ class ViewExecutable {
    */
   public function calculateDependencies() {
     return $this->storage->calculateDependencies();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function serialize() {
+    return serialize([
+      // Only serialize the storage entity ID.
+      $this->storage->id(),
+      $this->current_display,
+      $this->args,
+      $this->current_page,
+      $this->exposed_input,
+      $this->exposed_raw_input,
+      $this->exposed_data,
+      $this->dom_id,
+      $this->executed,
+    ]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function unserialize($serialized) {
+    list($storage, $current_display, $args, $current_page, $exposed_input, $exposed_raw_input, $exposed_data, $dom_id, $executed) = unserialize($serialized);
+
+    $this->setRequest(\Drupal::request());
+    $this->user = \Drupal::currentUser();
+
+    $this->storage = \Drupal::entityManager()->getStorage('view')->load($storage);
+
+    $this->setDisplay($current_display);
+    $this->setArguments($args);
+    $this->setCurrentPage($current_page);
+    $this->setExposedInput($exposed_input);
+    $this->exposed_data = $exposed_data;
+    $this->exposed_raw_input = $exposed_raw_input;
+    $this->dom_id = $dom_id;
+
+    $this->initHandlers();
+
+    // If the display was previously executed, execute it now.
+    if ($executed) {
+      $this->execute($this->current_display);
+    }
   }
 
 }

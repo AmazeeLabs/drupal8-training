@@ -8,14 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upload entity display.
  *
  * @group migrate_drupal
  */
-class MigrateUploadEntityDisplayTest extends MigrateDrupalTestBase {
+class MigrateUploadEntityDisplayTest extends MigrateDrupal6TestBase {
 
   /**
    * The modules to be enabled during the test.
@@ -43,7 +43,8 @@ class MigrateUploadEntityDisplayTest extends MigrateDrupalTestBase {
 
     $migration = entity_load('migration', 'd6_upload_entity_display');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6UploadInstance.php',
+      $this->getDumpDirectory() . '/NodeType.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -56,18 +57,18 @@ class MigrateUploadEntityDisplayTest extends MigrateDrupalTestBase {
   public function testUploadEntityDisplay() {
     $display = entity_get_display('node', 'page', 'default');
     $component = $display->getComponent('upload');
-    $this->assertEqual($component['type'], 'file_default');
+    $this->assertIdentical('file_default', $component['type']);
 
     $display = entity_get_display('node', 'story', 'default');
     $component = $display->getComponent('upload');
-    $this->assertEqual($component['type'], 'file_default');
+    $this->assertIdentical('file_default', $component['type']);
 
     // Assure this doesn't exist.
     $display = entity_get_display('node', 'article', 'default');
     $component = $display->getComponent('upload');
     $this->assertTrue(is_null($component));
 
-    $this->assertEqual(array('node', 'page', 'default', 'upload'), entity_load('migration', 'd6_upload_entity_display')->getIdMap()->lookupDestinationID(array('page')));
+    $this->assertIdentical(array('node', 'page', 'default', 'upload'), entity_load('migration', 'd6_upload_entity_display')->getIdMap()->lookupDestinationID(array('page')));
   }
 
 }

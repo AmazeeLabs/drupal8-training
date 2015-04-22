@@ -12,7 +12,7 @@ use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 
 /**
- * Tests content translation workflows.
+ * Base class for content translation tests.
  */
 abstract class ContentTranslationTestBase extends WebTestBase {
 
@@ -79,6 +79,11 @@ abstract class ContentTranslationTestBase extends WebTestBase {
    */
   protected $controller;
 
+  /**
+   * @var \Drupal\content_translation\ContentTranslationManagerInterface
+   */
+  protected $manager;
+
   protected function setUp() {
     parent::setUp();
 
@@ -88,7 +93,8 @@ abstract class ContentTranslationTestBase extends WebTestBase {
     $this->setupUsers();
     $this->setupTestFields();
 
-    $this->controller = content_translation_controller($this->entityTypeId);
+    $this->manager = $this->container->get('content_translation.manager');
+    $this->controller = $this->manager->getTranslationHandler($this->entityTypeId);
 
     // Rebuild the container so that the new languages are picked up by services
     // that hold a list of languages.
@@ -103,7 +109,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
     foreach ($this->langcodes as $langcode) {
       ConfigurableLanguage::createFromLangcode($langcode)->save();
     }
-    array_unshift($this->langcodes, \Drupal::languageManager()->getDefaultLanguage()->id);
+    array_unshift($this->langcodes, \Drupal::languageManager()->getDefaultLanguage()->getId());
   }
 
   /**
@@ -163,41 +169,38 @@ abstract class ContentTranslationTestBase extends WebTestBase {
   protected function enableTranslation() {
     // Enable translation for the current entity type and ensure the change is
     // picked up.
-    content_translation_set_config($this->entityTypeId, $this->bundle, 'enabled', TRUE);
+    \Drupal::service('content_translation.manager')->setEnabled($this->entityTypeId, $this->bundle, TRUE);
     drupal_static_reset();
     \Drupal::entityManager()->clearCachedDefinitions();
     \Drupal::service('router.builder')->rebuild();
+    \Drupal::service('entity.definition_update_manager')->applyUpdates();
   }
 
   /**
    * Creates the test fields.
    */
   protected function setupTestFields() {
-    $entity_type = \Drupal::entityManager()->getDefinition($this->entityTypeId);
-    if ($entity_type->isFieldable()) {
-      if (empty($this->fieldName)) {
-        $this->fieldName = 'field_test_et_ui_test';
-      }
-      entity_create('field_storage_config', array(
-        'name' => $this->fieldName,
-        'type' => 'string',
-        'entity_type' => $this->entityTypeId,
-        'cardinality' => 1,
-        'translatable' => TRUE,
-      ))->save();
-      entity_create('field_config', array(
-        'entity_type' => $this->entityTypeId,
-        'field_name' => $this->fieldName,
-        'bundle' => $this->bundle,
-        'label' => 'Test translatable text-field',
-      ))->save();
-      entity_get_form_display($this->entityTypeId, $this->bundle, 'default')
-        ->setComponent($this->fieldName, array(
-          'type' => 'string_textfield',
-          'weight' => 0,
-        ))
-        ->save();
+    if (empty($this->fieldName)) {
+      $this->fieldName = 'field_test_et_ui_test';
     }
+    entity_create('field_storage_config', array(
+      'field_name' => $this->fieldName,
+      'type' => 'string',
+      'entity_type' => $this->entityTypeId,
+      'cardinality' => 1,
+    ))->save();
+    entity_create('field_config', array(
+      'entity_type' => $this->entityTypeId,
+      'field_name' => $this->fieldName,
+      'bundle' => $this->bundle,
+      'label' => 'Test translatable text-field',
+    ))->save();
+    entity_get_form_display($this->entityTypeId, $this->bundle, 'default')
+      ->setComponent($this->fieldName, array(
+        'type' => 'string_textfield',
+        'weight' => 0,
+      ))
+      ->save();
   }
 
   /**
@@ -211,7 +214,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
    *   (optional) The entity bundle, if the entity uses bundles. Defaults to
    *   NULL. If left NULL, $this->bundle will be used.
    *
-   * @return
+   * @return string
    *   The entity id.
    */
   protected function createEntity($values, $langcode, $bundle_name = NULL) {

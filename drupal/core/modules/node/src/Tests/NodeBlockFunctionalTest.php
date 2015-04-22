@@ -7,6 +7,9 @@
 
 namespace Drupal\node\Tests;
 
+use Drupal\block\Entity\Block;
+use Drupal\user\RoleInterface;
+
 /**
  * Tests node block functionality.
  *
@@ -39,7 +42,7 @@ class NodeBlockFunctionalTest extends NodeTestBase {
     parent::setUp();
 
     // Create users and test node.
-    $this->adminUser = $this->drupalCreateUser(array('administer content types', 'administer nodes', 'administer blocks'));
+    $this->adminUser = $this->drupalCreateUser(array('administer content types', 'administer nodes', 'administer blocks', 'access content overview'));
     $this->webUser = $this->drupalCreateUser(array('access content', 'create article content'));
   }
 
@@ -50,7 +53,7 @@ class NodeBlockFunctionalTest extends NodeTestBase {
     $this->drupalLogin($this->adminUser);
 
     // Disallow anonymous users to view content.
-    user_role_change_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_change_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access content' => FALSE,
     ));
 
@@ -99,6 +102,12 @@ class NodeBlockFunctionalTest extends NodeTestBase {
     $this->drupalLogout();
     $this->drupalLogin($this->adminUser);
 
+    // Verify that the More link is shown and leads to the admin content page.
+    $this->drupalGet('');
+    $this->clickLink('More');
+    $this->assertResponse('200');
+    $this->assertUrl('admin/content');
+
     // Set the number of recent nodes to show to 10.
     $block->getPlugin()->setConfigurationValue('items_per_page', 10);
     $block->save();
@@ -114,15 +123,15 @@ class NodeBlockFunctionalTest extends NodeTestBase {
     $this->assertText($node4->label(), 'Node found in block.');
 
     // Enable the "Powered by Drupal" block only on article nodes.
-    $block = $this->drupalPlaceBlock('system_powered_by_block', array(
-      'visibility' => array(
-        'node_type' => array(
-          'bundles' => array(
-            'article' => 'article',
-          ),
-        ),
-      ),
-    ));
+    $edit = [
+      'id' => strtolower($this->randomMachineName()),
+      'region' => 'sidebar_first',
+      'visibility[node_type][bundles][article]' => 'article',
+    ];
+    $theme =  \Drupal::service('theme_handler')->getDefault();
+    $this->drupalPostForm("admin/structure/block/add/system_powered_by_block/$theme", $edit, t('Save block'));
+
+    $block = Block::load($edit['id']);
     $visibility = $block->getVisibility();
     $this->assertTrue(isset($visibility['node_type']['bundles']['article']), 'Visibility settings were saved to configuration');
 
@@ -146,7 +155,7 @@ class NodeBlockFunctionalTest extends NodeTestBase {
     $this->drupalLogin($this->adminUser);
     $this->drupalGet('admin/structure/block');
     $this->assertText($label, 'Block was displayed on the admin/structure/block page.');
-    $this->assertLinkByHref(url('admin/structure/block/manage/' . $block->id()));
+    $this->assertLinkByHref($block->url());
   }
 
 }

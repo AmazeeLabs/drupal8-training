@@ -70,7 +70,7 @@
     attach: function (context) {
       // Initially hide all field rows for non translatable bundles and all column
       // rows for non translatable fields.
-      $(context).find('table .bundle-settings .translatable :input').once('translation-entity-admin-hide', function () {
+      $(context).find('table .bundle-settings .translatable :input').once('translation-entity-admin-hide').each(function () {
         var $input = $(this);
         var $bundleSettings = $input.closest('.bundle-settings');
         if (!$input.is(':checked')) {
@@ -90,7 +90,7 @@
         var $settings = $bundleSettings.nextUntil('.bundle-settings');
         var $fieldSettings = $settings.filter('.field-settings');
         if ($target.is(':checked')) {
-          $bundleSettings.find('.operations :input[name$="[language_show]"]').prop('checked', true);
+          $bundleSettings.find('.operations :input[name$="[language_alterable]"]').prop('checked', true);
           $fieldSettings.find('.translatable :input').prop('checked', true);
           $settings.show();
         }

@@ -73,7 +73,7 @@ function pager_find_page($element = 0) {
  *   );
  *
  *   // Finally, display the pager controls, and return.
- *   $pager = array('#theme' => 'pager');
+ *   $pager = array('#type' => 'pager');
  *   $output .= drupal_render($pager);
  *   return $output;
  * @endcode
@@ -105,7 +105,7 @@ function pager_find_page($element = 0) {
  *   $output = drupal_render($search_results);
  *
  *   // Finally, display the pager controls, and return.
- *   $pager = array('#theme' => 'pager');
+ *   $pager = array('#type' => 'pager');
  *   $output .= drupal_render($pager);
  *   return $output;
  * @endcode
@@ -158,23 +158,24 @@ function pager_get_query_parameters() {
  *
  * Default template: pager.html.twig.
  *
- * Menu callbacks that display paged query results should call _theme('pager')
+ * Menu callbacks that display paged query results should use #type => pager
  * to retrieve a pager control so that users can view other results. Format a
  * list of nearby pages with additional query results.
  *
  * @param array $variables
  *   An associative array containing:
- *   - tags: An array of labels for the controls in the pager.
- *   - element: An optional integer to distinguish between multiple pagers on
- *     one page.
- *   - parameters: An associative array of query string parameters to append to
- *     the pager links.
- *   - quantity: The number of pages in the list.
+ *   - pager: A render element containing:
+ *     - #tags: An array of labels for the controls in the pager.
+ *     - #element: An optional integer to distinguish between multiple pagers on
+ *       one page.
+ *     - #parameters: An associative array of query string parameters to append to
+ *       the pager links.
+ *     - #quantity: The number of pages in the list.
  */
 function template_preprocess_pager(&$variables) {
-  $element = $variables['element'];
-  $parameters = $variables['parameters'];
-  $quantity = $variables['quantity'];
+  $element = $variables['pager']['#element'];
+  $parameters = $variables['pager']['#parameters'];
+  $quantity = $variables['pager']['#quantity'];
   global $pager_page_array, $pager_total;
 
   // Nothing to do if there is only one page.
@@ -182,15 +183,7 @@ function template_preprocess_pager(&$variables) {
     return;
   }
 
-  // Fill in default link labels.
-  $tags = &$variables['tags'];
-  $tags += array(
-    t('« first'),
-    t('‹ previous'),
-    '',
-    t('next ›'),
-    t('last »'),
-  );
+  $tags = $variables['pager']['#tags'];
 
   // Calculate various markers within this pager piece:
   // Middle is used to "center" pages around the current page.
@@ -219,196 +212,70 @@ function template_preprocess_pager(&$variables) {
   }
   // End of generation loop preparation.
 
-  $li_first = '';
-  $li_previous = '';
-  $li_next = '';
-  $li_last = '';
-  $current_path = current_path();
-
   // Create the "first" and "previous" links if we are not on the first page.
   if ($pager_page_array[$element] > 0) {
-    $li_first = array(
-      '#type' => 'link',
-      '#title' => $tags[0],
-      '#href' => $current_path,
-      '#options' => array(
-        'query' => pager_query_add_page($parameters, $element, 0),
-        'attributes' => array(
-          'title' => t('Go to first page'),
-        ),
-        // Below is ignored by default, supplied to support hook_link_alter
-        // implementations.
-        'pager_context' => array(
-          'link_type' => 'first',
-          'element' => $element,
-        ),
-      ),
+    $items['first'] = array();
+    $options = array(
+      'query' => pager_query_add_page($parameters, $element, 0),
     );
-    $li_previous = array(
-      '#type' => 'link',
-      '#title' => $tags[1],
-      '#href' => $current_path,
-      '#options' => array(
-        'query' => pager_query_add_page($parameters, $element, $pager_page_array[$element] - 1),
-        'attributes' => array(
-          'title' => t('Go to previous page'),
-          'rel' => 'prev',
-        ),
-        // Below is ignored by default, supplied to support hook_link_alter
-        // implementations.
-        'pager_context' => array(
-          'link_type' => 'previous',
-          'element' => $element,
-        ),
-      ),
+    $items['first']['href'] = \Drupal::url('<current>', [], $options);
+    if (isset($tags[0])) {
+      $items['first']['text'] = $tags[0];
+    }
+
+    $items['previous'] = array();
+    $options = array(
+      'query' => pager_query_add_page($parameters, $element, $pager_page_array[$element] - 1),
     );
+    $items['previous']['href'] = \Drupal::url('<current>', [], $options);
+    if (isset($tags[1])) {
+      $items['previous']['text'] = $tags[1];
+    }
   }
 
-  // Create the "last" and "next" links if we are not on the last page.
-  if ($pager_page_array[$element] < ($pager_total[$element] - 1)) {
-    $li_next = array(
-      '#type' => 'link',
-      '#title' => $tags[3],
-      '#href' => $current_path,
-      '#options' => array(
-        'query' => pager_query_add_page($parameters, $element, $pager_page_array[$element] + 1),
-        'attributes' => array(
-          'title' => t('Go to next page'),
-          'rel' => 'next',
-        ),
-        // Below is ignored by default, supplied to support hook_link_alter
-        // implementations.
-        'pager_context' => array(
-          'link_type' => 'next',
-          'element' => $element,
-        ),
-      ),
-    );
-    $li_last = array(
-      '#type' => 'link',
-      '#title' => $tags[4],
-      '#href' => $current_path,
-      '#options' => array(
-        'query' => pager_query_add_page($parameters, $element, $pager_total[$element] - 1),
-        'attributes' => array(
-          'title' => t('Go to last page'),
-        ),
-        // Below is ignored by default, supplied to support hook_link_alter
-        // implementations.
-        'pager_context' => array(
-          'link_type' => 'last',
-          'element' => $element,
-        ),
-      ),
-    );
+  if ($i != $pager_max) {
+    // Add an ellipsis if there are further previous pages.
+    if ($i > 1) {
+      $variables['ellipses']['previous'] = TRUE;
+    }
+    // Now generate the actual pager piece.
+    for (; $i <= $pager_last && $i <= $pager_max; $i++) {
+      $options = array(
+        'query' => pager_query_add_page($parameters, $element, $i - 1),
+      );
+      $items['pages'][$i]['href'] = \Drupal::url('<current>', [], $options);
+      if ($i == $pager_current) {
+        $variables['current'] = $i;
+      }
+    }
+    // Add an ellipsis if there are further next pages.
+    if ($i < $pager_max) {
+      $variables['ellipses']['next'] = TRUE;
+    }
   }
 
-  if ($pager_total[$element] > 1) {
-    if ($li_first) {
-      $items[] = array(
-        '#wrapper_attributes' => array('class' => array('pager-first')),
-        'link' => $li_first,
-      );
-    }
-    if ($li_previous) {
-      $items[] = array(
-        '#wrapper_attributes' => array('class' => array('pager-previous')),
-        'link' => $li_previous,
-      );
-    }
-
-    // When there is more than one page, create the pager list.
-    if ($i != $pager_max) {
-      // Check whether there are further previous pages.
-      if ($i > 1) {
-        $items[] = array(
-          '#wrapper_attributes' => array('class' => array('pager-ellipsis')),
-          '#markup' => '…',
-        );
-      }
-      // Now generate the actual pager piece.
-      for (; $i <= $pager_last && $i <= $pager_max; $i++) {
-        if ($i < $pager_current) {
-          $items[] = array(
-            '#wrapper_attributes' => array('class' => array('pager-item')),
-            'link' => array(
-              '#type' => 'link',
-              '#title' => $i,
-              '#href' => $current_path,
-              '#options' => array(
-                'query' => pager_query_add_page($parameters, $element, $i - 1),
-                'attributes' => array(
-                  'title' => t('Go to page @number', array('@number' => $i)),
-                ),
-                // Below is ignored by default, supplied to support hook_link_alter
-                // implementations.
-                'pager_context' => array(
-                  'link_type' => 'item',
-                  'element' => $element,
-                  'interval' => ($pager_current - $i),
-                ),
-              ),
-            ),
-          );
-        }
-        if ($i == $pager_current) {
-          $items[] = array(
-            '#wrapper_attributes' => array('class' => array('pager-current')),
-            '#markup' => $i,
-          );
-        }
-        if ($i > $pager_current) {
-          $items[] = array(
-            '#wrapper_attributes' => array('class' => array('pager-item')),
-            'link' => array(
-              '#type' => 'link',
-              '#title' => $i,
-              '#href' => $current_path,
-              '#options' => array(
-                'query' => pager_query_add_page($parameters, $element, $i - 1),
-                'attributes' => array(
-                  'title' => t('Go to page @number', array('@number' => $i)),
-                ),
-                // Below is ignored by default, supplied to support hook_link_alter
-                // implementations.
-                'pager_context' => array(
-                  'link_type' => 'item',
-                  'element' => $element,
-                  'interval' => ($i - $pager_current),
-                ),
-              ),
-            ),
-          );
-        }
-      }
-      // Check whether there are further next pages.
-      if ($i < $pager_max) {
-        $items[] = array(
-          '#wrapper_attributes' => array('class' => array('pager-ellipsis')),
-          '#markup' => '…',
-        );
-      }
-    }
-    // End generation.
-    if ($li_next) {
-      $items[] = array(
-        '#wrapper_attributes' => array('class' => array('pager-next')),
-        'link' => $li_next,
-      );
-    }
-    if ($li_last) {
-      $items[] = array(
-        '#wrapper_attributes' => array('class' => array('pager-last')),
-        'link' => $li_last,
-      );
-    }
-
-    $variables['items'] = array(
-      '#theme' => 'item_list__pager',
-      '#items' => $items,
-      '#attributes' => array('class' => array('pager')),
+  // Create the "next" and "last" links if we are not on the last page.
+  if ($pager_page_array[$element] < ($pager_max - 1)) {
+    $items['next'] = array();
+    $options = array(
+      'query' => pager_query_add_page($parameters, $element, $pager_page_array[$element] + 1),
     );
+    $items['next']['href'] = \Drupal::url('<current>', [], $options);
+    if (isset($tags[3])) {
+      $items['next']['text'] = $tags[3];
+    }
+
+    $items['last'] = array();
+    $options = array(
+      'query' => pager_query_add_page($parameters, $element, $pager_max - 1),
+    );
+    $items['last']['href'] = \Drupal::url('<current>', [], $options);
+    if (isset($tags[4])) {
+      $items['last']['text'] = $tags[4];
+    }
   }
+
+  $variables['items'] = $items;
 }
 
 /**
@@ -438,8 +305,11 @@ function pager_query_add_page(array $query, $element, $index) {
   if ($new_page = implode(',', pager_load_array($page_new[$element], $element, explode(',', $page)))) {
     $query['page'] = $new_page;
   }
-  if ($query_pager = pager_get_query_parameters()) {
-    $query = array_merge($query, $query_pager);
+  // Merge the query parameters passed to this function with the parameters
+  // from the current request. In case of collision, the parameters passed
+  // into this function take precedence.
+  if ($current_request_query = pager_get_query_parameters()) {
+    $query = array_merge($current_request_query, $query);
   }
   return $query;
 }

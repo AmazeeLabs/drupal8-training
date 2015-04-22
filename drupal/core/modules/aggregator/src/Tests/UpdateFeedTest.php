@@ -16,14 +16,15 @@ class UpdateFeedTest extends AggregatorTestBase {
   /**
    * Creates a feed and attempts to update it.
    */
-  function testUpdateFeed() {
+  public function testUpdateFeed() {
     $remaining_fields = array('title[0][value]', 'url[0][value]', '');
     foreach ($remaining_fields as $same_field) {
       $feed = $this->createFeed();
 
       // Get new feed data array and modify newly created feed.
       $edit = $this->getFeedEditArray();
-      $edit['refresh'] =  1800; // Change refresh value.
+      // Change refresh value.
+      $edit['refresh'] = 1800;
       if (isset($feed->{$same_field}->value)) {
         $edit[$same_field] = $feed->{$same_field}->value;
       }
@@ -31,7 +32,7 @@ class UpdateFeedTest extends AggregatorTestBase {
       $this->assertRaw(t('The feed %name has been updated.', array('%name' => $edit['title[0][value]'])), format_string('The feed %name has been updated.', array('%name' => $edit['title[0][value]'])));
 
       // Check feed data.
-      $this->assertEqual($this->getUrl(), url('aggregator/sources/' . $feed->id(), array('absolute' => TRUE)));
+      $this->assertUrl($feed->url('canonical', ['absolute' => TRUE]));
       $this->assertTrue($this->uniqueFeed($edit['title[0][value]'], $edit['url[0][value]']), 'The feed is unique.');
 
       // Check feed source.
@@ -39,8 +40,10 @@ class UpdateFeedTest extends AggregatorTestBase {
       $this->assertResponse(200, 'Feed source exists.');
       $this->assertText($edit['title[0][value]'], 'Page title');
 
+      // Set correct title so deleteFeed() will work.
+      $feed->title = $edit['title[0][value]'];
+
       // Delete feed.
-      $feed->title = $edit['title[0][value]']; // Set correct title so deleteFeed() will work.
       $this->deleteFeed($feed);
     }
   }

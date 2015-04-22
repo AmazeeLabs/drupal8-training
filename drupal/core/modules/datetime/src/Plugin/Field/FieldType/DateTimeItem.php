@@ -51,7 +51,8 @@ class DateTimeItem extends FieldItemBase {
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
     $properties['value'] = DataDefinition::create('datetime_iso8601')
-      ->setLabel(t('Date value'));
+      ->setLabel(t('Date value'))
+      ->setRequired(TRUE);
 
     $properties['date'] = DataDefinition::create('any')
       ->setLabel(t('Computed date'))
@@ -73,7 +74,6 @@ class DateTimeItem extends FieldItemBase {
           'description' => 'The date value.',
           'type' => 'varchar',
           'length' => 20,
-          'not null' => FALSE,
         ),
       ),
       'indexes' => array(
@@ -131,13 +131,12 @@ class DateTimeItem extends FieldItemBase {
   /**
    * {@inheritdoc}
    */
-  public function onChange($property_name) {
-    parent::onChange($property_name);
-
+  public function onChange($property_name, $notify = TRUE) {
     // Enforce that the computed date is recalculated.
     if ($property_name == 'value') {
       $this->date = NULL;
     }
+    parent::onChange($property_name, $notify);
   }
 
 }

@@ -13,6 +13,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\TypedData\DataDefinition;
 
 /**
@@ -22,9 +23,11 @@ use Drupal\Core\TypedData\DataDefinition;
  *   id = "file",
  *   label = @Translation("File"),
  *   description = @Translation("This field stores the ID of a file as an integer value."),
+ *   category = @Translation("Reference"),
  *   default_widget = "file_generic",
  *   default_formatter = "file_default",
- *   list_class = "\Drupal\file\Plugin\Field\FieldType\FileFieldItemList"
+ *   list_class = "\Drupal\file\Plugin\Field\FieldType\FileFieldItemList",
+ *   constraints = {"ValidReference" = {}, "ReferenceAccess" = {}}
  * )
  */
 class FileItem extends EntityReferenceItem {
@@ -62,7 +65,6 @@ class FileItem extends EntityReferenceItem {
         'target_id' => array(
           'description' => 'The ID of the file entity.',
           'type' => 'int',
-          'not null' => TRUE,
           'unsigned' => TRUE,
         ),
         'display' => array(
@@ -70,13 +72,11 @@ class FileItem extends EntityReferenceItem {
           'type' => 'int',
           'size' => 'tiny',
           'unsigned' => TRUE,
-          'not null' => TRUE,
           'default' => 1,
         ),
         'description' => array(
           'description' => 'A description of the file.',
           'type' => 'text',
-          'not null' => FALSE,
         ),
       ),
       'indexes' => array(
@@ -98,10 +98,11 @@ class FileItem extends EntityReferenceItem {
     $properties = parent::propertyDefinitions($field_definition);
 
     $properties['display'] = DataDefinition::create('boolean')
-      ->setLabel(t('Flag to control whether this file should be displayed when viewing content'));
+      ->setLabel(t('Display'))
+      ->setDescription(t('Flag to control whether this file should be displayed when viewing content'));
 
     $properties['description'] = DataDefinition::create('string')
-      ->setLabel(t('A description of the file'));
+      ->setLabel(t('Description'));
 
     return $properties;
   }
@@ -132,10 +133,7 @@ class FileItem extends EntityReferenceItem {
       ),
     );
 
-    $scheme_options = array();
-    foreach (file_get_stream_wrappers(STREAM_WRAPPERS_WRITE_VISIBLE) as $scheme => $stream_wrapper) {
-      $scheme_options[$scheme] = $stream_wrapper['name'];
-    }
+    $scheme_options = \Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE);
     $element['uri_scheme'] = array(
       '#type' => 'radios',
       '#title' => t('Upload destination'),
@@ -214,7 +212,7 @@ class FileItem extends EntityReferenceItem {
   public static function validateDirectory($element, FormStateInterface $form_state) {
     // Strip slashes from the beginning and end of $element['file_directory'].
     $value = trim($element['#value'], '\\/');
-    form_set_value($element, $value, $form_state);
+    $form_state->setValueForElement($element, $value);
   }
 
   /**
@@ -236,7 +234,7 @@ class FileItem extends EntityReferenceItem {
         $form_state->setError($element, t('The list of allowed extensions is not valid, be sure to exclude leading dots and to separate extensions with a comma or space.'));
       }
       else {
-        form_set_value($element, $extensions, $form_state);
+        $form_state->setValueForElement($element, $extensions);
       }
     }
   }

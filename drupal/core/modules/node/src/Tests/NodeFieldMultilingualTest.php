@@ -46,14 +46,14 @@ class NodeFieldMultilingualTest extends WebTestBase {
 
     // Set "Basic page" content type to use multilingual support.
     $edit = array(
-      'language_configuration[language_show]' => TRUE,
+      'language_configuration[language_alterable]' => TRUE,
     );
     $this->drupalPostForm('admin/structure/types/manage/page', $edit, t('Save content type'));
     $this->assertRaw(t('The content type %type has been updated.', array('%type' => 'Basic page')), 'Basic page content type has been updated.');
 
     // Make node body translatable.
     $field_storage = FieldStorageConfig::loadByName('node', 'body');
-    $field_storage->translatable = TRUE;
+    $field_storage->setTranslatable(TRUE);
     $field_storage->save();
   }
 
@@ -77,19 +77,19 @@ class NodeFieldMultilingualTest extends WebTestBase {
     // Check that the node exists in the database.
     $node = $this->drupalGetNodeByTitle($edit[$title_key]);
     $this->assertTrue($node, 'Node found in database.');
-    $this->assertTrue($node->language()->id == $langcode && $node->body->value == $body_value, 'Field language correctly set.');
+    $this->assertTrue($node->language()->getId() == $langcode && $node->body->value == $body_value, 'Field language correctly set.');
 
     // Change node language.
     $langcode = 'it';
     $this->drupalGet("node/{$node->id()}/edit");
     $edit = array(
       $title_key => $this->randomMachineName(8),
-      'langcode' => $langcode,
+      'langcode[0][value]' => $langcode,
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
     $node = $this->drupalGetNodeByTitle($edit[$title_key], TRUE);
     $this->assertTrue($node, 'Node found in database.');
-    $this->assertTrue($node->language()->id == $langcode && $node->body->value == $body_value, 'Field language correctly changed.');
+    $this->assertTrue($node->language()->getId() == $langcode && $node->body->value == $body_value, 'Field language correctly changed.');
 
     // Enable content language URL detection.
     $this->container->get('language_negotiator')->saveConfiguration(LanguageInterface::TYPE_CONTENT, array(LanguageNegotiationUrl::METHOD_ID => 0));

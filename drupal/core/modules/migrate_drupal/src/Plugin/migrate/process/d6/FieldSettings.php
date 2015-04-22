@@ -7,7 +7,7 @@
 
 namespace Drupal\migrate_drupal\Plugin\migrate\process\d6;
 
-use Drupal\migrate\MigrateExecutable;
+use Drupal\migrate\MigrateExecutableInterface;
 use Drupal\migrate\ProcessPluginBase;
 use Drupal\migrate\Row;
 
@@ -25,7 +25,7 @@ class FieldSettings extends ProcessPluginBase {
    *
    * Get the field default/mapped settings.
    */
-  public function transform($value, MigrateExecutable $migrate_executable, Row $row, $destination_property) {
+  public function transform($value, MigrateExecutableInterface $migrate_executable, Row $row, $destination_property) {
     list($field_type, $global_settings, $widget_settings) = $value;
     return $this->getSettings($field_type, $global_settings, $widget_settings);
   }
@@ -44,8 +44,6 @@ class FieldSettings extends ProcessPluginBase {
    *   A valid array of settings.
    */
   public function getSettings($field_type, $global_settings, $widget_settings) {
-    $image_label = isset($widget_settings['alt']) ? $widget_settings['alt'] : '';
-    $title_label = isset($widget_settings['title']) ? $widget_settings['title'] : '';
     $max_length = isset($global_settings['max_length']) ? $global_settings['max_length'] : '';
     $max_length = empty($max_length) ? 255 : $max_length;
     if (isset($global_settings['allowed_values'])) {
@@ -53,7 +51,7 @@ class FieldSettings extends ProcessPluginBase {
       $list = array_map('trim', $list);
       $list = array_filter($list, 'strlen');
       switch ($field_type) {
-        case 'list_text':
+        case 'list_string':
         case 'list_integer':
         case 'list_float':
           foreach ($list as $value) {
@@ -74,14 +72,8 @@ class FieldSettings extends ProcessPluginBase {
       'text' => array(
         'max_length' => $max_length,
       ),
-      'image' => array(
-        'column_groups' => array(
-          'alt' => array('label' => $image_label),
-          'title' => array('label' => $title_label),
-        ),
-      ),
       'datetime' => array('datetime_type' => 'datetime'),
-      'list_text' => array(
+      'list_string' => array(
         'allowed_values' => $allowed_values,
       ),
       'list_integer' => array(

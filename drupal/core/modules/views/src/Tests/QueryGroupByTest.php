@@ -28,7 +28,7 @@ class QueryGroupByTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('entity', 'entity_test', 'system', 'field', 'user');
+  public static $modules = array('entity_test', 'system', 'field', 'user');
 
   /**
    * The storage for the test entity type.
@@ -74,8 +74,9 @@ class QueryGroupByTest extends ViewUnitTestBase {
   /**
    * Provides a test helper which runs a view with some aggregation function.
    *
-   * @param string $aggregation_function
-   *   Which aggregation function should be used, for example sum or count.
+   * @param string|null $aggregation_function
+   *   Which aggregation function should be used, for example sum or count. If
+   *   NULL is passed the aggregation will be tested with no function.
    * @param array $values
    *   The expected views result.
    */
@@ -84,7 +85,16 @@ class QueryGroupByTest extends ViewUnitTestBase {
 
     $view = Views::getView('test_group_by_count');
     $view->setDisplay();
-    $view->displayHandlers->get('default')->options['fields']['id']['group_type'] = $aggregation_function;
+    // There is no need for a function in order to have aggregation.
+    if (empty($aggregation_function)) {
+      // The test table has 2 fields ('id' and 'name'). We'll remove 'id'
+      // because it's unique and will test aggregation on 'name'.
+      unset($view->displayHandlers->get('default')->options['fields']['id']);
+    }
+    else {
+      $view->displayHandlers->get('default')->options['fields']['id']['group_type'] = $aggregation_function;
+    }
+
     $this->executeView($view);
 
     $this->assertEqual(count($view->result), 2, 'Make sure the count of items is right.');
@@ -101,7 +111,7 @@ class QueryGroupByTest extends ViewUnitTestBase {
    * Helper method that creates some test entities.
    */
   protected function setupTestEntities() {
-    // Create 4 entities with name1 and 3 nodes with name2.
+    // Create 4 entities with name1 and 3 entities with name2.
     $entity_1 = array(
       'name' => 'name1',
     );
@@ -155,6 +165,13 @@ class QueryGroupByTest extends ViewUnitTestBase {
   }
 
   /**
+   * Tests aggregation with no specific function.
+   */
+  public function testGroupByNone() {
+    $this->groupByTestHelper(NULL, array(1, 5));
+  }
+
+  /**
    * Tests groupby with filters.
    */
   public function testGroupByCountOnlyFilters() {
@@ -170,6 +187,22 @@ class QueryGroupByTest extends ViewUnitTestBase {
 
     $this->assertTrue(strpos($view->build_info['query'], 'GROUP BY'), 'Make sure that GROUP BY is in the query');
     $this->assertTrue(strpos($view->build_info['query'], 'HAVING'), 'Make sure that HAVING is in the query');
+  }
+
+  /**
+   * Tests grouping on base field.
+   */
+  public function testGroupByBaseField() {
+    $this->setupTestEntities();
+
+    $view = Views::getView('test_group_by_count');
+    $view->setDisplay();
+    // This tests that the GROUP BY portion of the query is properly formatted
+    // to include the base table to avoid ambiguous field errors.
+    $view->displayHandlers->get('default')->options['fields']['name']['group_type'] = 'min';
+    unset($view->displayHandlers->get('default')->options['fields']['id']['group_type']);
+    $this->executeView($view);
+    $this->assertTrue(strpos($view->build_info['query'], 'GROUP BY entity_test.id'), 'GROUP BY field includes the base table name when grouping on the base field.');
   }
 
 }

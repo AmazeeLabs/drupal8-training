@@ -6,6 +6,7 @@
  */
 
 use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 
@@ -35,6 +36,29 @@ function text_help($route_name, RouteMatchInterface $route_match) {
       $output .= '</dl>';
     return $output;
   }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function text_theme() {
+  return [
+    // Normally theme suggestion templates are only picked up when they are in
+    // themes. We explicitly define theme suggestions here so that the text
+    // field templates in core/modules/text/templates are picked up.
+    'field__text' => [
+      'render element' => 'elements',
+      'base hook' => 'field',
+    ],
+    'field__text_long' => [
+      'render element' => 'elements',
+      'base hook' => 'field',
+    ],
+    'field__text_with_summary' => [
+      'render element' => 'elements',
+      'base hook' => 'field',
+    ],
+  ];
 }
 
 /**
@@ -90,7 +114,7 @@ function text_summary($text, $format = NULL, $size = NULL) {
   }
 
   // If we have a short body, the entire body is the summary.
-  if (drupal_strlen($text) <= $size) {
+  if (Unicode::strlen($text) <= $size) {
     return $text;
   }
 
@@ -98,7 +122,7 @@ function text_summary($text, $format = NULL, $size = NULL) {
   // sentence boundaries.
 
   // The summary may not be longer than maximum length specified. Initial slice.
-  $summary = truncate_utf8($text, $size);
+  $summary = Unicode::truncate($text, $size);
 
   // Store the actual length of the UTF8 string -- which might not be the same
   // as $size.

@@ -7,9 +7,9 @@
 
 namespace Drupal\image\Form;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\image\ConfigurableImageEffectInterface;
 use Drupal\image\ImageEffectManager;
 use Drupal\Component\Utility\String;
@@ -57,7 +57,7 @@ class ImageStyleEditForm extends ImageStyleFormBase {
     $user_input = $form_state->getUserInput();
     $form['#title'] = $this->t('Edit style %name', array('%name' => $this->entity->label()));
     $form['#tree'] = TRUE;
-    $form['#attached']['css'][drupal_get_path('module', 'image') . '/css/image.admin.css'] = array();
+    $form['#attached']['library'][] = 'image/admin';
 
     // Show the thumbnail preview.
     $preview_arguments = array('#theme' => 'image_style_preview', '#style' => $this->entity);
@@ -126,12 +126,18 @@ class ImageStyleEditForm extends ImageStyleFormBase {
       if ($is_configurable) {
         $links['edit'] = array(
           'title' => $this->t('Edit'),
-          'href' => 'admin/config/media/image-styles/manage/' . $this->entity->id() . '/effects/' . $key,
+          'url' => Url::fromRoute('image.effect_edit_form', [
+            'image_style' => $this->entity->id(),
+            'image_effect' => $key,
+          ]),
         );
       }
       $links['delete'] = array(
         'title' => $this->t('Delete'),
-        'href' => 'admin/config/media/image-styles/manage/' . $this->entity->id() . '/effects/' . $key . '/delete',
+        'url' => Url::fromRoute('image.effect_delete', [
+          'image_style' => $this->entity->id(),
+          'image_effect' => $key,
+        ]),
       );
       $form['effects'][$key]['operations'] = array(
         '#type' => 'operations',
@@ -275,18 +281,6 @@ class ImageStyleEditForm extends ImageStyleFormBase {
     foreach ($effects as $uuid => $effect_data) {
       if ($this->entity->getEffects()->has($uuid)) {
         $this->entity->getEffect($uuid)->setWeight($effect_data['weight']);
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function copyFormValuesToEntity(EntityInterface $entity, array $form, FormStateInterface $form_state) {
-    foreach ($form_state->getValues() as $key => $value) {
-      // Do not copy effects here, see self::updateEffectWeights().
-      if ($key != 'effects') {
-        $entity->set($key, $value);
       }
     }
   }

@@ -7,6 +7,7 @@
 
 namespace Drupal\views;
 
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -108,7 +109,7 @@ class ViewsData {
     $this->moduleHandler = $module_handler;
     $this->languageManager = $language_manager;
 
-    $this->langcode = $this->languageManager->getCurrentLanguage()->id;
+    $this->langcode = $this->languageManager->getCurrentLanguage()->getId();
     $this->skipCache = $config->get('views.settings')->get('skip_cache');
   }
 
@@ -199,7 +200,7 @@ class ViewsData {
    *   The data that will be cached.
    */
   protected function cacheSet($cid, $data) {
-    return $this->cacheBackend->set($this->prepareCid($cid), $data, Cache::PERMANENT, array('views_data' => TRUE, 'extension' => array(TRUE, 'views')));
+    return $this->cacheBackend->set($this->prepareCid($cid), $data, Cache::PERMANENT, array('views_data', 'config:core.extension'));
   }
 
   /**
@@ -230,7 +231,18 @@ class ViewsData {
       return $data->data;
     }
     else {
-      $data = $this->moduleHandler->invokeAll('views_data');
+      $modules = $this->moduleHandler->getImplementations('views_data');
+      $data = [];
+      foreach ($modules as $module) {
+        $views_data = $this->moduleHandler->invoke($module, 'views_data');
+        // Set the provider key for each base table.
+        foreach ($views_data as &$table) {
+          if (isset($table['table']) && !isset($table['table']['provider'])) {
+            $table['table']['provider'] = $module;
+          }
+        }
+        $data = NestedArray::mergeDeep($data, $views_data);
+      }
       $this->moduleHandler->alter('views_data', $data);
 
       $this->processEntityTypes($data);
@@ -310,6 +322,6 @@ class ViewsData {
     $this->storage = array();
     $this->allStorage = array();
     $this->fullyLoaded = FALSE;
-    Cache::deleteTags(array('views_data' => TRUE));
+    Cache::invalidateTags(array('views_data'));
   }
 }

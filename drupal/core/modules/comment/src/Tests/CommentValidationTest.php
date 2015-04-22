@@ -8,7 +8,9 @@
 namespace Drupal\comment\Tests;
 
 use Drupal\comment\CommentInterface;
+use Drupal\node\Entity\Node;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
+use Drupal\user\Entity\User;
 
 /**
  * Tests comment validation constraints.
@@ -18,7 +20,7 @@ use Drupal\system\Tests\Entity\EntityUnitTestBase;
 class CommentValidationTest extends EntityUnitTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -29,8 +31,6 @@ class CommentValidationTest extends EntityUnitTestBase {
    */
   protected function setUp() {
     parent::setUp();
-    $this->installEntitySchema('node');
-    $this->installEntitySchema('comment');
     $this->installSchema('comment', array('comment_entity_statistics'));
   }
 
@@ -38,6 +38,10 @@ class CommentValidationTest extends EntityUnitTestBase {
    * Tests the comment validation constraints.
    */
   public function testValidation() {
+    // Add a user.
+    $user = User::create(array('name' => 'test'));
+    $user->save();
+
     // Add comment type.
     $this->entityManager->getStorage('comment_type')->create(array(
       'id' => 'comment',
@@ -48,7 +52,7 @@ class CommentValidationTest extends EntityUnitTestBase {
     // Add comment field to content.
     $this->entityManager->getStorage('field_storage_config')->create(array(
       'entity_type' => 'node',
-      'name' => 'comment',
+      'field_name' => 'comment',
       'type' => 'comment',
       'settings' => array(
         'comment_type' => 'comment',
@@ -62,12 +66,14 @@ class CommentValidationTest extends EntityUnitTestBase {
     ))->save();
 
     // Add comment field to page content.
-    $this->entityManager->getStorage('field_config')->create(array(
+    /** @var \Drupal\field\FieldConfigInterface $field */
+    $field = $this->entityManager->getStorage('field_config')->create(array(
       'field_name' => 'comment',
       'entity_type' => 'node',
       'bundle' => 'page',
       'label' => 'Comment settings',
-    ))->save();
+    ));
+    $field->save();
 
     $node = $this->entityManager->getStorage('node')->create(array(
       'type' => 'page',
@@ -95,13 +101,12 @@ class CommentValidationTest extends EntityUnitTestBase {
 
     // Validate a name collision between an anonymous comment author name and an
     // existing user account name.
-    $user = entity_create('user', array('name' => 'test'));
-    $user->save();
     $comment->set('name', 'test');
+    $comment->set('uid', 0);
     $violations = $comment->validate();
     $this->assertEqual(count($violations), 1, "Violation found on author name collision");
     $this->assertEqual($violations[0]->getPropertyPath(), "name");
-    $this->assertEqual($violations[0]->getMessage(), t('%name belongs to a registered user.', array('%name' => 'test')));
+    $this->assertEqual($violations[0]->getMessage(), t('The name you used (%name) belongs to a registered user.', array('%name' => 'test')));
 
     // Make the name valid.
     $comment->set('name', 'valid unused name');
@@ -130,6 +135,53 @@ class CommentValidationTest extends EntityUnitTestBase {
     $comment->set('hostname', NULL);
     $comment->set('thread', $this->randomString(256));
     $this->assertLengthViolation($comment, 'thread', 255);
+
+    $comment->set('thread', NULL);
+
+    // Force anonymous users to enter contact details.
+    $field->settings['anonymous'] = COMMENT_ANONYMOUS_MUST_CONTACT;
+    $field->save();
+    // Reset the node entity.
+    \Drupal::entityManager()->getStorage('node')->resetCache([$node->id()]);
+    $node = Node::load($node->id());
+    // Create a new comment with the new field.
+    $comment = $this->entityManager->getStorage('comment')->create(array(
+      'entity_id' => $node->id(),
+      'entity_type' => 'node',
+      'field_name' => 'comment',
+      'comment_body' => $this->randomMachineName(),
+      'uid' => 0,
+      'name' => '',
+    ));
+    $violations = $comment->validate();
+    $this->assertEqual(count($violations), 1, 'Violation found when name is required, but empty and UID is anonymous.');
+    $this->assertEqual($violations[0]->getPropertyPath(), 'name');
+    $this->assertEqual($violations[0]->getMessage(), t('You have to specify a valid author.'));
+
+    // Test creating a default comment with a given user id works.
+    $comment = $this->entityManager->getStorage('comment')->create(array(
+      'entity_id' => $node->id(),
+      'entity_type' => 'node',
+      'field_name' => 'comment',
+      'comment_body' => $this->randomMachineName(),
+      'uid' => $user->id(),
+    ));
+    $violations = $comment->validate();
+    $this->assertEqual(count($violations), 0, 'No violations when validating a default comment with an author.');
+
+    // Test specifying a wrong author name does not work.
+    $comment = $this->entityManager->getStorage('comment')->create(array(
+      'entity_id' => $node->id(),
+      'entity_type' => 'node',
+      'field_name' => 'comment',
+      'comment_body' => $this->randomMachineName(),
+      'uid' => $user->id(),
+      'name' => 'not-test',
+    ));
+    $violations = $comment->validate();
+    $this->assertEqual(count($violations), 1, 'Violation found when author name and comment author do not match.');
+    $this->assertEqual($violations[0]->getPropertyPath(), 'name');
+    $this->assertEqual($violations[0]->getMessage(), t('The specified author name does not match the comment author.'));
   }
 
   /**

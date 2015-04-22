@@ -10,14 +10,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to node.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateNodeConfigsTest extends MigrateDrupalTestBase {
+class MigrateNodeConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -35,7 +35,7 @@ class MigrateNodeConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_node_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6NodeSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage);
@@ -46,8 +46,8 @@ class MigrateNodeConfigsTest extends MigrateDrupalTestBase {
    * Tests Drupal 6 node settings to Drupal 8 migration.
    */
   public function testNodeSettings() {
-    $config = \Drupal::config('node.settings');
-    $this->assertIdentical($config->get('use_admin_theme'), false);
+    $config = $this->config('node.settings');
+    $this->assertIdentical(FALSE, $config->get('use_admin_theme'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'node.settings', $config->get());
   }
 

@@ -92,6 +92,8 @@ class AliasStorage implements AliasStorageInterface {
     }
     return $select
       ->fields('url_alias')
+      ->orderBy('pid', 'DESC')
+      ->range(0, 1)
       ->execute()
       ->fetchAssoc();
   }
@@ -116,7 +118,7 @@ class AliasStorage implements AliasStorageInterface {
    */
   public function preloadPathAlias($preloaded, $langcode) {
     $args = array(
-      ':system' => $preloaded,
+      ':system[]' => $preloaded,
       ':langcode' => $langcode,
       ':langcode_undetermined' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
     );
@@ -130,13 +132,13 @@ class AliasStorage implements AliasStorageInterface {
     if ($langcode == LanguageInterface::LANGCODE_NOT_SPECIFIED) {
       // Prevent PDO from complaining about a token the query doesn't use.
       unset($args[':langcode']);
-      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN (:system) AND langcode = :langcode_undetermined ORDER BY pid ASC', $args);
+      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN ( :system[] ) AND langcode = :langcode_undetermined ORDER BY pid ASC', $args);
     }
     elseif ($langcode < LanguageInterface::LANGCODE_NOT_SPECIFIED) {
-      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN (:system) AND langcode IN (:langcode, :langcode_undetermined) ORDER BY langcode ASC, pid ASC', $args);
+      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN ( :system[] ) AND langcode IN (:langcode, :langcode_undetermined) ORDER BY langcode ASC, pid ASC', $args);
     }
     else {
-      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN (:system) AND langcode IN (:langcode, :langcode_undetermined) ORDER BY langcode DESC, pid ASC', $args);
+      $result = $this->connection->query('SELECT source, alias FROM {url_alias} WHERE source IN ( :system[] ) AND langcode IN (:langcode, :langcode_undetermined) ORDER BY langcode DESC, pid ASC', $args);
     }
 
     return $result->fetchAllKeyed();
@@ -191,16 +193,7 @@ class AliasStorage implements AliasStorageInterface {
   }
 
   /**
-   * Checks if alias already exists.
-   *
-   * @param string $alias
-   *   Alias to check against.
-   * @param string $langcode
-   *   Language of the alias.
-   * @param string $source
-   *   Path that alias is to be assigned to (optional).
-   * @return boolean
-   *   TRUE if alias already exists and FALSE otherwise.
+   * {@inheritdoc}
    */
   public function aliasExists($alias, $langcode, $source = NULL) {
     $query = $this->connection->select('url_alias')
@@ -215,24 +208,14 @@ class AliasStorage implements AliasStorageInterface {
   }
 
   /**
-   * Checks if there are any aliases with language defined.
-   *
-   * @return bool
-   *   TRUE if aliases with language exist.
+   * {@inheritdoc}
    */
   public function languageAliasExists() {
     return (bool) $this->connection->queryRange('SELECT 1 FROM {url_alias} WHERE langcode <> :langcode', 0, 1, array(':langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED))->fetchField();
   }
 
   /**
-   * Loads aliases for admin listing.
-   *
-   * @param array $header
-   *   Table header.
-   * @param string $keys
-   *   Search keys.
-   * @return array
-   *   Array of items to be displayed on the current page.
+   * {@inheritdoc}
    */
   public function getAliasesForAdminListing($header, $keys = NULL) {
     $query = $this->connection->select('url_alias')
@@ -251,13 +234,7 @@ class AliasStorage implements AliasStorageInterface {
   }
 
   /**
-   * Check if any alias exists starting with $initial_substring.
-   *
-   * @param $initial_substring
-   *   Initial path substring to test against.
-   *
-   * @return
-   *   TRUE if any alias exists, FALSE otherwise.
+   * {@inheritdoc}
    */
   public function pathHasMatchingAlias($initial_substring) {
     $query = $this->connection->select('url_alias', 'u');

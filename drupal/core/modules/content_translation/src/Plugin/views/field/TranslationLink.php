@@ -22,21 +22,21 @@ use Drupal\views\ResultRow;
 class TranslationLink extends FieldPluginBase {
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::defineOptions().
+   * {@inheritdoc}
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['text'] = array('default' => '', 'translatable' => TRUE);
+    $options['text'] = array('default' => '');
     return $options;
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::buildOptionsForm().
+   * {@inheritdoc}
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['text'] = array(
       '#type' => 'textfield',
-      '#title' => t('Text to display'),
+      '#title' => $this->t('Text to display'),
       '#default_value' => $this->options['text'],
     );
     parent::buildOptionsForm($form, $form_state);
@@ -62,17 +62,17 @@ class TranslationLink extends FieldPluginBase {
    */
   protected function renderLink(EntityInterface $entity, ResultRow $values) {
     if (content_translation_translate_access($entity)->isAllowed()) {
-      $text = !empty($this->options['text']) ? $this->options['text'] : t('Translate');
+      $text = !empty($this->options['text']) ? $this->options['text'] : $this->t('Translate');
 
       $this->options['alter']['make_link'] = TRUE;
-      $this->options['alter']['path'] = $entity->getSystemPath('drupal:content-translation-overview');
+      $this->options['alter']['url'] = $entity->urlInfo('drupal:content-translation-overview');
 
       return $text;
     }
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\Plugin\field\FieldPluginBase::query().
+   * {@inheritdoc}
    */
   public function query() {
   }

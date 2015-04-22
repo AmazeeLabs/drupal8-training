@@ -13,12 +13,20 @@ namespace Drupal\Core\TypedData;
 interface TranslatableInterface {
 
   /**
-   * Returns the default language.
+   * Returns the translation language.
    *
    * @return \Drupal\Core\Language\LanguageInterface
    *   The language object.
    */
   public function language();
+
+  /**
+   * Checks whether the translation is the default one.
+   *
+   * @return bool
+   *   TRUE if the translation is the default one, FALSE otherwise.
+   */
+  public function isDefaultTranslation();
 
   /**
    * Returns the languages the data is translated to.
@@ -27,8 +35,8 @@ interface TranslatableInterface {
    *   (optional) Whether the default language should be included. Defaults to
    *   TRUE.
    *
-   * @return
-   *   An array of language objects, keyed by language codes.
+   * @return \Drupal\Core\Language\LanguageInterface[]
+   *   An associative array of language objects, keyed by language codes.
    */
   public function getTranslationLanguages($include_default = TRUE);
 
@@ -44,7 +52,7 @@ interface TranslatableInterface {
    *   LanguageInterface::LANGCODE_DEFAULT
    *   to get the data in default language.
    *
-   * @return \Drupal\Core\TypedData\TypedDataInterface
+   * @return $this
    *   A typed data object for the translated data.
    */
   public function getTranslation($langcode);
@@ -52,7 +60,7 @@ interface TranslatableInterface {
   /**
    * Returns the translatable object referring to the original language.
    *
-   * @return \Drupal\Core\TypedData\TranslatableInterface
+   * @return $this
    *   The translation object referring to the original language.
    */
   public function getUntranslated();
@@ -77,7 +85,7 @@ interface TranslatableInterface {
    *   (optional) An array of initial values to be assigned to the translatable
    *   fields. Defaults to none.
    *
-   * @return \Drupal\Core\TypedData\TranslatableInterface
+   * @return $this
    */
   public function addTranslation($langcode, array $values = array());
 

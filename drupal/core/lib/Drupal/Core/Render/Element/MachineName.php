@@ -8,8 +8,8 @@
 namespace Drupal\Core\Render\Element;
 
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Provides a machine name render element.
@@ -131,7 +131,7 @@ class MachineName extends Textfield {
     if (!isset($element['#attributes'])) {
       $element['#attributes'] = array();
     }
-    $element['#attributes'] += array('dir' => 'ltr');
+    $element['#attributes'] += array('dir' => LanguageInterface::DIRECTION_LTR);
 
     // The source element defaults to array('name'), but may have been overridden.
     if (empty($element['#machine_name']['source'])) {
@@ -151,29 +151,21 @@ class MachineName extends Textfield {
     $element['#machine_name']['suffix'] = '#' . $suffix_id;
 
     if ($element['#machine_name']['standalone']) {
-      $element['#suffix'] = SafeMarkup::set($element['#suffix'] . ' <small id="' . $suffix_id . '">&nbsp;</small>');
+      $element['#suffix'] = $element['#suffix'] . ' <small id="' . $suffix_id . '">&nbsp;</small>';
     }
     else {
       // Append a field suffix to the source form element, which will contain
       // the live preview of the machine name.
       $source += array('#field_suffix' => '');
-      $source['#field_suffix'] = SafeMarkup::set($source['#field_suffix'] . ' <small id="' . $suffix_id . '">&nbsp;</small>');
+      $source['#field_suffix'] = $source['#field_suffix'] . ' <small id="' . $suffix_id . '">&nbsp;</small>';
 
       $parents = array_merge($element['#machine_name']['source'], array('#field_suffix'));
       NestedArray::setValue($form_state->getCompleteForm(), $parents, $source['#field_suffix']);
     }
 
-    $js_settings = array(
-      'type' => 'setting',
-      'data' => array(
-        'machineName' => array(
-          '#' . $source['#id'] => $element['#machine_name'],
-        ),
-        'langcode' => $language->id,
-      ),
-    );
     $element['#attached']['library'][] = 'core/drupal.machine-name';
-    $element['#attached']['js'][] = $js_settings;
+    $element['#attached']['drupalSettings']['machineName']['#' . $source['#id']] = $element['#machine_name'];
+    $element['#attached']['drupalSettings']['langcode'] = $language->getId();
 
     return $element;
   }

@@ -19,12 +19,12 @@ use Symfony\Component\Validator\Constraint;
  */
 class UserNameUnique extends Constraint {
 
-  public $message = 'The name %value is already taken.';
+  public $message = 'The username %value is already taken.';
 
   /**
    * {@inheritdoc}
    */
   public function validatedBy() {
-    return '\Drupal\user\Plugin\Validation\Constraint\UserUniqueValidator';
+    return '\Drupal\Core\Validation\Plugin\Validation\Constraint\UniqueFieldValueValidator';
   }
 }

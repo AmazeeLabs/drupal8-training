@@ -11,6 +11,7 @@ use Drupal\Core\Database\Database;
 use Drupal\Core\Database\SchemaObjectDoesNotExistException;
 use Drupal\Core\Database\SchemaObjectExistsException;
 use Drupal\simpletest\KernelTestBase;
+use Drupal\Component\Utility\Unicode;
 
 /**
  * Tests table creation and modification via the schema API.
@@ -30,7 +31,7 @@ class SchemaTest extends KernelTestBase {
   function testSchema() {
     // Try creating a table.
     $table_specification = array(
-      'description' => 'Schema table description.',
+      'description' => 'Schema table description may contain "quotes" and could be long—very long indeed.',
       'fields' => array(
         'id'  => array(
           'type' => 'int',
@@ -39,7 +40,7 @@ class SchemaTest extends KernelTestBase {
         'test_field'  => array(
           'type' => 'int',
           'not null' => TRUE,
-          'description' => 'Schema column description.',
+          'description' => 'Schema table description may contain "quotes" and could be long—very long indeed. There could be "multiple quoted regions".',
         ),
         'test_field_string'  => array(
           'type' => 'varchar',
@@ -90,38 +91,6 @@ class SchemaTest extends KernelTestBase {
     $index_exists = Database::getConnection()->schema()->indexExists('test_table2', 'test_field');
     $this->assertTrue($index_exists, 'Index was renamed.');
 
-    // Copy the schema of the table.
-    db_copy_table_schema('test_table2', 'test_table3');
-
-    // Index should be copied.
-    $index_exists = Database::getConnection()->schema()->indexExists('test_table3', 'test_field');
-    $this->assertTrue($index_exists, 'Index was copied.');
-
-    // Data should still exist on the old table but not on the new one.
-    $count = db_select('test_table2')->countQuery()->execute()->fetchField();
-    $this->assertEqual($count, 1, 'The old table still has its content.');
-    $count = db_select('test_table3')->countQuery()->execute()->fetchField();
-    $this->assertEqual($count, 0, 'The new table has no content.');
-
-    // Ensure that the proper exceptions are thrown for db_copy_table_schema().
-    $fail = FALSE;
-    try {
-      db_copy_table_schema('test_table4', 'test_table5');
-    }
-    catch (SchemaObjectDoesNotExistException $e) {
-      $fail = TRUE;
-    }
-    $this->assertTrue($fail, 'Ensure that db_copy_table_schema() throws an exception when the source table does not exist.');
-
-    $fail = FALSE;
-    try {
-      db_copy_table_schema('test_table2', 'test_table3');
-    }
-    catch (SchemaObjectExistsException $e) {
-      $fail = TRUE;
-    }
-    $this->assertTrue($fail, 'Ensure that db_copy_table_schema() throws an exception when the destination table already exists.');
-
     // We need the default so that we can insert after the rename.
     db_field_set_default('test_table2', 'test_field', 0);
     $this->assertFalse($this->tryInsert(), 'Insert into the old table failed.');
@@ -157,6 +126,77 @@ class SchemaTest extends KernelTestBase {
 
     $count = db_query('SELECT COUNT(*) FROM {test_table}')->fetchField();
     $this->assertEqual($count, 2, 'There were two rows.');
+
+    // Test renaming of keys and constraints.
+    db_drop_table('test_table');
+    $table_specification = array(
+      'fields' => array(
+        'id'  => array(
+          'type' => 'serial',
+          'not null' => TRUE,
+        ),
+        'test_field'  => array(
+          'type' => 'int',
+          'default' => 0,
+        ),
+      ),
+      'primary key' => array('id'),
+      'unique keys' => array(
+        'test_field' => array('test_field'),
+      ),
+    );
+    db_create_table('test_table', $table_specification);
+
+    // Tests for indexes are Database specific.
+    $db_type = Database::getConnection()->databaseType();
+
+    // Test for existing primary and unique keys.
+    switch ($db_type) {
+      case 'pgsql':
+        $primary_key_exists = Database::getConnection()->schema()->constraintExists('test_table', '__pkey');
+        $unique_key_exists = Database::getConnection()->schema()->constraintExists('test_table', 'test_field' . '__key');
+        break;
+      case 'sqlite':
+        // SQLite does not create a standalone index for primary keys.
+        $primary_key_exists = TRUE;
+        $unique_key_exists = Database::getConnection()->schema()->indexExists('test_table', 'test_field');
+        break;
+      default:
+        $primary_key_exists = Database::getConnection()->schema()->indexExists('test_table', 'PRIMARY');
+        $unique_key_exists = Database::getConnection()->schema()->indexExists('test_table', 'test_field');
+        break;
+    }
+    $this->assertIdentical($primary_key_exists, TRUE, 'Primary key created.');
+    $this->assertIdentical($unique_key_exists, TRUE, 'Unique key created.');
+
+    db_rename_table('test_table', 'test_table2');
+
+    // Test for renamed primary and unique keys.
+    switch ($db_type) {
+      case 'pgsql':
+        $renamed_primary_key_exists = Database::getConnection()->schema()->constraintExists('test_table2', '__pkey');
+        $renamed_unique_key_exists = Database::getConnection()->schema()->constraintExists('test_table2', 'test_field' . '__key');
+        break;
+      case 'sqlite':
+        // SQLite does not create a standalone index for primary keys.
+        $renamed_primary_key_exists = TRUE;
+        $renamed_unique_key_exists = Database::getConnection()->schema()->indexExists('test_table2', 'test_field');
+        break;
+      default:
+        $renamed_primary_key_exists = Database::getConnection()->schema()->indexExists('test_table2', 'PRIMARY');
+        $renamed_unique_key_exists = Database::getConnection()->schema()->indexExists('test_table2', 'test_field');
+        break;
+    }
+    $this->assertIdentical($renamed_primary_key_exists, TRUE, 'Primary key was renamed.');
+    $this->assertIdentical($renamed_unique_key_exists, TRUE, 'Unique key was renamed.');
+
+    // For PostgreSQL check in addition that sequence was renamed.
+    if ($db_type == 'pgsql') {
+      // Get information about new table.
+      $info = Database::getConnection()->schema()->queryTableInformation('test_table2');
+      $sequence_name = Database::getConnection()->schema()->prefixNonTable('test_table2', 'id', 'seq');
+      $this->assertEqual($sequence_name, current($info->sequences), 'Sequence was renamed.');
+    }
 
     // Use database specific data type and ensure that table is created.
     $table_specification = array(
@@ -212,6 +252,11 @@ class SchemaTest extends KernelTestBase {
   function checkSchemaComment($description, $table, $column = NULL) {
     if (method_exists(Database::getConnection()->schema(), 'getComment')) {
       $comment = Database::getConnection()->schema()->getComment($table, $column);
+      // The schema comment truncation for mysql is different.
+      if (Database::getConnection()->databaseType() == 'mysql') {
+        $max_length = $column ? 255 : 60;
+        $description = Unicode::truncate($description, $max_length, TRUE, TRUE);
+      }
       $this->assertEqual($comment, $description, 'The comment matches the schema description.');
     }
   }
@@ -286,6 +331,7 @@ class SchemaTest extends KernelTestBase {
         array('not null' => FALSE, 'default' => substr('"thing"', 0, $length)),
         array('not null' => FALSE, 'default' => substr("\"'hing", 0, $length)),
         array('not null' => TRUE, 'initial' => 'd'),
+        array('not null' => FALSE, 'default' => NULL),
         array('not null' => TRUE, 'initial' => 'd', 'default' => '7'),
       );
 
@@ -319,8 +365,8 @@ class SchemaTest extends KernelTestBase {
     // Test numeric types.
     foreach (array(1, 5, 10, 40, 65) as $precision) {
       foreach (array(0, 2, 10, 30) as $scale) {
+        // Skip combinations where precision is smaller than scale.
         if ($precision <= $scale) {
-          // Precision must be smaller then scale.
           continue;
         }
 
@@ -430,7 +476,65 @@ class SchemaTest extends KernelTestBase {
         ->fetchField();
       $this->assertEqual($field_value, $field_spec['default'], 'Default value registered.');
     }
+  }
 
-    db_drop_field($table_name, $field_name);
+  /**
+   * Tests changing columns between numeric types.
+   */
+  function testSchemaChangeField() {
+    $field_specs = array(
+      array('type' => 'int', 'size' => 'normal','not null' => FALSE),
+      array('type' => 'int', 'size' => 'normal', 'not null' => TRUE, 'initial' => 1, 'default' => 17),
+      array('type' => 'float', 'size' => 'normal', 'not null' => FALSE),
+      array('type' => 'float', 'size' => 'normal', 'not null' => TRUE, 'initial' => 1, 'default' => 7.3),
+      array('type' => 'numeric', 'scale' => 2, 'precision' => 10, 'not null' => FALSE),
+      array('type' => 'numeric', 'scale' => 2, 'precision' => 10, 'not null' => TRUE, 'initial' => 1, 'default' => 7),
+    );
+
+    foreach ($field_specs as $i => $old_spec) {
+      foreach ($field_specs as $j => $new_spec) {
+        if ($i === $j) {
+          // Do not change a field into itself.
+          continue;
+        }
+        $this->assertFieldChange($old_spec, $new_spec);
+      }
+    }
+  }
+
+  /**
+   * Asserts that a field can be changed from one spec to another.
+   *
+   * @param $old_spec
+   *   The beginning field specification.
+   * @param $new_spec
+   *   The ending field specification.
+   */
+  protected function assertFieldChange($old_spec, $new_spec) {
+    $table_name = 'test_table_' . ($this->counter++);
+    $table_spec = array(
+      'fields' => array(
+        'serial_column' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'test_field' => $old_spec,
+      ),
+      'primary key' => array('serial_column'),
+    );
+    db_create_table($table_name, $table_spec);
+    $this->pass(format_string('Table %table created.', array('%table' => $table_name)));
+
+    // Check the characteristics of the field.
+    $this->assertFieldCharacteristics($table_name, 'test_field', $old_spec);
+
+    // Remove inserted rows.
+    db_truncate($table_name)->execute();
+
+    // Change the field.
+    db_change_field($table_name, 'test_field', 'test_field', $new_spec);
+
+    // Check the field was changed.
+    $this->assertFieldCharacteristics($table_name, 'test_field', $new_spec);
+
+    // Clean-up.
+    db_drop_table($table_name);
   }
 }

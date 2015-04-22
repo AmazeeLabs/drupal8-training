@@ -8,6 +8,7 @@
 namespace Drupal\node\Plugin\views\field;
 
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
 use Drupal\node\Plugin\views\field\Link;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ResultRow;
@@ -28,7 +29,7 @@ class RevisionLink extends Link {
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
 
-    $this->additional_fields['node_vid'] = array('table' => 'node_revision', 'field' => 'vid');
+    $this->additional_fields['node_vid'] = array('table' => 'node_field_revision', 'field' => 'vid');
   }
 
   /**
@@ -56,16 +57,18 @@ class RevisionLink extends Link {
     }
 
     // Current revision uses the node view path.
-    $path = 'node/' . $node->nid;
     if (!$node->isDefaultRevision()) {
-      $path .= "/revisions/$vid/view";
+      $url = Url::fromRoute('node.revision_show', ['node' => $node->nid, 'node_revision' => $vid]);
+    }
+    else {
+      $url = $node->urlInfo();
     }
 
     $this->options['alter']['make_link'] = TRUE;
-    $this->options['alter']['path'] = $path;
+    $this->options['alter']['url'] = $url;
     $this->options['alter']['query'] = drupal_get_destination();
 
-    return !empty($this->options['text']) ? $this->options['text'] : t('View');
+    return !empty($this->options['text']) ? $this->options['text'] : $this->t('View');
   }
 
   /**

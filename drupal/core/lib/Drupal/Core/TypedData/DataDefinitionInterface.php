@@ -70,6 +70,9 @@ interface DataDefinitionInterface {
   /**
    * Returns a human readable description.
    *
+   * Descriptions are usually used on user interfaces where the data is edited
+   * or displayed.
+   *
    * @return string|null
    *   The description, or NULL if no description is available.
    */
@@ -193,7 +196,7 @@ interface DataDefinitionInterface {
    * details.
    *
    * @param string $constraint_name
-   *   The name of the the constraint, i.e. its plugin id.
+   *   The name of the constraint, i.e. its plugin id.
    *
    * @return array
    *   A validation constraint definition which can be used for instantiating a
@@ -202,5 +205,21 @@ interface DataDefinitionInterface {
    * @see \Symfony\Component\Validator\Constraint
    */
   public function getConstraint($constraint_name);
+
+  /**
+   * Adds a validation constraint.
+   *
+   * See \Drupal\Core\TypedData\DataDefinitionInterface::getConstraints() for
+   * details.
+   *
+   * @param string $constraint_name
+   *   The name of the constraint to add, i.e. its plugin id.
+   * @param array|null $options
+   *   The constraint options as required by the constraint plugin, or NULL.
+   *
+   * @return static
+   *   The object itself for chaining.
+   */
+  public function addConstraint($constraint_name, $options = NULL);
 
 }

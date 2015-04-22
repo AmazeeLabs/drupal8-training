@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\query;
 
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -178,16 +179,12 @@ class Sql extends QueryPluginBase {
     $options = parent::defineOptions();
     $options['disable_sql_rewrite'] = array(
       'default' => FALSE,
-      'translatable' => FALSE,
-      'bool' => TRUE,
     );
     $options['distinct'] = array(
       'default' => FALSE,
-      'bool' => TRUE,
     );
     $options['replica'] = array(
       'default' => FALSE,
-      'bool' => TRUE,
     );
     $options['query_comment'] = array(
       'default' => '',
@@ -206,34 +203,34 @@ class Sql extends QueryPluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $form['disable_sql_rewrite'] = array(
-      '#title' => t('Disable SQL rewriting'),
-      '#description' => t('Disabling SQL rewriting will disable node_access checks as well as other modules that implement hook_query_alter().'),
+      '#title' => $this->t('Disable SQL rewriting'),
+      '#description' => $this->t('Disabling SQL rewriting will omit all query tags, i. e. disable node access checks as well as override hook_query_alter() implementations in other modules.'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['disable_sql_rewrite']),
-      '#suffix' => '<div class="messages messages--warning sql-rewrite-warning js-hide">' . t('WARNING: Disabling SQL rewriting means that node access security is disabled. This may allow users to see data they should not be able to see if your view is misconfigured. Use this option only if you understand and accept this security risk.') . '</div>',
+      '#suffix' => '<div class="messages messages--warning sql-rewrite-warning js-hide">' . $this->t('WARNING: Disabling SQL rewriting means that node access security is disabled. This may allow users to see data they should not be able to see if your view is misconfigured. Use this option only if you understand and accept this security risk.') . '</div>',
     );
     $form['distinct'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Distinct'),
-      '#description' => t('This will make the view display only distinct items. If there are multiple identical items, each will be displayed only once. You can use this to try and remove duplicates from a view, though it does not always work. Note that this can slow queries down, so use it with caution.'),
+      '#title' => $this->t('Distinct'),
+      '#description' => $this->t('This will make the view display only distinct items. If there are multiple identical items, each will be displayed only once. You can use this to try and remove duplicates from a view, though it does not always work. Note that this can slow queries down, so use it with caution.'),
       '#default_value' => !empty($this->options['distinct']),
     );
     $form['replica'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Use Secondary Server'),
-      '#description' => t('This will make the query attempt to connect to a replica server if available.  If no replica server is defined or available, it will fall back to the default server.'),
+      '#title' => $this->t('Use Secondary Server'),
+      '#description' => $this->t('This will make the query attempt to connect to a replica server if available.  If no replica server is defined or available, it will fall back to the default server.'),
       '#default_value' => !empty($this->options['replica']),
     );
     $form['query_comment'] = array(
       '#type' => 'textfield',
-      '#title' => t('Query Comment'),
-      '#description' => t('If set, this comment will be embedded in the query and passed to the SQL server. This can be helpful for logging or debugging.'),
+      '#title' => $this->t('Query Comment'),
+      '#description' => $this->t('If set, this comment will be embedded in the query and passed to the SQL server. This can be helpful for logging or debugging.'),
       '#default_value' => $this->options['query_comment'],
     );
     $form['query_tags'] = array(
       '#type' => 'textfield',
-      '#title' => t('Query Tags'),
-      '#description' => t('If set, these tags will be appended to the query and can be used to identify the query in a module. This can be helpful for altering queries.'),
+      '#title' => $this->t('Query Tags'),
+      '#description' => $this->t('If set, these tags will be appended to the query and can be used to identify the query in a module. This can be helpful for altering queries.'),
       '#default_value' => implode(', ', $this->options['query_tags']),
       '#element_validate' => array('views_element_validate_tags'),
     );
@@ -246,7 +243,7 @@ class Sql extends QueryPluginBase {
     $element = array('#parents' => array('query', 'options', 'query_tags'));
     $value = explode(',', NestedArray::getValue($form_state->getValues(), $element['#parents']));
     $value = array_filter(array_map('trim', $value));
-    form_set_value($element, $value, $form_state);
+    $form_state->setValueForElement($element, $value);
   }
 
   /**
@@ -1236,6 +1233,10 @@ class Sql extends QueryPluginBase {
     if (count($this->having)) {
       $this->hasAggregate = TRUE;
     }
+    elseif (!$this->hasAggregate) {
+      // Allow 'GROUP BY' even no aggregation function has been set.
+      $this->hasAggregate = $this->view->display_handler->getOption('group_by');
+    }
     $groupby = array();
     if ($this->hasAggregate && (!empty($this->groupby) || !empty($non_aggregates))) {
       $groupby = array_unique(array_merge($this->groupby, $non_aggregates));
@@ -1254,8 +1255,8 @@ class Sql extends QueryPluginBase {
       }
 
       foreach ($entity_information as $entity_type_id => $info) {
-        $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
-        $base_field = empty($table['revision']) ? $entity_type->getKey('id') : $entity_type->getKey('revision');
+        $entity_type = \Drupal::entityManager()->getDefinition($info['entity_type']);
+        $base_field = !$info['revision'] ? $entity_type->getKey('id') : $entity_type->getKey('revision');
         $this->addField($info['alias'], $base_field, '', $params);
       }
     }
@@ -1266,6 +1267,11 @@ class Sql extends QueryPluginBase {
     // Add groupby.
     if ($groupby) {
       foreach ($groupby as $field) {
+        // Handle group by of field without table alias to avoid ambiguous
+        // column error.
+        if ($field == $this->view->storage->get('base_field')) {
+          $field = $this->view->storage->get('base_table') . '.' . $field;
+        }
         $query->groupBy($field);
       }
       if (!empty($this->having) && $condition = $this->buildCondition('having')) {
@@ -1460,38 +1466,51 @@ class Sql extends QueryPluginBase {
    * If the entity belongs to the base table, then it gets stored in
    * $result->_entity. Otherwise, it gets stored in
    * $result->_relationship_entities[$relationship_id];
+   *
+   * @param \Drupal\views\ResultRow[] $results
+   *   The result of the SQL query.
    */
-  function loadEntities(&$results) {
+  public function loadEntities(&$results) {
     $entity_information = $this->getEntityTableInfo();
     // No entity tables found, nothing else to do here.
     if (empty($entity_information)) {
       return;
     }
 
+    // Extract all entity types from entity_information.
+    $entity_types = array();
+    foreach ($entity_information as $info) {
+      $entity_type = $info['entity_type'];
+      if (!isset($entity_types[$entity_type])) {
+        $entity_types[$entity_type] = \Drupal::entityManager()->getDefinition($entity_type);
+      }
+    }
+
     // Assemble a list of entities to load.
     $ids_by_type = array();
-    foreach ($entity_information as $entity_type => $info) {
-      $entity_info = \Drupal::entityManager()->getDefinition($entity_type);
-      $id_key = empty($table['revision']) ? $entity_info->getKey('id') : $entity_info->getKey('revision');
+    foreach ($entity_information as $info) {
+      $relationship_id = $info['relationship_id'];
+      $entity_type = $info['entity_type'];
+      $entity_info = $entity_types[$entity_type];
+      $id_key = !$info['revision'] ? $entity_info->getKey('id') : $entity_info->getKey('revision');
       $id_alias = $this->getFieldAlias($info['alias'], $id_key);
 
       foreach ($results as $index => $result) {
         // Store the entity id if it was found.
         if (isset($result->{$id_alias}) && $result->{$id_alias} != '') {
-          $ids_by_type[$entity_type][$index] = $result->$id_alias;
+          $ids_by_type[$entity_type][$index][$relationship_id] = $result->$id_alias;
         }
       }
     }
 
     // Load all entities and assign them to the correct result row.
     foreach ($ids_by_type as $entity_type => $ids) {
-      $info = $entity_information[$entity_type];
-      $relationship_id = $info['relationship_id'];
+      $flat_ids = iterator_to_array(new \RecursiveIteratorIterator(new \RecursiveArrayIterator($ids)), FALSE);
 
       // Drupal core currently has no way to load multiple revisions. Sad.
-      if ($info['revision']) {
+      if (isset($entity_information[$entity_type]['revision']) && $entity_information[$entity_type]['revision'] === TRUE) {
         $entities = array();
-        foreach ($ids as $revision_id) {
+        foreach ($flat_ids as $revision_id) {
           $entity = entity_revision_load($entity_type, $revision_id);
           if ($entity) {
             $entities[$revision_id] = $entity;
@@ -1499,25 +1518,44 @@ class Sql extends QueryPluginBase {
         }
       }
       else {
-        $entities = entity_load_multiple($entity_type, $ids);
+        $entities = entity_load_multiple($entity_type, $flat_ids);
       }
 
-      foreach ($ids as $index => $id) {
-        if (isset($entities[$id])) {
-          $entity = $entities[$id];
-        }
-        else {
-          $entity = NULL;
-        }
+      foreach ($ids as $index => $relationships) {
+        foreach ($relationships as $relationship_id => $entity_id) {
+          if (isset($entities[$entity_id])) {
+            $entity = $entities[$entity_id];
+          }
+          else {
+            $entity = NULL;
+          }
 
-        if ($relationship_id == 'none') {
-          $results[$index]->_entity = $entity;
-        }
-        else {
-          $results[$index]->_relationship_entities[$relationship_id] = $entity;
+          if ($relationship_id == 'none') {
+            $results[$index]->_entity = $entity;
+          }
+          else {
+            $results[$index]->_relationship_entities[$relationship_id] = $entity;
+          }
         }
       }
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+    $tags = [];
+    // Add cache tags for each row, if there is an entity associated with it.
+    if (!$this->hasAggregate) {
+      foreach ($this->view->result as $row)  {
+        if ($row->_entity) {
+          $tags = Cache::mergeTags($row->_entity->getCacheTags(), $tags);
+        }
+      }
+    }
+
+    return $tags;
   }
 
   public function addSignature(ViewExecutable $view) {
@@ -1529,11 +1567,11 @@ class Sql extends QueryPluginBase {
     // functions into here.
     return array(
       'group' => array(
-        'title' => t('Group results together'),
+        'title' => $this->t('Group results together'),
         'is aggregate' => FALSE,
       ),
       'count' => array(
-        'title' => t('Count'),
+        'title' => $this->t('Count'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1543,7 +1581,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'count_distinct' => array(
-        'title' => t('Count DISTINCT'),
+        'title' => $this->t('Count DISTINCT'),
         'method' => 'aggregationMethodDistinct',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1553,7 +1591,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'sum' => array(
-        'title' => t('Sum'),
+        'title' => $this->t('Sum'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1563,7 +1601,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'avg' => array(
-        'title' => t('Average'),
+        'title' => $this->t('Average'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1573,7 +1611,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'min' => array(
-        'title' => t('Minimum'),
+        'title' => $this->t('Minimum'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1583,7 +1621,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'max' => array(
-        'title' => t('Maximum'),
+        'title' => $this->t('Maximum'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1593,7 +1631,7 @@ class Sql extends QueryPluginBase {
         ),
       ),
       'stddev_pop' => array(
-        'title' => t('Standard deviation'),
+        'title' => $this->t('Standard deviation'),
         'method' => 'aggregationMethodSimple',
         'handler' => array(
           'argument' => 'groupby_numeric',
@@ -1641,7 +1679,7 @@ class Sql extends QueryPluginBase {
         break;
       case 'sqlite':
         if (!empty($offset)) {
-          $field = "($field + '$offset_seconds')";
+          $field = "($field + $offset_seconds)";
         }
         break;
     }
@@ -1755,7 +1793,18 @@ class Sql extends QueryPluginBase {
           'A' => '',
         );
         $format = strtr($format, $replace);
-        return "strftime('$format', $field, 'unixepoch')";
+        $expression = "strftime('$format', $field, 'unixepoch')";
+        // The expression yields a string, but the comparison value is an
+        // integer in case the comparison value is a float, integer, or numeric.
+        // All of the above SQLite format tokens only produce integers. However,
+        // the given $format may contain 'Y-m-d', which results in a string.
+        // @see \Drupal\Core\Database\Driver\sqlite\Connection::expandArguments()
+        // @see http://www.sqlite.org/lang_datefunc.html
+        // @see http://www.sqlite.org/lang_expr.html#castexpr
+        if (preg_match('/^(?:%\w)+$/', $format)) {
+          $expression = "CAST($expression AS NUMERIC)";
+        }
+        return $expression;
     }
   }
 

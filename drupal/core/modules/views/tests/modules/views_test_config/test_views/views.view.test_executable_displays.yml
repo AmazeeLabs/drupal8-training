@@ -1,7 +1,14 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_executable_displays
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_plugin: default
@@ -20,10 +27,6 @@ display:
     position: 2
     display_options:
       defaults:
-        style: '0'
+        style: false
       style:
         type: grid
-label: ''
-langcode: en
-id: test_executable_displays
-tag: ''

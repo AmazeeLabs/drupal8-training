@@ -64,13 +64,13 @@ class Email extends FormElement {
     $value = trim($element['#value']);
     $form_state->setValueForElement($element, $value);
 
-    if ($value !== '' && !valid_email_address($value)) {
+    if ($value !== '' && !\Drupal::service('email.validator')->isValid($value)) {
       $form_state->setError($element, t('The email address %mail is not valid.', array('%mail' => $value)));
     }
   }
 
   /**
-   * Prepares a #type 'email' render element for theme_input().
+   * Prepares a #type 'email' render element for input.html.twig.
    *
    * @param array $element
    *   An associative array containing the properties of the element.
@@ -78,7 +78,7 @@ class Email extends FormElement {
    *   #placeholder, #required, #attributes.
    *
    * @return array
-   *   The $element with prepared variables ready for theme_input().
+   *   The $element with prepared variables ready for input.html.twig.
    */
   public static function preRenderEmail($element) {
     $element['#attributes']['type'] = 'email';

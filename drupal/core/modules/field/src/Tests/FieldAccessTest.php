@@ -43,16 +43,16 @@ class FieldAccessTest extends FieldTestBase {
 
     // Create content type.
     $content_type_info = $this->drupalCreateContentType();
-    $content_type = $content_type_info->type;
+    $content_type = $content_type_info->id();
 
     $field_storage = array(
-      'name' => 'test_view_field',
+      'field_name' => 'test_view_field',
       'entity_type' => 'node',
       'type' => 'text',
     );
     entity_create('field_storage_config', $field_storage)->save();
     $field = array(
-      'field_name' => $field_storage['name'],
+      'field_name' => $field_storage['field_name'],
       'entity_type' => 'node',
       'bundle' => $content_type,
     );
@@ -61,7 +61,7 @@ class FieldAccessTest extends FieldTestBase {
     // Assign display properties for the 'default' and 'teaser' view modes.
     foreach (array('default', 'teaser') as $view_mode) {
       entity_get_display('node', $content_type, $view_mode)
-        ->setComponent($field_storage['name'])
+        ->setComponent($field_storage['field_name'])
         ->save();
     }
 

@@ -60,10 +60,33 @@ class RowUITest extends UITestBase {
     $this->assertEqual($row['options']['test_option'], $random_name, 'Make sure that the custom settings field got saved as expected.');
 
     // Change the row plugin to fields using ajax.
-    $this->drupalPostAjaxForm($row_plugin_url, array('row[type]' => 'fields'), array('op' => 'Apply'), str_replace('/nojs/', '/ajax/', $row_plugin_url));
-    $this->drupalPostAjaxForm(NULL, array(), array('op' => 'Apply'), str_replace('/nojs/', '/ajax/', $row_plugin_url));
+    // Note: this is the best approximation we can achieve, because we cannot
+    // simulate the 'openDialog' command in
+    // WebTestBase::drupalProcessAjaxResponse(), hence we have to make do.
+    $row_plugin_url_ajax = str_replace('/nojs/', '/ajax/', $row_plugin_url);
+    $ajax_settings = [
+      'accepts' => 'application/vnd.drupal-ajax',
+      'submit' => [
+        '_triggering_element_name' => 'op',
+        '_triggering_element_value' => 'Apply',
+      ],
+      'url' => $row_plugin_url_ajax,
+    ];
+    $this->drupalPostAjaxForm($row_plugin_url, ['row[type]' => 'fields'], NULL, $row_plugin_url_ajax, [], [], NULL, $ajax_settings);
+    $this->drupalGet($row_plugin_url);
     $this->assertResponse(200);
     $this->assertFieldByName('row[type]', 'fields', 'Make sure that the fields got saved as used row plugin.');
+
+    // Ensure that entity row plugins appear.
+    $view_name = 'content';
+    $row_plugin_url = "admin/structure/views/nojs/display/$view_name/default/row";
+    $row_options_url = "admin/structure/views/nojs/display/$view_name/default/row_options";
+
+    $this->drupalGet($row_plugin_url);
+    $this->assertFieldByName('row[type]', 'entity:node');
+    $this->drupalPostForm(NULL, ['row[type]' => 'entity:node'], t('Apply'));
+    $this->assertUrl($row_options_url);
+    $this->assertFieldByName('row_options[view_mode]', 'teaser');
   }
 
 }

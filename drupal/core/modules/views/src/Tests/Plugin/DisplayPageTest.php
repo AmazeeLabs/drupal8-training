@@ -35,7 +35,7 @@ class DisplayPageTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('system', 'user', 'field', 'entity');
+  public static $modules = array('system', 'user', 'field');
 
   /**
    * The router dumper to get all routes.
@@ -80,7 +80,7 @@ class DisplayPageTest extends ViewUnitTestBase {
     $view->storage->disable()->save();
     // Router rebuild would occur in a kernel terminate event so we need to
     // simulate that here.
-    \Drupal::service('router.builder')->rebuildIfNeeded();
+    \Drupal::service('router.builder')->rebuild();
 
     $response = $this->container->get('http_kernel')->handle($subrequest, HttpKernelInterface::SUB_REQUEST);
     $this->assertEqual($response->getStatusCode(), 404);
@@ -137,7 +137,31 @@ class DisplayPageTest extends ViewUnitTestBase {
     $tree = \Drupal::menuTree()->load('admin', new MenuTreeParameters());
     $this->assertTrue(isset($tree['system.admin']->subtree['views_view:views.test_page_display_menu.page_4']));
     $menu_link = $tree['system.admin']->subtree['views_view:views.test_page_display_menu.page_4']->link;
-    $this->assertEqual($menu_link->getTitle(), 'Test child');
+    $this->assertEqual($menu_link->getTitle(), 'Test child (with parent)');
+  }
+
+  /**
+   * Tests the calculated dependencies for various views using Page displays.
+   */
+  public function testDependencies() {
+    $view = Views::getView('test_page_display');
+    $this->assertIdentical([], $view->calculateDependencies());
+
+    $view = Views::getView('test_page_display_route');
+    $expected = [
+      'content' => ['StaticTest'],
+      'module' => ['views_test_data'],
+    ];
+    $this->assertIdentical($expected, $view->calculateDependencies());
+
+    $view = Views::getView('test_page_display_menu');
+    $expected = [
+      'config' => [
+        'system.menu.admin',
+        'system.menu.tools',
+      ],
+    ];
+    $this->assertIdentical($expected, $view->calculateDependencies());
   }
 
 }

@@ -87,24 +87,6 @@ interface UserInterface extends ContentEntityInterface, EntityChangedInterface, 
   public function setEmail($mail);
 
   /**
-   * Returns the user signature.
-   *
-   * @todo: Convert this to a configurable field.
-   *
-   * @return string
-   *   The signature text.
-   */
-  public function getSignature();
-
-  /**
-   * Returns the signature format.
-   *
-   * @return string
-   *   Name of the filter format.
-   */
-  public function getSignatureFormat();
-
-  /**
    * Returns the creation time of the user as a UNIX timestamp.
    *
    * @return int

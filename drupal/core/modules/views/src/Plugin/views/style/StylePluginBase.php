@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\views\style;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -190,7 +191,7 @@ abstract class StylePluginBase extends PluginBase {
   public function usesTokens() {
     if ($this->usesRowClass()) {
       $class = $this->options['row_class'];
-      if (strpos($class, '[') !== FALSE || strpos($class, '!') !== FALSE || strpos($class, '%') !== FALSE) {
+      if (strpos($class, '{{') !== FALSE || strpos($class, '!') !== FALSE || strpos($class, '%') !== FALSE) {
         return TRUE;
       }
     }
@@ -217,7 +218,7 @@ abstract class StylePluginBase extends PluginBase {
 
       $classes = explode(' ', $class);
       foreach ($classes as &$class) {
-        $class = drupal_clean_css_identifier($class);
+        $class = Html::cleanCssIdentifier($class);
       }
       return implode(' ', $classes);
     }
@@ -227,18 +228,15 @@ abstract class StylePluginBase extends PluginBase {
    * Take a value and apply token replacement logic to it.
    */
   public function tokenizeValue($value, $row_index) {
-    if (strpos($value, '[') !== FALSE || strpos($value, '!') !== FALSE || strpos($value, '%') !== FALSE) {
+    if (strpos($value, '{{') !== FALSE || strpos($value, '!') !== FALSE || strpos($value, '%') !== FALSE) {
       // Row tokens might be empty, for example for node row style.
       $tokens = isset($this->rowTokens[$row_index]) ? $this->rowTokens[$row_index] : array();
       if (!empty($this->view->build_info['substitutions'])) {
         $tokens += $this->view->build_info['substitutions'];
       }
 
-      if ($tokens) {
-        $value = strtr($value, $tokens);
-      }
+      $value = $this->viewsTokenReplace($value, $tokens);
     }
-
     return $value;
   }
 
@@ -254,9 +252,9 @@ abstract class StylePluginBase extends PluginBase {
     $options['grouping'] = array('default' => array());
     if ($this->usesRowClass()) {
       $options['row_class'] = array('default' => '');
-      $options['default_row_class'] = array('default' => TRUE, 'bool' => TRUE);
+      $options['default_row_class'] = array('default' => TRUE);
     }
-    $options['uses_fields'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['uses_fields'] = array('default' => FALSE);
 
     return $options;
   }
@@ -268,7 +266,7 @@ abstract class StylePluginBase extends PluginBase {
     // to FALSE.
     // @TODO: Document "usesGrouping" in docs.php when docs.php is written.
     if ($this->usesFields() && $this->usesGrouping()) {
-      $options = array('' => t('- None -'));
+      $options = array('' => $this->t('- None -'));
       $field_labels = $this->displayHandler->getFieldLabels(TRUE);
       $options += $field_labels;
       // If there are no fields, we can't group on them.
@@ -292,16 +290,16 @@ abstract class StylePluginBase extends PluginBase {
           $grouping += array('field' => '', 'rendered' => TRUE, 'rendered_strip' => FALSE);
           $form['grouping'][$i]['field'] = array(
             '#type' => 'select',
-            '#title' => t('Grouping field Nr.@number', array('@number' => $i + 1)),
+            '#title' => $this->t('Grouping field Nr.@number', array('@number' => $i + 1)),
             '#options' => $options,
             '#default_value' => $grouping['field'],
-            '#description' => t('You may optionally specify a field by which to group the records. Leave blank to not group.'),
+            '#description' => $this->t('You may optionally specify a field by which to group the records. Leave blank to not group.'),
           );
           $form['grouping'][$i]['rendered'] = array(
             '#type' => 'checkbox',
-            '#title' => t('Use rendered output to group rows'),
+            '#title' => $this->t('Use rendered output to group rows'),
             '#default_value' => $grouping['rendered'],
-            '#description' => t('If enabled the rendered output of the grouping field is used to group the rows.'),
+            '#description' => $this->t('If enabled the rendered output of the grouping field is used to group the rows.'),
             '#states' => array(
               'invisible' => array(
                 ':input[name="style_options[grouping][' . $i . '][field]"]' => array('value' => ''),
@@ -310,7 +308,7 @@ abstract class StylePluginBase extends PluginBase {
           );
           $form['grouping'][$i]['rendered_strip'] = array(
             '#type' => 'checkbox',
-            '#title' => t('Remove tags from rendered output'),
+            '#title' => $this->t('Remove tags from rendered output'),
             '#default_value' => $grouping['rendered_strip'],
             '#states' => array(
               'invisible' => array(
@@ -324,19 +322,19 @@ abstract class StylePluginBase extends PluginBase {
 
     if ($this->usesRowClass()) {
       $form['row_class'] = array(
-        '#title' => t('Row class'),
-        '#description' => t('The class to provide on each row.'),
+        '#title' => $this->t('Row class'),
+        '#description' => $this->t('The class to provide on each row.'),
         '#type' => 'textfield',
         '#default_value' => $this->options['row_class'],
       );
 
       if ($this->usesFields()) {
-        $form['row_class']['#description'] .= ' ' . t('You may use field tokens from as per the "Replacement patterns" used in "Rewrite the output of this field" for all fields.');
+        $form['row_class']['#description'] .= ' ' . $this->t('You may use field tokens from as per the "Replacement patterns" used in "Rewrite the output of this field" for all fields.');
       }
 
       $form['default_row_class'] = array(
-        '#title' => t('Add views row classes'),
-        '#description' => t('Add the default row classes like views-row-1 to the output. You can use this to quickly reduce the amount of markup the view provides by default, at the cost of making it more difficult to apply CSS.'),
+        '#title' => $this->t('Add views row classes'),
+        '#description' => $this->t('Add the default row classes like views-row-1 to the output. You can use this to quickly reduce the amount of markup the view provides by default, at the cost of making it more difficult to apply CSS.'),
         '#type' => 'checkbox',
         '#default_value' => $this->options['default_row_class'],
       );
@@ -345,8 +343,8 @@ abstract class StylePluginBase extends PluginBase {
     if (!$this->usesFields() || !empty($this->options['uses_fields'])) {
       $form['uses_fields'] = array(
         '#type' => 'checkbox',
-        '#title' => t('Force using fields'),
-        '#description' => t('If neither the row nor the style plugin supports fields, this field allows to enable them, so you can for example use groupby.'),
+        '#title' => $this->t('Force using fields'),
+        '#description' => $this->t('If neither the row nor the style plugin supports fields, this field allows to enable them, so you can for example use groupby.'),
         '#default_value' => $this->options['uses_fields'],
       );
     }
@@ -688,7 +686,7 @@ abstract class StylePluginBase extends PluginBase {
    * @param $field
    *    The id of the field.
    */
-  protected function getFieldValue($index, $field) {
+  public function getFieldValue($index, $field) {
     $this->view->row_index = $index;
     $value = $this->view->field[$field]->getValue($this->view->result[$index]);
     unset($this->view->row_index);
@@ -701,7 +699,7 @@ abstract class StylePluginBase extends PluginBase {
     if ($this->usesRowPlugin()) {
       $plugin = $this->displayHandler->getPlugin('row');
       if (empty($plugin)) {
-        $errors[] = t('Style @style requires a row style but the row plugin is invalid.', array('@style' => $this->definition['title']));
+        $errors[] = $this->t('Style @style requires a row style but the row plugin is invalid.', array('@style' => $this->definition['title']));
       }
       else {
         $result = $plugin->validate();

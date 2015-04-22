@@ -77,8 +77,8 @@ function entity_load($entity_type, $id, $reset = FALSE) {
  * @param int $revision_id
  *   The id of the entity to load.
  *
- * @return \Drupal\Core\Entity\EntityInterface
- *   The entity object, or FALSE if there is no entity with the given revision
+ * @return \Drupal\Core\Entity\EntityInterface|null
+ *   The entity object, or NULL if there is no entity with the given revision
  *   id.
  *
  * @see \Drupal\Core\Entity\EntityManagerInterface
@@ -103,30 +103,6 @@ function entity_revision_delete($entity_type, $revision_id) {
   \Drupal::entityManager()
     ->getStorage($entity_type)
     ->deleteRevision($revision_id);
-}
-
-/**
- * Loads an entity by UUID.
- *
- * Note that some entity types may not support UUIDs.
- *
- * @param string $entity_type_id
- *   The entity type to load; e.g., 'node' or 'user'.
- * @param string $uuid
- *   The UUID of the entity to load.
- *
- * @return EntityInterface|FALSE
- *   The entity object, or FALSE if there is no entity with the given UUID.
- *
- * @throws \Drupal\Core\Entity\EntityStorageException
- *   Thrown in case the requested entity type does not support UUIDs.
- *
- * @see \Drupal\Core\Entity\EntityManagerInterface
- *
- * @deprecated Use \Drupal::entityManager()->loadEntityByUuid();
- */
-function entity_load_by_uuid($entity_type_id, $uuid) {
-  return \Drupal::entityManager()->loadEntityByUuid($entity_type_id, $uuid);
 }
 
 /**
@@ -182,7 +158,7 @@ function entity_load_multiple($entity_type, array $ids = NULL, $reset = FALSE) {
  *
  * @return array
  *   An array of entity objects indexed by their IDs. Returns an empty array if
- *   no matching entities found.
+ *   no matching entities are found.
  */
 function entity_load_multiple_by_properties($entity_type, array $values) {
   return \Drupal::entityManager()

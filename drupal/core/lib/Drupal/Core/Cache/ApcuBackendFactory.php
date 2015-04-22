@@ -19,10 +19,23 @@ class ApcuBackendFactory implements CacheFactoryInterface {
   protected $sitePrefix;
 
   /**
-   * Constructs an ApcuBackendFactory object.
+   * The cache tags checksum provider.
+   *
+   * @var \Drupal\Core\Cache\CacheTagsChecksumInterface
    */
-  public function __construct() {
-    $this->sitePrefix = Crypt::hashBase64(DRUPAL_ROOT . '/' . conf_path());
+  protected $checksumProvider;
+
+  /**
+   * Constructs an ApcuBackendFactory object.
+   *
+   * @param string $root
+   *   The app root.
+   * @param \Drupal\Core\Cache\CacheTagsChecksumInterface $checksum_provider
+   *   The cache tags checksum provider.
+   */
+  public function __construct($root, CacheTagsChecksumInterface $checksum_provider) {
+    $this->sitePrefix = Crypt::hashBase64($root . '/' . conf_path());
+    $this->checksumProvider = $checksum_provider;
   }
 
   /**
@@ -35,7 +48,7 @@ class ApcuBackendFactory implements CacheFactoryInterface {
    *   The cache backend object for the specified cache bin.
    */
   public function get($bin) {
-    return new ApcuBackend($bin, $this->sitePrefix);
+    return new ApcuBackend($bin, $this->sitePrefix, $this->checksumProvider);
   }
 
 }

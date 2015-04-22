@@ -13,11 +13,11 @@ namespace Drupal\user\Tests\Views;
 abstract class AccessTestBase extends UserTestBase {
 
   /**
-   * Contains a user object that can access all views.
+   * Modules to enable.
    *
-   * @var \Drupal\user\UserInterface
+   * @var array
    */
-  protected $adminUser;
+  public static $modules = array('block');
 
   /**
    * Contains a user object that has no special permissions.
@@ -47,12 +47,15 @@ abstract class AccessTestBase extends UserTestBase {
    */
   protected $normalRole;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
+    $this->drupalPlaceBlock('system_breadcrumb_block');
 
     $this->enableViewsTestModule();
 
-    $this->adminUser = $this->drupalCreateUser(array('access all views'));
     $this->webUser = $this->drupalCreateUser();
     $roles = $this->webUser->getRoles();
     $this->webRole = $roles[0];

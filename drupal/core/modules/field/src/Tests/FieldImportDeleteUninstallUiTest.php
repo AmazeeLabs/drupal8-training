@@ -38,7 +38,7 @@ class FieldImportDeleteUninstallUiTest extends FieldTestBase {
   public function testImportDeleteUninstall() {
     // Create a telephone field.
     $field_storage = entity_create('field_storage_config', array(
-      'name' => 'field_tel',
+      'field_name' => 'field_tel',
       'entity_type' => 'entity_test',
       'type' => 'telephone',
     ));
@@ -50,7 +50,7 @@ class FieldImportDeleteUninstallUiTest extends FieldTestBase {
 
     // Create a text field.
     $text_field_storage = entity_create('field_storage_config', array(
-      'name' => 'field_text',
+      'field_name' => 'field_text',
       'entity_type' => 'entity_test',
       'type' => 'text',
     ));
@@ -84,7 +84,7 @@ class FieldImportDeleteUninstallUiTest extends FieldTestBase {
     $this->copyConfig($active, $staging);
 
     // Stage uninstall of the Telephone module.
-    $core_extension = \Drupal::config('core.extension')->get();
+    $core_extension = $this->config('core.extension')->get();
     unset($core_extension['module']['telephone']);
     $staging->write('core.extension', $core_extension);
 
@@ -102,6 +102,16 @@ class FieldImportDeleteUninstallUiTest extends FieldTestBase {
     $staging->write('core.extension', $core_extension);
     $this->drupalGet('admin/config/development/configuration');
     $this->assertText('This synchronization will delete data from the fields: entity_test.field_tel, entity_test.field_text.');
+    // Delete all the text fields in staging, entity_test_install() adds quite
+    // a few.
+    foreach (\Drupal::entityManager()->getFieldMap() as $entity_type => $fields) {
+      foreach ($fields as $field_name => $info) {
+        if ($info['type'] == 'text') {
+          $staging->delete("field.storage.$entity_type.$field_name");
+          $staging->delete("field.field.$entity_type.$entity_type.$field_name");
+        }
+      }
+    }
 
     // This will purge all the data, delete the field and uninstall the
     // Telephone and Text modules.
@@ -109,7 +119,7 @@ class FieldImportDeleteUninstallUiTest extends FieldTestBase {
     $this->assertNoText('Field data will be deleted by this synchronization.');
     $this->rebuildContainer();
     $this->assertFalse(\Drupal::moduleHandler()->moduleExists('telephone'));
-    $this->assertFalse(entity_load_by_uuid('field_storage_config', $field_storage->uuid()), 'The telephone field has been deleted by the configuration synchronization');
+    $this->assertFalse(\Drupal::entityManager()->loadEntityByUuid('field_storage_config', $field_storage->uuid()), 'The telephone field has been deleted by the configuration synchronization');
     $deleted_storages = \Drupal::state()->get('field.storage.deleted') ?: array();
     $this->assertFalse(isset($deleted_storages[$field_storage->uuid()]), 'Telephone field has been completed removed from the system.');
     $this->assertFalse(isset($deleted_storages[$field_storage->uuid()]), 'Text field has been completed removed from the system.');

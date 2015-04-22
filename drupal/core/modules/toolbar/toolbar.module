@@ -13,8 +13,8 @@ use Drupal\Core\Template\Attribute;
 use Drupal\Component\Datetime\DateTimePlus;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\String;
-use Drupal\user\RoleInterface;
-use Drupal\user\UserInterface;
+use Drupal\user\Entity\Role;
+use Drupal\Core\Url;
 
 /**
  * Implements hook_help().
@@ -23,11 +23,13 @@ function toolbar_help($route_name, RouteMatchInterface $route_match) {
   switch ($route_name) {
     case 'help.page.toolbar':
       $output = '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Toolbar module displays links to top-level administration menu items and links from other modules at the top of the screen. For more information, see the online handbook entry for <a href="@toolbar">Toolbar module</a>.', array('@toolbar' => 'http://drupal.org/documentation/modules/toolbar')) . '</p>';
-      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<p>' . t('The Toolbar module provides a toolbar for site administrators, which displays tabs and trays provided by the Toolbar module itself and other modules. For more information, see the <a href="!toolbar_docs">online documentation for the Toolbar module</a>.', array('!toolbar_docs' => 'https://drupal.org/documentation/modules/toolbar')) . '</p>';
+      $output .= '<h4>' . t('Terminology') . '</h4>';
       $output .= '<dl>';
-      $output .= '<dt>' . t('Displaying administrative links') . '</dt>';
-      $output .= '<dd>' . t('The Toolbar module displays a bar containing top-level administrative components across the top of the screen. Below that, the Toolbar module has a <em>drawer</em> section where it displays links provided by other modules, such as the core <a href="@shortcuts-help">Shortcut module</a>. The drawer can be hidden/shown by clicking on its corresponding tab.', array('@shortcuts-help' => url('admin/help/shortcut'))) . '</dd>';
+      $output .= '<dt>' . t('Tabs') . '</dt>';
+      $output .= '<dd>' . t('Tabs are buttons, displayed in a bar across the top of the screen. Some tabs execute an action (such as starting Edit mode), while other tabs toggle which tray is open.') . '</dd>';
+      $output .= '<dt>' . t('Trays') . '</dt>';
+      $output .= '<dd>' . t('Trays are usually lists of links, which can be hierarchical like a menu. If a tray has been toggled open, it is displayed either vertically or horizontally below the tab bar, depending on the browser width. Only one tray may be open at a time. If you click another tab, that tray will replace the tray being displayed. In wide browser widths, the user has the ability to toggle from vertical to horizontal, using a link at the bottom or right of the tray. Hierarchical menus only have open/close behavior in vertical mode; if you display a tray containing a hierarchical menu horizontally, only the top-level links will be available.') . '</dd>';
       $output .= '</dl>';
       return $output;
   }
@@ -39,123 +41,21 @@ function toolbar_help($route_name, RouteMatchInterface $route_match) {
 function toolbar_theme($existing, $type, $theme, $path) {
   $items['toolbar'] = array(
     'render element' => 'element',
-    'template' => 'toolbar',
-  );
-  $items['toolbar_item'] = array(
-    'render element' => 'element',
   );
 
   return $items;
 }
 
 /**
- * Implements hook_element_info().
- */
-function toolbar_element_info() {
-  $elements = array();
-
-  $elements['toolbar'] = array(
-    '#pre_render' => array('toolbar_pre_render'),
-    '#theme' => 'toolbar',
-    '#attached' => array(
-      'library' => array(
-        'toolbar/toolbar',
-      ),
-    ),
-    // Metadata for the toolbar wrapping element.
-    '#attributes' => array(
-      // The id cannot be simply "toolbar" or it will clash with the simpletest
-      // tests listing which produces a checkbox with attribute id="toolbar"
-      'id' => 'toolbar-administration',
-      'role' => 'group',
-      'aria-label' => t('Site administration toolbar'),
-    ),
-    // Metadata for the administration bar.
-    '#bar' => array(
-      '#heading' => t('Toolbar items'),
-      '#attributes' => array(
-        'id' => 'toolbar-bar',
-        'role' => 'navigation',
-        'aria-label' => t('Toolbar items'),
-      ),
-    ),
-  );
-
-  // A toolbar item is wrapped in markup for common styling.  The 'tray'
-  // property contains a renderable array.
-  $elements['toolbar_item'] = array(
-    '#pre_render' => array('toolbar_pre_render_item'),
-    '#theme' => 'toolbar_item',
-    'tab' => array(
-      '#type' => 'link',
-      '#title' => NULL,
-      '#href' => '',
-    ),
-  );
-  return $elements;
-}
-
-/**
- * Implements hook_page_build().
+ * Implements hook_page_top().
  *
- * Add admin toolbar to the page_top region automatically.
+ * Add admin toolbar to the top of the page automatically.
  */
-function toolbar_page_build(&$page) {
-  $page['page_top']['toolbar'] = array(
+function toolbar_page_top(array &$page_top) {
+  $page_top['toolbar'] = array(
     '#type' => 'toolbar',
     '#access' => \Drupal::currentUser()->hasPermission('access toolbar'),
   );
-}
-
-/**
- * Builds the Toolbar as a structured array ready for drupal_render().
- *
- * Since building the toolbar takes some time, it is done just prior to
- * rendering to ensure that it is built only if it will be displayed.
- *
- * @param array $element
- *  A renderable array.
- *
- * @return
- *  A renderable array.
- *
- * @see toolbar_page_build().
- */
-function toolbar_pre_render($element) {
-
-  // Get the configured breakpoints to switch from vertical to horizontal
-  // toolbar presentation.
-  $breakpoints = \Drupal::service('breakpoint.manager')->getBreakpointsByGroup('toolbar');
-  if (!empty($breakpoints)) {
-    $media_queries =  array();
-    foreach ($breakpoints as $id => $breakpoint) {
-      $media_queries[$id] = $breakpoint->getMediaQuery();
-    }
-
-    $element['#attached']['js'][] = array(
-      'data' => array(
-        'toolbar' => array(
-          'breakpoints' => $media_queries,
-        )
-      ),
-      'type' => 'setting',
-    );
-  }
-
-  // Get toolbar items from all modules that implement hook_toolbar().
-  $items = \Drupal::moduleHandler()->invokeAll('toolbar');
-  // Allow for altering of hook_toolbar().
-  \Drupal::moduleHandler()->alter('toolbar', $items);
-  // Sort the children.
-  uasort($items, array('\Drupal\Component\Utility\SortArray', 'sortByWeightProperty'));
-
-  // Merge in the original toolbar values.
-  $element = array_merge($element, $items);
-
-  // Render the children.
-  $element['#children'] = drupal_render_children($element);
-
-  return $element;
 }
 
 /**
@@ -216,61 +116,6 @@ function template_preprocess_toolbar(&$variables) {
 }
 
 /**
- * Provides markup for associating a tray trigger with a tray element.
- *
- * A tray is a responsive container that wraps renderable content. Trays present
- * content well on small and large screens alike.
- *
- * @param array $element
- *   A renderable array.
- *
- * @return
- *   A renderable array.
- */
-function toolbar_pre_render_item($element) {
-  // Assign each item a unique ID.
-  $id = drupal_html_id('toolbar-item');
-
-  // Provide attributes for a toolbar item.
-  $attributes = array(
-    'id' => $id,
-  );
-
-  // If tray content is present, markup the tray and its associated trigger.
-  if (!empty($element['tray'])) {
-    // Provide attributes necessary for trays.
-    $attributes += array(
-      'data-toolbar-tray' => $id . '-tray',
-      'aria-owns' => $id,
-      'role' => 'button',
-      'aria-pressed' => 'false',
-    );
-
-    // Merge in module-provided attributes.
-    $element['tab'] += array('#attributes' => array());
-    $element['tab']['#attributes'] += $attributes;
-    $element['tab']['#attributes']['class'][] = 'trigger';
-
-    // Provide attributes for the tray theme wrapper.
-    $attributes = array(
-      'id' => $id . '-tray',
-      'data-toolbar-tray' => $id . '-tray',
-      'aria-owned-by' => $id,
-    );
-    // Merge in module-provided attributes.
-    if (!isset($element['tray']['#wrapper_attributes'])) {
-      $element['tray']['#wrapper_attributes'] = array();
-    }
-    $element['tray']['#wrapper_attributes'] += $attributes;
-    $element['tray']['#wrapper_attributes']['class'][] = 'toolbar-tray';
-  }
-
-  $element['tab']['#attributes']['class'][] = 'toolbar-item';
-
-  return $element;
-}
-
-/**
  * Implements hook_toolbar().
  */
 function toolbar_toolbar() {
@@ -280,7 +125,7 @@ function toolbar_toolbar() {
     'tab' => array(
       '#type' => 'link',
       '#title' => t('Back to site'),
-      '#href' => '<front>',
+      '#url' => Url::fromRoute('<front>'),
       '#attributes' => array(
         'title' => t('Return to site content'),
         'class' => array('toolbar-icon', 'toolbar-icon-escape-admin'),
@@ -288,7 +133,7 @@ function toolbar_toolbar() {
       ),
     ),
     '#wrapper_attributes' => array(
-      'class' => array('hidden'),
+      'class' => array('hidden', 'home-toolbar-tab'),
     ),
     '#attached' => array(
       'library' => array(
@@ -303,14 +148,11 @@ function toolbar_toolbar() {
   // toolbar_subtrees route. We provide the JavaScript requesting that JSONP
   // script here with the hash parameter that is needed for that route.
   // @see toolbar_subtrees_jsonp()
-  $langcode = \Drupal::languageManager()->getCurrentLanguage()->id;
-  $subtrees_attached['js'][] = array(
-    'type' => 'setting',
-    'data' => array('toolbar' => array(
-      'subtreesHash' => _toolbar_get_subtrees_hash($langcode),
-      'langcode' => $langcode,
-    )),
-  );
+  $langcode = \Drupal::languageManager()->getCurrentLanguage()->getId();
+  $subtrees_attached['drupalSettings']['toolbar'] = [
+    'subtreesHash' => _toolbar_get_subtrees_hash($langcode),
+    'langcode' => $langcode,
+  ];
 
   // The administration element has a link that is themed to correspond to
   // a toolbar tray. The tray contains the full administrative menu of the site.
@@ -319,7 +161,7 @@ function toolbar_toolbar() {
     'tab' => array(
       '#type' => 'link',
       '#title' => t('Manage'),
-      '#href' => 'admin',
+      '#url' => Url::fromRoute('system.admin'),
       '#attributes' => array(
         'title' => t('Admin menu'),
         'class' => array('toolbar-icon', 'toolbar-icon-menu'),
@@ -398,7 +240,7 @@ function toolbar_menu_navigation_links(array $tree) {
     $url = $link->getUrlObject();
     if ($url->isExternal()) {
       // This is an unusual case, so just get a distinct, safe string.
-      $id = substr(Crypt::hashBase64($url->getPath()), 0, 16);
+      $id = substr(Crypt::hashBase64($url->getUri()), 0, 16);
     }
     else {
       $id = str_replace(array('.', '<', '>'), array('-', '', ''), $url->getRouteName());
@@ -471,7 +313,8 @@ function _toolbar_get_subtrees_hash($langcode) {
     // caches later, based on the user's ID regardless of language.
     // Clear the cache when the 'locale' tag is deleted. This ensures a fresh
     // subtrees rendering when string translations are made.
-    \Drupal::cache('toolbar')->set($cid, $hash, Cache::PERMANENT, array('user' => array($uid), 'locale' => TRUE, 'menu' => 'admin', 'user_roles' => TRUE));
+    $role_list_cache_tags = \Drupal::entityManager()->getDefinition('user_role')->getListCacheTags();
+    \Drupal::cache('toolbar')->set($cid, $hash, Cache::PERMANENT, Cache::mergeTags(array('user:' . $uid, 'locale', 'config:system.menu.admin'), $role_list_cache_tags));
   }
   return $hash;
 }

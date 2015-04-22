@@ -8,7 +8,6 @@
 namespace Drupal\node\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
-use Drupal\Core\Config\Entity\ThirdPartySettingsTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\node\NodeTypeInterface;
 
@@ -35,13 +34,13 @@ use Drupal\node\NodeTypeInterface;
  *     "label" = "name"
  *   },
  *   links = {
- *     "edit-form" = "entity.node_type.edit_form",
- *     "delete-form" = "entity.node_type.delete_form"
+ *     "edit-form" = "/admin/structure/types/manage/{node_type}",
+ *     "delete-form" = "/admin/structure/types/manage/{node_type}/delete",
+ *     "collection" = "/admin/structure/types",
  *   }
  * )
  */
 class NodeType extends ConfigEntityBundleBase implements NodeTypeInterface {
-  use ThirdPartySettingsTrait;
 
   /**
    * The machine name of this node type.
@@ -50,7 +49,7 @@ class NodeType extends ConfigEntityBundleBase implements NodeTypeInterface {
    *
    * @todo Rename to $id.
    */
-  public $type;
+  protected $type;
 
   /**
    * The human-readable name of the node type.
@@ -59,21 +58,21 @@ class NodeType extends ConfigEntityBundleBase implements NodeTypeInterface {
    *
    * @todo Rename to $label.
    */
-  public $name;
+  protected $name;
 
   /**
    * A brief description of this node type.
    *
    * @var string
    */
-  public $description;
+  protected $description;
 
   /**
    * Help information shown to the user when creating a Node of this type.
    *
    * @var string
    */
-  public $help;
+  protected $help;
 
   /**
    * Default value of the 'Create new revision' checkbox of this node type.
@@ -95,28 +94,6 @@ class NodeType extends ConfigEntityBundleBase implements NodeTypeInterface {
    * @var bool
    */
   protected $display_submitted = TRUE;
-
-  /**
-   * Indicates whether a Body field should be created for this node type.
-   *
-   * This property affects entity creation only. It allows default configuration
-   * of modules and installation profiles to specify whether a Body field should
-   * be created for this bundle.
-   *
-   * @var bool
-   *
-   * @see \Drupal\node\Entity\NodeType::$create_body_label
-   */
-  protected $create_body = TRUE;
-
-  /**
-   * The label to use for the Body field upon entity creation.
-   *
-   * @see \Drupal\node\Entity\NodeType::$create_body
-   *
-   * @var string
-   */
-  protected $create_body_label = 'Body';
 
   /**
    * {@inheritdoc}
@@ -178,21 +155,27 @@ class NodeType extends ConfigEntityBundleBase implements NodeTypeInterface {
   /**
    * {@inheritdoc}
    */
+  public function getHelp() {
+    return $this->help;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getDescription() {
+    return $this->description;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function postSave(EntityStorageInterface $storage, $update = TRUE) {
     parent::postSave($storage, $update);
 
-    if (!$update) {
-      // Create a body if the create_body property is true and we're not in
-      // the syncing process.
-      if ($this->get('create_body') && !$this->isSyncing()) {
-        $label = $this->get('create_body_label');
-        node_add_body_field($this, $label);
-      }
-    }
-    elseif ($this->getOriginalId() != $this->id()) {
+    if ($update && $this->getOriginalId() != $this->id()) {
       $update_count = node_type_update_nodes($this->getOriginalId(), $this->id());
       if ($update_count) {
-        drupal_set_message(format_plural($update_count,
+        drupal_set_message(\Drupal::translation()->formatPlural($update_count,
           'Changed the content type of 1 post from %old-type to %type.',
           'Changed the content type of @count posts from %old-type to %type.',
           array(

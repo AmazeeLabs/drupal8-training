@@ -12,6 +12,7 @@ use Drupal\Core\Database\Connection as DatabaseConnection;
 use Drupal\Core\Database\DatabaseNotFoundException;
 use Drupal\Core\Database\StatementInterface;
 use Drupal\Core\Database\IntegrityConstraintViolationException;
+use Drupal\Core\Database\DatabaseExceptionWrapper;
 
 /**
  * @addtogroup database
@@ -101,7 +102,6 @@ class Connection extends DatabaseConnection {
     return $pdo;
   }
 
-
   public function query($query, array $args = array(), $options = array()) {
 
     $options += $this->defaultOptions();
@@ -148,6 +148,9 @@ class Connection extends DatabaseConnection {
         if (substr($e->getCode(), -6, -3) == '23') {
           $e = new IntegrityConstraintViolationException($e->getMessage(), $e->getCode(), $e);
         }
+        else {
+          $e = new DatabaseExceptionWrapper($e->getMessage(), 0, $e);
+        }
         // Add additional debug information.
         if ($query instanceof StatementInterface) {
           $e->query_string = $stmt->getQueryString();
@@ -181,6 +184,64 @@ class Connection extends DatabaseConnection {
     $tablename = $this->generateTemporaryTableName();
     $this->query('CREATE TEMPORARY TABLE {' . $tablename . '} AS ' . $query, $args, $options);
     return $tablename;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function escapeField($field) {
+    $escaped = parent::escapeField($field);
+
+    // Remove any invalid start character.
+    $escaped = preg_replace('/^[^A-Za-z0-9_]/', '', $escaped);
+
+    // The pgsql database driver does not support field names that contain
+    // periods (supported by PostgreSQL server) because this method may be
+    // called by a field with a table alias as part of SQL conditions or
+    // order by statements. This will consider a period as a table alias
+    // identifier, and split the string at the first period.
+    if (preg_match('/^([A-Za-z0-9_]+)"?[.]"?([A-Za-z0-9_.]+)/', $escaped, $parts)) {
+      $table = $parts[1];
+      $column = $parts[2];
+
+      // Use escape alias because escapeField may contain multiple periods that
+      // need to be escaped.
+      $escaped = $this->escapeTable($table) . '.' . $this->escapeAlias($column);
+    }
+    elseif (preg_match('/[A-Z]/', $escaped)) {
+      // Quote the field name for case-sensitivity.
+      $escaped = '"' . $escaped . '"';
+    }
+
+    return $escaped;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function escapeAlias($field) {
+    $escaped = preg_replace('/[^A-Za-z0-9_]+/', '', $field);
+
+    // Escape the alias in quotes for case-sensitivity.
+    if (preg_match('/[A-Z]/', $escaped)) {
+      $escaped = '"' . $escaped . '"';
+    }
+
+    return $escaped;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function escapeTable($table) {
+    $escaped = parent::escapeTable($table);
+
+    // Quote identifier to make it case-sensitive.
+    if (preg_match('/[A-Z]/', $escaped)) {
+      $escaped = '"' . $escaped . '"';
+    }
+
+    return $escaped;
   }
 
   public function driver() {
@@ -226,6 +287,7 @@ class Connection extends DatabaseConnection {
       // In PostgreSQL, 'LIKE' is case-sensitive. For case-insensitive LIKE
       // statements, we need to use ILIKE instead.
       'LIKE' => array('operator' => 'ILIKE'),
+      'LIKE BINARY' => array('operator' => 'LIKE'),
       'NOT LIKE' => array('operator' => 'NOT ILIKE'),
       'REGEXP' => array('operator' => '~*'),
     );
@@ -273,6 +335,52 @@ class Connection extends DatabaseConnection {
     $this->query("SELECT pg_advisory_unlock(" . self::POSTGRESQL_NEXTID_LOCK . ")");
 
     return $id;
+  }
+
+  /**
+   * Add a new savepoint with an unique name.
+   *
+   * The main use for this method is to mimic InnoDB functionality, which
+   * provides an inherent savepoint before any query in a transaction.
+   *
+   * @param $savepoint_name
+   *   A string representing the savepoint name. By default,
+   *   "mimic_implicit_commit" is used.
+   *
+   * @see Drupal\Core\Database\Connection::pushTransaction().
+   */
+  public function addSavepoint($savepoint_name = 'mimic_implicit_commit') {
+    if ($this->inTransaction()) {
+      $this->pushTransaction($savepoint_name);
+    }
+  }
+
+  /**
+   * Release a savepoint by name.
+   *
+   * @param $savepoint_name
+   *   A string representing the savepoint name. By default,
+   *   "mimic_implicit_commit" is used.
+   *
+   * @see Drupal\Core\Database\Connection::popTransaction().
+   */
+  public function releaseSavepoint($savepoint_name = 'mimic_implicit_commit') {
+    if (isset($this->transactionLayers[$savepoint_name])) {
+      $this->popTransaction($savepoint_name);
+    }
+  }
+
+  /**
+   * Rollback a savepoint by name if it exists.
+   *
+   * @param $savepoint_name
+   *   A string representing the savepoint name. By default,
+   *   "mimic_implicit_commit" is used.
+   */
+  public function rollbackSavepoint($savepoint_name = 'mimic_implicit_commit') {
+    if (isset($this->transactionLayers[$savepoint_name])) {
+      $this->rollback($savepoint_name);
+    }
   }
 }
 

@@ -6,7 +6,7 @@
 
 namespace Drupal\migrate_drupal\Plugin\migrate\process\d6;
 
-use Drupal\migrate\MigrateExecutable;
+use Drupal\migrate\MigrateExecutableInterface;
 use Drupal\migrate\ProcessPluginBase;
 use Drupal\migrate\Row;
 
@@ -22,7 +22,7 @@ class FieldInstanceDefaults extends ProcessPluginBase {
    *
    * Set the field instance defaults.
    */
-  public function transform($value, MigrateExecutable $migrate_executable, Row $row, $destination_property) {
+  public function transform($value, MigrateExecutableInterface $migrate_executable, Row $row, $destination_property) {
     list($widget_type, $widget_settings) = $value;
     $default = array();
 
@@ -30,7 +30,9 @@ class FieldInstanceDefaults extends ProcessPluginBase {
       case 'text_textfield':
       case 'number':
       case 'phone_textfield':
-        $default['value'] = $widget_settings['default_value'][0]['value'];
+        if (!empty($widget_settings['default_value'][0]['value'])) {
+          $default['value'] = $widget_settings['default_value'][0]['value'];
+        }
         break;
 
       case 'imagefield_widget':
@@ -39,19 +41,30 @@ class FieldInstanceDefaults extends ProcessPluginBase {
         break;
 
       case 'date_select':
-        $default['value'] = $widget_settings['default_value'];
+        if (!empty($widget_settings['default_value'])) {
+          $default['default_date_type'] = 'relative';
+          $default['default_date'] = $widget_settings['default_value'];
+        }
         break;
 
       case 'email_textfield':
-        $default['value'] = $widget_settings['default_value'][0]['email'];
+        if (!empty($widget_settings['default_value'][0]['email'])) {
+          $default['value'] = $widget_settings['default_value'][0]['email'];
+        }
         break;
 
       case 'link':
-        $default['title'] = $widget_settings['default_value'][0]['title'];
-        $default['url'] = $widget_settings['default_value'][0]['url'];
+        if (!empty($widget_settings['default_value'][0]['url'])) {
+          $default['title'] = $widget_settings['default_value'][0]['title'];
+          $default['url'] = $widget_settings['default_value'][0]['url'];
+          $default['options'] = ['attributes' => []];
+        }
         break;
     }
-    return array($default);
+    if (!empty($default)) {
+      $default = array($default);
+    }
+    return $default;
   }
 
 }

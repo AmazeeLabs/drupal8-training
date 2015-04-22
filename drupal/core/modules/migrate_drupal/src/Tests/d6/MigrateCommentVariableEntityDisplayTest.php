@@ -22,7 +22,7 @@ class MigrateCommentVariableEntityDisplayTest extends MigrateCommentVariableDisp
   /**
    * The node types being used.
    */
-  protected $types = array('page', 'story');
+  protected $types = array('page', 'story', 'article');
 
   /**
    * Tests comment variables migrated into an entity display.
@@ -30,9 +30,9 @@ class MigrateCommentVariableEntityDisplayTest extends MigrateCommentVariableDisp
   public function testCommentEntityDisplay() {
     foreach ($this->types as $type) {
       $component = entity_get_display('node', $type, 'default')->getComponent('comment');
-      $this->assertEqual($component['label'], 'hidden');
-      $this->assertEqual($component['type'], 'comment_default');
-      $this->assertEqual($component['weight'], 20);
+      $this->assertIdentical('hidden', $component['label']);
+      $this->assertIdentical('comment_default', $component['type']);
+      $this->assertIdentical(20, $component['weight']);
     }
   }
 }

@@ -8,8 +8,6 @@
 namespace Drupal\Core\Template;
 
 use Drupal\Core\PhpStorage\PhpStorageFactory;
-use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
  * A class that defines a Twig environment for Drupal.
@@ -33,30 +31,21 @@ class TwigEnvironment extends \Twig_Environment {
   /**
    * Constructs a TwigEnvironment object and stores cache and storage
    * internally.
+   *
+   * @param string $root
+   *   The app root.
+   * @param \Twig_LoaderInterface $loader
+   *   The Twig loader or loader chain.
+   * @param array $options
+   *   The options for the Twig environment.
    */
-  public function __construct(\Twig_LoaderInterface $loader = NULL, ModuleHandlerInterface $module_handler, ThemeHandlerInterface $theme_handler, $options = array()) {
+  public function __construct($root, \Twig_LoaderInterface $loader = NULL, $options = array()) {
     // @todo Pass as arguments from the DIC.
     $this->cache_object = \Drupal::cache();
 
     // Ensure that twig.engine is loaded, given that it is needed to render a
     // template because functions like twig_drupal_escape_filter are called.
-    require_once DRUPAL_ROOT . '/core/themes/engines/twig/twig.engine';
-
-    // Set twig path namespace for themes and modules.
-    $namespaces = array();
-    foreach ($module_handler->getModuleList() as $name => $extension) {
-      $namespaces[$name] = $extension->getPath();
-    }
-    foreach ($theme_handler->listInfo() as $name => $extension) {
-      $namespaces[$name] = $extension->getPath();
-    }
-
-    foreach ($namespaces as $name => $path) {
-      $templatesDirectory = $path . '/templates';
-      if (file_exists($templatesDirectory)) {
-        $loader->addPath($templatesDirectory, $name);
-      }
-    }
+    require_once $root . '/core/themes/engines/twig/twig.engine';
 
     $this->templateClasses = array();
 
@@ -69,7 +58,7 @@ class TwigEnvironment extends \Twig_Environment {
     // Ensure autoescaping is always on.
     $options['autoescape'] = TRUE;
 
-    $this->loader = new \Twig_Loader_Chain([$loader, new \Twig_Loader_String()]);
+    $this->loader = $loader;
     parent::__construct($this->loader, $options);
   }
 
@@ -206,8 +195,12 @@ class TwigEnvironment extends \Twig_Environment {
    *
    * @return string
    *   The rendered inline template.
+   *
+   * @see \Drupal\Core\Template\Loader\StringLoader::exists()
    */
   public function renderInline($template_string, array $context = array()) {
+    // Prefix all inline templates with a special comment.
+    $template_string = '{# inline_template_start #}' . $template_string;
     return $this->loadTemplate($template_string, NULL)->render($context);
   }
 

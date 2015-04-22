@@ -78,12 +78,16 @@ process:
       - @plugin
       - delta
       - settings
+  visibility:
+    plugin: d6_block_visibility
+    source:
+      - pages
+      - roles
       - visibility
-  'settings/visibility/request_path/pages': pages
-  'settings/visibility/user_role/roles': roles
 destination:
   plugin: entity:block
 migration_dependencies:
   required:
     - d6_menu
     - d6_custom_block
+    - d6_user_role

@@ -13,6 +13,7 @@ use Drupal\Core\Form\FormState;
 use Drupal\Core\Render\Element;
 use Drupal\form_test\Form\FormTestDisabledElementsForm;
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests various form element validation mechanisms.
@@ -38,7 +39,7 @@ class FormTest extends WebTestBase {
     $filtered_html_format->save();
 
     $filtered_html_permission = $filtered_html_format->getPermissionName();
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array($filtered_html_permission));
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array($filtered_html_permission));
   }
 
   /**
@@ -117,7 +118,7 @@ class FormTest extends WebTestBase {
           // so we bypass it by setting the token to FALSE.
           $form['#token'] = FALSE;
           \Drupal::formBuilder()->prepareForm($form_id, $form, $form_state);
-          drupal_process_form($form_id, $form, $form_state);
+          \Drupal::formBuilder()->processForm($form_id, $form, $form_state);
           $errors = $form_state->getErrors();
           // Form elements of type 'radios' throw all sorts of PHP notices
           // when you try to render them like this, so we ignore those for
@@ -338,7 +339,7 @@ class FormTest extends WebTestBase {
       'multiple_no_default_required[]' => 'three',
     );
     $this->drupalPostForm(NULL, $edit, 'Submit');
-    $values = Json::decode($this->drupalGetContent());
+    $values = Json::decode($this->getRawContent());
 
     // Verify expected values.
     $expected = array(

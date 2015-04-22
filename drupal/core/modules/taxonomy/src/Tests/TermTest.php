@@ -10,8 +10,11 @@ namespace Drupal\taxonomy\Tests;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Tags;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
  * Tests load, save and delete for taxonomy terms.
@@ -20,15 +23,28 @@ use Drupal\field\Entity\FieldStorageConfig;
  */
 class TermTest extends TaxonomyTestBase {
 
+  /**
+   * Vocabulary for testing.
+   *
+   * @var \Drupal\taxonomy\VocabularyInterface
+   */
+  protected $vocabulary;
+
+  /**
+   * Taxonomy term reference field for testing.
+   *
+   * @var \Drupal\field\FieldConfigInterface
+   */
+  protected $field;
+
   protected function setUp() {
     parent::setUp();
-    $this->admin_user = $this->drupalCreateUser(array('administer taxonomy', 'bypass node access'));
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->drupalCreateUser(['administer taxonomy', 'bypass node access']));
     $this->vocabulary = $this->createVocabulary();
 
     $field_name = 'taxonomy_' . $this->vocabulary->id();
     entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -69,8 +85,8 @@ class TermTest extends TaxonomyTestBase {
     $term2 = $this->createTerm($this->vocabulary);
 
     // Check that hierarchy is flat.
-    $vocabulary = entity_load('taxonomy_vocabulary', $this->vocabulary->id());
-    $this->assertEqual(0, $vocabulary->hierarchy, 'Vocabulary is flat.');
+    $vocabulary = Vocabulary::load($this->vocabulary->id());
+    $this->assertEqual(0, $vocabulary->getHierarchy(), 'Vocabulary is flat.');
 
     // Edit $term2, setting $term1 as parent.
     $edit = array();
@@ -84,7 +100,7 @@ class TermTest extends TaxonomyTestBase {
     $this->assertTrue(isset($parents[$term1->id()]), 'Parent found correctly.');
 
     // Load and save a term, confirming that parents are still set.
-    $term = entity_load('taxonomy_term', $term2->id());
+    $term = Term::load($term2->id());
     $term->save();
     $parents = taxonomy_term_load_parents($term2->id());
     $this->assertTrue(isset($parents[$term1->id()]), 'Parent found correctly.');
@@ -102,7 +118,7 @@ class TermTest extends TaxonomyTestBase {
    */
   function testTaxonomyTermChildTerms() {
     // Set limit to 10 terms per page. Set variable to 9 so 10 terms appear.
-    \Drupal::config('taxonomy.settings')->set('terms_per_page_admin', '9')->save();
+    $this->config('taxonomy.settings')->set('terms_per_page_admin', '9')->save();
     $term1 = $this->createTerm($this->vocabulary);
     $terms_array = '';
 
@@ -120,7 +136,7 @@ class TermTest extends TaxonomyTestBase {
       $term = $this->createTerm($this->vocabulary, $edit);
       $children = taxonomy_term_load_children($term1->id());
       $parents = taxonomy_term_load_parents($term->id());
-      $terms_array[$x] = taxonomy_term_load($term->id());
+      $terms_array[$x] = Term::load($term->id());
     }
 
     // Get Page 1.
@@ -203,11 +219,14 @@ class TermTest extends TaxonomyTestBase {
         ),
       ))
       ->save();
+    // Prefix the terms with a letter to ensure there is no clash in the first
+    // three letters.
+    // @see https://www.drupal.org/node/2397691
     $terms = array(
-      'term1' => $this->randomMachineName(),
-      'term2' => $this->randomMachineName(),
-      'term3' => $this->randomMachineName() . ', ' . $this->randomMachineName(),
-      'term4' => $this->randomMachineName(),
+      'term1' => 'a'. $this->randomMachineName(),
+      'term2' => 'b'. $this->randomMachineName(),
+      'term3' => 'c'. $this->randomMachineName() . ', ' . $this->randomMachineName(),
+      'term4' => 'd'. $this->randomMachineName(),
     );
 
     $edit = array();
@@ -246,6 +265,15 @@ class TermTest extends TaxonomyTestBase {
       $term_objects[$key] = reset($term_objects[$key]);
     }
 
+    // Get the node.
+    $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
+
+    // Test editing the node.
+    $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
+    foreach ($terms as $term) {
+      $this->assertText($term, 'The term was retained after edit and still appears on the node page.');
+    }
+
     // Delete term 1 from the term edit page.
     $this->drupalGet('taxonomy/term/' . $term_objects['term1']->id() . '/edit');
     $this->clickLink(t('Delete'));
@@ -256,8 +284,6 @@ class TermTest extends TaxonomyTestBase {
     $this->drupalPostForm(NULL, array(), t('Delete'));
     $term_names = array($term_objects['term3']->getName(), $term_objects['term4']->getName());
 
-    // Get the node.
-    $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $this->drupalGet('node/' . $node->id());
 
     foreach ($term_names as $term_name) {
@@ -347,7 +373,7 @@ class TermTest extends TaxonomyTestBase {
    * Save, edit and delete a term using the user interface.
    */
   function testTermInterface() {
-    \Drupal::moduleHandler()->install(array('views'));
+    \Drupal::service('module_installer')->install(array('views'));
     $edit = array(
       'name[0][value]' => $this->randomMachineName(12),
       'description[0][value]' => $this->randomMachineName(100),
@@ -534,7 +560,7 @@ class TermTest extends TaxonomyTestBase {
     $this->assertFalse($terms, 'No term loaded with an invalid name.');
 
     // Try to load the term using a substring of the name.
-    $terms = taxonomy_term_load_multiple_by_name(drupal_substr($term->getName(), 2), 'No term loaded with a substring of the name.');
+    $terms = taxonomy_term_load_multiple_by_name(Unicode::substr($term->getName(), 2), 'No term loaded with a substring of the name.');
     $this->assertFalse($terms);
 
     // Create a new term in a different vocabulary with the same name.

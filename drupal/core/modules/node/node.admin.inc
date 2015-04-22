@@ -7,6 +7,7 @@
 
 use Drupal\Core\Language\Language;
 use Drupal\node\NodeInterface;
+use Drupal\node\Entity\Node;
 
 /**
  * Updates all nodes in the passed-in array with the passed-in field values.
@@ -52,7 +53,7 @@ function node_mass_update(array $nodes, array $updates, $langcode = NULL, $load 
   }
   else {
     if ($load && !$revisions) {
-      $nodes = entity_load_multiple('node', $nodes);
+      $nodes = Node::loadMultiple($nodes);
     }
     foreach ($nodes as $node) {
       if ($load && $revisions) {
@@ -94,6 +95,8 @@ function _node_mass_update_helper(NodeInterface $node, array $updates, $langcode
 }
 
 /**
+ * Implements callback_batch_operation().
+ *
  * Executes a batch operation for node_mass_update().
  *
  * @param array $nodes
@@ -123,12 +126,12 @@ function _node_mass_update_batch_process(array $nodes, array $updates, $load, $r
     $node = array_shift($context['sandbox']['nodes']);
     if ($load) {
       $node = $revisions ?
-        entity_revision_load('node', $node) : entity_load('node', $node);
+        entity_revision_load('node', $node) : Node::load($node);
     }
     $node = _node_mass_update_helper($node, $updates);
 
     // Store result for post-processing in the finished callback.
-    $context['results'][] = l($node->label(), 'node/' . $node->id());
+    $context['results'][] = \Drupal::l($node->label(), $node->urlInfo());
 
     // Update our progress information.
     $context['sandbox']['progress']++;
@@ -142,6 +145,8 @@ function _node_mass_update_batch_process(array $nodes, array $updates, $load, $r
 }
 
 /**
+ * Implements callback_batch_finished().
+ *
  * Reports the 'finished' status of batch operation for node_mass_update().
  *
  * @param bool $success
@@ -158,7 +163,7 @@ function _node_mass_update_batch_finished($success, $results, $operations) {
   }
   else {
     drupal_set_message(t('An error occurred and processing did not complete.'), 'error');
-    $message = format_plural(count($results), '1 item successfully processed:', '@count items successfully processed:');
+    $message = \Drupal::translation()->formatPlural(count($results), '1 item successfully processed:', '@count items successfully processed:');
     $item_list = array(
       '#theme' => 'item_list',
       '#items' => $results,

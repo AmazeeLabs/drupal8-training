@@ -9,6 +9,7 @@ namespace Drupal\node\Tests;
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\system\Tests\Entity\EntityWithUriCacheTagsTestBase;
+use Drupal\user\Entity\Role;
 
 /**
  * Tests the Node entity's cache tags.
@@ -21,19 +22,6 @@ class NodeCacheTagsTest extends EntityWithUriCacheTagsTestBase {
    * {@inheritdoc}
    */
   public static $modules = array('node');
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp() {
-    parent::setUp();
-
-    // Give anonymous users permission to view nodes, so that we can verify the
-    // cache tags of cached versions of node pages.
-    $user_role = entity_load('user_role', DRUPAL_ANONYMOUS_RID);
-    $user_role->grantPermission('acess content');
-    $user_role->save();
-  }
 
   /**
    * {@inheritdoc}
@@ -56,11 +44,25 @@ class NodeCacheTagsTest extends EntityWithUriCacheTagsTestBase {
 
   /**
    * {@inheritdoc}
+   */
+  protected function getAdditionalCacheContextsForEntity(EntityInterface $entity) {
+    return ['timezone'];
+  }
+
+  /**
+   * {@inheritdoc}
    *
    * Each node must have an author.
    */
   protected function getAdditionalCacheTagsForEntity(EntityInterface $node) {
-    return array('user:' . $node->getOwnerId(), 'user_view:1');
+    return array('user:' . $node->getOwnerId(), 'user_view');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getAdditionalCacheContextsForEntityListing() {
+    return ['user.node_grants:view'];
   }
 
 }

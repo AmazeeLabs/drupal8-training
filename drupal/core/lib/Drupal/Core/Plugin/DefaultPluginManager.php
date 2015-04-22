@@ -81,6 +81,13 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
   protected $defaults = array();
 
   /**
+   * Flag whether persistent caches should be used.
+   *
+   * @var bool
+   */
+  protected $useCaches = TRUE;
+
+  /**
    * Creates the discovery object.
    *
    * @param string|bool $subdir
@@ -125,6 +132,7 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
    *   definitions should be cleared along with other, related cache entries.
    */
   public function setCacheBackend(CacheBackendInterface $cache_backend, $cache_key, array $cache_tags = array()) {
+    Cache::validateTags($cache_tags);
     $this->cacheBackend = $cache_backend;
     $this->cacheKey = $cache_key;
     $this->cacheTags = $cache_tags;
@@ -160,7 +168,7 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
     if ($this->cacheBackend) {
       if ($this->cacheTags) {
         // Use the cache tags to clear the cache.
-        Cache::deleteTags($this->cacheTags);
+        Cache::invalidateTags($this->cacheTags);
       }
       else {
         $this->cacheBackend->delete($this->cacheKey);
@@ -179,7 +187,7 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
    *   and would actually be returned by the getDefinitions() method.
    */
   protected function getCachedDefinitions() {
-    if (!isset($this->definitions) && $this->cacheBackend && $cache = $this->cacheBackend->get($this->cacheKey)) {
+    if (!isset($this->definitions) && $cache = $this->cacheGet($this->cacheKey)) {
       $this->definitions = $cache->data;
     }
     return $this->definitions;
@@ -192,10 +200,41 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
    *   List of definitions to store in cache.
    */
   protected function setCachedDefinitions($definitions) {
-    if ($this->cacheBackend) {
-      $this->cacheBackend->set($this->cacheKey, $definitions, Cache::PERMANENT, $this->cacheTags);
-    }
+    $this->cacheSet($this->cacheKey, $definitions, Cache::PERMANENT, $this->cacheTags);
     $this->definitions = $definitions;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function useCaches($use_caches = FALSE) {
+    $this->useCaches = $use_caches;
+    if (!$use_caches) {
+      $this->definitions = NULL;
+    }
+  }
+
+  /**
+   * Fetches from the cache backend, respecting the use caches flag.
+   *
+   * @see \Drupal\Core\Cache\CacheBackendInterface::get()
+   */
+  protected function cacheGet($cid) {
+    if ($this->useCaches && $this->cacheBackend) {
+      return $this->cacheBackend->get($cid);
+    }
+    return FALSE;
+  }
+
+  /**
+   * Stores data in the persistent cache, respecting the use caches flag.
+   *
+   * @see \Drupal\Core\Cache\CacheBackendInterface::set()
+   */
+  protected function cacheSet($cid, $data, $expire = Cache::PERMANENT, array $tags = array()) {
+    if ($this->cacheBackend && $this->useCaches) {
+      $this->cacheBackend->set($cid, $data, $expire, $tags);
+    }
   }
 
 
@@ -223,9 +262,7 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
     foreach ($definitions as $plugin_id => &$definition) {
       $this->processDefinition($definition, $plugin_id);
     }
-    if ($this->alterHook) {
-      $this->moduleHandler->alter($this->alterHook, $definitions);
-    }
+    $this->alterDefinitions($definitions);
     // If this plugin was provided by a module that does not exist, remove the
     // plugin definition.
     foreach ($definitions as $plugin_id => $plugin_definition) {
@@ -239,6 +276,18 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
       }
     }
     return $definitions;
+  }
+
+  /**
+   * Invokes the hook to alter the definitions if the alter hook is set.
+   *
+   * @param $definitions
+   *   The discovered plugin defintions.
+   */
+  protected function alterDefinitions(&$definitions) {
+    if ($this->alterHook) {
+      $this->moduleHandler->alter($this->alterHook, $definitions);
+    }
   }
 
 }

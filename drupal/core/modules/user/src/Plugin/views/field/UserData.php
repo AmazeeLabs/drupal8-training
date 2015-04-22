@@ -50,7 +50,7 @@ class UserData extends FieldPluginBase {
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::defineOptions().
+   * {@inheritdoc}
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
@@ -62,7 +62,7 @@ class UserData extends FieldPluginBase {
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::defineOptions().
+   * {@inheritdoc}
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
@@ -74,17 +74,17 @@ class UserData extends FieldPluginBase {
     }
 
     $form['data_module'] = array(
-      '#title' => t('Module name'),
+      '#title' => $this->t('Module name'),
       '#type' => 'select',
-      '#description' => t('The module which sets this user data.'),
+      '#description' => $this->t('The module which sets this user data.'),
       '#default_value' => $this->options['data_module'],
       '#options' => $names,
     );
 
     $form['data_name'] = array(
-      '#title' => t('Name'),
+      '#title' => $this->t('Name'),
       '#type' => 'textfield',
-      '#description' => t('The name of the data key.'),
+      '#description' => $this->t('The name of the data key.'),
       '#default_value' => $this->options['data_name'],
     );
   }

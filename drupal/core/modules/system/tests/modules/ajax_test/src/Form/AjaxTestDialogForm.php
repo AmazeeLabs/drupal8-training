@@ -7,16 +7,15 @@
 
 namespace Drupal\ajax_test\Form;
 
-use Drupal\Core\Form\FormInterface;
+use Drupal\ajax_test\Controller\AjaxTestController;
 use Drupal\Core\Form\FormBase;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\OpenModalDialogCommand;
 use Drupal\Core\Ajax\OpenDialogCommand;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
- * Dummy form for testing DialogController with _form routes.
+ * Dummy form for testing DialogRenderer with _form routes.
  */
 class AjaxTestDialogForm extends FormBase {
 
@@ -97,16 +96,20 @@ class AjaxTestDialogForm extends FormBase {
    *   An ajax response object.
    */
   protected function dialog($is_modal = FALSE) {
-    $content = ajax_test_dialog_contents();
+    $content = AjaxTestController::dialogContents();
     $response = new AjaxResponse();
     $title = $this->t('AJAX Dialog contents');
-    $html = drupal_render($content);
+
+    // Attach the library necessary for using the Open(Modal)DialogCommand and
+    // set the attachments for this Ajax response.
+    $content['#attached']['library'][] = 'core/drupal.dialog.ajax';
+
     if ($is_modal) {
-      $response->addCommand(new OpenModalDialogCommand($title, $html));
+      $response->addCommand(new OpenModalDialogCommand($title, $content));
     }
     else {
       $selector = '#ajax-test-dialog-wrapper-1';
-      $response->addCommand(new OpenDialogCommand($selector, $title, $html));
+      $response->addCommand(new OpenDialogCommand($selector, $title, $content));
     }
     return $response;
   }

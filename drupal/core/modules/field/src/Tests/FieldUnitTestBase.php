@@ -7,21 +7,22 @@
 
 namespace Drupal\field\Tests;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Language\LanguageInterface;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Parent class for Field API unit tests.
  */
-abstract class FieldUnitTestBase extends DrupalUnitTestBase {
+abstract class FieldUnitTestBase extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('user', 'entity', 'system', 'field', 'text', 'entity_test', 'field_test');
+  public static $modules = array('user', 'system', 'field', 'text', 'entity_test', 'field_test', 'entity_reference');
 
   /**
    * Bag of created field storages and fields.
@@ -50,6 +51,7 @@ abstract class FieldUnitTestBase extends DrupalUnitTestBase {
     $this->installEntitySchema('entity_test');
     $this->installEntitySchema('user');
     $this->installSchema('system', array('sequences'));
+    $this->installSchema('system', array('router'));
 
     // Set default storage backend and configure the theme system.
     $this->installConfig(array('field', 'system'));
@@ -89,9 +91,9 @@ abstract class FieldUnitTestBase extends DrupalUnitTestBase {
     $field = 'field' . $suffix;
     $field_definition = 'field_definition' . $suffix;
 
-    $this->fieldTestData->$field_name = drupal_strtolower($this->randomMachineName() . '_field_name' . $suffix);
+    $this->fieldTestData->$field_name = Unicode::strtolower($this->randomMachineName() . '_field_name' . $suffix);
     $this->fieldTestData->$field_storage = entity_create('field_storage_config', array(
-      'name' => $this->fieldTestData->$field_name,
+      'field_name' => $this->fieldTestData->$field_name,
       'entity_type' => $entity_type,
       'type' => 'test_field',
       'cardinality' => 4,

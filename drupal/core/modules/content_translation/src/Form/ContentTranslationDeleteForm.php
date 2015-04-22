@@ -9,6 +9,7 @@ namespace Drupal\content_translation\Form;
 
 use Drupal\Core\Form\ConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
 
 /**
@@ -40,9 +41,9 @@ class ContentTranslationDeleteForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state, $entity_type_id = NULL, $language = NULL) {
-    $this->entity = $this->getRequest()->attributes->get($entity_type_id);
-    $this->language = language_load($language);
+  public function buildForm(array $form, FormStateInterface $form_state, $entity_type_id = NULL, LanguageInterface $language = NULL) {
+    $this->entity = $this->getRouteMatch()->getParameter($entity_type_id);
+    $this->language = $language;
     return parent::buildForm($form, $form_state);
   }
 
@@ -57,7 +58,7 @@ class ContentTranslationDeleteForm extends ConfirmFormBase {
    * {@inheritdoc}
    */
   public function getQuestion() {
-    return $this->t('Are you sure you want to delete the @language translation of %label?', array('@language' => $this->language->name, '%label' => $this->entity->label()));
+    return $this->t('Are you sure you want to delete the @language translation of %label?', array('@language' => $this->language->getName(), '%label' => $this->entity->label()));
   }
 
   /**
@@ -72,14 +73,15 @@ class ContentTranslationDeleteForm extends ConfirmFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     // Remove the translated values.
-    $this->entity->removeTranslation($this->language->id);
+    $this->entity = $this->entity->getUntranslated();
+    $this->entity->removeTranslation($this->language->getId());
     $this->entity->save();
 
     // Remove any existing path alias for the removed translation.
     // @todo This should be taken care of by the Path module.
     if (\Drupal::moduleHandler()->moduleExists('path')) {
-      $path = $this->entity->getSystemPath();
-      $conditions = array('source' => $path, 'langcode' => $this->language->id);
+      $path = $this->entity->urlInfo()->getInternalPath();
+      $conditions = array('source' => $path, 'langcode' => $this->language->getId());
       \Drupal::service('path.alias_storage')->delete($conditions);
     }
 

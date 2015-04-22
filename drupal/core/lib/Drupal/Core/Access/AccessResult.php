@@ -8,40 +8,25 @@ namespace Drupal\Core\Access;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableInterface;
+use Drupal\Core\Config\ConfigBase;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
  * Value object for passing an access result with cacheability metadata.
  *
+ * The access result itself — excluding the cacheability metadata — is
+ * immutable. There are subclasses for each of the three possible access results
+ * themselves:
+ *
+ * @see \Drupal\Core\Access\AccessResultAllowed
+ * @see \Drupal\Core\Access\AccessResultForbidden
+ * @see \Drupal\Core\Access\AccessResultNeutral
+ *
  * When using ::orIf() and ::andIf(), cacheability metadata will be merged
  * accordingly as well.
  */
-class AccessResult implements AccessResultInterface, CacheableInterface {
-
-  /**
-   * The value that explicitly allows access.
-   */
-  const ALLOW = 'ALLOW';
-
-  /**
-   * The value that neither explicitly allows nor explicitly forbids access.
-   */
-  const DENY = 'DENY';
-
-  /**
-   * The value that explicitly forbids access.
-   */
-  const KILL = 'KILL';
-
-  /**
-   * The access result value.
-   *
-   * A \Drupal\Core\Access\AccessResultInterface constant value.
-   *
-   * @var string
-   */
-  protected $value;
+abstract class AccessResult implements AccessResultInterface, CacheableInterface {
 
   /**
    * Whether the access result is cacheable.
@@ -78,7 +63,6 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
    * Constructs a new AccessResult object.
    */
   public function __construct() {
-    $this->resetAccess();
     $this->setCacheable(TRUE)
       ->resetCacheContexts()
       ->resetCacheTags()
@@ -88,64 +72,67 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
   }
 
   /**
-   * Instantiates a new AccessResult object.
-   *
-   * This factory method exists to improve DX; it allows developers to fluently
-   * create access results.
-   *
-   * Defaults to a cacheable access result that neither explicitly allows nor
-   * explicitly forbids access.
+   * Creates an AccessResultInterface object with isNeutral() === TRUE.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   isNeutral() will be TRUE.
    */
-  public static function create() {
-    return new static();
+  public static function neutral() {
+    return new AccessResultNeutral();
   }
 
   /**
-   * Convenience method, creates an AccessResult object and calls allow().
+   * Creates an AccessResultInterface object with isAllowed() === TRUE.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   isAllowed() will be TRUE.
    */
   public static function allowed() {
-    return static::create()->allow();
+    return new AccessResultAllowed();
   }
 
   /**
-   * Convenience method, creates an AccessResult object and calls forbid().
+   * Creates an AccessResultInterface object with isForbidden() === TRUE.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   isForbidden() will be TRUE.
    */
   public static function forbidden() {
-    return static::create()->forbid();
+    return new AccessResultForbidden();
   }
 
   /**
-   * Convenience method, creates an AccessResult object and calls allowIf().
+   * Creates an allowed or neutral access result.
    *
    * @param bool $condition
-   *   The condition to evaluate. If TRUE, ::allow() will be called.
+   *   The condition to evaluate.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   If $condition is TRUE, isAllowed() will be TRUE, otherwise isNeutral()
+   *   will be TRUE.
    */
   public static function allowedIf($condition) {
-    return static::create()->allowIf($condition);
+    return $condition ? static::allowed() : static::neutral();
   }
 
   /**
-   * Convenience method, creates an AccessResult object and calls forbiddenIf().
+   * Creates a forbidden or neutral access result.
    *
    * @param bool $condition
-   *   The condition to evaluate. If TRUE, ::forbid() will be called.
+   *   The condition to evaluate.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   If $condition is TRUE, isForbidden() will be TRUE, otherwise isNeutral()
+   *   will be TRUE.
    */
   public static function forbiddenIf($condition) {
-    return static::create()->forbidIf($condition);
+    return $condition ? static::forbidden(): static::neutral();
   }
 
   /**
-   * Convenience method, creates an AccessResult object and calls allowIfHasPermission().
+   * Creates an allowed access result if the permission is present, neutral otherwise.
+   *
+   * Convenience method, checks the permission and calls ::cachePerRole().
    *
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The account for which to check a permission.
@@ -153,91 +140,92 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
    *   The permission to check for.
    *
    * @return \Drupal\Core\Access\AccessResult
+   *   If the account has the permission, isAllowed() will be TRUE, otherwise
+   *   isNeutral() will be TRUE.
    */
   public static function allowedIfHasPermission(AccountInterface $account, $permission) {
-    return static::create()->allowIfHasPermission($account, $permission);
+    return static::allowedIf($account->hasPermission($permission))->cachePerRole();
+  }
+
+  /**
+   * Creates an allowed access result if the permissions are present, neutral otherwise.
+   *
+   * Convenience method, checks the permissions and calls ::cachePerRole().
+   *
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   The account for which to check permissions.
+   * @param array $permissions
+   *   The permissions to check.
+   * @param string $conjunction
+   *   (optional) 'AND' if all permissions are required, 'OR' in case just one.
+   *   Defaults to 'AND'
+   *
+   * @return \Drupal\Core\Access\AccessResult
+   *   If the account has the permissions, isAllowed() will be TRUE, otherwise
+   *   isNeutral() will be TRUE.
+   */
+  public static function allowedIfHasPermissions(AccountInterface $account, array $permissions, $conjunction = 'AND') {
+    $access = FALSE;
+
+    if ($conjunction == 'AND' && !empty($permissions)) {
+      $access = TRUE;
+      foreach ($permissions as $permission) {
+        if (!$permission_access = $account->hasPermission($permission)) {
+          $access = FALSE;
+          break;
+        }
+      }
+    }
+    else {
+      foreach ($permissions as $permission) {
+        if ($permission_access = $account->hasPermission($permission)) {
+          $access = TRUE;
+          break;
+        }
+      }
+    }
+
+    return static::allowedIf($access)->cachePerRole();
   }
 
   /**
    * {@inheritdoc}
+   *
+   * @see \Drupal\Core\Access\AccessResultAllowed
    */
   public function isAllowed() {
-    return $this->value === static::ALLOW;
+    return FALSE;
   }
 
   /**
    * {@inheritdoc}
+   *
+   * @see \Drupal\Core\Access\AccessResultForbidden
    */
   public function isForbidden() {
-    return $this->value === static::KILL;
-  }
-
-  /**
-   * Explicitly allows access.
-   *
-   * @return $this
-   */
-  public function allow() {
-    $this->value = static::ALLOW;
-    return $this;
-  }
-
-  /**
-   * Explicitly forbids access.
-   *
-   * @return $this
-   */
-  public function forbid() {
-    $this->value = static::KILL;
-    return $this;
-  }
-
-  /**
-   * Neither explicitly allows nor explicitly forbids access.
-   *
-   * @return $this
-   */
-  public function resetAccess() {
-    $this->value = static::DENY;
-    return $this;
-  }
-
-  /**
-   * Conditionally calls ::allow().
-   *
-   * @param bool $condition
-   *   The condition to evaluate. If TRUE, ::allow() will be called.
-   *
-   * @return $this
-   */
-  public function allowIf($condition) {
-    if ($condition) {
-      $this->allow();
-    }
-    return $this;
-  }
-
-  /**
-   * Conditionally calls ::forbid().
-   *
-   * @param bool $condition
-   *   The condition to evaluate. If TRUE, ::forbid() will be called.
-   *
-   * @return $this
-   */
-  public function forbidIf($condition) {
-    if ($condition) {
-      $this->forbid();
-    }
-    return $this;
+    return FALSE;
   }
 
   /**
    * {@inheritdoc}
    *
-   * AccessResult objects solely return cache context tokens, no static strings.
+   * @see \Drupal\Core\Access\AccessResultNeutral
+   */
+  public function isNeutral() {
+    return FALSE;
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function getCacheKeys() {
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
     sort($this->contexts);
     return $this->contexts;
   }
@@ -318,20 +306,7 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
    * @return $this
    */
   public function addCacheTags(array $tags) {
-    foreach ($tags as $namespace => $values) {
-      if (is_array($values)) {
-        foreach ($values as $value) {
-          $this->tags[$namespace][$value] = $value;
-        }
-        ksort($this->tags[$namespace]);
-      }
-      else {
-        if (!isset($this->tags[$namespace])) {
-          $this->tags[$namespace] = $values;
-        }
-      }
-    }
-    ksort($this->tags);
+    $this->tags = Cache::mergeTags($this->tags, $tags);
     return $this;
   }
 
@@ -359,22 +334,22 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
   }
 
   /**
-   * Convenience method, adds the "cache_context.user.roles" cache context.
+   * Convenience method, adds the "user.roles" cache context.
    *
    * @return $this
    */
   public function cachePerRole() {
-    $this->addCacheContexts(array('cache_context.user.roles'));
+    $this->addCacheContexts(array('user.roles'));
     return $this;
   }
 
   /**
-   * Convenience method, adds the "cache_context.user" cache context.
+   * Convenience method, adds the "user" cache context.
    *
    * @return $this
    */
   public function cachePerUser() {
-    $this->addCacheContexts(array('cache_context.user'));
+    $this->addCacheContexts(array('user'));
     return $this;
   }
 
@@ -387,22 +362,20 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
    * @return $this
    */
   public function cacheUntilEntityChanges(EntityInterface $entity) {
-    $this->addCacheTags($entity->getCacheTag());
+    $this->addCacheTags($entity->getCacheTags());
     return $this;
   }
 
   /**
-   * Convenience method, checks permission and calls ::cachePerRole().
+   * Convenience method, adds the configuration object's cache tag.
    *
-   * @param \Drupal\Core\Session\AccountInterface $account
-   *   The account for which to check a permission.
-   * @param string $permission
-   *   The permission to check for.
+   * @param \Drupal\Core\Config\ConfigBase $configuration
+   *   The configuration object whose cache tag to set on the access result.
    *
    * @return $this
    */
-  public function allowIfHasPermission(AccountInterface $account, $permission) {
-    $this->allowIf($account->hasPermission($permission))->cachePerRole();
+  public function cacheUntilConfigurationChanges(ConfigBase $configuration) {
+    $this->addCacheTags($configuration->getCacheTags());
     return $this;
   }
 
@@ -410,70 +383,90 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
    * {@inheritdoc}
    */
   public function orIf(AccessResultInterface $other) {
-    // If this AccessResult already is forbidden, then that already is the
-    // conclusion. We can completely disregard $other.
-    if ($this->isForbidden()) {
-      return $this;
+    // $other's cacheability metadata is merged if $merge_other gets set to TRUE
+    // and this happens in two cases:
+    // 1. $other's access result is the one that determines the combined access
+    //    result.
+    // 2. This access result is not cacheable and $other's access result is the
+    //    same. i.e. attempt to return a cacheable access result.
+    $merge_other = FALSE;
+    if ($this->isForbidden() || $other->isForbidden()) {
+      $result = static::forbidden();
+      if (!$this->isForbidden() || (!$this->isCacheable() && $other->isForbidden())) {
+        $merge_other = TRUE;
+      }
     }
-    // Otherwise, we make this AccessResult forbidden if the other is, or
-    // allowed if the other is, and we merge in the cacheability metadata if the
-    // other access result also has cacheability metadata.
+    elseif ($this->isAllowed() || $other->isAllowed()) {
+      $result = static::allowed();
+      if (!$this->isAllowed() || (!$this->isCacheable() && $other->isAllowed())) {
+        $merge_other = TRUE;
+      }
+    }
     else {
-      if ($other->isForbidden()) {
-        $this->forbid();
+      $result = static::neutral();
+      if (!$this->isNeutral() || (!$this->isCacheable() && $other->isNeutral())) {
+        $merge_other = TRUE;
       }
-      else if ($other->isAllowed()) {
-        $this->allow();
-      }
-      $this->mergeCacheabilityMetadata($other);
-      return $this;
     }
+    $result->inheritCacheability($this);
+    if ($merge_other) {
+      $result->inheritCacheability($other);
+    }
+    return $result;
   }
 
   /**
    * {@inheritdoc}
    */
   public function andIf(AccessResultInterface $other) {
-    // If this AccessResult already is forbidden or is merely not explicitly
-    // allowed, then that already is the conclusion. We can completely disregard
-    // $other.
-    if ($this->isForbidden() || !$this->isAllowed()) {
-      return $this;
+    // The other access result's cacheability metadata is merged if $merge_other
+    // gets set to TRUE. It gets set to TRUE in one case: if the other access
+    // result is used.
+    $merge_other = FALSE;
+    if ($this->isForbidden() || $other->isForbidden()) {
+      $result = static::forbidden();
+      if (!$this->isForbidden()) {
+        $merge_other = TRUE;
+      }
     }
-    // Otherwise, we make this AccessResult forbidden if the other is, or not
-    // explicitly allowed if the other isn't, and we merge in the cacheability
-    // metadata if the other access result also has cacheability metadata.
+    elseif ($this->isAllowed() && $other->isAllowed()) {
+      $result = static::allowed();
+      $merge_other = TRUE;
+    }
     else {
-      if ($other->isForbidden()) {
-        $this->forbid();
+      $result = static::neutral();
+      if (!$this->isNeutral()) {
+        $merge_other = TRUE;
       }
-      else if (!$other->isAllowed()) {
-        $this->resetAccess();
-      }
-      $this->mergeCacheabilityMetadata($other);
-      return $this;
     }
+    $result->inheritCacheability($this);
+    if ($merge_other) {
+      $result->inheritCacheability($other);
+      // If this access result is not cacheable, then an AND with another access
+      // result must also not be cacheable, except if the other access result
+      // has isForbidden() === TRUE. isForbidden() access results are contagious
+      // in that they propagate regardless of the other value.
+      if (!$this->isCacheable() && !$result->isForbidden()) {
+        $result->setCacheable(FALSE);
+      }
+    }
+    return $result;
   }
 
   /**
-   * Merges the cacheability metadata of the other access result, if any.
+   * Inherits the cacheability of the other access result, if any.
    *
    * @param \Drupal\Core\Access\AccessResultInterface $other
-   *   The other access result, whose cacheability data (if any) to merge.
+   *   The other access result, whose cacheability (if any) to inherit.
+   *
+   * @return $this
    */
-  protected function mergeCacheabilityMetadata(AccessResultInterface $other) {
+  public function inheritCacheability(AccessResultInterface $other) {
     if ($other instanceof CacheableInterface) {
       $this->setCacheable($other->isCacheable());
-      $this->addCacheContexts($other->getCacheKeys());
+      $this->addCacheContexts($other->getCacheContexts());
       $this->addCacheTags($other->getCacheTags());
-      // Use the lowest max-age.
-      if ($this->getCacheMaxAge() === Cache::PERMANENT) {
-        // The other max-age is either lower or equal.
-        $this->setCacheMaxAge($other->getCacheMaxAge());
-      }
-      else {
-        $this->setCacheMaxAge(min($this->getCacheMaxAge(), $other->getCacheMaxAge()));
-      }
+      $this->setCacheMaxAge(Cache::mergeMaxAges($this->getCacheMaxAge(), $other->getCacheMaxAge()));
     }
     // If any of the access results don't provide cacheability metadata, then
     // we cannot cache the combined access result, for we may not make
@@ -481,6 +474,7 @@ class AccessResult implements AccessResultInterface, CacheableInterface {
     else {
       $this->setCacheable(FALSE);
     }
+    return $this;
   }
 
 }

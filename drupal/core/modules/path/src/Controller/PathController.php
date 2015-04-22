@@ -7,10 +7,13 @@
 
 namespace Drupal\path\Controller;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Path\AliasStorageInterface;
 use Drupal\Core\Path\AliasManagerInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Controller routines for path routes.
@@ -54,7 +57,17 @@ class PathController extends ControllerBase {
     );
   }
 
-  public function adminOverview($keys) {
+  /**
+   * Displays the path administration overview page.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
+   *
+   * @return array
+   *   A render array as expected by drupal_render().
+   */
+  public function adminOverview(Request $request) {
+    $keys = $request->query->get('search');
     // Add the filter form above the overview table.
     $build['path_admin_filter_form'] = $this->formBuilder()->getForm('Drupal\path\Form\PathFilterForm', $keys);
     // Enable language column if language.module is enabled or if we have any
@@ -73,13 +86,15 @@ class PathController extends ControllerBase {
     $destination = drupal_get_destination();
     foreach ($this->aliasStorage->getAliasesForAdminListing($header, $keys) as $data) {
       $row = array();
-      $row['data']['alias'] = l(truncate_utf8($data->alias, 50, FALSE, TRUE), $data->source, array(
+      // @todo Should Path module store leading slashes? See
+      //   https://www.drupal.org/node/2430593.
+      $row['data']['alias'] = $this->l(Unicode::truncate($data->alias, 50, FALSE, TRUE), Url::fromUserInput('/' . $data->source, array(
         'attributes' => array('title' => $data->alias),
-      ));
-      $row['data']['source'] = l(truncate_utf8($data->source, 50, FALSE, TRUE), $data->source, array(
+      )));
+      $row['data']['source'] = $this->l(Unicode::truncate($data->source, 50, FALSE, TRUE), Url::fromUserInput('/' . $data->source, array(
         'alias' => TRUE,
         'attributes' => array('title' => $data->source),
-      ));
+      )));
       if ($multilanguage) {
         $row['data']['language_name'] = $this->languageManager()->getLanguageName($data->langcode);
       }
@@ -87,19 +102,11 @@ class PathController extends ControllerBase {
       $operations = array();
       $operations['edit'] = array(
         'title' => $this->t('Edit'),
-        'route_name' => 'path.admin_edit',
-        'route_parameters' => array(
-          'pid' => $data->pid,
-        ),
-        'query' => $destination,
+        'url' => Url::fromRoute('path.admin_edit', ['pid' => $data->pid], ['query' => $destination]),
       );
       $operations['delete'] = array(
         'title' => $this->t('Delete'),
-        'route_name' => 'path.delete',
-        'route_parameters' => array(
-          'pid' => $data->pid,
-        ),
-        'query' => $destination,
+        'url' => Url::fromRoute('path.delete', ['pid' => $data->pid], ['query' => $destination]),
       );
       $row['data']['operations'] = array(
         'data' => array(
@@ -123,7 +130,7 @@ class PathController extends ControllerBase {
       '#rows' => $rows,
       '#empty' => $this->t('No URL aliases available. <a href="@link">Add URL alias</a>.', array('@link' => $this->url('path.admin_add'))),
     );
-    $build['path_pager'] = array('#theme' => 'pager');
+    $build['path_pager'] = array('#type' => 'pager');
 
     return $build;
   }

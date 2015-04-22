@@ -7,10 +7,14 @@
 
 namespace Drupal\Core;
 
+use Drupal\Core\Routing\LinkGeneratorTrait;
+
 /**
  * Defines an object that holds information about a link.
  */
 class Link {
+
+  use LinkGeneratorTrait;
 
   /**
    * The text of the link.
@@ -63,8 +67,7 @@ class Link {
    *     current language for the language type LanguageInterface::TYPE_URL.
    *   - 'https': Whether this URL should point to a secure location. If not
    *     defined, the current scheme is used, so the user stays on HTTP or HTTPS
-   *     respectively. if mixed mode sessions are permitted, TRUE enforces HTTPS
-   *     and FALSE enforces HTTP.
+   *     respectively. TRUE enforces HTTPS and FALSE enforces HTTP.
    *
    * @return static
    */
@@ -114,6 +117,13 @@ class Link {
   public function setUrl(Url $url) {
     $this->url = $url;
     return $this;
+  }
+
+  /**
+   * Generates the HTML for this Link object.
+   */
+  public function toString() {
+    return $this->getLinkGenerator()->generateFromLink($this);
   }
 
 }

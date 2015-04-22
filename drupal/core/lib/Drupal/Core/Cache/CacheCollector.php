@@ -114,7 +114,8 @@ abstract class CacheCollector implements CacheCollectorInterface, DestructableIn
    * @param array $tags
    *   (optional) The tags to specify for the cache item.
    */
-  public function __construct($cid, CacheBackendInterface $cache, LockBackendInterface $lock, $tags = array()) {
+  public function __construct($cid, CacheBackendInterface $cache, LockBackendInterface $lock, array $tags = array()) {
+    Cache::validateTags($tags);
     $this->cid = $cid;
     $this->cache = $cache;
     $this->tags = $tags;
@@ -279,7 +280,7 @@ abstract class CacheCollector implements CacheCollectorInterface, DestructableIn
   public function clear() {
     $this->reset();
     if ($this->tags) {
-      Cache::deleteTags($this->tags);
+      Cache::invalidateTags($this->tags);
     }
     else {
       $this->cache->delete($this->getCid());

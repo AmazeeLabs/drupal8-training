@@ -21,7 +21,8 @@ class ConfigEntityListBuilder extends EntityListBuilder {
    * {@inheritdoc}
    */
   public function load() {
-    $entities = parent::load();
+    $entity_ids = $this->getEntityIds();
+    $entities = $this->storage->loadMultipleOverrideFree($entity_ids);
 
     // Sort the entities using the entity class's sort() method.
     // See \Drupal\Core\Config\Entity\ConfigEntityBase::sort().
@@ -41,13 +42,15 @@ class ConfigEntityListBuilder extends EntityListBuilder {
         $operations['enable'] = array(
           'title' => t('Enable'),
           'weight' => -10,
-        ) + $entity->urlInfo('enable')->toArray();
+          'url' => $entity->urlInfo('enable'),
+        );
       }
       elseif ($entity->hasLinkTemplate('disable')) {
         $operations['disable'] = array(
           'title' => t('Disable'),
           'weight' => 40,
-        ) + $entity->urlInfo('disable')->toArray();
+          'url' => $entity->urlInfo('disable'),
+        );
       }
     }
 

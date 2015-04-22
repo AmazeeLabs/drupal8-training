@@ -10,14 +10,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to search.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSearchConfigsTest extends MigrateDrupalTestBase {
+class MigrateSearchConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -35,7 +35,7 @@ class MigrateSearchConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_search_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SearchSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -46,10 +46,11 @@ class MigrateSearchConfigsTest extends MigrateDrupalTestBase {
    * Tests migration of search variables to search.settings.yml.
    */
   public function testSearchSettings() {
-    $config = \Drupal::config('search.settings');
-    $this->assertIdentical($config->get('index.minimum_word_size'), 3);
-    $this->assertIdentical($config->get('index.overlap_cjk'), TRUE);
-    $this->assertIdentical($config->get('index.cron_limit'), 100);
+    $config = $this->config('search.settings');
+    $this->assertIdentical(3, $config->get('index.minimum_word_size'));
+    $this->assertIdentical(TRUE, $config->get('index.overlap_cjk'));
+    $this->assertIdentical(100, $config->get('index.cron_limit'));
+    $this->assertIdentical(TRUE, $config->get('logging'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'search.settings', $config->get());
   }
 

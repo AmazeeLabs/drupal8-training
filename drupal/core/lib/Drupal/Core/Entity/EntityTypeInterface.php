@@ -46,7 +46,7 @@ interface EntityTypeInterface {
    * @param mixed $value
    *   The value to set.
    *
-   * @return static
+   * @return $this
    */
   public function set($property, $value);
 
@@ -105,12 +105,15 @@ interface EntityTypeInterface {
    *     entry can be omitted if this entity type exposes a single bundle (such
    *     that all entities have the same collection of fields). The name of this
    *     single bundle will be the same as the entity type.
-   *   - label: The name of the property that contains the entity label. For
-   *     example, if the entity's label is located in $entity->subject, then
-   *     'subject' should be specified here. If complex logic is required to
-   *     build the label, a 'label_callback' should be defined instead (see the
-   *     $label_callback block above for details).
-   *   - uuid (optional): The name of the property that contains the universally
+   *   - label: (optional) The name of the property that contains the entity
+   *     label. For example, if the entity's label is located in
+   *     $entity->subject, then 'subject' should be specified here. If complex
+   *     logic is required to build the label, a 'label_callback' should be
+   *     defined instead (see the $label_callback block above for details).
+   *   - langcode: (optional) The name of the property that contains the
+   *     language code. For instance, if the entity's language is located in
+   *     $entity->langcode, then 'langcode' should be specified here.
+   *   - uuid: (optional) The name of the property that contains the universally
    *     unique identifier of the entity, which is used to distinctly identify
    *     an entity across different systems.
    */
@@ -173,7 +176,7 @@ interface EntityTypeInterface {
    * @param string $class
    *   The name of the entity type class.
    *
-   * @return static
+   * @return $this
    */
   public function setClass($class);
 
@@ -222,6 +225,10 @@ interface EntityTypeInterface {
    *   - access: The name of the class that is used for access checks. The class
    *     must implement \Drupal\Core\Entity\EntityAccessControlHandlerInterface.
    *     Defaults to \Drupal\Core\Entity\EntityAccessControlHandler.
+   *   - route_provider: (optional) A list of class names, keyed by a group
+   *     string, which will be used to define routes related to this entity
+   *     type. These classes must implement
+   *     \Drupal\Core\Entity\Routing\EntityRouteProviderInterface.
    */
   public function getHandlerClasses();
 
@@ -265,7 +272,7 @@ interface EntityTypeInterface {
    *   The form class implementing
    *   \Drupal\Core\Entity\EntityFormInterface.
    *
-   * @return static
+   * @return $this
    *
    * @see \Drupal\Core\Entity\EntityFormBuilderInterface
    */
@@ -278,6 +285,22 @@ interface EntityTypeInterface {
    *   TRUE if there are any forms for this entity type, FALSE otherwise.
    */
   public function hasFormClasses();
+
+  /**
+   * Indicates if this entity type has any route provider.
+   *
+   * @return bool
+   */
+  public function hasRouteProviders();
+
+  /**
+   * Gets all the route provide handlers.
+   *
+   * Much like forms you can define multiple route provider handlers.
+   *
+   * @return string[]
+   */
+  public function getRouteProviderClasses();
 
   /**
    * Returns the list class.
@@ -293,7 +316,7 @@ interface EntityTypeInterface {
    * @param string $class
    *   The list class to use for the operation.
    *
-   * @return static
+   * @return $this
    */
   public function setListBuilderClass($class);
 
@@ -368,7 +391,7 @@ interface EntityTypeInterface {
    * @param array|string $value
    *   The value for a handler type.
    *
-   * @return static
+   * @return $this
    */
   public function setHandlerClass($handler_type, $value);
 
@@ -394,14 +417,6 @@ interface EntityTypeInterface {
    *   should use entity-type level granularity or bundle level granularity.
    */
   public function getPermissionGranularity();
-
-  /**
-   * Indicates whether fields can be attached to entities of this type.
-   *
-   * @return bool
-   *   Returns TRUE if the entity type can has fields, otherwise FALSE.
-   */
-  public function isFieldable();
 
   /**
    * Returns link templates using the URI template syntax.
@@ -440,7 +455,7 @@ interface EntityTypeInterface {
    *   The link type.
    *
    * @return string|bool
-   *   The route name for this link, or FALSE if it doesn't exist.
+   *   The path for this link, or FALSE if it doesn't exist.
    */
   public function getLinkTemplate($key);
 
@@ -460,12 +475,15 @@ interface EntityTypeInterface {
    *
    * @param string $key
    *   The name of a link.
-   * @param string $route_name
-   *   The route name to use for the link.
+   * @param string $path
+   *   The route path to use for the link.
    *
-   * @return static
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown when the path does not start with a leading slash.
    */
-  public function setLinkTemplate($key, $route_name);
+  public function setLinkTemplate($key, $path);
 
   /**
    * Gets the callback for the label of the entity.
@@ -493,7 +511,7 @@ interface EntityTypeInterface {
    * @param callable $callback
    *   A callable that returns the label of the entity.
    *
-   * @return static
+   * @return $this
    */
   public function setLabelCallback($callback);
 
@@ -633,8 +651,46 @@ interface EntityTypeInterface {
    * @param callable $callback
    *   A callback to use to provide a URI for the entity.
    *
-   * @return static
+   * @return $this
    */
   public function setUriCallback($callback);
+
+  /**
+   * The list cache contexts associated with this entity type.
+   *
+   * Enables code listing entities of this type to ensure that rendered listings
+   * are varied as necessary, typically to ensure users of role A see other
+   * entities listed as users of role B.
+   *
+   * @return string[]
+   */
+  public function getListCacheContexts();
+
+  /**
+   * The list cache tags associated with this entity type.
+   *
+   * Enables code listing entities of this type to ensure that newly created
+   * entities show up immediately.
+   *
+   * @return string[]
+   */
+  public function getListCacheTags();
+
+  /**
+   * Gets the key that is used to store configuration dependencies.
+   *
+   * @return string
+   *   The key to be used in configuration dependencies when storing
+   *   dependencies on entities of this type.
+   */
+  public function getConfigDependencyKey();
+
+  /**
+   * Indicates whether this entity type is commonly used as a reference target.
+   *
+   * @return bool
+   *   TRUE if the entity type is a common reference; FALSE otherwise.
+   */
+  public function isCommonReferenceTarget();
 
 }

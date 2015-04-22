@@ -15,7 +15,7 @@ use Drupal\Component\Utility\String;
  *   https://www.drupal.org/node/2289201 and
  *   https://www.drupal.org/node/2307163 and then decrease this limit.
  */
-const SIMPLETEST_MINIMUM_PHP_MEMORY_LIMIT = '320M';
+const SIMPLETEST_MINIMUM_PHP_MEMORY_LIMIT = '192M';
 
 /**
  * Implements hook_requirements().
@@ -42,7 +42,7 @@ function simpletest_requirements($phase) {
   );
   if (!$has_domdocument) {
     $requirements['php_domdocument']['severity'] = REQUIREMENT_ERROR;
-    $requirements['php_domdocument']['description'] = t('The testing framework requires the DOMDocument class to be available. Check the configure command at the <a href="@link-phpinfo">PHP info page</a>.', array('@link-phpinfo' => url('admin/reports/status/php')));
+    $requirements['php_domdocument']['description'] = t('The testing framework requires the DOMDocument class to be available. Check the configure command at the <a href="@link-phpinfo">PHP info page</a>.', array('@link-phpinfo' => \Drupal::url('system.php')));
   }
 
   // SimpleTest currently needs 2 cURL options which are incompatible with
@@ -66,23 +66,23 @@ function simpletest_requirements($phase) {
   }
 
   $site_directory = 'sites/simpletest';
-  if (!drupal_verify_install_file(DRUPAL_ROOT . '/' . $site_directory, FILE_EXIST|FILE_READABLE|FILE_WRITABLE|FILE_EXECUTABLE, 'dir')) {
+  if (!drupal_verify_install_file(\Drupal::root() . '/' . $site_directory, FILE_EXIST|FILE_READABLE|FILE_WRITABLE|FILE_EXECUTABLE, 'dir')) {
     $requirements['simpletest_site_directory'] = array(
       'title' => t('Simpletest site directory'),
-      'value' => is_dir(DRUPAL_ROOT . '/' . $site_directory) ? t('Not writable') : t('Missing'),
+      'value' => is_dir(\Drupal::root() . '/' . $site_directory) ? t('Not writable') : t('Missing'),
       'severity' => REQUIREMENT_ERROR,
-      'description' => t('The testing framework requires the !sites-simpletest directory to exist and be writable in order to run tests.', array(
-        '!sites-simpletest' => '<code>./' . String::checkPlain($site_directory) . '</code>',
+      'description' => t('The testing framework requires the %sites-simpletest directory to exist and be writable in order to run tests.', array(
+        '%sites-simpletest' => $site_directory,
       )),
     );
   }
-  elseif (!file_save_htaccess(DRUPAL_ROOT . '/' . $site_directory, FALSE)) {
+  elseif (!file_save_htaccess(\Drupal::root() . '/' . $site_directory, FALSE)) {
     $requirements['simpletest_site_directory'] = array(
       'title' => t('Simpletest site directory'),
       'value' => t('Not protected'),
       'severity' => REQUIREMENT_ERROR,
-      'description' => t('The file !file does not exist and could not be created automatically, which poses a security risk. Ensure that the directory is writable.', array(
-        '!file' => '<code>./' . String::checkPlain($site_directory) . '/.htaccess</code>',
+      'description' => t('The file %file does not exist and could not be created automatically, which poses a security risk. Ensure that the directory is writable.', array(
+        '%file' => $site_directory . '/.htaccess',
       )),
     );
   }

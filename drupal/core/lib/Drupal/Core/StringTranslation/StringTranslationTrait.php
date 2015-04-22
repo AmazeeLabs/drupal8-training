@@ -12,8 +12,8 @@ namespace Drupal\Core\StringTranslation;
  *
  * Using this trait will add t() and formatPlural() methods to the class. These
  * must be used for every translatable string, similar to how procedural code
- * must use the global functions t() and format_plural(). This allows string
- * extractor tools to find translatable strings.
+ * must use the global functions t() and \Drupal::translation()->formatPlural().
+ * This allows string extractor tools to find translatable strings.
  *
  * If the class is capable of injecting services from the container, it should
  * inject the 'string_translation' service and assign it to
@@ -50,6 +50,17 @@ trait StringTranslationTrait {
    */
   protected function formatPlural($count, $singular, $plural, array $args = array(), array $options = array()) {
     return $this->getStringTranslation()->formatPlural($count, $singular, $plural, $args, $options);
+  }
+
+  /**
+   * Formats a translated string containing a count of items.
+   *
+   * See the
+   * \Drupal\Core\StringTranslation\TranslationInterface::formatPluralTranslated()
+   * documentation for details.
+   */
+  protected function formatPluralTranslated($count, $translated, array $args = array(), array $options = array()) {
+    return $this->getStringTranslation()->formatPluralTranslated($count, $translated, $args, $options);
   }
 
   /**

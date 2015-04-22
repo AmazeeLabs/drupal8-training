@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Tests\Plugin;
 
+use Drupal\views\Views;
+
 /**
  * Provides a base class for a testing a relationship.
  *
@@ -20,12 +22,12 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('system', 'user', 'entity', 'field');
+  public static $modules = array('system', 'user', 'field');
 
   /**
    * @var \Drupal\user\Entity\User
    */
-  protected $root_user;
+  protected $rootUser;
 
   /**
    * Overrides \Drupal\views\Tests\ViewUnitTestBase::setUpFixtures().
@@ -36,9 +38,10 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
     parent::setUpFixtures();
 
     // Create a record for uid 1.
-    $this->installSchema('system', 'sequences');
-    $this->root_user = entity_create('user', array('name' => $this->randomMachineName()));
-    $this->root_user->save();
+    $this->rootUser = entity_create('user', array('name' => $this->randomMachineName()));
+    $this->rootUser->save();
+
+    Views::viewsData()->clear();
   }
 
   /**
@@ -50,7 +53,7 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
     $schema = parent::schemaDefinition();
 
     $schema['views_test_data']['fields']['uid'] = array(
-      'description' => "The {users}.uid of the author of the beatle entry.",
+      'description' => "The {users_field_data}.uid of the author of the beatle entry.",
       'type' => 'int',
       'unsigned' => TRUE,
       'not null' => TRUE,
@@ -72,7 +75,7 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
       'help' => t('The test data UID'),
       'relationship' => array(
         'id' => 'standard',
-        'base' => 'users',
+        'base' => 'users_field_data',
         'base field' => 'uid'
       )
     );

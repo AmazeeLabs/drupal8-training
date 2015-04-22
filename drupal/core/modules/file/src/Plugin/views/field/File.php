@@ -8,6 +8,7 @@
 namespace Drupal\file\Plugin\views\field;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -23,7 +24,7 @@ use Drupal\views\Plugin\views\field\FieldPluginBase;
 class File extends FieldPluginBase {
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::init().
+   * {@inheritdoc}
    */
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
@@ -33,9 +34,12 @@ class File extends FieldPluginBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['link_to_file'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['link_to_file'] = array('default' => FALSE);
     return $options;
   }
 
@@ -44,8 +48,8 @@ class File extends FieldPluginBase {
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_file'] = array(
-      '#title' => t('Link this field to download the file'),
-      '#description' => t("Enable to override this field's links."),
+      '#title' => $this->t('Link this field to download the file'),
+      '#description' => $this->t("Enable to override this field's links."),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['link_to_file']),
     );

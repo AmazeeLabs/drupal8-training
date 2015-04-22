@@ -39,9 +39,9 @@ class Name extends User {
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['overwrite_anonymous'] = array('default' => FALSE, 'bool' => TRUE);
-    $options['anonymous_text'] = array('default' => '', 'translatable' => TRUE);
-    $options['format_username'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['overwrite_anonymous'] = array('default' => FALSE);
+    $options['anonymous_text'] = array('default' => '');
+    $options['format_username'] = array('default' => TRUE);
 
     return $options;
   }
@@ -53,19 +53,19 @@ class Name extends User {
     parent::buildOptionsForm($form, $form_state);
 
     $form['format_username'] = array(
-      '#title' => t('Use formatted username'),
+      '#title' => $this->t('Use formatted username'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['format_username']),
-      '#description' => t('If checked, the username will be formatted by the system. If unchecked, it will be displayed raw.'),
+      '#description' => $this->t('If checked, the username will be formatted by the system. If unchecked, it will be displayed raw.'),
     );
     $form['overwrite_anonymous'] = array(
-      '#title' => t('Overwrite the value to display for anonymous users'),
+      '#title' => $this->t('Overwrite the value to display for anonymous users'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['overwrite_anonymous']),
-      '#description' => t('Enable to display different text for anonymous users.'),
+      '#description' => $this->t('Enable to display different text for anonymous users.'),
     );
     $form['anonymous_text'] = array(
-      '#title' => t('Text to display for anonymous users'),
+      '#title' => $this->t('Text to display for anonymous users'),
       '#type' => 'textfield',
       '#default_value' => $this->options['anonymous_text'],
       '#states' => array(
@@ -80,10 +80,10 @@ class Name extends User {
    * {@inheritdoc}
    */
   protected function renderLink($data, ResultRow $values) {
-    $account = entity_create('user');
-    $account->uid = $this->getValue($values, 'uid');
-    $account->name = $this->getValue($values);
-    if (!empty($this->options['link_to_user']) || !empty($this->options['overwrite_anonymous'])) {
+    if (!empty($this->options['link_to_user']) || !empty($this->options['overwrite_anonymous']) || !empty($this->options['format_username'])) {
+      $account = entity_create('user');
+      $account->uid = $this->getValue($values, 'uid');
+      $account->name = $this->getValue($values);
       if (!empty($this->options['overwrite_anonymous']) && !$account->id()) {
         // This is an anonymous user, and we're overriting the text.
         return String::checkPlain($this->options['anonymous_text']);
@@ -96,11 +96,12 @@ class Name extends User {
         );
         return drupal_render($username);
       }
+      // If we want a formatted username, do that.
+      if (!empty($this->options['format_username'])) {
+        return user_format_name($account);
+      }
     }
-    // If we want a formatted username, do that.
-    if (!empty($this->options['format_username'])) {
-      return user_format_name($account);
-    }
+
     // Otherwise, there's no special handling, so return the data directly.
     return $data;
   }

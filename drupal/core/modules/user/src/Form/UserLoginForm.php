@@ -7,6 +7,7 @@
 
 namespace Drupal\user\Form;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Flood\FloodInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -78,13 +79,15 @@ class UserLoginForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
+    $config = $this->config('system.site');
+
     // Display login form:
     $form['name'] = array(
       '#type' => 'textfield',
       '#title' => $this->t('Username'),
       '#size' => 60,
       '#maxlength' => USERNAME_MAX_LENGTH,
-      '#description' => $this->t('Enter your @s username.', array('@s' => $this->config('system.site')->get('name'))),
+      '#description' => $this->t('Enter your @s username.', array('@s' => $config->get('name'))),
       '#required' => TRUE,
       '#attributes' => array(
         'autocorrect' => 'off',
@@ -108,6 +111,8 @@ class UserLoginForm extends FormBase {
     $form['#validate'][] = '::validateName';
     $form['#validate'][] = '::validateAuthentication';
     $form['#validate'][] = '::validateFinal';
+
+    $form['#cache']['tags'] = Cache::mergeTags(isset($form['#cache']['tags']) ? $form['#cache']['tags'] : [],  $config->getCacheTags());
 
     return $form;
   }
@@ -207,15 +212,15 @@ class UserLoginForm extends FormBase {
 
       if ($flood_control_triggered = $form_state->get('flood_control_triggered')) {
         if ($flood_control_triggered == 'user') {
-          $form_state->setErrorByName('name', format_plural($flood_config->get('user_limit'), 'Sorry, there has been more than one failed login attempt for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', 'Sorry, there have been more than @count failed login attempts for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => url('user/password'))));
+          $form_state->setErrorByName('name', $this->formatPlural($flood_config->get('user_limit'), 'Sorry, there has been more than one failed login attempt for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', 'Sorry, there have been more than @count failed login attempts for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => $this->url('user.pass'))));
         }
         else {
           // We did not find a uid, so the limit is IP-based.
-          $form_state->setErrorByName('name', $this->t('Sorry, too many failed login attempts from your IP address. This IP address is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => url('user/password'))));
+          $form_state->setErrorByName('name', $this->t('Sorry, too many failed login attempts from your IP address. This IP address is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => $this->url('user.pass'))));
         }
       }
       else {
-        $form_state->setErrorByName('name', $this->t('Sorry, unrecognized username or password. <a href="@password">Have you forgotten your password?</a>', array('@password' => url('user/password', array('query' => array('name' => $form_state->getValue('name')))))));
+        $form_state->setErrorByName('name', $this->t('Sorry, unrecognized username or password. <a href="@password">Have you forgotten your password?</a>', array('@password' => $this->url('user.pass', [], array('query' => array('name' => $form_state->getValue('name')))))));
         $accounts = $this->userStorage->loadByProperties(array('name' => $form_state->getValue('name')));
         if (!empty($accounts)) {
           $this->logger('user')->notice('Login attempt failed for %user.', array('%user' => $form_state->getValue('name')));

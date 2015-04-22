@@ -39,11 +39,11 @@ class LinkDelete extends Link {
    *   Returns a string for the link text.
    */
   protected function renderLink($data, ResultRow $values) {
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('Delete');
+    $text = !empty($this->options['text']) ? $this->options['text'] : $this->t('Delete');
     $comment = $this->getEntity($values);
 
     $this->options['alter']['make_link'] = TRUE;
-    $this->options['alter']['path'] = $comment->getSystemPath('delete-form');
+    $this->options['alter']['url'] = $comment->urlInfo('delete-form');
     $this->options['alter']['query'] = drupal_get_destination();
 
     return $text;

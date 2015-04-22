@@ -44,7 +44,7 @@ class QueryTest extends QueryPluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $form['test_setting'] = array(
-      '#title' => t('Test setting'),
+      '#title' => $this->t('Test setting'),
       '#type' => 'textfield',
       '#default_value' => $this->options['test_setting'],
     );
@@ -146,5 +146,13 @@ class QueryTest extends QueryPluginBase {
     return FALSE;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    return parent::calculateDependencies() + [
+      'content' => ['QueryTest'],
+    ];
+  }
 
 }

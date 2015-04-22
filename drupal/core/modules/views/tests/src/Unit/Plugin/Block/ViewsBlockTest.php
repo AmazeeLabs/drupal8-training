@@ -39,7 +39,7 @@ class ViewsBlockTest extends UnitTestCase {
   /**
    * The view entity.
    *
-   * @var \Drupal\views\ViewStorageInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\views\ViewEntityInterface|\PHPUnit_Framework_MockObject_MockObject
    */
   protected $view;
 
@@ -72,7 +72,7 @@ class ViewsBlockTest extends UnitTestCase {
 
     $this->executable = $this->getMockBuilder('Drupal\views\ViewExecutable')
       ->disableOriginalConstructor()
-      ->setMethods(array('executeDisplay', 'setDisplay', 'setItemsPerPage'))
+      ->setMethods(['buildRenderable', 'setDisplay', 'setItemsPerPage'])
       ->getMock();
     $this->executable->expects($this->any())
       ->method('setDisplay')
@@ -116,9 +116,9 @@ class ViewsBlockTest extends UnitTestCase {
     $output = $this->randomMachineName(100);
     $build = array('#markup' => $output);
     $this->executable->expects($this->once())
-      ->method('executeDisplay')
-      ->with($this->equalTo('block_1'))
-      ->will($this->returnValue($build));
+      ->method('buildRenderable')
+      ->with('block_1', [])
+      ->willReturn($build);
 
     $block_id = 'views_block:test_view-block_1';
     $config = array();
@@ -126,10 +126,6 @@ class ViewsBlockTest extends UnitTestCase {
 
     $definition['provider'] = 'views';
     $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storage, $this->account);
-    $reflector = new \ReflectionClass($plugin);
-    $property = $reflector->getProperty('conditionPluginManager');
-    $property->setAccessible(TRUE);
-    $property->setValue($plugin, $this->getMock('Drupal\Core\Executable\ExecutableManagerInterface'));
 
     $this->assertEquals($build, $plugin->build());
   }
@@ -142,9 +138,9 @@ class ViewsBlockTest extends UnitTestCase {
   public function testBuildFailed() {
     $output = FALSE;
     $this->executable->expects($this->once())
-      ->method('executeDisplay')
-      ->with($this->equalTo('block_1'))
-      ->will($this->returnValue($output));
+      ->method('buildRenderable')
+      ->with('block_1', [])
+      ->willReturn($output);
 
     $block_id = 'views_block:test_view-block_1';
     $config = array();
@@ -152,10 +148,6 @@ class ViewsBlockTest extends UnitTestCase {
 
     $definition['provider'] = 'views';
     $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storage, $this->account);
-    $reflector = new \ReflectionClass($plugin);
-    $property = $reflector->getProperty('conditionPluginManager');
-    $property->setAccessible(TRUE);
-    $property->setValue($plugin, $this->getMock('Drupal\Core\Executable\ExecutableManagerInterface'));
 
     $this->assertEquals(array(), $plugin->build());
   }

@@ -11,6 +11,7 @@ use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Url;
 
 /**
  * Provides a base class for Forum blocks.
@@ -27,7 +28,7 @@ abstract class ForumBlockBase extends BlockBase {
       $elements['forum_list'] = $node_title_list;
       $elements['forum_more'] = array(
         '#type' => 'more_link',
-        '#href' => 'forum',
+        '#url' => Url::fromRoute('forum.index'),
         '#attributes' => array('title' => $this->t('Read the latest forum topics.')),
       );
     }
@@ -68,7 +69,7 @@ abstract class ForumBlockBase extends BlockBase {
     $range = range(2, 20);
     $form['block_count'] = array(
       '#type' => 'select',
-      '#title' => t('Number of topics'),
+      '#title' => $this->t('Number of topics'),
       '#default_value' => $this->configuration['block_count'],
       '#options' => array_combine($range, $range),
     );

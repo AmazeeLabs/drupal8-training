@@ -8,10 +8,12 @@
 namespace Drupal\views_ui\Form\Ajax;
 
 use Drupal\Component\Utility\Html;
+use Drupal\Core\Ajax\OpenModalDialogCommand;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\ViewStorageInterface;
+use Drupal\views_ui\ViewUI;
+use Drupal\views\ViewEntityInterface;
 use Drupal\views\Ajax;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\CloseModalDialogCommand;
@@ -63,7 +65,7 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFormState(ViewStorageInterface $view, $display_id, $js) {
+  public function getFormState(ViewEntityInterface $view, $display_id, $js) {
     // $js may already have been converted to a Boolean.
     $ajax = is_string($js) ? $js === 'ajax' : $js;
     return (new FormState())
@@ -81,14 +83,13 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
   /**
    * {@inheritdoc}
    */
-  public function getForm(ViewStorageInterface $view, $display_id, $js) {
+  public function getForm(ViewEntityInterface $view, $display_id, $js) {
     $form_state = $this->getFormState($view, $display_id, $js);
     $view = $form_state->get('view');
     $key = $form_state->get('form_key');
 
     // @todo Remove the need for this.
     \Drupal::moduleHandler()->loadInclude('views_ui', 'inc', 'admin');
-    \Drupal::moduleHandler()->loadInclude('views', 'inc', 'includes/ajax');
 
     // Reset the cache of IDs. Drupal rather aggressively prevents ID
     // duplication but this causes it to remember IDs that are no longer even
@@ -118,16 +119,8 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
       unset($view->form_cache);
     }
 
-    // With the below logic, we may end up rendering a form twice (or two forms
-    // each sharing the same element ids), potentially resulting in
-    // _drupal_add_js() being called twice to add the same setting. drupal_get_js()
-    // is ok with that, but until \Drupal\Core\Ajax\AjaxResponse::ajaxRender()
-    // is (http://drupal.org/node/208611), reset the _drupal_add_js() static
-    // before rendering the second time.
-    $drupal_add_js_original = _drupal_add_js();
-    $drupal_add_js = &drupal_static('_drupal_add_js');
     $form_class = get_class($form_state->getFormObject());
-    $response = views_ajax_form_wrapper($form_class, $form_state);
+    $response = $this->ajaxFormWrapper($form_class, $form_state);
 
     // If the form has not been submitted, or was not set for rerendering, stop.
     if (!$form_state->isSubmitted() || $form_state->get('rerender')) {
@@ -136,7 +129,6 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
 
     // Sometimes we need to re-generate the form for multi-step type operations.
     if (!empty($view->stack)) {
-      $drupal_add_js = $drupal_add_js_original;
       $stack = $view->stack;
       $top = array_shift($stack);
 
@@ -147,17 +139,17 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
       $form_class = get_class($form_state->getFormObject());
 
       $form_state->setUserInput(array());
-      $form_path = views_ui_build_form_path($form_state);
+      $form_url = views_ui_build_form_url($form_state);
       if (!$form_state->get('ajax')) {
-        return new RedirectResponse(url($form_path, array('absolute' => TRUE)));
+        return new RedirectResponse($form_url->setAbsolute()->toString());
       }
-      $form_state->set('path', $form_path);
-      $response = views_ajax_form_wrapper($form_class, $form_state);
+      $form_state->set('url', $form_url);
+      $response = $this->ajaxFormWrapper($form_class, $form_state);
     }
     elseif (!$form_state->get('ajax')) {
       // if nothing on the stack, non-js forms just go back to the main view editor.
       $display_id = $form_state->get('display_id');
-      return new RedirectResponse(url("admin/structure/views/view/{$view->id()}/edit/$display_id", array('absolute' => TRUE)));
+      return new RedirectResponse($this->url('entity.view.edit_display_form', ['view' => $view->id(), 'display_id' => $display_id], ['absolute' => TRUE]));
     }
     else {
       $response = new AjaxResponse();
@@ -175,6 +167,83 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
     }
 
     return $response;
+  }
+
+  /**
+   * Wrapper for handling AJAX forms.
+   *
+   * Wrapper around \Drupal\Core\Form\FormBuilderInterface::buildForm() to
+   * handle some AJAX stuff automatically.
+   * This makes some assumptions about the client.
+   *
+   * @param \Drupal\Core\Form\FormInterface|string $form_class
+   *   The value must be one of the following:
+   *   - The name of a class that implements \Drupal\Core\Form\FormInterface.
+   *   - An instance of a class that implements \Drupal\Core\Form\FormInterface.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse|string|array
+   *   Returns one of three possible values:
+   *   - A \Drupal\Core\Ajax\AjaxResponse object.
+   *   - The rendered form, as a string.
+   *   - A render array with the title in #title and the rendered form in the
+   *   #markup array.
+   */
+  protected function ajaxFormWrapper($form_class, FormStateInterface &$form_state) {
+    /** @var \Drupal\Core\Render\RendererInterface $renderer */
+    $renderer = \Drupal::service('renderer');
+
+    // This won't override settings already in.
+    if (!$form_state->has('rerender')) {
+      $form_state->set('rerender', FALSE);
+    }
+    $ajax = $form_state->get('ajax');
+    // Do not overwrite if the redirect has been disabled.
+    if (!$form_state->isRedirectDisabled()) {
+      $form_state->disableRedirect($ajax);
+    }
+    $form_state->disableCache();
+
+    $form = \Drupal::formBuilder()->buildForm($form_class, $form_state);
+    $output = $renderer->renderRoot($form);
+    drupal_process_attached($form);
+
+    // These forms have the title built in, so set the title here:
+    $title = $form_state->get('title') ?: '';
+
+    if ($ajax && (!$form_state->isExecuted() || $form_state->get('rerender'))) {
+      // If the form didn't execute and we're using ajax, build up an
+      // Ajax command list to execute.
+      $response = new AjaxResponse();
+
+      // Attach the library necessary for using the OpenModalDialogCommand and
+      // set the attachments for this Ajax response.
+      $form['#attached']['library'][] = 'core/drupal.dialog.ajax';
+      $response->setAttachments($form['#attached']);
+
+      $display = '';
+      $status_messages = array('#type' => 'status_messages');
+      if ($messages = $renderer->renderRoot($status_messages)) {
+        $display = '<div class="views-messages">' . $messages . '</div>';
+      }
+      $display .= $output;
+
+      $options = array(
+        'dialogClass' => 'views-ui-dialog',
+        'width' => '50%',
+      );
+
+      $response->addCommand(new OpenModalDialogCommand($title, $display, $options));
+
+      if ($section = $form_state->get('#section')) {
+        $response->addCommand(new Ajax\HighlightCommand('.' . Html::cleanCssIdentifier($section)));
+      }
+
+      return $response;
+    }
+
+    return $title ? ['#title' => $title, '#markup' => $output] : $output;
   }
 
   /**

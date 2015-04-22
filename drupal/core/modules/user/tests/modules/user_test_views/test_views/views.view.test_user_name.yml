@@ -1,7 +1,16 @@
-base_table: users
-core: '8'
+langcode: en
+status: true
+dependencies:
+  module:
+    - user
+id: test_user_name
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: users_field_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -20,13 +29,14 @@ display:
       fields:
         name:
           id: uid
-          table: users
+          table: users_field_data
           field: uid
-          provider: user
+          entity_type: user
+          entity_field: uid
       filters:
         uid:
           id: uid
-          table: users
+          table: users_field_data
           field: uid
           exposed: true
           expose:
@@ -36,8 +46,9 @@ display:
             identifier: uid
             remember_roles:
               authenticated: authenticated
-              anonymous: 0
-          provider: user
+              anonymous: '0'
+          entity_type: user
+          entity_field: uid
     display_plugin: default
     display_title: Master
     id: default
@@ -49,6 +60,3 @@ display:
     display_title: Page
     id: page_1
     position: 0
-label: ''
-id: test_user_name
-tag: ''

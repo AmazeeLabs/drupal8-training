@@ -157,6 +157,10 @@ abstract class ConfigBase {
    *
    * @param array $data
    *   The new configuration data.
+   * @param bool $validate_keys
+   *   (optional) Whether the data should be verified for valid keys. Set to
+   *   FALSE if the $data is known to be valid already (for example, being
+   *   loaded from the config storage).
    *
    * @return $this
    *   The configuration object.
@@ -164,8 +168,10 @@ abstract class ConfigBase {
    * @throws \Drupal\Core\Config\ConfigValueException
    *   If any key in $data in any depth contains a dot.
    */
-  public function setData(array $data) {
-    $this->validateKeys($data);
+  public function setData(array $data, $validate_keys = TRUE) {
+    if ($validate_keys) {
+      $this->validateKeys($data);
+    }
     $this->data = $data;
     return $this;
   }
@@ -256,4 +262,15 @@ abstract class ConfigBase {
     $this->setData(NestedArray::mergeDeepArray(array($this->data, $data_to_merge), TRUE));
     return $this;
   }
+
+  /**
+   * The unique cache tag associated with this configuration object.
+   *
+   * @return string[]
+   *   An array of cache tags.
+   */
+  public function getCacheTags() {
+    return ['config:' . $this->name];
+  }
+
 }

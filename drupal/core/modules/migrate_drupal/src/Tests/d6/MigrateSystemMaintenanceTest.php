@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade maintenance variables to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemMaintenanceTest extends MigrateDrupalTestBase {
+class MigrateSystemMaintenanceTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemMaintenanceTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_maintenance');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemMaintenance.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,9 +36,8 @@ class MigrateSystemMaintenanceTest extends MigrateDrupalTestBase {
    * Tests migration of system (maintenance) variables to system.maintenance.yml.
    */
   public function testSystemMaintenance() {
-    $config = \Drupal::config('system.maintenance');
-    $this->assertIdentical($config->get('enable'), 0);
-    $this->assertIdentical($config->get('message'), 'Drupal is currently under maintenance. We should be back shortly. Thank you for your patience.');
+    $config = $this->config('system.maintenance');
+    $this->assertIdentical('Drupal is currently under maintenance. We should be back shortly. Thank you for your patience.', $config->get('message'));
   }
 
 }

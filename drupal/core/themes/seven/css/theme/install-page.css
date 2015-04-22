@@ -3,9 +3,9 @@
  * Installation styling.
  *
  * Unfortunately we have to make our styling quite strong, to override the
- * .in-maintenance styling.
+ * .maintenance-page styling.
  */
-.install-background {
+.install-page {
   background-color: #1275b2;
   background-image:
     url(../../images/noise-low.png),
@@ -39,14 +39,13 @@
     width: 100%;
   }
   .install-configure-form .form-type-password {
-    float: left;
     width: 100%;
   }
-  input.password-confirm,
-  input.password-field {
+  .password-confirm,
+  .password-field {
     float: none;
   }
-  div.password-confirm {
+  .password-confirm-match {
     float: none;
     width: auto;
     max-width: 100%;

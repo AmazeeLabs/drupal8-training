@@ -15,11 +15,11 @@ if (PHP_SAPI !== 'cli') {
   return;
 }
 
-if (version_compare(PHP_VERSION, "5.4.2", "<")) {
+if (version_compare(PHP_VERSION, '5.4.5') < 0) {
   $version  = PHP_VERSION;
   echo <<<EOF
 
-ERROR: This script requires at least PHP version 5.4.2. You invoked it with
+ERROR: This script requires at least PHP version 5.4.5. You invoked it with
        PHP version {$version}.
 \n
 EOF;
@@ -55,7 +55,7 @@ EOF;
 // Password list to be processed.
 $passwords = $_SERVER['argv'];
 
-$autoloader = require __DIR__ . '/../vendor/autoload.php';
+$autoloader = require __DIR__ . '/../../autoload.php';
 
 $request = Request::createFromGlobals();
 $kernel = DrupalKernel::createFromRequest($request, $autoloader, 'prod', FALSE);

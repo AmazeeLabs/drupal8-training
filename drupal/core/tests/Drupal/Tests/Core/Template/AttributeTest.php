@@ -25,6 +25,11 @@ class AttributeTest extends UnitTestCase {
     $attribute = new Attribute(array('class' => array('example-class')));
     $this->assertTrue(isset($attribute['class']));
     $this->assertEquals(new AttributeArray('class', array('example-class')), $attribute['class']);
+
+    // Test adding boolean attributes through the constructor.
+    $attribute = new Attribute(['selected' => TRUE, 'checked' => FALSE]);
+    $this->assertTrue($attribute['selected']->value());
+    $this->assertFalse($attribute['checked']->value());
   }
 
   /**
@@ -58,8 +63,75 @@ class AttributeTest extends UnitTestCase {
   }
 
   /**
+   * Tests setting attributes.
+   * @covers ::setAttribute
+   */
+  public function testSetAttribute() {
+    $attribute = new Attribute();
+
+    // Test adding various attributes.
+    $attributes = ['alt', 'id', 'src', 'title', 'value'];
+    foreach ($attributes as $key) {
+      foreach (['kitten', ''] as $value) {
+        $attribute = new Attribute();
+        $attribute->setAttribute($key, $value);
+        $this->assertEquals($value, $attribute[$key]);
+      }
+    }
+
+    // Test adding array to class.
+    $attribute = new Attribute();
+    $attribute->setAttribute('class', ['kitten', 'cat']);
+    $this->assertArrayEquals(['kitten', 'cat'], $attribute['class']->value());
+
+    // Test adding boolean attributes.
+    $attribute = new Attribute();
+    $attribute['checked'] = TRUE;
+    $this->assertTrue($attribute['checked']->value());
+  }
+
+  /**
+   * Tests removing attributes.
+   * @covers ::removeAttribute
+   */
+  public function testRemoveAttribute() {
+    $attributes = [
+      'alt' => 'Alternative text',
+      'id' => 'bunny',
+      'src' => 'zebra',
+      'style' => 'color: pink;',
+      'title' => 'kitten',
+      'value' => 'ostrich',
+      'checked' => TRUE,
+    ];
+    $attribute = new Attribute($attributes);
+
+    // Single value.
+    $attribute->removeAttribute('alt');
+    $this->assertEmpty($attribute['alt']);
+
+    // Multiple values.
+    $attribute->removeAttribute('id', 'src');
+    $this->assertEmpty($attribute['id']);
+    $this->assertEmpty($attribute['src']);
+
+    // Single value in array.
+    $attribute->removeAttribute(['style']);
+    $this->assertEmpty($attribute['style']);
+
+    // Boolean value.
+    $attribute->removeAttribute('checked');
+    $this->assertEmpty($attribute['checked']);
+
+    // Multiple values in array.
+    $attribute->removeAttribute(['title', 'value']);
+    $this->assertEmpty((string) $attribute);
+
+  }
+
+  /**
    * Tests adding class attributes with the AttributeArray helper method.
-   * @covers ::addClass()
+   * @covers ::addClass
    */
   public function testAddClasses() {
     // Add empty Attribute object with no classes.
@@ -111,7 +183,7 @@ class AttributeTest extends UnitTestCase {
 
   /**
    * Tests removing class attributes with the AttributeArray helper method.
-   * @covers ::removeClass()
+   * @covers ::removeClass
    */
   public function testRemoveClasses() {
     // Add duplicate class to ensure that both duplicates are removed.
@@ -141,9 +213,24 @@ class AttributeTest extends UnitTestCase {
   }
 
   /**
+   * Tests checking for class names with the Attribute method.
+   * @covers ::hasClass
+   */
+  public function testHasClass() {
+    // Test an attribute without any classes.
+    $attribute = new Attribute();
+    $this->assertFalse($attribute->hasClass('a-class-nowhere-to-be-found'));
+
+    // Add a class to check for.
+    $attribute->addClass('we-totally-have-this-class');
+    // Check that this class exists.
+    $this->assertTrue($attribute->hasClass('we-totally-have-this-class'));
+  }
+
+  /**
    * Tests removing class attributes with the Attribute helper methods.
-   * @covers ::removeClass()
-   * @covers ::addClass()
+   * @covers ::removeClass
+   * @covers ::addClass
    */
   public function testChainAddRemoveClasses() {
     $attribute = new Attribute(
@@ -162,8 +249,8 @@ class AttributeTest extends UnitTestCase {
    * Tests the twig calls to the Attribute.
    * @dataProvider providerTestAttributeClassHelpers
    *
-   * @covers ::removeClass()
-   * @covers ::addClass()
+   * @covers ::removeClass
+   * @covers ::addClass
    */
   public function testTwigAddRemoveClasses($template, $expected, $seed_attributes = array()) {
     $loader = new \Twig_Loader_String();
@@ -244,13 +331,84 @@ class AttributeTest extends UnitTestCase {
 
     $content = $this->randomMachineName();
     $html = '<div' . (string) $attribute . '>' . $content . '</div>';
-    $this->assertSelectEquals('div.example-class', $content, 1, $html);
-    $this->assertSelectEquals('div.example-class2', $content, 0, $html);
+    $this->assertClass('example-class', $html);
+    $this->assertNoClass('example-class2', $html);
 
-    $this->assertSelectEquals('div#example-id', $content, 1, $html);
-    $this->assertSelectEquals('div#example-id2', $content, 0, $html);
+    $this->assertID('example-id', $html);
+    $this->assertNoID('example-id2', $html);
 
     $this->assertTrue(strpos($html, 'enabled') !== FALSE);
+  }
+
+  /**
+   * Checks that the given CSS class is present in the given HTML snippet.
+   *
+   * @param string $class
+   *   The CSS class to check.
+   * @param string $html
+   *   The HTML snippet to check.
+   */
+  protected function assertClass($class, $html) {
+    $xpath = "//*[@class='$class']";
+    self::assertTrue((bool) $this->getXPathResultCount($xpath, $html));
+  }
+
+  /**
+   * Checks that the given CSS class is not present in the given HTML snippet.
+   *
+   * @param string $class
+   *   The CSS class to check.
+   * @param string $html
+   *   The HTML snippet to check.
+   */
+  protected function assertNoClass($class, $html) {
+    $xpath = "//*[@class='$class']";
+    self::assertFalse((bool) $this->getXPathResultCount($xpath, $html));
+  }
+
+  /**
+   * Checks that the given CSS ID is present in the given HTML snippet.
+   *
+   * @param string $id
+   *   The CSS ID to check.
+   * @param string $html
+   *   The HTML snippet to check.
+   */
+  protected function assertID($id, $html) {
+    $xpath = "//*[@id='$id']";
+    self::assertTrue((bool) $this->getXPathResultCount($xpath, $html));
+  }
+
+  /**
+   * Checks that the given CSS ID is not present in the given HTML snippet.
+   *
+   * @param string $id
+   *   The CSS ID to check.
+   * @param string $html
+   *   The HTML snippet to check.
+   */
+  protected function assertNoID($id, $html) {
+    $xpath = "//*[@id='$id']";
+    self::assertFalse((bool) $this->getXPathResultCount($xpath, $html));
+  }
+
+  /**
+   * Counts the occurrences of the given XPath query in a given HTML snippet.
+   *
+   * @param string $query
+   *   The XPath query to execute.
+   * @param string $html
+   *   The HTML snippet to check.
+   *
+   * @return int
+   *   The number of results that are found.
+   */
+  protected function getXPathResultCount($query, $html) {
+    $document = new \DOMDocument;
+    $document->loadHTML($html);
+    $xpath = new \DOMXPath($document);
+
+    return $xpath->query($query)->length;
   }
 
   /**

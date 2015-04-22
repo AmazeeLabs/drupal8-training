@@ -10,14 +10,9 @@ namespace Drupal\Core\EventSubscriber;
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\ContentNegotiation;
-use Drupal\Core\Page\DefaultHtmlPageRenderer;
-use Drupal\Core\Page\HtmlFragment;
-use Drupal\Core\Page\HtmlFragmentRendererInterface;
-use Drupal\Core\Page\HtmlPageRendererInterface;
+use Drupal\Core\Render\BareHtmlPageRendererInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Utility\Error;
-use Symfony\Component\Debug\Exception\FlattenException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,20 +31,6 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
   use StringTranslationTrait;
 
   /**
-   * The fragment renderer.
-   *
-   * @var \Drupal\Core\Page\HtmlFragmentRendererInterface
-   */
-  protected $fragmentRenderer;
-
-  /**
-   * The page renderer.
-   *
-   * @var \Drupal\Core\Page\HtmlPageRendererInterface
-   */
-  protected $htmlPageRenderer;
-
-  /**
    * @var string
    *
    * One of the error level constants defined in bootstrap.inc.
@@ -64,19 +45,23 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
   protected $configFactory;
 
   /**
-   * Constructs a new DefaultExceptionHtmlSubscriber.
+   * The bare HTML page renderer.
    *
-   * @param \Drupal\Core\Page\HtmlFragmentRendererInterface $fragment_renderer
-   *   The fragment renderer.
-   * @param \Drupal\Core\Page\HtmlPageRendererInterface $page_renderer
-   *   The page renderer.
+   * @var \Drupal\Core\Render\BareHtmlPageRendererInterface
+   */
+  protected $bareHtmlPageRenderer;
+
+  /**
+   * Constructs a new DefaultExceptionSubscriber.
+   *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   The configuration factory.
+   * @param \Drupal\Core\Render\BareHtmlPageRendererInterface $bare_html_page_renderer
+   *   The bare HTML page renderer.
    */
-  public function __construct(HtmlFragmentRendererInterface $fragment_renderer, HtmlPageRendererInterface $page_renderer, ConfigFactoryInterface $config_factory) {
-    $this->fragmentRenderer = $fragment_renderer;
-    $this->htmlPageRenderer = $page_renderer;
+  public function __construct(ConfigFactoryInterface $config_factory, BareHtmlPageRendererInterface $bare_html_page_renderer) {
     $this->configFactory = $config_factory;
+    $this->bareHtmlPageRenderer = $bare_html_page_renderer;
   }
 
   /**
@@ -100,7 +85,6 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
   protected function onHtml(GetResponseForExceptionEvent $event) {
     $exception = $event->getException();
     $error = Error::decodeException($exception);
-    $flatten_exception = FlattenException::create($exception, 500);
 
     // Display the message if the current error reporting level allows this type
     // of message to be displayed, and unconditionally in update.php.
@@ -127,7 +111,7 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
 
       // Check if verbose error reporting is on.
       if ($this->getErrorLevel() == ERROR_REPORTING_DISPLAY_VERBOSE) {
-        $backtrace_exception = $flatten_exception;
+        $backtrace_exception = $exception;
         while ($backtrace_exception->getPrevious()) {
           $backtrace_exception = $backtrace_exception->getPrevious();
         }
@@ -138,18 +122,20 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
         // once more in the backtrace.
         array_shift($backtrace);
 
-        // Generate a backtrace containing only scalar argument values.
-        $message .= '<pre class="backtrace">' . Error::formatFlattenedBacktrace($backtrace) . '</pre>';
+        // Generate a backtrace containing only scalar argument values. Make
+        // sure the backtrace is escaped as it can contain user submitted data.
+        $message .= '<pre class="backtrace">' . SafeMarkup::escape(Error::formatBacktrace($backtrace)) . '</pre>';
       }
       drupal_set_message(SafeMarkup::set($message), $class, TRUE);
     }
 
     $content = $this->t('The website has encountered an error. Please try again later.');
-    $output = DefaultHtmlPageRenderer::renderPage($content, $this->t('Error'));
+    $output = $this->bareHtmlPageRenderer->renderBarePage(['#markup' => $content], $this->t('Error'), 'maintenance_page');
     $response = new Response($output);
 
     if ($exception instanceof HttpExceptionInterface) {
       $response->setStatusCode($exception->getStatusCode());
+      $response->headers->add($exception->getHeaders());
     }
     else {
       $response->setStatusCode(Response::HTTP_INTERNAL_SERVER_ERROR, '500 Service unavailable (with message)');
@@ -180,29 +166,10 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
     $response = new JsonResponse($data, Response::HTTP_INTERNAL_SERVER_ERROR);
     if ($exception instanceof HttpExceptionInterface) {
       $response->setStatusCode($exception->getStatusCode());
+      $response->headers->add($exception->getHeaders());
     }
 
     $event->setResponse($response);
-  }
-
-  /**
-   * Creates an Html response for the provided criteria.
-   *
-   * @param $title
-   *   The page title of the response.
-   * @param $body
-   *   The body of the error page.
-   * @param $response_code
-   *   The HTTP response code of the response.
-   * @return \Symfony\Component\HttpFoundation\Response
-   *   An error Response object ready to return to the browser.
-   */
-  protected function createHtmlResponse($title, $body, $response_code) {
-    $fragment = new HtmlFragment($body);
-    $fragment->setTitle($title);
-
-    $page = $this->fragmentRenderer->render($fragment, $response_code);
-    return new Response($this->htmlPageRenderer->render($page), $page->getStatusCode());
   }
 
   /**
@@ -238,8 +205,7 @@ class DefaultExceptionSubscriber implements EventSubscriberInterface {
     // to this code. We therefore use this style for now on the expectation
     // that it will get replaced with better code later. This approach makes
     // that change easier when we get to it.
-    $conneg = new ContentNegotiation();
-    $format = $conneg->getContentType($request);
+    $format = \Drupal::service('http_negotiation.format_negotiator')->getContentType($request);
 
     // These are all JSON errors for our purposes. Any special handling for
     // them can/should happen in earlier listeners if desired.

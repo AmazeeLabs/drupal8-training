@@ -88,7 +88,7 @@ class SelectExtender implements SelectInterface {
 
   /* Implementations of Drupal\Core\Database\Query\ConditionInterface for the WHERE clause. */
 
-  public function condition($field, $value = NULL, $operator = NULL) {
+  public function condition($field, $value = NULL, $operator = '=') {
     $this->query->condition($field, $value, $operator);
     return $this;
   }
@@ -138,6 +138,38 @@ class SelectExtender implements SelectInterface {
     return $this->query->havingCompile($connection);
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function havingIsNull($field) {
+    $this->query->havingIsNull($field);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function havingIsNotNull($field) {
+    $this->query->havingIsNotNull($field);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function havingExists(SelectInterface $select) {
+    $this->query->havingExists($select);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function havingNotExists(SelectInterface $select) {
+    $this->query->havingNotExists($select);
+    return $this;
+  }
+
   /* Implementations of Drupal\Core\Database\Query\ExtendableInterface. */
 
   public function extend($extender_name) {
@@ -169,6 +201,13 @@ class SelectExtender implements SelectInterface {
 
   public function &getUnion() {
     return $this->query->getUnion();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function escapeLike($string) {
+    return $this->query->escapeLike($string);
   }
 
   public function getArguments(PlaceholderInterface $queryPlaceholder = NULL) {

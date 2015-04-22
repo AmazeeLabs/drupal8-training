@@ -14,13 +14,14 @@ use Drupal\Tests\UnitTestCase;
  * Tests the migrate entity.
  *
  * @coversDefaultClass \Drupal\migrate\Entity\Migration
+ * @group migrate
  */
 class MigrationTest extends UnitTestCase {
 
   /**
    * Tests Migration::getProcessPlugins()
    *
-   * @covers ::getProcessPlugins()
+   * @covers ::getProcessPlugins
    */
   public function testGetProcessPlugins() {
     $migration = new Migration([], 'migration');

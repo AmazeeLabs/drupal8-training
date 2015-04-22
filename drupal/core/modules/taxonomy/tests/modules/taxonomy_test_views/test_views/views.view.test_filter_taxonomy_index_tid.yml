@@ -1,8 +1,18 @@
-base_field: nid
-base_table: node
-core: 8.x
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - node
+    - taxonomy
+    - user
+id: test_filter_taxonomy_index_tid
+label: test_filter_taxonomy_index_tid
+module: views
+description: ''
+tag: ''
+base_table: node_field_data
+base_field: nid
+core: 8.x
 display:
   default:
     display_plugin: default
@@ -41,14 +51,14 @@ display:
           items_per_page: 10
           offset: 0
           id: 0
-          total_pages: ''
+          total_pages: null
           expose:
             items_per_page: false
             items_per_page_label: 'Items per page'
             items_per_page_options: '5, 10, 25, 50'
             items_per_page_options_all: false
             items_per_page_options_all_label: '- All -'
-            offset: 0
+            offset: false
             offset_label: Offset
           tags:
             previous: '‹ previous'
@@ -75,7 +85,6 @@ display:
           id: title
           table: node_field_data
           field: title
-          provider: node
           label: ''
           alter:
             alter_text: false
@@ -88,7 +97,6 @@ display:
             html: false
           hide_empty: false
           empty_zero: false
-          link_to_node: true
           relationship: none
           group_type: group
           admin_label: ''
@@ -103,16 +111,21 @@ display:
           element_default_classes: true
           empty: ''
           hide_alter_empty: true
+          plugin_id: field
+          entity_type: node
+          entity_field: title
       filters:
         status:
           value: true
           table: node_field_data
           field: status
-          provider: node
           id: status
           expose:
             operator: '0'
-          group: '1'
+          group: 1
+          plugin_id: boolean
+          entity_type: node
+          entity_field: status
         tid:
           id: tid
           table: taxonomy_index
@@ -122,11 +135,11 @@ display:
           admin_label: ''
           operator: or
           value:
-            2: 2
+            - 2
           group: 1
           exposed: false
           expose:
-            operator_id: 0
+            operator_id: '0'
             label: ''
             description: ''
             use_operator: false
@@ -157,15 +170,9 @@ display:
           hierarchy: true
           error_message: true
           plugin_id: taxonomy_index_tid
-          provider: taxonomy
       sorts: {  }
       header: {  }
       footer: {  }
       empty: {  }
       relationships: {  }
       arguments: {  }
-label: test_filter_taxonomy_index_tid
-module: views
-id: test_filter_taxonomy_index_tid
-tag: ''
-langcode: en

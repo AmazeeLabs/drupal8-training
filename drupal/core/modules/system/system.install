@@ -8,9 +8,11 @@
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\Environment;
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Url;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\StreamWrapper\PrivateStream;
 use Drupal\Core\StreamWrapper\PublicStream;
 
 /**
@@ -59,7 +61,7 @@ function system_requirements($phase) {
     $requirements['php'] = array(
       'title' => t('PHP'),
       // $phpversion is safe and output of l() is safe, so this value is safe.
-      'value' => SafeMarkup::set(($phase == 'runtime') ? $phpversion . ' (' . l(t('more information'), 'admin/reports/status/php') . ')' : $phpversion),
+      'value' => SafeMarkup::set(($phase == 'runtime') ? $phpversion . ' (' . \Drupal::l(t('more information'), new Url('system.php')) . ')' : $phpversion),
     );
   }
   else {
@@ -87,7 +89,6 @@ function system_requirements($phase) {
   $required_extensions = array(
     'date',
     'dom',
-    'fileinfo',
     'filter',
     'gd',
     'hash',
@@ -111,11 +112,18 @@ function system_requirements($phase) {
       '@system_requirements' => 'http://drupal.org/requirements',
     ));
 
-    $item_list = array(
-      '#theme' => 'item_list',
-      '#items' => $missing_extensions,
+    // We use twig inline_template to avoid twig's autoescape.
+    $description = array(
+      '#type' => 'inline_template',
+      '#template' => '{{ description }}{{ missing_extensions }}',
+      '#context' => array(
+        'description' => $description,
+        'missing_extensions' => array(
+          '#theme' => 'item_list',
+          '#items' => $missing_extensions,
+        ),
+      ),
     );
-    $description .= drupal_render($item_list);
 
     $requirements['php_extensions']['value'] = t('Disabled');
     $requirements['php_extensions']['severity'] = REQUIREMENT_ERROR;
@@ -188,26 +196,38 @@ function system_requirements($phase) {
   );
 
   if (!Environment::checkMemoryLimit(DRUPAL_MINIMUM_PHP_MEMORY_LIMIT, $memory_limit)) {
-    $description = '';
+    $description = array();
     if ($phase == 'install') {
-      $description = t('Consider increasing your PHP memory limit to %memory_minimum_limit to help prevent errors in the installation process.', array('%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
+      $description['phase'] = t('Consider increasing your PHP memory limit to %memory_minimum_limit to help prevent errors in the installation process.', array('%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
     }
     elseif ($phase == 'update') {
-      $description = t('Consider increasing your PHP memory limit to %memory_minimum_limit to help prevent errors in the update process.', array('%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
+      $description['phase'] = t('Consider increasing your PHP memory limit to %memory_minimum_limit to help prevent errors in the update process.', array('%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
     }
     elseif ($phase == 'runtime') {
-      $description = t('Depending on your configuration, Drupal can run with a %memory_limit PHP memory limit. However, a %memory_minimum_limit PHP memory limit or above is recommended, especially if your site uses additional custom or contributed modules.', array('%memory_limit' => $memory_limit, '%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
+      $description['phase'] = t('Depending on your configuration, Drupal can run with a %memory_limit PHP memory limit. However, a %memory_minimum_limit PHP memory limit or above is recommended, especially if your site uses additional custom or contributed modules.', array('%memory_limit' => $memory_limit, '%memory_minimum_limit' => DRUPAL_MINIMUM_PHP_MEMORY_LIMIT));
     }
 
-    if (!empty($description)) {
+    if (!empty($description['phase'])) {
       if ($php_ini_path = get_cfg_var('cfg_file_path')) {
-        $description .= ' ' . t('Increase the memory limit by editing the memory_limit parameter in the file %configuration-file and then restart your web server (or contact your system administrator or hosting provider for assistance).', array('%configuration-file' => $php_ini_path));
+        $description['memory'] = t('Increase the memory limit by editing the memory_limit parameter in the file %configuration-file and then restart your web server (or contact your system administrator or hosting provider for assistance).', array('%configuration-file' => $php_ini_path));
       }
       else {
-        $description .= ' ' . t('Contact your system administrator or hosting provider for assistance with increasing your PHP memory limit.');
+        $description['memory'] = t('Contact your system administrator or hosting provider for assistance with increasing your PHP memory limit.');
       }
 
-      $requirements['php_memory_limit']['description'] = $description . ' ' . t('For more information, see the online handbook entry for <a href="@memory-limit">increasing the PHP memory limit</a>.', array('@memory-limit' => 'http://drupal.org/node/207036'));
+      $handbook_link = t('For more information, see the online handbook entry for <a href="@memory-limit">increasing the PHP memory limit</a>.', array('@memory-limit' => 'http://drupal.org/node/207036'));
+
+      $description = array(
+        '#type' => 'inline_template',
+        '#template' => '{{ description_phase }} {{ description_memory }} {{ handbook }}',
+        '#context' => array(
+          'description_phase' => $description['phase'],
+          'description_memory' => $description['memory'],
+          'handbook' => $handbook_link,
+        ),
+      );
+
+      $requirements['php_memory_limit']['description'] = $description;
       $requirements['php_memory_limit']['severity'] = REQUIREMENT_WARNING;
     }
   }
@@ -230,11 +250,17 @@ function system_requirements($phase) {
         $description = $conf_errors[0];
       }
       else {
-        $item_list = array(
-          '#theme' => 'item_list',
-          '#items' => $conf_errors,
+        // We use twig inline_template to avoid double escaping.
+        $description = array(
+          '#type' => 'inline_template',
+          '#template' => '{{ configuration_error_list }}',
+          '#context' => array(
+            'configuration_error_list' => array(
+              '#theme' => 'item_list',
+              '#items' => $conf_errors,
+            ),
+          ),
         );
-        $description = drupal_render($item_list);
       }
       $requirements['configuration_files'] = array(
         'value' => t('Not protected'),
@@ -259,7 +285,7 @@ function system_requirements($phase) {
       'title' => t('Public files directory'),
       'directory' => drupal_realpath('public://'),
     );
-    if (\Drupal::config('system.file')->get('path.private')) {
+    if (PrivateStream::basePath()) {
       $htaccess_files['private://.htaccess'] = array(
         'title' => t('Private files directory'),
         'directory' => drupal_realpath('private://'),
@@ -315,8 +341,8 @@ function system_requirements($phase) {
       $description = t('Cron has not run recently.') . ' ' . $help;
     }
 
-    $description .= ' ' . t('You can <a href="@cron">run cron manually</a>.', array('@cron' => url('admin/reports/status/run-cron')));
-    $description .= '<br />' . t('To run cron from outside the site, go to <a href="!cron">!cron</a>', array('!cron' => url('cron/' . \Drupal::state()->get('system.cron_key'), array('absolute' => TRUE))));
+    $description .= ' ' . t('You can <a href="@cron">run cron manually</a>.', array('@cron' => \Drupal::url('system.run_cron')));
+    $description .= '<br />' . t('To run cron from outside the site, go to <a href="!cron">!cron</a>', array('!cron' => \Drupal::url('system.cron', array('key' => \Drupal::state()->get('system.cron_key'), array('absolute' => TRUE)))));
 
     $requirements['cron'] = array(
       'title' => t('Cron maintenance tasks'),
@@ -335,7 +361,7 @@ function system_requirements($phase) {
       PublicStream::basePath(),
       // By default no private files directory is configured. For private files
       // to be secure the admin needs to provide a path outside the webroot.
-      $filesystem_config->get('path.private'),
+      PrivateStream::basePath(),
       file_directory_temp(),
     );
   }
@@ -352,8 +378,8 @@ function system_requirements($phase) {
       // in the intended site directory, so don't require it.
       $directories[] = conf_path(FALSE) . '/files';
     }
-    if (!empty($GLOBALS['config']['system.file']['path']['private'])) {
-      $directories[] = $GLOBALS['config']['system.file']['path']['private'];
+    if ($file_private_path = Settings::get('file_private_path')) {
+      $directories[] = $file_private_path;
     }
     if (!empty($GLOBALS['config']['system.file']['path']['temporary'])) {
       $directories[] = $GLOBALS['config']['system.file']['path']['temporary'];
@@ -369,8 +395,9 @@ function system_requirements($phase) {
   // defined, the installer will create a valid config directory later, but
   // during runtime we must always display an error.
   if (!empty($GLOBALS['config_directories'])) {
-    $directories[] = config_get_config_directory(CONFIG_ACTIVE_DIRECTORY);
-    $directories[] = config_get_config_directory(CONFIG_STAGING_DIRECTORY);
+    foreach ($GLOBALS['config_directories'] as $type => $directory) {
+      $directories[] = config_get_config_directory($type);
+    }
   }
   elseif ($phase != 'install') {
     $requirements['config directories'] = array(
@@ -400,22 +427,30 @@ function system_requirements($phase) {
       $description = '';
       $requirements['file system']['value'] = t('Not writable');
       if (!$is_directory) {
-        $error .= t('The directory %directory does not exist.', array('%directory' => $directory)) . ' ';
+        $error = t('The directory %directory does not exist.', array('%directory' => $directory));
       }
       else {
-        $error .= t('The directory %directory is not writable.', array('%directory' => $directory)) . ' ';
+        $error = t('The directory %directory is not writable.', array('%directory' => $directory));
       }
       // The files directory requirement check is done only during install and runtime.
       if ($phase == 'runtime') {
-        $description = $error . t('You may need to set the correct directory at the <a href="@admin-file-system">file system settings page</a> or change the current directory\'s permissions so that it is writable.', array('@admin-file-system' => url('admin/config/media/file-system')));
+        $description = t('You may need to set the correct directory at the <a href="@admin-file-system">file system settings page</a> or change the current directory\'s permissions so that it is writable.', array('@admin-file-system' => \Drupal::url('system.file_system_settings')));
       }
       elseif ($phase == 'install') {
         // For the installer UI, we need different wording. 'value' will
         // be treated as version, so provide none there.
-        $description = $error . t('An automated attempt to create this directory failed, possibly due to a permissions problem. To proceed with the installation, either create the directory and modify its permissions manually or ensure that the installer has the permissions to create it automatically. For more information, see INSTALL.txt or the <a href="@handbook_url">online handbook</a>.', array('@handbook_url' => 'http://drupal.org/server-permissions'));
+        $description = t('An automated attempt to create this directory failed, possibly due to a permissions problem. To proceed with the installation, either create the directory and modify its permissions manually or ensure that the installer has the permissions to create it automatically. For more information, see INSTALL.txt or the <a href="@handbook_url">online handbook</a>.', array('@handbook_url' => 'http://drupal.org/server-permissions'));
         $requirements['file system']['value'] = '';
       }
       if (!empty($description)) {
+        $description = array(
+          '#type' => 'inline_template',
+          '#template' => '{{ error }} {{ description }}',
+          '#context' => array(
+            'error' => $error,
+            'description' => $description,
+          ),
+        );
         $requirements['file system']['description'] = $description;
         $requirements['file system']['severity'] = REQUIREMENT_ERROR;
       }
@@ -447,7 +482,7 @@ function system_requirements($phase) {
         if (max($updates) > $default) {
           $requirements['update']['severity'] = REQUIREMENT_ERROR;
           $requirements['update']['value'] = t('Out of date');
-          $requirements['update']['description'] = t('Some modules have database schema updates to install. You should run the <a href="@update">database update script</a> immediately.', array('@update' => base_path() . 'core/update.php'));
+          $requirements['update']['description'] = t('Some modules have database schema updates to install. You should run the <a href="@update">database update script</a> immediately.', array('@update' => \Drupal::url('system.db_update')));
           break;
         }
       }
@@ -455,7 +490,7 @@ function system_requirements($phase) {
     if (!isset($requirements['update']['severity']) && \Drupal::service('entity.definition_update_manager')->needsUpdates()) {
       $requirements['update']['severity'] = REQUIREMENT_ERROR;
       $requirements['update']['value'] = t('Out of date');
-      $requirements['update']['description'] = t('Some modules have database schema updates to install. You should run the <a href="@update">database update script</a> immediately.', array('@update' => base_path() . 'update.php'));
+      $requirements['update']['description'] = t('Some modules have database schema updates to install. You should run the <a href="@update">database update script</a> immediately.', array('@update' => \Drupal::url('system.db_update')));
     }
   }
 
@@ -534,7 +569,10 @@ function system_requirements($phase) {
       $requirements['update status'] = array(
         'value' => t('Not enabled'),
         'severity' => REQUIREMENT_WARNING,
-        'description' => t('Update notifications are not enabled. It is <strong>highly recommended</strong> that you enable the Update Manager module from the <a href="@module">module administration page</a> in order to stay up-to-date on new releases. For more information, <a href="@update">Update status handbook page</a>.', array('@update' => 'http://drupal.org/documentation/modules/update', '@module' => url('admin/modules'))),
+        'description' => t('Update notifications are not enabled. It is <strong>highly recommended</strong> that you enable the Update Manager module from the <a href="@module">module administration page</a> in order to stay up-to-date on new releases. For more information, <a href="@update">Update status handbook page</a>.', array(
+          '@update' => 'http://drupal.org/documentation/modules/update',
+          '@module' => \Drupal::url('system.modules_list'),
+        )),
       );
     }
     else {
@@ -568,11 +606,33 @@ function system_requirements($phase) {
       $requirements['disabled_modules'] = array(
         'severity' => REQUIREMENT_ERROR,
         'title' => t('Disabled modules'),
-        'value' => format_plural(count($modules), 'The %modules module is disabled.', 'The following modules are disabled: %modules', array('%modules' => implode(', ', $modules))),
+        'value' => \Drupal::translation()->formatPlural(count($modules), 'The %modules module is disabled.', 'The following modules are disabled: %modules', array('%modules' => implode(', ', $modules))),
         'description' => t('Drupal 8 no longer supports disabled modules. Please either enable or uninstall them before upgrading.'),
       );
     }
   }
+
+  // See if trusted hostnames have been configured, and warn the user if they
+  // are not set.
+  if ($phase == 'runtime') {
+    $trusted_host_patterns = Settings::get('trusted_host_patterns');
+    if (empty($trusted_host_patterns)) {
+      $requirements['trusted_host_patterns'] = array(
+        'title' => t('Trusted Host Settings'),
+        'value' => t('Not enabled'),
+        'description' => t('The trusted_host_patterns setting is not configured in settings.php. This can lead to security vulnerabilities. It is <strong>highly recommended</strong> that you configure this. See <a href="@url">Protecting against HTTP HOST Header attacks</a> for more information.', array('@url' => 'https://www.drupal.org/node/1992030')),
+        'severity' => REQUIREMENT_ERROR,
+      );
+    }
+    else {
+      $requirements['trusted_host_patterns'] = array(
+        'title' => t('Trusted Host Settings'),
+        'value' => t('Enabled'),
+        'description' => t('The trusted_host_patterns setting is set to allow %trusted_host_patterns', array('%trusted_host_patterns' => join(', ', $trusted_host_patterns))),
+      );
+    }
+  }
+
   return $requirements;
 }
 
@@ -585,7 +645,7 @@ function system_install() {
   \Drupal::state()->set('system.cron_key', $cron_key);
 
   // Populate the site UUID.
-  \Drupal::config('system.site')
+  \Drupal::configFactory()->getEditable('system.site')
     ->set('uuid', \Drupal::service('uuid')->generate())
     ->save();
 }
@@ -887,13 +947,6 @@ function system_schema() {
         'length' => 128,
         'not null' => TRUE,
       ),
-      'ssid' => array(
-        'description' => "Secure session ID (hashed). The value is generated by Drupal's session handlers.",
-        'type' => 'varchar',
-        'length' => 128,
-        'not null' => TRUE,
-        'default' => '',
-      ),
       'hostname' => array(
         'description' => 'The IP address that last used this session ID (sid).',
         'type' => 'varchar',
@@ -916,12 +969,10 @@ function system_schema() {
     ),
     'primary key' => array(
       'sid',
-      'ssid',
     ),
     'indexes' => array(
       'timestamp' => array('timestamp'),
       'uid' => array('uid'),
-      'ssid' => array('ssid'),
     ),
     'foreign keys' => array(
       'session_user' => array(

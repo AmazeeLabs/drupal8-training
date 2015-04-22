@@ -7,12 +7,20 @@
 
 namespace Drupal\node\Tests;
 
+use Drupal\user\RoleInterface;
+
 /**
  * Tests node administration page functionality.
  *
  * @group node
  */
 class NodeAdminTest extends NodeTestBase {
+  /**
+   * A user with permission to bypass access content.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $adminUser;
 
   /**
    * Modules to enable.
@@ -27,9 +35,9 @@ class NodeAdminTest extends NodeTestBase {
     // Remove the "view own unpublished content" permission which is set
     // by default for authenticated users so we can test this permission
     // correctly.
-    user_role_revoke_permissions(DRUPAL_AUTHENTICATED_RID, array('view own unpublished content'));
+    user_role_revoke_permissions(RoleInterface::AUTHENTICATED_ID, array('view own unpublished content'));
 
-    $this->admin_user = $this->drupalCreateUser(array('access administration pages', 'access content overview', 'administer nodes', 'bypass node access'));
+    $this->adminUser = $this->drupalCreateUser(array('access administration pages', 'access content overview', 'administer nodes', 'bypass node access'));
     $this->base_user_1 = $this->drupalCreateUser(array('access content overview'));
     $this->base_user_2 = $this->drupalCreateUser(array('access content overview', 'view own unpublished content'));
     $this->base_user_3 = $this->drupalCreateUser(array('access content overview', 'bypass node access'));
@@ -39,7 +47,7 @@ class NodeAdminTest extends NodeTestBase {
    * Tests that the table sorting works on the content admin pages.
    */
   function testContentAdminSort() {
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
 
     $changed = REQUEST_TIME;
     foreach (array('dd', 'aa', 'DD', 'bb', 'cc', 'CC', 'AA', 'BB') as $prefix) {
@@ -87,7 +95,7 @@ class NodeAdminTest extends NodeTestBase {
    * @see TaxonomyNodeFilterTestCase
    */
   function testContentAdminPages() {
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
 
     $nodes['published_page'] = $this->drupalCreateNode(array('type' => 'page'));
     $nodes['published_article'] = $this->drupalCreateNode(array('type' => 'article'));
@@ -165,4 +173,5 @@ class NodeAdminTest extends NodeTestBase {
       $this->assertLinkByHref('node/' . $node->id() . '/delete');
     }
   }
+
 }

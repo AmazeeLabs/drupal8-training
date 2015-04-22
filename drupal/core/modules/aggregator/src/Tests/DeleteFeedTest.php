@@ -15,7 +15,7 @@ namespace Drupal\aggregator\Tests;
 class DeleteFeedTest extends AggregatorTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -24,7 +24,7 @@ class DeleteFeedTest extends AggregatorTestBase {
   /**
    * Deletes a feed and ensures that all of its services are deleted.
    */
-  function testDeleteFeed() {
+  public function testDeleteFeed() {
     $feed1 = $this->createFeed();
     $feed2 = $this->createFeed();
 

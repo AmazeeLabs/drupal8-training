@@ -26,12 +26,12 @@ class UserCreateFailMailTest extends WebTestBase {
   /**
    * Tests the create user administration page.
    */
-  protected function testUserAdd() {
+  public function testUserAdd() {
     $user = $this->drupalCreateUser(array('administer users'));
     $this->drupalLogin($user);
 
     // Replace the mail functionality with a fake, malfunctioning service.
-    \Drupal::config('system.mail')->set('interface.default', 'test_php_mail_failure')->save();
+    $this->config('system.mail')->set('interface.default', 'test_php_mail_failure')->save();
     // Create a user, but fail to send an email.
     $name = $this->randomMachineName();
     $edit = array(

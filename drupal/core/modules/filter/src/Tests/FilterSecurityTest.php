@@ -9,6 +9,7 @@ namespace Drupal\filter\Tests;
 
 use Drupal\simpletest\WebTestBase;
 use Drupal\filter\Plugin\FilterInterface;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests the behavior of check_markup() when a filter or text format vanishes,
@@ -29,9 +30,9 @@ class FilterSecurityTest extends WebTestBase {
   /**
    * A user with administrative permissions.
    *
-   * @var object
+   * @var \Drupal\user\UserInterface
    */
-  protected $admin_user;
+  protected $adminUser;
 
   protected function setUp() {
     parent::setUp();
@@ -42,10 +43,10 @@ class FilterSecurityTest extends WebTestBase {
     /** @var \Drupal\filter\Entity\FilterFormat $filtered_html_format */
     $filtered_html_format = entity_load('filter_format', 'filtered_html');
     $filtered_html_permission = $filtered_html_format->getPermissionName();
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array($filtered_html_permission));
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array($filtered_html_permission));
 
-    $this->admin_user = $this->drupalCreateUser(array('administer modules', 'administer filters', 'administer site configuration'));
-    $this->drupalLogin($this->admin_user);
+    $this->adminUser = $this->drupalCreateUser(array('administer modules', 'administer filters', 'administer site configuration'));
+    $this->drupalLogin($this->adminUser);
   }
 
   /**

@@ -17,7 +17,7 @@ use Drupal\Core\Utility\Error;
  * Disables any extensions that are incompatible with the current core version.
  */
 function update_fix_compatibility() {
-  $extension_config = \Drupal::config('core.extension');
+  $extension_config = \Drupal::configFactory()->getEditable('core.extension');
   $save = FALSE;
   foreach (array('module', 'theme') as $type) {
     foreach ($extension_config->get($type) as $name => $weight) {
@@ -44,7 +44,7 @@ function update_check_incompatibility($name, $type = 'module') {
     // We need to do a full rebuild here to make sure the database reflects any
     // code changes that were made in the filesystem before the update script
     // was initiated.
-    $themes = system_rebuild_theme_data();
+    $themes = \Drupal::service('theme_handler')->rebuildThemeData();
     $modules = system_rebuild_module_data();
   }
 
@@ -61,34 +61,6 @@ function update_check_incompatibility($name, $type = 'module') {
     return TRUE;
   }
   return FALSE;
-}
-
-/**
- * Returns whether the settings file requirement has been satisfied.
- *
- * @return array
- *  A requirements info array.
- */
-function update_settings_file_requirements() {
-  $requirements = array();
-
-  // Check whether settings.php needs to be rewritten.
-  $settings_file = conf_path() . '/settings.php';
-  $writable = drupal_verify_install_file($settings_file, FILE_EXIST | FILE_READABLE | FILE_WRITABLE);
-  $requirements['settings file']['title'] = 'Settings file';
-  if ($writable) {
-    $requirements['settings file'] += array(
-      'value' => 'settings.php is writable.',
-    );
-  }
-  else {
-    $requirements['settings file'] += array(
-      'value' => 'settings.php is not writable.',
-      'severity' => REQUIREMENT_ERROR,
-      'description' => 'Drupal requires write permissions to <em>' . $settings_file . '</em> during the update process. If you are unsure how to grant file permissions, consult the <a href="http://drupal.org/server-permissions">online handbook</a>.',
-    );
-  }
-  return $requirements;
 }
 
 /**
@@ -127,7 +99,6 @@ function update_check_requirements() {
   // Check requirements of all loaded modules.
   $requirements = \Drupal::moduleHandler()->invokeAll('requirements', array('update'));
   $requirements += update_system_schema_requirements();
-  $requirements += update_settings_file_requirements();
   return $requirements;
 }
 
@@ -150,6 +121,8 @@ function update_set_schema($module, $schema_version) {
 }
 
 /**
+ * Implements callback_batch_operation().
+ *
  * Performs one update and stores the results for display on the results page.
  *
  * If an update function completes successfully, it should return a message
@@ -691,9 +664,9 @@ function update_replace_permissions($replace) {
  * @param $flags
  *   (optional) Specifies the state of the languages that have to be returned.
  *   It can be: LanguageInterface::STATE_CONFIGURABLE,
- *   LanguageInterface::STATE_LOCKED, LanguageInterface::STATE_ALL.
+ *   LanguageInterface::STATE_LOCKED, or LanguageInterface::STATE_ALL.
  *
- * @return array
+ * @return \Drupal\Core\Language\LanguageInterface[]
  *   An associative array of languages, keyed by the language code, ordered by
  *   weight ascending and name ascending.
  */
@@ -719,7 +692,7 @@ function update_language_list($flags = LanguageInterface::STATE_CONFIGURABLE) {
         $langcode = substr($langcode_config_name, strlen('language.entity.'));
         $info = \Drupal::config($langcode_config_name)->get();
         $languages[$langcode] = new Language(array(
-          'default' => ($info['id'] == $default->id),
+          'default' => ($info['id'] == $default->getId()),
           'name' => $info['label'],
           'id' => $info['id'],
           'direction' => $info['direction'],
@@ -731,9 +704,9 @@ function update_language_list($flags = LanguageInterface::STATE_CONFIGURABLE) {
     }
     else {
       // No language module, so use the default language only.
-      $languages = array($default->id => $default);
+      $languages = array($default->getId() => $default);
       // Add the special languages, they will be filtered later if needed.
-      $languages += \Drupal::languageManager()->getDefaultLockedLanguages($default->weight);
+      $languages += \Drupal::languageManager()->getDefaultLockedLanguages($default->getWeight());
     }
   }
 
@@ -744,16 +717,16 @@ function update_language_list($flags = LanguageInterface::STATE_CONFIGURABLE) {
 
   // Add the site's default language if flagged as allowed value.
   if ($flags & LanguageInterface::STATE_SITE_DEFAULT) {
-    $default = isset($default) ? $default : \Drupal::languageManager()->getDefaultLanguage();
+    $default = \Drupal::languageManager()->getDefaultLanguage();
     // Rename the default language.
-    $default->name = t("Site's default language (@lang_name)", array('@lang_name' => $default->name));
-    $filtered_languages['site_default'] = $default;
+    $default->setName(t("Site's default language (@lang_name)", array('@lang_name' => $default->getName())));
+    $filtered_languages[LanguageInterface::LANGCODE_SITE_DEFAULT] = $default;
   }
 
   foreach ($languages as $langcode => $language) {
-    if (($language->locked && !($flags & LanguageInterface::STATE_LOCKED)) || (!$language->locked && !($flags & LanguageInterface::STATE_CONFIGURABLE))) {
+    if (($language->isLocked() && !($flags & LanguageInterface::STATE_LOCKED)) || (!$language->isLocked() && !($flags & LanguageInterface::STATE_CONFIGURABLE))) {
       continue;
-     }
+    }
     $filtered_languages[$langcode] = $language;
   }
 

@@ -26,9 +26,9 @@ abstract class ConfigEntityBundleBase extends ConfigEntityBase {
     // Rename entity displays.
     if ($this->getOriginalId() !== $this->id()) {
       foreach ($this->loadDisplays('entity_view_display') as $display) {
-        $new_id = $this->getEntityType()->getBundleOf() . '.' . $this->id() . '.' . $display->mode;
+        $new_id = $this->getEntityType()->getBundleOf() . '.' . $this->id() . '.' . $display->getMode();
         $display->set('id', $new_id);
-        $display->bundle = $this->id();
+        $display->setTargetBundle($this->id());
         $display->save();
       }
     }
@@ -36,9 +36,9 @@ abstract class ConfigEntityBundleBase extends ConfigEntityBase {
     // Rename entity form displays.
     if ($this->getOriginalId() !== $this->id()) {
       foreach ($this->loadDisplays('entity_form_display') as $form_display) {
-        $new_id = $this->getEntityType()->getBundleOf() . '.' . $this->id() . '.' . $form_display->mode;
+        $new_id = $this->getEntityType()->getBundleOf() . '.' . $this->id() . '.' . $form_display->getMode();
         $form_display->set('id', $new_id);
-        $form_display->bundle = $this->id();
+        $form_display->setTargetBundle($this->id());
         $form_display->save();
       }
     }
@@ -67,12 +67,25 @@ abstract class ConfigEntityBundleBase extends ConfigEntityBase {
   public function postSave(EntityStorageInterface $storage, $update = TRUE) {
     parent::postSave($storage, $update);
 
+    $entity_manager = $this->entityManager();
+    $bundle_of = $this->getEntityType()->getBundleOf();
     if (!$update) {
-      $this->entityManager()->onBundleCreate($this->getEntityType()->getBundleOf(), $this->id());
+      $entity_manager->onBundleCreate($this->id(), $bundle_of);
     }
-    elseif ($this->getOriginalId() != $this->id()) {
-      $this->renameDisplays();
-      $this->entityManager()->onBundleRename($this->getEntityType()->getBundleOf(), $this->getOriginalId(), $this->id());
+    else {
+      // Invalidate the render cache of entities for which this entity
+      // is a bundle.
+      if ($entity_manager->hasHandler($bundle_of, 'view_builder')) {
+        $entity_manager->getViewBuilder($bundle_of)->resetCache();
+      }
+      // Entity bundle field definitions may depend on bundle settings.
+      $entity_manager->clearCachedFieldDefinitions();
+
+      if ($this->getOriginalId() != $this->id()) {
+        // If the entity was renamed, update the displays.
+        $this->renameDisplays();
+        $entity_manager->onBundleRename($this->getOriginalId(), $this->id(), $bundle_of);
+      }
     }
   }
 
@@ -84,7 +97,7 @@ abstract class ConfigEntityBundleBase extends ConfigEntityBase {
 
     foreach ($entities as $entity) {
       $entity->deleteDisplays();
-      \Drupal::entityManager()->onBundleDelete($entity->getEntityType()->getBundleOf(), $entity->id());
+      \Drupal::entityManager()->onBundleDelete($entity->id(), $entity->getEntityType()->getBundleOf());
     }
   }
 

@@ -7,10 +7,12 @@
 
 namespace Drupal\taxonomy\Tests\Views;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Language\Language;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\user\Entity\Role;
+use Drupal\user\RoleInterface;
+use Drupal\views\Views;
 
 /**
  * Tests the taxonomy term view page and its translation.
@@ -27,20 +29,34 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
   public static $modules = array('taxonomy', 'views');
 
   /**
+   * An user with permissions to administer taxonomy.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $adminUser;
+
+  /**
+   * Name of the taxonomy term reference field.
+   *
+   * @var string
+   */
+  protected $fieldName1;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
 
     // Create an administrative user.
-    $this->admin_user = $this->drupalCreateUser(array('administer taxonomy', 'bypass node access'));
-    $this->drupalLogin($this->admin_user);
+    $this->adminUser = $this->drupalCreateUser(['administer taxonomy', 'bypass node access']);
+    $this->drupalLogin($this->adminUser);
 
     // Create a vocabulary and add two term reference fields to article nodes.
 
-    $this->field_name_1 = drupal_strtolower($this->randomMachineName());
+    $this->fieldName1 = Unicode::strtolower($this->randomMachineName());
     entity_create('field_storage_config', array(
-      'name' => $this->field_name_1,
+      'field_name' => $this->fieldName1,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -54,17 +70,17 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
       ),
     ))->save();
     entity_create('field_config', array(
-      'field_name' => $this->field_name_1,
+      'field_name' => $this->fieldName1,
       'bundle' => 'article',
       'entity_type' => 'node',
     ))->save();
     entity_get_form_display('node', 'article', 'default')
-      ->setComponent($this->field_name_1, array(
+      ->setComponent($this->fieldName1, array(
         'type' => 'options_select',
       ))
       ->save();
     entity_get_display('node', 'article', 'default')
-      ->setComponent($this->field_name_1, array(
+      ->setComponent($this->fieldName1, array(
         'type' => 'taxonomy_term_reference_link',
       ))
       ->save();
@@ -81,7 +97,7 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
     $edit = array();
     $edit['title[0][value]'] = $original_title = $this->randomMachineName();
     $edit['body[0][value]'] = $this->randomMachineName();
-    $edit["{$this->field_name_1}[]"] = $term->id();
+    $edit["{$this->fieldName1}[]"] = $term->id();
     $this->drupalPostForm('node/add/article', $edit, t('Save'));
     $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
 
@@ -89,13 +105,13 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
     $this->assertText($term->label());
     $this->assertText($node->label());
 
-    \Drupal::moduleHandler()->install(array('language', 'content_translation'));
+    \Drupal::service('module_installer')->install(array('language', 'content_translation'));
     $language = ConfigurableLanguage::createFromLangcode('ur');
     $language->save();
     // Enable translation for the article content type and ensure the change is
     // picked up.
-    content_translation_set_config('node', 'article', 'enabled', TRUE);
-    $roles = $this->admin_user->getRoles(TRUE);
+    \Drupal::service('content_translation.manager')->setEnabled('node', 'article', TRUE);
+    $roles = $this->adminUser->getRoles(TRUE);
     Role::load(reset($roles))
       ->grantPermission('create content translations')
       ->grantPermission('translate any entity')
@@ -103,6 +119,7 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
     drupal_static_reset();
     \Drupal::entityManager()->clearCachedDefinitions();
     \Drupal::service('router.builder')->rebuild();
+    \Drupal::service('entity.definition_update_manager')->applyUpdates();
 
     $edit['title[0][value]'] = $translated_title = $this->randomMachineName();
 
@@ -117,6 +134,38 @@ class TaxonomyTermViewTest extends TaxonomyTestBase {
     $this->assertText($term->label());
     $this->assertNoText($original_title);
     $this->assertText($translated_title);
+
+    // Uninstall language module and ensure that the language is not part of the
+    // query anymore.
+    // @see \Drupal\views\Plugin\views\filter\LanguageFilter::query()
+    $node->delete();
+    \Drupal::service('module_installer')->uninstall(['content_translation', 'language']);
+
+    $view = Views::getView('taxonomy_term');
+    $view->initDisplay();
+    $view->setArguments([$term->id()]);
+    $view->build();
+    /** @var \Drupal\Core\Database\Query\Select $query */
+    $query = $view->build_info['query'];
+    $tables = $query->getTables();
+
+    // Ensure that the join to node_field_data is not added by default.
+    $this->assertEqual(['node_field_data', 'taxonomy_index'], array_keys($tables));
+    // Ensure that the filter to the language column is not there by default.
+    $condition = $query->conditions();
+    // We only want to check the no. of conditions in the query.
+    unset($condition['#conjunction']);
+    $this->assertEqual(1, count($condition));
+
+    // Clear permissions for anonymous users to check access for default views.
+    Role::load(RoleInterface::ANONYMOUS_ID)->revokePermission('access content')->save();
+
+    // Test the default views disclose no data by default.
+    $this->drupalLogout();
+    $this->drupalGet('taxonomy/term/' . $term->id());
+    $this->assertResponse(403);
+    $this->drupalGet('taxonomy/term/' . $term->id() . '/feed');
+    $this->assertResponse(403);
   }
 
 }

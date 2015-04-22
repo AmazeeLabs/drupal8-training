@@ -8,6 +8,7 @@
 namespace Drupal\system\Tests\Installer;
 
 use Drupal\simpletest\InstallerTestBase;
+use Drupal\user\Entity\User;
 
 /**
  * Selects German as the installation language and verifies the following page
@@ -29,8 +30,8 @@ class InstallerTranslationTest extends InstallerTestBase {
    */
   protected function setUpLanguage() {
     // Place a custom local translation in the translations directory.
-    mkdir(DRUPAL_ROOT . '/' . $this->siteDirectory . '/files/translations', 0777, TRUE);
-    file_put_contents(DRUPAL_ROOT . '/' . $this->siteDirectory . '/files/translations/drupal-8.0.0.de.po', "msgid \"\"\nmsgstr \"\"\nmsgid \"Save and continue\"\nmsgstr \"Save and continue German\"");
+    mkdir(\Drupal::root() . '/' . $this->siteDirectory . '/files/translations', 0777, TRUE);
+    file_put_contents(\Drupal::root() . '/' . $this->siteDirectory . '/files/translations/drupal-8.0.0.de.po', "msgid \"\"\nmsgstr \"\"\nmsgid \"Save and continue\"\nmsgstr \"Save and continue German\"");
 
     parent::setUpLanguage();
     // After selecting a different language than English, all following screens
@@ -51,6 +52,13 @@ class InstallerTranslationTest extends InstallerTestBase {
     $this->assertUrl('user/1');
     $this->assertResponse(200);
 
+    $account = User::load(0);
+    $this->assertEqual($account->language()->getId(), 'en', 'Anonymous user is English.');
+    $account = User::load(1);
+    $this->assertEqual($account->language()->getId(), 'en', 'Administrator user is English.');
+    $account = $this->drupalCreateUser();
+    $this->assertEqual($account->language()->getId(), 'de', 'New user is German.');
+
     // Ensure that we can enable basic_auth on a non-english site.
     $this->drupalPostForm('admin/modules', array('modules[Web services][basic_auth][enable]' => TRUE), t('Save configuration'));
     $this->assertResponse(200);
@@ -59,7 +67,7 @@ class InstallerTranslationTest extends InstallerTestBase {
     $edit = array('preprocess_css' => FALSE);
     $this->drupalPostForm('admin/config/development/performance', $edit, t('Save configuration'));
     $this->drupalGet('<front>');
-    $this->assertRaw('stark/css/layout.css');
+    $this->assertRaw('classy/css/layout.css');
   }
 
 }

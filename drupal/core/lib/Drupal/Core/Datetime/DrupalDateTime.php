@@ -14,6 +14,11 @@ use Drupal\Component\Datetime\DateTimePlus;
  * This class extends the basic component and adds in Drupal-specific
  * handling, like translation of the format() method.
  *
+ * Static methods in base class can also be used to create DrupalDateTime objects.
+ * For example:
+ *
+ * DrupalDateTime::createFromArray( array('year' => 2010, 'month' => 9, 'day' => 28) )
+ *
  * @see \Drupal/Component/Datetime/DateTimePlus.php
  */
 class DrupalDateTime extends DateTimePlus {
@@ -21,9 +26,8 @@ class DrupalDateTime extends DateTimePlus {
   /**
    * Constructs a date object.
    *
-   * @param mixed $time
-   *   A DateTime object, a date/input_time_adjusted string, a unix timestamp,
-   *   or an array of date parts, like ('year' => 2014, 'month => 4).
+   * @param string $time
+   *   A DateTime object, a date/input_time_adjusted string, a unix timestamp.
    *   Defaults to 'now'.
    * @param mixed $timezone
    *   PHP DateTimeZone object, string or NULL allowed.
@@ -43,7 +47,7 @@ class DrupalDateTime extends DateTimePlus {
    */
   public function __construct($time = 'now', $timezone = NULL, $settings = array()) {
     if (!isset($settings['langcode'])) {
-      $settings['langcode'] = \Drupal::languageManager()->getCurrentLanguage()->id;
+      $settings['langcode'] = \Drupal::languageManager()->getCurrentLanguage()->getId();
     }
 
     // Instantiate the parent class.
@@ -58,9 +62,9 @@ class DrupalDateTime extends DateTimePlus {
    * knowledge of the preferred user timezone.
    */
   protected function prepareTimezone($timezone) {
-    $user_timezone = drupal_get_user_timezone();
-    if (empty($timezone) && !empty($user_timezone)) {
-      $timezone = $user_timezone;
+    if (empty($timezone)) {
+      // Fallback to user or system default timezone.
+      $timezone = drupal_get_user_timezone();
     }
     return parent::prepareTimezone($timezone);
   }

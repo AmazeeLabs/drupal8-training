@@ -13,17 +13,20 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\OptionsProviderInterface;
+use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
  * Plugin implementation of the 'term_reference' field type.
  *
  * @FieldType(
  *   id = "taxonomy_term_reference",
- *   label = @Translation("Term Reference"),
+ *   label = @Translation("Taxonomy term"),
  *   description = @Translation("This field stores a reference to a taxonomy term."),
+ *   category = @Translation("Reference"),
  *   default_widget = "options_select",
  *   default_formatter = "taxonomy_term_reference_link",
- *   list_class = "\Drupal\Core\Field\EntityReferenceFieldItemList"
+ *   list_class = "\Drupal\Core\Field\EntityReferenceFieldItemList",
+ *   constraints = {"ValidReference" = {}}
  * )
  */
 class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsProviderInterface {
@@ -42,6 +45,15 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsPr
         ),
       ),
     ) + parent::defaultStorageSettings();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function defaultFieldSettings() {
+    return array(
+      'handler' => 'default:taxonomy_term',
+    ) + parent::defaultFieldSettings();
   }
 
   /**
@@ -67,8 +79,9 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsPr
   public function getSettableValues(AccountInterface $account = NULL) {
     // Flatten options firstly, because Settable Options may contain group
     // arrays.
-    $flatten_options = OptGroup::flattenOptions($this->getSettableOptions($account));
-    return array_keys($flatten_options);
+    $values = array_keys(OptGroup::flattenOptions($this->getSettableOptions($account)));
+    $values[] = static::$NEW_ENTITY_MARKER;
+    return $values;
   }
 
   /**
@@ -81,7 +94,7 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsPr
     else {
       $options = array();
       foreach ($this->getSetting('allowed_values') as $tree) {
-        if ($vocabulary = entity_load('taxonomy_vocabulary', $tree['vocabulary'])) {
+        if ($vocabulary = Vocabulary::load($tree['vocabulary'])) {
           if ($terms = taxonomy_get_tree($vocabulary->id(), $tree['parent'], NULL, TRUE)) {
             foreach ($terms as $term) {
               $options[$term->id()] = str_repeat('-', $term->depth) . $term->getName();
@@ -102,7 +115,6 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsPr
         'target_id' => array(
           'type' => 'int',
           'unsigned' => TRUE,
-          'not null' => FALSE,
         ),
       ),
       'indexes' => array(
@@ -121,10 +133,10 @@ class TaxonomyTermReferenceItem extends EntityReferenceItem implements OptionsPr
    * {@inheritdoc}
    */
   public function storageSettingsForm(array &$form, FormStateInterface $form_state, $has_data) {
-    $vocabularies = entity_load_multiple('taxonomy_vocabulary');
+    $vocabularies = Vocabulary::loadMultiple();
     $options = array();
     foreach ($vocabularies as $vocabulary) {
-      $options[$vocabulary->id()] = $vocabulary->name;
+      $options[$vocabulary->id()] = $vocabulary->label();
     }
 
     $element = array();

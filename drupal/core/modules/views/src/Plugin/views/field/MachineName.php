@@ -46,24 +46,33 @@ class MachineName extends FieldPluginBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['machine_name'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['machine_name'] = array('default' => FALSE);
 
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
     $form['machine_name'] = array(
-      '#title' => t('Output machine name'),
-      '#description' => t('Display field as machine name.'),
+      '#title' => $this->t('Output machine name'),
+      '#description' => $this->t('Display field as machine name.'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['machine_name']),
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function preRender(&$values) {
     $this->getValueOptions();
   }

@@ -9,6 +9,7 @@ namespace Drupal\image\Tests;
 
 use Drupal\Component\Utility\String;
 use Drupal\image\ImageStyleInterface;
+use Drupal\node\Entity\Node;
 
 /**
  * Tests creation, deletion, and editing of image styles and effects.
@@ -245,7 +246,7 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
       'Effect with ID %uuid no longer found on image style %style',
       array(
         '%uuid' => $uuids['image_crop'],
-        '%style' => $style->label,
+        '%style' => $style->label(),
       )));
 
     // Additional test on Rotate effect, for transparent background.
@@ -295,8 +296,8 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
 
     // Create a new node with an image attached.
     $test_image = current($this->drupalGetTestFiles('image'));
-    $nid = $this->uploadNodeImage($test_image, $field_name, 'article');
-    $node = node_load($nid);
+    $nid = $this->uploadNodeImage($test_image, $field_name, 'article', $this->randomMachineName());
+    $node = Node::load($nid);
 
     // Get node field original image URI.
     $fid = $node->get($field_name)->target_id;
@@ -326,7 +327,7 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
       'replacement' => 'thumbnail',
     );
     $this->drupalPostForm($style_path . $new_style_name . '/delete', $edit, t('Delete'));
-    $message = t('Style %name was deleted.', array('%name' => $new_style_label));
+    $message = t('The image style %name has been deleted.', array('%name' => $new_style_label));
     $this->assertRaw($message);
 
     $replacement_style = entity_load('image_style', 'thumbnail');
@@ -344,15 +345,15 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
     $this->drupalPostForm(NULL, array('label' => 'Test style effect edit', 'name' => $style_name), t('Create new style'));
     $this->drupalPostForm(NULL, array('new' => 'image_scale_and_crop'), t('Add'));
     $this->drupalPostForm(NULL, array('data[width]' => '300', 'data[height]' => '200'), t('Add effect'));
-    $this->assertText(t('Scale and crop 300x200'));
+    $this->assertText(t('Scale and crop 300×200'));
 
     // There should normally be only one edit link on this page initially.
     $this->clickLink(t('Edit'));
     $this->drupalPostForm(NULL, array('data[width]' => '360', 'data[height]' => '240'), t('Update effect'));
-    $this->assertText(t('Scale and crop 360x240'));
+    $this->assertText(t('Scale and crop 360×240'));
 
     // Check that the previous effect is replaced.
-    $this->assertNoText(t('Scale and crop 300x200'));
+    $this->assertNoText(t('Scale and crop 300×200'));
 
     // Add another scale effect.
     $this->drupalGet('admin/config/media/image-styles/add');
@@ -367,8 +368,8 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
 
     // Add another scale effect and make sure both exist.
     $this->drupalPostForm(NULL, array('data[width]' => '12', 'data[height]' => '19'), t('Add effect'));
-    $this->assertText(t('Scale 24x19'));
-    $this->assertText(t('Scale 12x19'));
+    $this->assertText(t('Scale 24×19'));
+    $this->assertText(t('Scale 12×19'));
 
     // Try to edit a nonexistent effect.
     $uuid = $this->container->get('uuid');
@@ -429,8 +430,8 @@ class ImageAdminStylesTest extends ImageFieldTestBase {
 
     // Create a new node with an image attached.
     $test_image = current($this->drupalGetTestFiles('image'));
-    $nid = $this->uploadNodeImage($test_image, $field_name, 'article');
-    $node = node_load($nid);
+    $nid = $this->uploadNodeImage($test_image, $field_name, 'article', $this->randomMachineName());
+    $node = Node::load($nid);
 
     // Get node field original image URI.
     $fid = $node->get($field_name)->target_id;

@@ -15,16 +15,10 @@ use Drupal\views\ResultRow;
 class DefaultLanguageRenderer extends RendererBase {
 
   /**
-   * Returns the language code associated to the given row.
-   *
-   * @param \Drupal\views\ResultRow $row
-   *   The result row.
-   *
-   * @return string
-   *   A language code.
+   * {@inheritdoc}
    */
-  protected function getLangcode(ResultRow $row) {
-    return $row->_entity->getUntranslated()->language()->id;
+  public function getLangcode(ResultRow $row) {
+    return $row->_entity->getUntranslated()->language()->getId();
   }
 
 }

@@ -5,7 +5,7 @@
  * Administration functions for editor.module.
  */
 
-use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\editor\Entity\Editor;
 
 /**
@@ -51,10 +51,7 @@ function editor_image_upload_settings_form(Editor $editor) {
 
   // Any visible, writable wrapper can potentially be used for uploads,
   // including a remote file system that integrates with a CDN.
-  $stream_wrappers = file_get_stream_wrappers(STREAM_WRAPPERS_WRITE_VISIBLE);
-  foreach ($stream_wrappers as $scheme => $info) {
-    $options[$scheme] = $info['description'];
-  }
+  $options = \Drupal::service('stream_wrapper_manager')->getDescriptions(StreamWrapperInterface::WRITE_VISIBLE);
   if (!empty($options)) {
     $form['scheme'] = array(
       '#type' => 'radios',
@@ -68,8 +65,8 @@ function editor_image_upload_settings_form(Editor $editor) {
   // Set data- attributes with human-readable names for all possible stream
   // wrappers, so that drupal.ckeditor.drupalimage.admin's summary rendering
   // can use that.
-  foreach ($stream_wrappers as $scheme => $info) {
-    $form['scheme'][$scheme]['#attributes']['data-label'] = t('Storage: @name', array('@name' => $info['name']));
+  foreach (\Drupal::service('stream_wrapper_manager')->getNames(StreamWrapperInterface::WRITE_VISIBLE) as $scheme => $name) {
+    $form['scheme'][$scheme]['#attributes']['data-label'] = t('Storage: @name', array('@name' => $name));
   }
 
   $form['directory'] = array(
@@ -95,8 +92,8 @@ function editor_image_upload_settings_form(Editor $editor) {
   $form['max_dimensions'] = array(
     '#type' => 'item',
     '#title' => t('Maximum dimensions'),
-    '#field_prefix' => SafeMarkup::set('<div class="container-inline clearfix">'),
-    '#field_suffix' => SafeMarkup::set('</div>'),
+    '#field_prefix' => '<div class="container-inline clearfix">',
+    '#field_suffix' => '</div>',
     '#description' => t('Images larger than these dimensions will be scaled down.'),
     '#states' => $show_if_image_uploads_enabled,
   );

@@ -7,9 +7,11 @@
 
 namespace Drupal\tour\Tests;
 
+use Drupal\Core\Url;
 use Drupal\system\Tests\Cache\PageCacheTagsTestBase;
 use Drupal\tour\Entity\Tour;
 use Drupal\user\Entity\Role;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests the Tour entity's cache tags.
@@ -31,7 +33,7 @@ class TourCacheTagsTest extends PageCacheTagsTestBase {
 
     // Give anonymous users permission to view nodes, so that we can verify the
     // cache tags of cached versions of node pages.
-    Role::load(DRUPAL_ANONYMOUS_RID)->grantPermission('access tour')
+    Role::load(RoleInterface::ANONYMOUS_ID)->grantPermission('access tour')
      ->save();
   }
 
@@ -39,38 +41,39 @@ class TourCacheTagsTest extends PageCacheTagsTestBase {
    * Tests cache tags presence and invalidation of the Tour entity.
    *
    * Tests the following cache tags:
-   * - ['tour' => '<tour ID>']
+   * - 'tour:<tour ID>'
    */
   public function testRenderedTour() {
-    $path = 'tour-test-1';
+    $url = Url::fromRoute('tour_test.1');
 
     // Prime the page cache.
-    $this->verifyPageCache($path, 'MISS');
+    $this->verifyPageCache($url, 'MISS');
 
     // Verify a cache hit, but also the presence of the correct cache tags.
-    $expected_tags = array(
-      'theme:stark',
-      'theme_global_settings:1',
-      'tour:tour-test',
-      'rendered:1',
-    );
-    $this->verifyPageCache($path, 'HIT', $expected_tags);
+    $expected_tags = [
+      'config:tour.tour.tour-test',
+      'rendered',
+    ];
+    $this->verifyPageCache($url, 'HIT', $expected_tags);
 
     // Verify that after modifying the tour, there is a cache miss.
     $this->pass('Test modification of tour.', 'Debug');
     Tour::load('tour-test')->save();
-    $this->verifyPageCache($path, 'MISS');
+    $this->verifyPageCache($url, 'MISS');
 
     // Verify a cache hit.
-    $this->verifyPageCache($path, 'HIT', $expected_tags);
+    $this->verifyPageCache($url, 'HIT', $expected_tags);
 
     // Verify that after deleting the tour, there is a cache miss.
     $this->pass('Test deletion of tour.', 'Debug');
     Tour::load('tour-test')->delete();
-    $this->verifyPageCache($path, 'MISS');
+    $this->verifyPageCache($url, 'MISS');
 
     // Verify a cache hit.
-    $this->verifyPageCache($path, 'HIT', array('rendered:1', 'theme:stark', 'theme_global_settings:1'));
+    $expected_tags = [
+      'rendered',
+    ];
+    $this->verifyPageCache($url, 'HIT', $expected_tags);
   }
 
 }

@@ -9,9 +9,11 @@ namespace Drupal\rest\LinkManager;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Utility\UnroutedUrlAssemblerInterface;
 
-class RelationLinkManager implements RelationLinkManagerInterface{
+class RelationLinkManager implements RelationLinkManagerInterface {
 
   /**
    * @var \Drupal\Core\Cache\CacheBackendInterface;
@@ -26,28 +28,37 @@ class RelationLinkManager implements RelationLinkManagerInterface{
   protected $entityManager;
 
   /**
+   * The unrouted URL assembler.
+   *
+   * @var \Drupal\Core\Utility\UnroutedUrlAssemblerInterface
+   */
+  protected $urlAssembler;
+
+  /**
    * Constructor.
    *
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
    *   The cache of relation URIs and their associated Typed Data IDs.
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
+   * @param \Drupal\Core\Utility\UnroutedUrlAssemblerInterface $url_assembler
+   *   The unrouted URL assembler.
    */
-  public function __construct(CacheBackendInterface $cache, EntityManagerInterface $entity_manager) {
+  public function __construct(CacheBackendInterface $cache, EntityManagerInterface $entity_manager, UnroutedUrlAssemblerInterface $url_assembler) {
     $this->cache = $cache;
     $this->entityManager = $entity_manager;
+    $this->urlAssembler = $url_assembler;
   }
 
   /**
-   * Implements \Drupal\rest\LinkManager\RelationLinkManagerInterface::getRelationUri().
+   * {@inheritdoc}
    */
   public function getRelationUri($entity_type, $bundle, $field_name) {
-    // @todo Make the base path configurable.
-    return url("rest/relation/$entity_type/$bundle/$field_name", array('absolute' => TRUE));
+    return $this->urlAssembler->assemble("base:rest/relation/$entity_type/$bundle/$field_name", array('absolute' => TRUE));
   }
 
   /**
-   * Implements \Drupal\rest\LinkManager\RelationLinkManagerInterface::getRelationInternalIds().
+   * {@inheritdoc}
    */
   public function getRelationInternalIds($relation_uri) {
     $relations = $this->getRelations();
@@ -70,7 +81,7 @@ class RelationLinkManager implements RelationLinkManagerInterface{
    *   An array of typed data ids (entity_type, bundle, and field name) keyed
    *   by corresponding relation URI.
    */
-  public function getRelations() {
+  protected function getRelations() {
     $cid = 'rest:links:relations';
     $cache = $this->cache->get($cid);
     if (!$cache) {
@@ -87,7 +98,7 @@ class RelationLinkManager implements RelationLinkManagerInterface{
     $data = array();
 
     foreach ($this->entityManager->getDefinitions() as $entity_type) {
-      if ($entity_type->isFieldable()) {
+      if ($entity_type instanceof ContentEntityTypeInterface) {
         foreach ($this->entityManager->getBundleInfo($entity_type->id()) as $bundle => $bundle_info) {
           foreach ($this->entityManager->getFieldDefinitions($entity_type->id(), $bundle) as $field_definition) {
             $relation_uri = $this->getRelationUri($entity_type->id(), $bundle, $field_definition->getName());
@@ -102,6 +113,6 @@ class RelationLinkManager implements RelationLinkManagerInterface{
     }
     // These URIs only change when field info changes, so cache it permanently
     // and only clear it when the fields cache is cleared.
-    $this->cache->set('rest:links:relations', $data, Cache::PERMANENT, array('entity_field_info' => TRUE));
+    $this->cache->set('rest:links:relations', $data, Cache::PERMANENT, array('entity_field_info'));
   }
 }

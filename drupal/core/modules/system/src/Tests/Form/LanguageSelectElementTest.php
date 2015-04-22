@@ -55,8 +55,10 @@ class LanguageSelectElementTest extends WebTestBase {
     foreach ($ids as $id => $flags) {
       $this->assertField($id, format_string('The @id field was found on the page.', array('@id' => $id)));
       $options = array();
-      foreach ($this->container->get('language_manager')->getLanguages($flags) as $langcode => $language) {
-        $options[$langcode] = $language->locked ? t('- @name -', array('@name' => $language->name)) : $language->name;
+      /* @var $language_manager \Drupal\Core\Language\LanguageManagerInterface */
+      $language_manager = $this->container->get('language_manager');
+      foreach ($language_manager->getLanguages($flags) as $langcode => $language) {
+        $options[$langcode] = $language->isLocked() ? t('- @name -', array('@name' => $language->getName())) : $language->getName();
       }
       $this->_testLanguageSelectElementOptions($id, $options);
     }
@@ -74,7 +76,7 @@ class LanguageSelectElementTest extends WebTestBase {
   function testHiddenLanguageSelectElement() {
     // Disable the language module, so that the language select field will not
     // be rendered.
-    $this->container->get('module_handler')->uninstall(array('language'));
+    $this->container->get('module_installer')->uninstall(array('language'));
     $this->drupalGet('form-test/language_select');
     // Check that the language fields were rendered on the page.
     $ids = array('edit-languages-all', 'edit-languages-configurable', 'edit-languages-locked', 'edit-languages-config-and-locked');
@@ -86,7 +88,7 @@ class LanguageSelectElementTest extends WebTestBase {
     // field elements.
     $edit = array();
     $this->drupalPostForm(NULL, $edit, t('Submit'));
-    $values = Json::decode($this->drupalGetContent());
+    $values = Json::decode($this->getRawContent());
     $this->assertEqual($values['languages_all'], 'xx');
     $this->assertEqual($values['languages_configurable'], 'en');
     $this->assertEqual($values['languages_locked'], LanguageInterface::LANGCODE_NOT_SPECIFIED);

@@ -27,7 +27,7 @@ class SearchRow extends RowPluginBase {
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['score'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['score'] = array('default' => TRUE);
 
     return $options;
   }
@@ -38,7 +38,7 @@ class SearchRow extends RowPluginBase {
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['score'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Display score'),
+      '#title' => $this->t('Display score'),
       '#default_value' => $this->options['score'],
     );
   }

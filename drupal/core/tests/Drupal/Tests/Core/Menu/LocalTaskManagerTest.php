@@ -9,6 +9,7 @@ namespace Drupal\Tests\Core\Menu;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Menu\LocalTaskManager;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -84,12 +85,19 @@ class LocalTaskManagerTest extends UnitTestCase {
   protected $accessManager;
 
   /**
+   * The route match.
+   *
+   * @var \Drupal\Core\Routing\RouteMatchInterface|\PHPUnit_Framework_MockObject_MockObject
+   */
+  protected $routeMatch;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
 
-    $this->controllerResolver = $this->getMock('Symfony\Component\HttpKernel\Controller\ControllerResolverInterface');
+    $this->controllerResolver = $this->getMock('Drupal\Core\Controller\ControllerResolverInterface');
     $this->request = new Request();
     $this->routeProvider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
     $this->routeBuilder = $this->getMock('Drupal\Core\Routing\RouteBuilderInterface');
@@ -97,6 +105,7 @@ class LocalTaskManagerTest extends UnitTestCase {
     $this->factory = $this->getMock('Drupal\Component\Plugin\Factory\FactoryInterface');
     $this->cacheBackend = $this->getMock('Drupal\Core\Cache\CacheBackendInterface');
     $this->accessManager = $this->getMock('Drupal\Core\Access\AccessManagerInterface');
+    $this->routeMatch = $this->getMock('Drupal\Core\Routing\RouteMatchInterface');
 
     $this->setupLocalTaskManager();
   }
@@ -168,24 +177,21 @@ class LocalTaskManagerTest extends UnitTestCase {
 
     $this->cacheBackend->expects($this->at(0))
       ->method('get')
-      ->with('local_task:en:menu_local_task_test_tasks_view');
+      ->with('local_task_plugins:en:menu_local_task_test_tasks_view');
 
     $this->cacheBackend->expects($this->at(1))
       ->method('get')
-      ->with('local_task:en');
+      ->with('local_task_plugins:en');
 
     $this->cacheBackend->expects($this->at(2))
       ->method('set')
-      ->with('local_task:en', $definitions, Cache::PERMANENT);
-
-    $this->routeBuilder->expects($this->once())
-      ->method('rebuildIfNeeded');
+      ->with('local_task_plugins:en', $definitions, Cache::PERMANENT);
 
     $expected_set = $this->getLocalTasksCache();
 
     $this->cacheBackend->expects($this->at(3))
       ->method('set')
-      ->with('local_task:en:menu_local_task_test_tasks_view', $expected_set, Cache::PERMANENT, array('local_task' => 1));
+      ->with('local_task_plugins:en:menu_local_task_test_tasks_view', $expected_set, Cache::PERMANENT, array('local_task'));
 
     $local_tasks = $this->manager->getLocalTasksForRoute('menu_local_task_test_tasks_view');
     $this->assertEquals($result, $local_tasks);
@@ -207,14 +213,14 @@ class LocalTaskManagerTest extends UnitTestCase {
 
     $this->cacheBackend->expects($this->at(0))
       ->method('get')
-      ->with('local_task:en:menu_local_task_test_tasks_view')
+      ->with('local_task_plugins:en:menu_local_task_test_tasks_view')
       ->will($this->returnValue((object) array('data' => $result)));
 
     $this->cacheBackend->expects($this->never())
       ->method('set');
 
     $this->routeBuilder->expects($this->never())
-      ->method('rebuildIfNeeded');
+      ->method('rebuild');
 
     $result = $this->getLocalTasksForRouteResult($mock_plugin);
     $local_tasks = $this->manager->getLocalTasksForRoute('menu_local_task_test_tasks_view');
@@ -243,29 +249,19 @@ class LocalTaskManagerTest extends UnitTestCase {
    * Setups the local task manager for the test.
    */
   protected function setupLocalTaskManager() {
-    $this->manager = $this
-      ->getMockBuilder('Drupal\Core\Menu\LocalTaskManager')
-      ->disableOriginalConstructor()
-      ->setMethods(array('enforcePluginInterface'))
-      ->getMock();
-
-    $property = new \ReflectionProperty('Drupal\Core\Menu\LocalTaskManager', 'controllerResolver');
-    $property->setAccessible(TRUE);
-    $property->setValue($this->manager, $this->controllerResolver);
-
     $request_stack = new RequestStack();
     $request_stack->push($this->request);
-    $property = new \ReflectionProperty('Drupal\Core\Menu\LocalTaskManager', 'requestStack');
-    $property->setAccessible(TRUE);
-    $property->setValue($this->manager, $request_stack);
+    $module_handler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
+    $module_handler->expects($this->any())
+      ->method('getModuleDirectories')
+      ->willReturn(array());
+    $language_manager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
+    $language_manager->expects($this->any())
+      ->method('getCurrentLanguage')
+      ->will($this->returnValue(new Language(array('id' => 'en'))));
 
-    $property = new \ReflectionProperty('Drupal\Core\Menu\LocalTaskManager', 'accessManager');
-    $property->setAccessible(TRUE);
-    $property->setValue($this->manager, $this->accessManager);
-
-    $property = new \ReflectionProperty('Drupal\Core\Menu\LocalTaskManager', 'routeBuilder');
-    $property->setAccessible(TRUE);
-    $property->setValue($this->manager, $this->routeBuilder);
+    $account = $this->getMock('Drupal\Core\Session\AccountInterface');
+    $this->manager = new LocalTaskManager($this->controllerResolver, $request_stack, $this->routeMatch, $this->routeProvider, $this->routeBuilder, $module_handler, $this->cacheBackend, $language_manager, $this->accessManager, $account);
 
     $property = new \ReflectionProperty('Drupal\Core\Menu\LocalTaskManager', 'discovery');
     $property->setAccessible(TRUE);
@@ -275,12 +271,6 @@ class LocalTaskManagerTest extends UnitTestCase {
     $property->setAccessible(TRUE);
     $property->setValue($this->manager, $this->factory);
 
-    $language_manager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
-    $language_manager->expects($this->any())
-      ->method('getCurrentLanguage')
-      ->will($this->returnValue(new Language(array('id' => 'en'))));
-
-    $this->manager->setCacheBackend($this->cacheBackend, 'local_task:en', array('local_task' => 1));
   }
 
   /**

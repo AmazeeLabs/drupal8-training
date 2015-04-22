@@ -25,6 +25,13 @@ class NegotiationSessionForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
+  protected function getEditableConfigNames() {
+    return ['language.negotiation'];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('language.negotiation');
     $form['language_negotiation_session_param'] = array(
@@ -43,7 +50,7 @@ class NegotiationSessionForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $this->config('language.settings')
+    $this->config('language.negotiation')
       ->set('session.parameter', $form_state->getValue('language_negotiation_session_param'))
       ->save();
 

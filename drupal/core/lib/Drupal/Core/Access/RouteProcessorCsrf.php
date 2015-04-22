@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
 
 /**
- * Processes the inbound path by resolving it to the front page if empty.
+ * Processes the outbound route to handle the CSRF token.
  */
 class RouteProcessorCsrf implements OutboundRouteProcessorInterface {
 
@@ -37,7 +37,7 @@ class RouteProcessorCsrf implements OutboundRouteProcessorInterface {
   /**
    * {@inheritdoc}
    */
-  public function processOutbound(Route $route, array &$parameters) {
+  public function processOutbound($route_name, Route $route, array &$parameters) {
     if ($route->hasRequirement('_csrf_token')) {
       $path = ltrim($route->getPath(), '/');
       // Replace the path parameters with values from the parameters array.
@@ -51,4 +51,3 @@ class RouteProcessorCsrf implements OutboundRouteProcessorInterface {
   }
 
 }
-

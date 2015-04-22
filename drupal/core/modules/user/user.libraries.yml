@@ -5,10 +5,18 @@ drupal.user:
   css:
     component:
       css/user.module.css: {}
+    theme:
+      css/user.theme.css: {}
   dependencies:
     - core/jquery
     - core/drupal
     - core/jquery.once
+
+drupal.user.admin:
+  version: VERSION
+  css:
+    theme:
+      css/user.admin.css: {}
 
 drupal.user.permissions:
   version: VERSION
@@ -19,9 +27,10 @@ drupal.user.permissions:
     - core/jquery.once
     - core/drupal
     - core/drupalSettings
+    - user/drupal.user.admin
 
 drupal.user.icons:
   version: VERSION
   css:
     theme:
-      css/user.icons.css: {}
+      css/user.icons.theme.css: {}

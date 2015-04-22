@@ -3,13 +3,58 @@
  * Attaches the behaviors for the Field UI module.
  */
 
-(function ($) {
+(function ($, Drupal, drupalSettings) {
 
   "use strict";
 
+  Drupal.behaviors.fieldUIFieldStorageAddForm = {
+    attach: function (context) {
+      var $form = $(context).find('#field-ui-field-storage-add-form').once('field_ui_add');
+      if ($form.length) {
+        // Add a few 'form-required' css classes here. We can not use the Form API
+        // '#required' property because both label elements for "add new" and
+        // "re-use existing" can never be filled and submitted at the same time.
+        // The actual validation will happen server-side.
+        $form.find(
+          '.form-item-label label,' +
+          '.form-item-field-name label,' +
+          '.form-item-existing-storage-label label')
+          .addClass('form-required');
+
+        var $newFieldType = $form.find('select[name="new_storage_type"]');
+        var $existingStorageName = $form.find('select[name="existing_storage_name"]');
+        var $existingStorageLabel = $form.find('input[name="existing_storage_label"]');
+
+        // When the user selects a new field type, clear the "existing field"
+        // selection.
+        $newFieldType.on('change', function () {
+          if ($(this).val() !== '') {
+            // Reset the "existing storage name" selection.
+            $existingStorageName.val('').trigger('change');
+          }
+        });
+
+        // When the user selects an existing storage name, clear the "new field
+        // type" selection and populate the 'existing_storage_label' element.
+        $existingStorageName.on('change', function () {
+          var value = $(this).val();
+          if (value !== '') {
+            // Reset the "new field type" selection.
+            $newFieldType.val('').trigger('change');
+
+            // Pre-populate the "existing storage label" element.
+            if (typeof drupalSettings.existingFieldLabels[value] !== 'undefined') {
+              $existingStorageLabel.val(drupalSettings.existingFieldLabels[value]);
+            }
+          }
+        });
+      }
+    }
+  };
+
   Drupal.behaviors.fieldUIDisplayOverview = {
     attach: function (context, settings) {
-      $(context).find('table#field-display-overview').once('field-display-overview', function () {
+      $(context).find('table#field-display-overview').once('field-display-overview').each(function () {
         Drupal.fieldUIOverview.attach(this, settings.fieldUIRowsData, Drupal.fieldUIDisplayOverview);
       });
     }
@@ -150,10 +195,7 @@
 
       if (rowNames.length) {
         // Add a throbber next each of the ajaxElements.
-        var $throbber = $('<div class="ajax-progress ajax-progress-throbber"><div class="throbber">&nbsp;</div></div>');
-        $(ajaxElements)
-          .addClass('progress-disabled')
-          .after($throbber);
+        $(ajaxElements).after('<div class="ajax-progress ajax-progress-throbber"><div class="throbber">&nbsp;</div></div>');
 
         // Fire the Ajax update.
         $('input[name=refresh_rows]').val(rowNames.join(' '));
@@ -249,4 +291,4 @@
     }
   };
 
-})(jQuery);
+})(jQuery, Drupal, drupalSettings);

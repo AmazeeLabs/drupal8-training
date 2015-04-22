@@ -106,7 +106,7 @@ class LocaleTranslationUiTest extends WebTestBase {
     $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
     $this->assertText(t('The strings have been saved.'), 'The strings have been saved.');
     $url_bits = explode('?', $this->getUrl());
-    $this->assertEqual($url_bits[0], url('admin/config/regional/translate', array('absolute' => TRUE)), 'Correct page redirection.');
+    $this->assertEqual($url_bits[0], \Drupal::url('locale.translate_page', array(), array('absolute' => TRUE)), 'Correct page redirection.');
     $search = array(
       'string' => $name,
       'langcode' => $langcode,
@@ -136,8 +136,8 @@ class LocaleTranslationUiTest extends WebTestBase {
     $this->assertRaw($translation_to_en, 'English translation properly saved.');
 
     // Reset the tag cache on the tester side in order to pick up the call to
-    // Cache::deleteTags() on the tested side.
-    drupal_static_reset('Drupal\Core\Cache\CacheBackendInterface::tagCache');
+    // Cache::invalidateTags() on the tested side.
+    \Drupal::service('cache_tags.invalidator.checksum')->reset();
 
     $this->assertTrue($name != $translation && t($name, array(), array('langcode' => $langcode)) == $translation, 't() works for non-English.');
     // Refresh the locale() cache to get fresh data from t() below. We are in
@@ -205,7 +205,7 @@ class LocaleTranslationUiTest extends WebTestBase {
   public function testJavaScriptTranslation() {
     $user = $this->drupalCreateUser(array('translate interface', 'administer languages', 'access administration pages'));
     $this->drupalLogin($user);
-    $config = \Drupal::config('locale.settings');
+    $config = $this->config('locale.settings');
 
     $langcode = 'xx';
     // The English name for the language. This will be translated.

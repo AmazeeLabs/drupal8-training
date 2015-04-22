@@ -43,7 +43,11 @@ class ResultTest extends UnitTestCase {
       ->will($this->returnValue('ResultTest'));
 
     $user = $this->getMock('Drupal\Core\Session\AccountInterface');
-    $this->view = new ViewExecutable($storage, $user);
+    $views_data = $this->getMockBuilder('Drupal\views\ViewsData')
+      ->disableOriginalConstructor()
+      ->getMock();
+    $route_provider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
+    $this->view = new ViewExecutable($storage, $user, $views_data, $route_provider);
 
     $this->resultHandler = new Result(array(), 'result', array());
     $this->resultHandler->view = $this->view;

@@ -8,12 +8,12 @@
 namespace Drupal\Core;
 
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\Core\Queue\QueueFactory;
-use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
-use Drupal\Core\Session\SessionManagerInterface;
+use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\Core\Queue\SuspendQueueException;
 use Psr\Log\LoggerInterface;
 
@@ -51,18 +51,11 @@ class Cron implements CronInterface {
   protected $state;
 
   /**
-   * The current user.
+   * The account switcher service.
    *
-   * @var \Drupal\Core\Session\AccountProxyInterface
+   * @var \Drupal\Core\Session\AccountSwitcherInterface
    */
-  protected $currentUser;
-
-  /**
-   * The session manager.
-   *
-   * @var \Drupal\Core\Session\SessionManagerInterface
-   */
-  protected $sessionManager;
+  protected $accountSwitcher;
 
   /**
    * A logger instance.
@@ -70,6 +63,13 @@ class Cron implements CronInterface {
    * @var \Psr\Log\LoggerInterface
    */
   protected $logger;
+
+  /**
+   * The queue plugin manager.
+   *
+   * @var \Drupal\Core\Queue\QueueWorkerManagerInterface
+   */
+  protected $queueManager;
 
   /**
    * Constructs a cron object.
@@ -82,21 +82,21 @@ class Cron implements CronInterface {
    *   The queue service.
    * @param \Drupal\Core\State\StateInterface $state
    *   The state service.
-   * @param \Drupal\Core\Session\AccountProxyInterface $current_user
-   *    The current user.
-   * @param \Drupal\Core\Session\SessionManagerInterface $session_manager
-   *   The session manager.
+   * @param \Drupal\Core\Session\AccountSwitcherInterface $account_switcher
+   *    The account switching service.
    * @param \Psr\Log\LoggerInterface $logger
    *   A logger instance.
+   * @param \Drupal\Core\Queue\QueueWorkerManagerInterface
+   *   The queue plugin manager.
    */
-  public function __construct(ModuleHandlerInterface $module_handler, LockBackendInterface $lock, QueueFactory $queue_factory, StateInterface $state, AccountProxyInterface $current_user, SessionManagerInterface $session_manager, LoggerInterface $logger) {
+  public function __construct(ModuleHandlerInterface $module_handler, LockBackendInterface $lock, QueueFactory $queue_factory, StateInterface $state, AccountSwitcherInterface $account_switcher, LoggerInterface $logger, QueueWorkerManagerInterface $queue_manager) {
     $this->moduleHandler = $module_handler;
     $this->lock = $lock;
     $this->queueFactory = $queue_factory;
     $this->state = $state;
-    $this->currentUser = $current_user;
-    $this->sessionManager = $session_manager;
+    $this->accountSwitcher = $account_switcher;
     $this->logger = $logger;
+    $this->queueManager = $queue_manager;
   }
 
   /**
@@ -106,14 +106,9 @@ class Cron implements CronInterface {
     // Allow execution to continue even if the request gets cancelled.
     @ignore_user_abort(TRUE);
 
-    // Prevent session information from being saved while cron is running.
-    $original_session_saving = $this->sessionManager->isEnabled();
-    $this->sessionManager->disable();
-
     // Force the current user to anonymous to ensure consistent permissions on
     // cron runs.
-    $original_user = $this->currentUser->getAccount();
-    $this->currentUser->setAccount(new AnonymousUserSession());
+    $this->accountSwitcher->switchTo(new AnonymousUserSession());
 
     // Try to allocate enough time to run all the hook_cron implementations.
     drupal_set_time_limit(240);
@@ -140,10 +135,7 @@ class Cron implements CronInterface {
     $this->processQueues();
 
     // Restore the user.
-    $this->currentUser->setAccount($original_user);
-    if ($original_session_saving) {
-      $this->sessionManager->enable();
-    }
+    $this->accountSwitcher->switchBack();
 
     return $return;
   }
@@ -162,21 +154,18 @@ class Cron implements CronInterface {
    */
   protected function processQueues() {
     // Grab the defined cron queues.
-    $queues = $this->moduleHandler->invokeAll('queue_info');
-    $this->moduleHandler->alter('queue_info', $queues);
-
-    foreach ($queues as $queue_name => $info) {
+    foreach ($this->queueManager->getDefinitions() as $queue_name => $info) {
       if (isset($info['cron'])) {
         // Make sure every queue exists. There is no harm in trying to recreate
         // an existing queue.
         $this->queueFactory->get($queue_name)->createQueue();
 
-        $callback = $info['worker callback'];
+        $queue_worker = $this->queueManager->createInstance($queue_name);
         $end = time() + (isset($info['cron']['time']) ? $info['cron']['time'] : 15);
         $queue = $this->queueFactory->get($queue_name);
         while (time() < $end && ($item = $queue->claimItem())) {
           try {
-            call_user_func_array($callback, array($item->data));
+            $queue_worker->processItem($item->data);
             $queue->deleteItem($item);
           }
           catch (SuspendQueueException $e) {

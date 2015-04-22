@@ -19,20 +19,25 @@ use Drupal\views\ResultRow;
  */
 class LanguageField extends FieldPluginBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['native_language'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['native_language'] = array('default' => FALSE);
 
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $form['native_language'] = array(
-      '#title' => t('Native language'),
+      '#title' => $this->t('Display in native language'),
       '#type' => 'checkbox',
       '#default_value' => $this->options['native_language'],
-      '#description' => t('If enabled, the native name of the language will be displayed'),
     );
   }
 
@@ -40,11 +45,9 @@ class LanguageField extends FieldPluginBase {
    * {@inheritdoc}
    */
   public function render(ResultRow $values) {
-    // @todo: Drupal Core dropped native language until config translation is
-    // ready, see http://drupal.org/node/1616594.
     $value = $this->getValue($values);
-    $language = language_load($value);
-    return $language ? $language->name : '';
+    $languages = $this->options['native_language'] ? \Drupal::languageManager()->getNativeLanguages() : \Drupal::languageManager()->getLanguages();
+    return isset($languages[$value]) ? $languages[$value]->getName() : '';
   }
 
 }

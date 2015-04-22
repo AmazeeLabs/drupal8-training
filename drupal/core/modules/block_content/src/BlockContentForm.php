@@ -7,11 +7,11 @@
 
 namespace Drupal\block_content;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -26,6 +26,13 @@ class BlockContentForm extends ContentEntityForm {
    * @var \Drupal\Core\Entity\EntityStorageInterface
    */
   protected $blockContentStorage;
+
+  /**
+   * The custom block type storage.
+   *
+   * @var \Drupal\Core\Entity\EntityStorageInterface
+   */
+  protected $blockContentTypeStorage;
 
   /**
    * The language manager.
@@ -48,12 +55,15 @@ class BlockContentForm extends ContentEntityForm {
    *   The entity manager.
    * @param \Drupal\Core\Entity\EntityStorageInterface $block_content_storage
    *   The custom block storage.
+   * @param \Drupal\Core\Entity\EntityStorageInterface $block_content_type_storage
+   *   The custom block type storage.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
    */
-  public function __construct(EntityManagerInterface $entity_manager, EntityStorageInterface $block_content_storage, LanguageManagerInterface $language_manager) {
+  public function __construct(EntityManagerInterface $entity_manager, EntityStorageInterface $block_content_storage, EntityStorageInterface $block_content_type_storage, LanguageManagerInterface $language_manager) {
     parent::__construct($entity_manager);
     $this->blockContentStorage = $block_content_storage;
+    $this->blockContentTypeStorage = $block_content_type_storage;
     $this->languageManager = $language_manager;
   }
 
@@ -65,6 +75,7 @@ class BlockContentForm extends ContentEntityForm {
     return new static(
       $entity_manager,
       $entity_manager->getStorage('block_content'),
+      $entity_manager->getStorage('block_content_type'),
       $container->get('language_manager')
     );
   }
@@ -74,18 +85,18 @@ class BlockContentForm extends ContentEntityForm {
    *
    * Prepares the custom block object.
    *
-   * Fills in a few default values, and then invokes hook_block_content_prepare()
-   * on all modules.
+   * Fills in a few default values, and then invokes
+   * hook_block_content_prepare() on all modules.
    */
   protected function prepareEntity() {
     $block = $this->entity;
     // Set up default values, if required.
-    $block_type = entity_load('block_content_type', $block->bundle());
+    $block_type = $this->blockContentTypeStorage->load($block->bundle());
     if (!$block->isNew()) {
       $block->setRevisionLog(NULL);
     }
     // Always use the default revision setting.
-    $block->setNewRevision($block_type->revision);
+    $block->setNewRevision($block_type->shouldCreateNewRevision());
   }
 
   /**
@@ -101,25 +112,7 @@ class BlockContentForm extends ContentEntityForm {
     // Override the default CSS class name, since the user-defined custom block
     // type name in 'TYPE-block-form' potentially clashes with third-party class
     // names.
-    $form['#attributes']['class'][0] = drupal_html_class('block-' . $block->bundle() . '-form');
-
-    if ($this->moduleHandler->moduleExists('language')) {
-      $language_configuration = language_get_default_configuration('block_content', $block->bundle());
-
-      // Set the correct default language.
-      if ($block->isNew()) {
-        $language_default = $this->languageManager->getCurrentLanguage($language_configuration['langcode']);
-        $block->langcode->value = $language_default->id;
-      }
-    }
-
-    $form['langcode'] = array(
-      '#title' => $this->t('Language'),
-      '#type' => 'language_select',
-      '#default_value' => $block->getUntranslated()->language()->id,
-      '#languages' => LanguageInterface::STATE_ALL,
-      '#access' => isset($language_configuration['language_show']) && $language_configuration['language_show'],
-    );
+    $form['#attributes']['class'][0] = 'block-' . Html::getClass($block->bundle()) . '-form';
 
     $form['advanced'] = array(
       '#type' => 'vertical_tabs',
@@ -188,7 +181,7 @@ class BlockContentForm extends ContentEntityForm {
     $block->save();
     $context = array('@type' => $block->bundle(), '%info' => $block->label());
     $logger = $this->logger('block_content');
-    $block_type = entity_load('block_content_type', $block->bundle());
+    $block_type = $this->blockContentTypeStorage->load($block->bundle());
     $t_args = array('@type' => $block_type->label(), '%info' => $block->label());
 
     if ($insert) {
@@ -216,7 +209,7 @@ class BlockContentForm extends ContentEntityForm {
         );
       }
       else {
-        $form_state->setRedirect('block_content.list');
+        $form_state->setRedirectUrl($block->urlInfo('collection'));
       }
     }
     else {
@@ -232,7 +225,7 @@ class BlockContentForm extends ContentEntityForm {
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
     if ($this->entity->isNew()) {
-      $exists = $this->blockContentStorage->loadByProperties(array('info' => $form_state->getValue('info')));
+      $exists = $this->blockContentStorage->loadByProperties(array('info' => $form_state->getValue(['info', 0, 'value'])));
       if (!empty($exists)) {
         $form_state->setErrorByName('info', $this->t('A block with description %name already exists.', array(
           '%name' => $form_state->getValue(array('info', 0, 'value')),

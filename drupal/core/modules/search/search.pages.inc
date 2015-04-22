@@ -37,7 +37,7 @@ function template_preprocess_search_result(&$variables) {
   $result = $variables['result'];
   $variables['url'] = check_url($result['link']);
   $variables['title'] = String::checkPlain($result['title']);
-  if (isset($result['language']) && $result['language'] != $language_interface->id && $result['language'] != LanguageInterface::LANGCODE_NOT_SPECIFIED) {
+  if (isset($result['language']) && $result['language'] != $language_interface->getId() && $result['language'] != LanguageInterface::LANGCODE_NOT_SPECIFIED) {
     $variables['title_attributes']['lang'] = $result['language'];
     $variables['content_attributes']['lang'] = $result['language'];
   }
@@ -59,6 +59,10 @@ function template_preprocess_search_result(&$variables) {
   $variables['snippet'] = isset($result['snippet']) ? $result['snippet'] : '';
   // Provide separated and grouped meta information..
   $variables['info_split'] = $info;
-  $variables['info'] = implode(' - ', $info);
+  $variables['info'] = array(
+    '#type' => 'inline_template',
+    '#template' => '{{ info|safe_join(" - ") }}',
+    '#context' => array('info' => $info),
+  );
 }
 

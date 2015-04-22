@@ -8,13 +8,17 @@
 namespace Drupal\taxonomy\Plugin\views\argument_default;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\taxonomy\TermInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\argument_default\ArgumentDefaultPluginBase;
 use Drupal\node\NodeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\taxonomy\VocabularyStorageInterface;
 
 /**
  * Taxonomy tid default argument.
@@ -24,7 +28,55 @@ use Symfony\Component\HttpFoundation\Request;
  *   title = @Translation("Taxonomy term ID from URL")
  * )
  */
-class Tid extends ArgumentDefaultPluginBase {
+class Tid extends ArgumentDefaultPluginBase implements CacheablePluginInterface {
+
+  /**
+   * The route match.
+   *
+   * @var \Drupal\Core\Routing\RouteMatchInterface
+   */
+  protected $routeMatch;
+
+  /**
+   * The vocabulary storage.
+   *
+   * @var \Drupal\taxonomy\VocabularyStorageInterface.
+   */
+  protected $vocabularyStorage;
+
+  /**
+   * Constructs a new Tid instance.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.   *
+   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+   *   The route match.
+   * @param \Drupal\taxonomy\VocabularyStorageInterface $vocabulary_storage
+   *   The vocabulary storage.
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteMatchInterface $route_match, VocabularyStorageInterface $vocabulary_storage) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+
+    $this->routeMatch = $route_match;
+    $this->vocabularyStorage = $vocabulary_storage;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('current_route_match'),
+      $container->get('entity.manager')->getStorage('taxonomy_vocabulary')
+    );
+  }
 
   /**
    * Overrides \Drupal\views\Plugin\views\Plugin\views\PluginBase::init().
@@ -47,10 +99,10 @@ class Tid extends ArgumentDefaultPluginBase {
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['term_page'] = array('default' => TRUE, 'bool' => TRUE);
-    $options['node'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['term_page'] = array('default' => TRUE);
+    $options['node'] = array('default' => FALSE);
     $options['anyall'] = array('default' => ',');
-    $options['limit'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['limit'] = array('default' => FALSE);
     $options['vids'] = array('default' => array());
 
     return $options;
@@ -59,18 +111,18 @@ class Tid extends ArgumentDefaultPluginBase {
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['term_page'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Load default filter from term page'),
+      '#title' => $this->t('Load default filter from term page'),
       '#default_value' => $this->options['term_page'],
     );
     $form['node'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Load default filter from node page, that\'s good for related taxonomy blocks'),
+      '#title' => $this->t('Load default filter from node page, that\'s good for related taxonomy blocks'),
       '#default_value' => $this->options['node'],
     );
 
     $form['limit'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Limit terms by vocabulary'),
+      '#title' => $this->t('Limit terms by vocabulary'),
       '#default_value' => $this->options['limit'],
       '#states' => array(
         'visible' => array(
@@ -80,14 +132,14 @@ class Tid extends ArgumentDefaultPluginBase {
     );
 
     $options = array();
-    $vocabularies = entity_load_multiple('taxonomy_vocabulary');
+    $vocabularies = $this->vocabularyStorage->loadMultiple();
     foreach ($vocabularies as $voc) {
       $options[$voc->id()] = $voc->label();
     }
 
     $form['vids'] = array(
       '#type' => 'checkboxes',
-      '#title' => t('Vocabularies'),
+      '#title' => $this->t('Vocabularies'),
       '#options' => $options,
       '#default_value' => $this->options['vids'],
       '#states' => array(
@@ -100,11 +152,11 @@ class Tid extends ArgumentDefaultPluginBase {
 
     $form['anyall'] = array(
       '#type' => 'radios',
-      '#title' => t('Multiple-value handling'),
+      '#title' => $this->t('Multiple-value handling'),
       '#default_value' => $this->options['anyall'],
       '#options' => array(
-        ',' => t('Filter to items that share all terms'),
-        '+' => t('Filter to items that share any term'),
+        ',' => $this->t('Filter to items that share all terms'),
+        '+' => $this->t('Filter to items that share any term'),
       ),
       '#states' => array(
         'visible' => array(
@@ -125,14 +177,14 @@ class Tid extends ArgumentDefaultPluginBase {
   public function getArgument() {
     // Load default argument from taxonomy page.
     if (!empty($this->options['term_page'])) {
-      if (($taxonomy_term = $this->request->attributes->get('taxonomy_term')) && $taxonomy_term instanceof TermInterface) {
+      if (($taxonomy_term = $this->routeMatch->getParameter('taxonomy_term')) && $taxonomy_term instanceof TermInterface) {
         return $taxonomy_term->id();
       }
     }
     // Load default argument from node.
     if (!empty($this->options['node'])) {
       // Just check, if a node could be detected.
-      if (($node = $this->view->getRequest()->attributes->has('node')) && $node instanceof NodeInterface) {
+      if (($node = $this->routeMatch->getParameter('node')) && $node instanceof NodeInterface) {
         $taxonomy = array();
         foreach ($node->getFieldDefinitions() as $field) {
           if ($field->getType() == 'taxonomy_term_reference') {
@@ -165,6 +217,32 @@ class Tid extends ArgumentDefaultPluginBase {
     if ($views_page && isset($views_page->argument['tid'])) {
       return $views_page->argument['tid']->argument;
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return ['url'];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    $dependencies = parent::calculateDependencies();
+
+    foreach ($this->vocabularyStorage->loadMultiple(array_keys($this->options['vids'])) as $vocabulary) {
+      $dependencies[$vocabulary->getConfigDependencyKey()][] = $vocabulary->getConfigDependencyName();
+    }
+    return $dependencies;
   }
 
 }

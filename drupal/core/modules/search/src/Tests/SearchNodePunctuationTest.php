@@ -14,15 +14,20 @@ namespace Drupal\search\Tests;
  */
 class SearchNodePunctuationTest extends SearchTestBase {
 
-  public $test_user;
+  /**
+   * A user with permission to use advanced search.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  public $testUser;
 
   protected function setUp() {
     parent::setUp();
     node_access_rebuild();
 
     // Create a test user and log in.
-    $this->test_user = $this->drupalCreateUser(array('access content', 'search content', 'use advanced search'));
-    $this->drupalLogin($this->test_user);
+    $this->testUser = $this->drupalCreateUser(array('access content', 'search content', 'use advanced search', 'access user profiles'));
+    $this->drupalLogin($this->testUser);
   }
 
   /**
@@ -42,5 +47,9 @@ class SearchNodePunctuationTest extends SearchTestBase {
     $edit = array('keys' => '"bunny\'s"');
     $this->drupalPostForm('search/node', $edit, t('Search'));
     $this->assertText($node->label());
+
+    // Check if the author is linked correctly to the user profile page.
+    $username = $node->getOwner()->getUsername();
+    $this->assertLink($username);
   }
 }

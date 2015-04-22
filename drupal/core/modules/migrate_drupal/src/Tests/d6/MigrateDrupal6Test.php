@@ -61,6 +61,9 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     'd6_aggregator_feed',
     'd6_aggregator_item',
     'd6_block',
+    'd6_block_content_body_field',
+    'd6_block_content_type',
+    'd6_book',
     'd6_book_settings',
     'd6_cck_field_values:*',
     'd6_cck_field_revision:*',
@@ -87,7 +90,11 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     'd6_locale_settings',
     'd6_menu_settings',
     'd6_menu',
+    'd6_menu_links',
     'd6_node_revision',
+    'd6_node_setting_promote',
+    'd6_node_setting_status',
+    'd6_node_setting_sticky',
     'd6_node',
     'd6_node_settings',
     'd6_node_type',
@@ -102,6 +109,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     'd6_system_filter',
     'd6_system_image',
     'd6_system_image_gd',
+    'd6_system_logging',
     'd6_system_maintenance',
     'd6_system_performance',
     'd6_system_rss',
@@ -120,6 +128,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     'd6_upload',
     'd6_url_alias',
     'd6_user_mail',
+    'd6_user_contact_settings',
     'd6_user_profile_field_instance',
     'd6_user_profile_entity_display',
     'd6_user_profile_entity_form_display',
@@ -130,6 +139,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     'd6_user_picture_field',
     'd6_user_picture_file',
     'd6_user_role',
+    'd6_user_settings',
     'd6_user',
     'd6_view_modes',
     'd6_vocabulary_entity_display',
@@ -143,10 +153,13 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
    */
   protected function setUp() {
     parent::setUp();
-    $config = \Drupal::config('system.theme');
+    $config = $this->config('system.theme');
     $config->set('default', 'bartik');
     $config->set('admin', 'seven');
     $config->save();
+
+    // We need a temp file for testing the MigrateFileTest.
+    file_put_contents('/tmp/some-temp-file.jpg', '');
   }
 
   /**
@@ -155,62 +168,44 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
   protected function getDumps() {
     $tests_path = $this->getDumpDirectory();
     $dumps = array(
-      $tests_path . '/Drupal6ActionSettings.php',
-      $tests_path . '/Drupal6AggregatorFeed.php',
-      $tests_path . '/Drupal6AggregatorItem.php',
-      $tests_path . '/Drupal6AggregatorSettings.php',
-      $tests_path . '/Drupal6Block.php',
-      $tests_path . '/Drupal6BookSettings.php',
-      $tests_path . '/Drupal6Box.php',
-      $tests_path . '/Drupal6Comment.php',
-      $tests_path . '/Drupal6CommentVariable.php',
-      $tests_path . '/Drupal6ContactCategory.php',
-      $tests_path . '/Drupal6ContactSettings.php',
-      $tests_path . '/Drupal6DateFormat.php',
-      $tests_path . '/Drupal6DblogSettings.php',
-      $tests_path . '/Drupal6FieldInstance.php',
-      $tests_path . '/Drupal6File.php',
-      $tests_path . '/Drupal6FileSettings.php',
-      $tests_path . '/Drupal6FilterFormat.php',
-      $tests_path . '/Drupal6ForumSettings.php',
-      $tests_path . '/Drupal6LocaleSettings.php',
-      $tests_path . '/Drupal6Menu.php',
-      $tests_path . '/Drupal6MenuSettings.php',
-      $tests_path . '/Drupal6NodeBodyInstance.php',
-      $tests_path . '/Drupal6Node.php',
-      $tests_path . '/Drupal6NodeRevision.php',
-      $tests_path . '/Drupal6NodeSettings.php',
-      $tests_path . '/Drupal6NodeType.php',
-      $tests_path . '/Drupal6SearchPage.php',
-      $tests_path . '/Drupal6SearchSettings.php',
-      $tests_path . '/Drupal6SimpletestSettings.php',
-      $tests_path . '/Drupal6StatisticsSettings.php',
-      $tests_path . '/Drupal6SyslogSettings.php',
-      $tests_path . '/Drupal6SystemCron.php',
-      // This dump contains the file directory path to the simpletest directory
-      // where the files are.
-      $tests_path . '/Drupal6SystemFile.php',
-      $tests_path . '/Drupal6SystemFilter.php',
-      $tests_path . '/Drupal6SystemImageGd.php',
-      $tests_path . '/Drupal6SystemImage.php',
-      $tests_path . '/Drupal6SystemMaintenance.php',
-      $tests_path . '/Drupal6SystemPerformance.php',
-      $tests_path . '/Drupal6SystemRss.php',
-      $tests_path . '/Drupal6SystemSite.php',
-      $tests_path . '/Drupal6TaxonomySettings.php',
-      $tests_path . '/Drupal6TaxonomyTerm.php',
-      $tests_path . '/Drupal6TaxonomyVocabulary.php',
-      $tests_path . '/Drupal6TermNode.php',
-      $tests_path . '/Drupal6TextSettings.php',
-      $tests_path . '/Drupal6UpdateSettings.php',
-      $tests_path . '/Drupal6UploadInstance.php',
-      $tests_path . '/Drupal6Upload.php',
-      $tests_path . '/Drupal6UrlAlias.php',
-      $tests_path . '/Drupal6UserMail.php',
-      $tests_path . '/Drupal6User.php',
-      $tests_path . '/Drupal6UserProfileFields.php',
-      $tests_path . '/Drupal6UserRole.php',
-      $tests_path . '/Drupal6VocabularyField.php',
+      $tests_path . '/AggregatorFeed.php',
+      $tests_path . '/AggregatorItem.php',
+      $tests_path . '/Blocks.php',
+      $tests_path . '/BlocksRoles.php',
+      $tests_path . '/Book.php',
+      $tests_path . '/Boxes.php',
+      $tests_path . '/Comments.php',
+      $tests_path . '/Contact.php',
+      $tests_path . '/ContentFieldMultivalue.php',
+      $tests_path . '/ContentFieldTest.php',
+      $tests_path . '/ContentFieldTestTwo.php',
+      $tests_path . '/ContentNodeField.php',
+      $tests_path . '/ContentNodeFieldInstance.php',
+      $tests_path . '/ContentTypeStory.php',
+      $tests_path . '/ContentTypeTestPlanet.php',
+      $tests_path . '/EventTimezones.php',
+      $tests_path . '/Files.php',
+      $tests_path . '/FilterFormats.php',
+      $tests_path . '/Filters.php',
+      $tests_path . '/MenuCustom.php',
+      $tests_path . '/MenuLinks.php',
+      $tests_path . '/Node.php',
+      $tests_path . '/NodeRevisions.php',
+      $tests_path . '/NodeType.php',
+      $tests_path . '/Permission.php',
+      $tests_path . '/ProfileFields.php',
+      $tests_path . '/ProfileValues.php',
+      $tests_path . '/Role.php',
+      $tests_path . '/TermData.php',
+      $tests_path . '/TermHierarchy.php',
+      $tests_path . '/TermNode.php',
+      $tests_path . '/Upload.php',
+      $tests_path . '/UrlAlias.php',
+      $tests_path . '/Users.php',
+      $tests_path . '/UsersRoles.php',
+      $tests_path . '/Variable.php',
+      $tests_path . '/Vocabulary.php',
+      $tests_path . '/VocabularyNodeTypes.php',
     );
 
     return $dumps;
@@ -226,6 +221,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
       __NAMESPACE__ . '\MigrateAggregatorFeedTest',
       __NAMESPACE__ . '\MigrateAggregatorItemTest',
       __NAMESPACE__ . '\MigrateBlockTest',
+      __NAMESPACE__ . '\MigrateBookTest',
       __NAMESPACE__ . '\MigrateBookConfigsTest',
       __NAMESPACE__ . '\MigrateCckFieldValuesTest',
       __NAMESPACE__ . '\MigrateCckFieldRevisionTest',
@@ -251,12 +247,14 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
       __NAMESPACE__ . '\MigrateForumConfigsTest',
       __NAMESPACE__ . '\MigrateLocaleConfigsTest',
       __NAMESPACE__ . '\MigrateMenuConfigsTest',
+      __NAMESPACE__ . '\MigrateMenuLinkTest',
       __NAMESPACE__ . '\MigrateMenuTest',
+      __NAMESPACE__ . '\MigrateNodeBundleSettingsTest',
       __NAMESPACE__ . '\MigrateNodeConfigsTest',
       __NAMESPACE__ . '\MigrateNodeRevisionTest',
       __NAMESPACE__ . '\MigrateNodeTest',
       __NAMESPACE__ . '\MigrateNodeTypeTest',
-      __NAMESPACE__ . '\MigrateProfileValuesTest',
+      __NAMESPACE__ . '\MigrateUserProfileValuesTest',
       __NAMESPACE__ . '\MigrateSearchConfigsTest',
       __NAMESPACE__ . '\MigrateSearchPageTest',
       __NAMESPACE__ . '\MigrateSimpletestConfigsTest',
@@ -267,6 +265,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
       __NAMESPACE__ . '\MigrateSystemFilterTest',
       __NAMESPACE__ . '\MigrateSystemImageGdTest',
       __NAMESPACE__ . '\MigrateSystemImageTest',
+      __NAMESPACE__ . '\MigrateSystemLoggingTest',
       __NAMESPACE__ . '\MigrateSystemMaintenanceTest',
       __NAMESPACE__ . '\MigrateSystemPerformanceTest',
       __NAMESPACE__ . '\MigrateSystemRssTest',
@@ -285,6 +284,7 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
       __NAMESPACE__ . '\MigrateUploadTest',
       __NAMESPACE__ . '\MigrateUrlAliasTest',
       __NAMESPACE__ . '\MigrateUserConfigsTest',
+      __NAMESPACE__ . '\MigrateUserContactSettingsTest',
       __NAMESPACE__ . '\MigrateUserProfileEntityDisplayTest',
       __NAMESPACE__ . '\MigrateUserProfileEntityFormDisplayTest',
       __NAMESPACE__ . '\MigrateUserProfileFieldTest',
@@ -304,6 +304,16 @@ class MigrateDrupal6Test extends MigrateFullDrupalTestBase {
     );
 
     return $classes;
+  }
+
+  /**
+   * Returns the path to the dump directory.
+   *
+   * @return string
+   *   A string that represents the dump directory path.
+   */
+  protected function getDumpDirectory() {
+    return dirname(__DIR__) . '/Table/d6';
   }
 
 }

@@ -12,6 +12,9 @@ use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\field\PrerenderList;
 use Drupal\Component\Utility\String;
+use Drupal\taxonomy\Entity\Vocabulary;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\taxonomy\VocabularyStorageInterface;
 
 /**
  * Field handler to display all taxonomy terms of a node.
@@ -21,6 +24,42 @@ use Drupal\Component\Utility\String;
  * @ViewsField("taxonomy_index_tid")
  */
 class TaxonomyIndexTid extends PrerenderList {
+
+  /**
+   * The vocabulary storage.
+   *
+   * @var \Drupal\taxonomy\VocabularyStorageInterface.
+   */
+  protected $vocabularyStorage;
+
+  /**
+   * Constructs a TaxonomyIndexTid object.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\taxonomy\VocabularyStorageInterface $vocabulary_storage
+   *   The vocabulary storage.
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, VocabularyStorageInterface $vocabulary_storage) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+    $this->vocabularyStorage = $vocabulary_storage;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('entity.manager')->getStorage('taxonomy_vocabulary')
+    );
+  }
 
   /**
    * Overrides \Drupal\views\Plugin\views\field\PrerenderList::init().
@@ -33,15 +72,15 @@ class TaxonomyIndexTid extends PrerenderList {
       $this->additional_fields['nid'] = array('table' => 'node_field_revision', 'field' => 'nid');
     }
     else {
-      $this->additional_fields['nid'] = array('table' => 'node', 'field' => 'nid');
+      $this->additional_fields['nid'] = array('table' => 'node_field_data', 'field' => 'nid');
     }
   }
 
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['link_to_taxonomy'] = array('default' => TRUE, 'bool' => TRUE);
-    $options['limit'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['link_to_taxonomy'] = array('default' => TRUE);
+    $options['limit'] = array('default' => FALSE);
     $options['vids'] = array('default' => array());
 
     return $options;
@@ -52,26 +91,26 @@ class TaxonomyIndexTid extends PrerenderList {
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_taxonomy'] = array(
-      '#title' => t('Link this field to its term page'),
+      '#title' => $this->t('Link this field to its term page'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['link_to_taxonomy']),
     );
 
     $form['limit'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Limit terms by vocabulary'),
+      '#title' => $this->t('Limit terms by vocabulary'),
       '#default_value' => $this->options['limit'],
     );
 
     $options = array();
-    $vocabularies = entity_load_multiple('taxonomy_vocabulary');
+    $vocabularies = $this->vocabularyStorage->loadMultiple();
     foreach ($vocabularies as $voc) {
       $options[$voc->id()] = $voc->label();
     }
 
     $form['vids'] = array(
       '#type' => 'checkboxes',
-      '#title' => t('Vocabularies'),
+      '#title' => $this->t('Vocabularies'),
       '#options' => $options,
       '#default_value' => $this->options['vids'],
       '#states' => array(
@@ -93,7 +132,7 @@ class TaxonomyIndexTid extends PrerenderList {
   }
 
   public function preRender(&$values) {
-    $vocabularies = entity_load_multiple('taxonomy_vocabulary');
+    $vocabularies = $this->vocabularyStorage->loadMultiple();
     $this->field_alias = $this->aliases['nid'];
     $nids = array();
     foreach ($values as $result) {
@@ -130,10 +169,10 @@ class TaxonomyIndexTid extends PrerenderList {
   }
 
   protected function documentSelfTokens(&$tokens) {
-    $tokens['[' . $this->options['id'] . '-tid' . ']'] = t('The taxonomy term ID for the term.');
-    $tokens['[' . $this->options['id'] . '-name' . ']'] = t('The taxonomy term name for the term.');
-    $tokens['[' . $this->options['id'] . '-vocabulary-vid' . ']'] = t('The machine name for the vocabulary the term belongs to.');
-    $tokens['[' . $this->options['id'] . '-vocabulary' . ']'] = t('The name for the vocabulary the term belongs to.');
+    $tokens['[' . $this->options['id'] . '-tid' . ']'] = $this->t('The taxonomy term ID for the term.');
+    $tokens['[' . $this->options['id'] . '-name' . ']'] = $this->t('The taxonomy term name for the term.');
+    $tokens['[' . $this->options['id'] . '-vocabulary-vid' . ']'] = $this->t('The machine name for the vocabulary the term belongs to.');
+    $tokens['[' . $this->options['id'] . '-vocabulary' . ']'] = $this->t('The name for the vocabulary the term belongs to.');
   }
 
   protected function addSelfTokens(&$tokens, $item) {

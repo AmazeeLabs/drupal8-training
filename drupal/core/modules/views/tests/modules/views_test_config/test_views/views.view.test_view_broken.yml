@@ -1,15 +1,21 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_view_broken
+label: 'Test view'
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
       defaults:
-        fields: '0'
-        pager: '0'
-        pager_options: '0'
-        sorts: '0'
+        fields: false
+        pager: false
+        sorts: false
       fields:
         id_broken:
           field: id_broken
@@ -17,7 +23,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       filters:
         id_broken:
           field: id_broken
@@ -25,7 +30,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       arguments:
         id_broken:
           field: id_broken
@@ -33,7 +37,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       sorts:
         id_broken:
           field: id_broken
@@ -42,7 +45,6 @@ display:
           table: views_test_data
           plugin_id: numeric
           order: ASC
-          provider: views
       relationships:
         id_broken:
           field: id_broken
@@ -50,7 +52,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       header:
         id_broken:
           field: id_broken
@@ -58,7 +59,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       footer:
         id_broken:
           field: id_broken
@@ -66,7 +66,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       empty:
         id_broken:
           field: id_broken
@@ -74,16 +73,11 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views
       pager:
         options:
-          offset: '0'
+          offset: 0
         type: none
-      pager_options: {  }
     display_plugin: default
     display_title: Master
     id: default
     position: 0
-label: 'Test view'
-id: test_view_broken
-tag: ''

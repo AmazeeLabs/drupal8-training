@@ -134,14 +134,14 @@ a.tabledrag-handle:focus .handle {
 .touch .draggable.drag a.tabledrag-handle .handle {
   background-position: 50% -32px;
 }
-div.indentation {
+.indentation {
   float: left; /* LTR */
   height: 1.7em;
   margin: -0.4em 0.2em -0.4em -0.4em; /* LTR */
   padding: 0.42em 0 0.42em 0.6em; /* LTR */
   width: 20px;
 }
-[dir="rtl"] div.indentation {
+[dir="rtl"] .indentation {
   float: right;
   margin: -0.4em -0.4em -0.4em 0.2em;
   padding: 0.42em 0.6em 0.42em 0;
@@ -175,6 +175,7 @@ table.sticky-header {
   background-color: #fff;
   margin-top: 0;
   z-index: 500;
+  top: 0;
 }
 
 /**
@@ -279,6 +280,32 @@ tr .ajax-progress-throbber .throbber {
 .container-inline .details-wrapper {
   display: block;
 }
+/* Display form elements horizontally. */
+.form--inline .form-item {
+  float: left; /* LTR */
+  margin-right: 0.5em; /* LTR */
+}
+[dir="rtl"] .form--inline .form-item {
+  float: right;
+  margin-right: 0;
+  margin-left: 0.5em;
+}
+.form--inline .form-item-separator {
+  margin-top: 2.3em;
+  margin-right: 1em; /* LTR */
+  margin-left: 0.5em; /* LTR */
+}
+[dir="rtl"] .form--inline .form-item-separator {
+  margin-right: 0.5em;
+  margin-left: 1em;
+}
+.form--inline .form-actions {
+  clear: left; /* LTR */
+}
+[dir="rtl"] .form--inline .form-actions {
+  clear: right;
+}
+
 
 /**
  * Prevent text wrapping.

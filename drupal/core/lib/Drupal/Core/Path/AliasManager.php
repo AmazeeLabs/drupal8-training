@@ -157,7 +157,7 @@ class AliasManager implements AliasManagerInterface, CacheDecoratorInterface {
     // language. If we used a language different from the one conveyed by the
     // requested URL, we might end up being unable to check if there is a path
     // alias matching the URL path.
-    $langcode = $langcode ?: $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->id;
+    $langcode = $langcode ?: $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->getId();
 
     // If we already know that there are no paths for this alias simply return.
     if (empty($alias) || !empty($this->noPath[$langcode][$alias])) {
@@ -191,7 +191,7 @@ class AliasManager implements AliasManagerInterface, CacheDecoratorInterface {
     // language. If we used a language different from the one conveyed by the
     // requested URL, we might end up being unable to check if there is a path
     // alias matching the URL path.
-    $langcode = $langcode ?: $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->id;
+    $langcode = $langcode ?: $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->getId();
 
     // Check the path whitelist, if the top-level part before the first /
     // is not in the list, then there is no need to do anything further,
@@ -253,7 +253,7 @@ class AliasManager implements AliasManagerInterface, CacheDecoratorInterface {
   public function cacheClear($source = NULL) {
     if ($source) {
       foreach (array_keys($this->lookupMap) as $lang) {
-        $this->lookupMap[$lang][$source];
+        unset($this->lookupMap[$lang][$source]);
       }
     }
     else {

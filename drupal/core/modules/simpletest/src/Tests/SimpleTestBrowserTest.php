@@ -7,6 +7,7 @@
 
 namespace Drupal\simpletest\Tests;
 
+use Drupal\Core\Url;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -37,7 +38,7 @@ class SimpleTestBrowserTest extends WebTestBase {
     $this->drupalGet('test-page');
     $this->assertTrue($this->drupalGetHeader('Date'), 'An HTTP header was received.');
     $this->assertTitle(t('Test page | @site-name', array(
-      '@site-name' => \Drupal::config('system.site')->get('name'),
+      '@site-name' => $this->config('system.site')->get('name'),
     )));
     $this->assertNoTitle('Foo');
 
@@ -64,7 +65,7 @@ class SimpleTestBrowserTest extends WebTestBase {
       'name' => $user->getUsername(),
       'pass' => $user->pass_raw
     );
-    $this->drupalPostForm('user', $edit, t('Log in'), array(
+    $this->drupalPostForm('user/login', $edit, t('Log in'), array(
       'query' => array('destination' => 'user/logout'),
     ));
     $headers = $this->drupalGetHeaders(TRUE);
@@ -76,8 +77,7 @@ class SimpleTestBrowserTest extends WebTestBase {
     // @see drupal_valid_test_ua()
     // Not using File API; a potential error must trigger a PHP warning.
     unlink($this->siteDirectory . '/.htkey');
-    global $base_url;
-    $this->drupalGet(url($base_url . '/core/install.php', array('external' => TRUE, 'absolute' => TRUE)));
+    $this->drupalGet(Url::fromUri('base:core/install.php', array('external' => TRUE, 'absolute' => TRUE))->toString());
     $this->assertResponse(403, 'Cannot access install.php.');
   }
 
@@ -86,9 +86,13 @@ class SimpleTestBrowserTest extends WebTestBase {
    */
   public function testUserAgentValidation() {
     global $base_url;
+
+    // Logout the user which was logged in during test-setup.
+    $this->drupalLogout();
+
     $system_path = $base_url . '/' . drupal_get_path('module', 'system');
-    $HTTP_path = $system_path .'/tests/http.php?q=node';
-    $https_path = $system_path .'/tests/https.php?q=node';
+    $HTTP_path = $system_path .'/tests/http.php/user/login';
+    $https_path = $system_path .'/tests/https.php/user/login';
     // Generate a valid simpletest User-Agent to pass validation.
     $this->assertTrue(preg_match('/simpletest\d+/', $this->databasePrefix, $matches), 'Database prefix contains simpletest prefix.');
     $test_ua = drupal_generate_test_ua($matches[0]);

@@ -7,6 +7,7 @@
 
 namespace Drupal\migrate_drupal\Plugin\migrate\source\d6;
 
+use Drupal\migrate\Row;
 use Drupal\migrate\Plugin\SourceEntityInterface;
 use Drupal\migrate_drupal\Plugin\migrate\source\DrupalSqlBase;
 
@@ -23,6 +24,13 @@ class Node extends DrupalSqlBase implements SourceEntityInterface {
    * The join options between the node and the node_revisions table.
    */
   const JOIN = 'n.vid = nr.vid';
+
+  /**
+   * The default filter format.
+   *
+   * @var string
+   */
+  protected $filterDefaultFormat;
 
   /**
    * {@inheritdoc}
@@ -46,16 +54,30 @@ class Node extends DrupalSqlBase implements SourceEntityInterface {
       ))
       ->fields('nr', array(
         'vid',
-        'uid',
         'title',
         'body',
         'teaser',
-        'format',
+        'log',
         'timestamp',
+        'format',
       ));
+    $query->addField('n', 'uid', 'node_uid');
+    $query->addField('nr', 'uid', 'revision_uid');
     $query->innerJoin('node', 'n', static::JOIN);
 
+    if (isset($this->configuration['node_type'])) {
+      $query->condition('type', $this->configuration['node_type']);
+    }
+
     return $query;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function initializeIterator() {
+    $this->filterDefaultFormat = $this->variableGet('filter_default_format', '1');
+    return parent::initializeIterator();
   }
 
   /**
@@ -69,19 +91,31 @@ class Node extends DrupalSqlBase implements SourceEntityInterface {
       'body' => $this->t('Body'),
       'format' => $this->t('Format'),
       'teaser' => $this->t('Teaser'),
-      'uid' => $this->t('Authored by (uid)'),
+      'node_uid' => $this->t('Node authored by (uid)'),
+      'revision_uid' => $this->t('Revision authored by (uid)'),
       'created' => $this->t('Created timestamp'),
       'changed' => $this->t('Modified timestamp'),
       'status' => $this->t('Published'),
       'promote' => $this->t('Promoted to front page'),
       'sticky' => $this->t('Sticky at top of lists'),
       'revision' => $this->t('Create new revision'),
-      'log' => $this->t('Revision Log message'),
       'language' => $this->t('Language (fr, en, ...)'),
       'tnid' => $this->t('The translation set id for this node'),
       'timestamp' => $this->t('The timestamp the latest revision of this node was created.'),
     );
     return $fields;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function prepareRow(Row $row) {
+    // format = 0 can happen when the body field is hidden. Set the format to 1
+    // to avoid migration map issues (since the body field isn't used anyway).
+    if ($row->getSourceProperty('format') === '0') {
+      $row->setSourceProperty('format', $this->filterDefaultFormat);
+    }
+    return parent::prepareRow($row);
   }
 
   /**

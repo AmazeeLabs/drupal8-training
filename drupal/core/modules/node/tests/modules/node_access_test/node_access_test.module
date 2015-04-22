@@ -120,7 +120,7 @@ function node_access_test_node_access_records(NodeInterface $node) {
  */
 function node_access_test_add_field(NodeTypeInterface $type) {
   $field_storage = FieldStorageConfig::create(array(
-    'name' => 'private',
+    'field_name' => 'private',
     'entity_type' => 'node',
     'type' => 'integer',
   ));
@@ -151,5 +151,5 @@ function node_access_test_node_access(\Drupal\node\NodeInterface $node, $op, \Dr
     return AccessResult::forbidden()->setCacheable(FALSE);
   }
   // No opinion.
-  return AccessResult::create()->setCacheable(FALSE);
+  return AccessResult::neutral()->setCacheable(FALSE);
 }

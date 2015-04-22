@@ -41,7 +41,7 @@ class EntityDisplayModeAddForm extends EntityDisplayModeFormBase {
   public function validate(array $form, FormStateInterface $form_state) {
     parent::validate($form, $form_state);
 
-    form_set_value($form['id'], $this->targetEntityTypeId . '.' . $form_state->getValue('id'), $form_state);
+    $form_state->setValueForElement($form['id'], $this->targetEntityTypeId . '.' . $form_state->getValue('id'));
   }
 
   /**
@@ -49,11 +49,11 @@ class EntityDisplayModeAddForm extends EntityDisplayModeFormBase {
    */
   protected function prepareEntity() {
     $definition = $this->entityManager->getDefinition($this->targetEntityTypeId);
-    if (!$definition->isFieldable() || !$definition->hasViewBuilderClass()) {
+    if (!$definition->get('field_ui_base_route') || !$definition->hasViewBuilderClass()) {
       throw new NotFoundHttpException();
     }
 
-    $this->entity->targetEntityType = $this->targetEntityTypeId;
+    $this->entity->setTargetType($this->targetEntityTypeId);
   }
 
 }

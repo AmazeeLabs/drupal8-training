@@ -45,21 +45,22 @@ class SearchMultilingualTest extends ViewTestBase {
     // Create a content type and make it translatable.
     $type = $this->drupalCreateContentType();
     $edit = array(
-      'language_configuration[language_show]' => TRUE,
+      'language_configuration[language_alterable]' => TRUE,
     );
-    $this->drupalPostForm('admin/structure/types/manage/' . $type->type, $edit, t('Save content type'));
+    $this->drupalPostForm('admin/structure/types/manage/' . $type->id(), $edit, t('Save content type'));
     $edit = array(
       'entity_types[node]' => TRUE,
-      'settings[node][' . $type->type . '][translatable]' => TRUE,
-      'settings[node][' . $type->type . '][fields][title]' => TRUE,
-      'settings[node][' . $type->type . '][fields][body]' => TRUE,
+      'settings[node][' . $type->id() . '][translatable]' => TRUE,
+      'settings[node][' . $type->id() . '][fields][title]' => TRUE,
+      'settings[node][' . $type->id() . '][fields][body]' => TRUE,
     );
-    $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save'));
+    $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save configuration'));
+    \Drupal::entityManager()->clearCachedDefinitions();
 
     // Add a node in English, with title "sandwich".
     $values = array(
       'title' => 'sandwich',
-      'type' => $type->type,
+      'type' => $type->id(),
     );
     $node = $this->drupalCreateNode($values);
 

@@ -1,8 +1,18 @@
-base_field: tid
-base_table: taxonomy_term_data
-core: 8.0-dev
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - node
+    - taxonomy
+    - user
+id: test_groupwise_term
+label: test_groupwise
+module: views
+description: ''
+tag: default
+base_table: taxonomy_term_field_data
+base_field: tid
+core: 8.0-dev
 display:
   default:
     display_options:
@@ -18,14 +28,16 @@ display:
           id: name
           table: taxonomy_term_field_data
           plugin_id: taxonomy
-          provider: taxonomy
+          entity_type: taxonomy_term
+          entity_field: name
         nid:
           field: nid
           id: nid
           relationship: tid_representative
-          table: node
+          table: node_field_data
           plugin_id: node
-          provider: node
+          entity_type: node
+          entity_field: nid
       pager:
         options:
           items_per_page: 10
@@ -34,11 +46,10 @@ display:
         type: views_query
       relationships:
         tid_representative:
-          admin_label: ''
+          admin_label: 'Representative node'
           field: tid_representative
           group_type: group
           id: tid_representative
-          label: 'Representative node'
           relationship: none
           required: false
           subquery_namespace: ''
@@ -46,9 +57,8 @@ display:
           subquery_regenerate: true
           subquery_sort: node.nid
           subquery_view: ''
-          table: taxonomy_term_data
+          table: taxonomy_term_field_data
           plugin_id: groupwise_max
-          provider: views
       row:
         type: fields
       sorts:
@@ -56,9 +66,10 @@ display:
           field: tid
           id: tid
           order: DESC
-          table: taxonomy_term_data
+          table: taxonomy_term_field_data
           plugin_id: standard
-          provider: views
+          entity_type: taxonomy_term
+          entity_field: tid
       style:
         type: default
       title: test_groupwise
@@ -66,8 +77,3 @@ display:
     display_title: Master
     id: default
     position: 0
-label: test_groupwise
-langcode: und
-module: views
-id: test_groupwise_term
-tag: default

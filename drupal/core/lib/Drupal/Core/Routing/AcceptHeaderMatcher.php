@@ -8,33 +8,15 @@
 namespace Drupal\Core\Routing;
 
 use Drupal\Component\Utility\String;
-use Drupal\Core\ContentNegotiation;
-use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
+use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
  * Filters routes based on the media type specified in the HTTP Accept headers.
  */
 class AcceptHeaderMatcher implements RouteFilterInterface {
-
-  /**
-   * The content negotiation library.
-   *
-   * @var \Drupal\Core\ContentNegotiation
-   */
-  protected $contentNegotiation;
-
-  /**
-   * Constructs a new AcceptHeaderMatcher.
-   *
-   * @param \Drupal\Core\ContentNegotiation $content_negotiation
-   *   The content negotiation library.
-   */
-  public function __construct(ContentNegotiation $content_negotiation) {
-    $this->contentNegotiation = $content_negotiation;
-  }
 
   /**
    * {@inheritdoc}
@@ -44,7 +26,7 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
     // @todo replace by proper content negotiation library.
     $acceptable_mime_types = $request->getAcceptableContentTypes();
     $acceptable_formats = array_filter(array_map(array($request, 'getFormat'), $acceptable_mime_types));
-    $primary_format = $this->contentNegotiation->getContentType($request);
+    $primary_format = $request->getRequestFormat();
 
     foreach ($collection as $name => $route) {
       // _format could be a |-delimited list of supported formats.
@@ -80,6 +62,13 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
     // \Symfony\Component\Routing\Exception\ResourceNotFoundException here
     // because we don't want to return a 404 status code, but rather a 406.
     throw new NotAcceptableHttpException(String::format('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function applies(Route $route) {
+    return TRUE;
   }
 
 }

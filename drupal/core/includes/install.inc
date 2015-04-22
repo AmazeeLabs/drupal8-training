@@ -5,9 +5,11 @@
  * API functions for installing modules and themes.
  */
 
+use Drupal\Component\Utility\Unicode;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\OpCodeCache;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Extension\ExtensionDiscovery;
 use Drupal\Core\Site\Settings;
@@ -464,18 +466,22 @@ function drupal_install_config_directories() {
 
   // Add a randomized config directory name to settings.php, unless it was
   // manually defined in the existing already.
-  if (empty($config_directories)) {
-    $config_directories_hash = Crypt::randomBytesBase64(55);
-    $settings['config_directories'] = array(
-      CONFIG_ACTIVE_DIRECTORY => (object) array(
-        'value' => conf_path() . '/files/config_' . $config_directories_hash . '/active',
-        'required' => TRUE,
-      ),
-      CONFIG_STAGING_DIRECTORY => (object) array(
-        'value' => conf_path() . '/files/config_' . $config_directories_hash . '/staging',
-        'required' => TRUE,
-      ),
-    );
+  $settings = [];
+  $config_directories_hash = Crypt::randomBytesBase64(55);
+  if (empty($config_directories[CONFIG_ACTIVE_DIRECTORY])) {
+    $settings['config_directories'][CONFIG_ACTIVE_DIRECTORY] = (object) [
+      'value' => conf_path() . '/files/config_' . $config_directories_hash . '/active',
+      'required' => TRUE,
+    ];
+  }
+  if (empty($config_directories[CONFIG_STAGING_DIRECTORY])) {
+    $settings['config_directories'][CONFIG_STAGING_DIRECTORY] = (object) [
+      'value' => conf_path() . '/files/config_' . $config_directories_hash . '/staging',
+      'required' => TRUE,
+    ];
+  }
+
+  if (!empty($settings)) {
     // Rewrite settings.php, which also sets the value as global variable.
     drupal_rewrite_settings($settings);
   }
@@ -513,41 +519,6 @@ function drupal_install_config_directories() {
 }
 
 /**
- * Checks whether a config directory exists and is writable.
- *
- * This partially duplicates install_ensure_config_directory(), but is required
- * since the installer would create the config directory too early in the
- * installation process otherwise (e.g., when only visiting install.php when
- * there is a settings.php already, but not actually executing the
- * installation).
- *
- * @param string $type
- *   Type of config directory to return. Drupal core provides 'active' and
- *   'staging'.
- *
- * @return bool
- *   TRUE if the config directory exists and is writable.
- */
-function install_verify_config_directory($type) {
-  global $config_directories;
-  if (!isset($config_directories[$type])) {
-    return FALSE;
-  }
-  // config_get_config_directory() throws an exception when the passed $type
-  // does not exist in $config_directories. This can happen if there is a
-  // prepared settings.php that defines $config_directories already.
-  try {
-    $config_directory = config_get_config_directory($type);
-    if (is_dir($config_directory) && is_writable($config_directory)) {
-      return TRUE;
-    }
-  }
-  catch (\Exception $e) {
-  }
-  return FALSE;
-}
-
-/**
  * Ensures that the config directory exists and is writable, or can be made so.
  *
  * @param string $type
@@ -581,17 +552,11 @@ function install_ensure_config_directory($type) {
  *   The list of modules to install.
  */
 function drupal_verify_profile($install_state) {
-  include_once __DIR__ . '/file.inc';
-  include_once __DIR__ . '/common.inc';
-
   $profile = $install_state['parameters']['profile'];
-  if (!isset($profile) || !isset($install_state['profiles'][$profile])) {
-    throw new Exception(install_no_profile_error());
-  }
   $info = $install_state['profile_info'];
 
   // Get the list of available modules for the selected installation profile.
-  $listing = new ExtensionDiscovery();
+  $listing = new ExtensionDiscovery(DRUPAL_ROOT);
   $present_modules = array();
   foreach ($listing->scan('module') as $present_module) {
     $present_modules[] = $present_module->getName();
@@ -609,7 +574,7 @@ function drupal_verify_profile($install_state) {
   if (count($missing_modules)) {
     $modules = array();
     foreach ($missing_modules as $module) {
-      $modules[] = '<span class="admin-missing">' . drupal_ucfirst($module) . '</span>';
+      $modules[] = '<span class="admin-missing">' . Unicode::ucfirst($module) . '</span>';
     }
     $requirements['required_modules'] = array(
       'title'       => t('Required modules'),
@@ -647,22 +612,13 @@ function drupal_install_system($install_state) {
   // Install base system configuration.
   \Drupal::service('config.installer')->installDefaultConfig('core', 'core');
 
-  // Install System module.
-  $kernel->getContainer()->get('module_handler')->install(array('system'), FALSE);
-
-  // DrupalKernel::prepareLegacyRequest() above calls into
-  // DrupalKernel::bootCode(), which primes file_get_stream_wrappers()'s static
-  // list of custom stream wrappers that are based on the currently enabled
-  // list of modules (none).
-  // @todo Custom stream wrappers of a new module have to be registered as soon
-  //   as the module is installed/enabled. Fix either ModuleHandler::install()
-  //   and/or DrupalKernel::updateModules().
-  // @see https://drupal.org/node/2028109
-  drupal_static_reset('file_get_stream_wrappers');
+  // Install System module and rebuild the newly available routes.
+  $kernel->getContainer()->get('module_installer')->install(array('system'), FALSE);
+  \Drupal::service('router.builder')->rebuild();
 
   // Ensure default language is saved.
   if (isset($install_state['parameters']['langcode'])) {
-    \Drupal::config('system.site')
+    \Drupal::configFactory()->getEditable('system.site')
       ->set('langcode', $install_state['parameters']['langcode'])
       ->save();
   }
@@ -961,12 +917,6 @@ function drupal_requirements_url($severity) {
  *   Array of the installation profile's requirements.
  */
 function drupal_check_profile($profile, array $install_state) {
-  include_once __DIR__ . '/file.inc';
-
-  if (!isset($profile) || !isset($install_state['profiles'][$profile])) {
-    throw new Exception(install_no_profile_error());
-  }
-
   $info = install_profile_info($profile);
 
   // Collect requirement testing results.
@@ -1018,11 +968,14 @@ function drupal_check_module($module) {
     // Print any error messages
     foreach ($requirements as $requirement) {
       if (isset($requirement['severity']) && $requirement['severity'] == REQUIREMENT_ERROR) {
-        $message = $requirement['description'];
+        $message = SafeMarkup::escape($requirement['description']);
         if (isset($requirement['value']) && $requirement['value']) {
           $message .= ' (' . t('Currently using !item !version', array('!item' => $requirement['title'], '!version' => $requirement['value'])) . ')';
         }
-        drupal_set_message($message, 'error');
+        // The string was previously checked as safe or escaped properly with
+        // SafeMarkup::escape() method and the concatinated message string is
+        // designated safe by running through the t() function.
+        drupal_set_message(SafeMarkup::set($message), 'error');
       }
     }
     return FALSE;

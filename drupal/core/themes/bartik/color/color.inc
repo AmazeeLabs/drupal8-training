@@ -6,9 +6,8 @@
  */
 
 // Put the logo path into JavaScript for the live preview.
-$js = array('color' => array('logo' => theme_get_setting('logo.url', 'bartik')));
-$js_attached['#attached']['js'][] = array('data' => $js, 'type' => 'setting');
-drupal_render($js_attached);
+$js_attached['#attached']['drupalSettings']['color']['logo'] = theme_get_setting('logo.url', 'bartik');
+drupal_process_attached($js_attached);
 
 $info = array(
   // Available colors and color labels used in theme.
@@ -104,7 +103,7 @@ $info = array(
 
   // Files to copy.
   'copy' => array(
-    'logo.png',
+    'logo.svg',
   ),
 
   // Gradient definitions.
@@ -120,7 +119,6 @@ $info = array(
   ),
 
   // Preview files.
-  'preview_css' => 'color/preview.css',
-  'preview_js' => 'color/preview.js',
+  'preview_library' => 'bartik/color.preview',
   'preview_html' => 'color/preview.html',
 );

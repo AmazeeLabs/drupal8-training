@@ -26,6 +26,16 @@ class ConfigEntityListTest extends WebTestBase {
   public static $modules = array('config_test');
 
   /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+    // Delete the override config_test entity since it is not required by this
+    // test.
+    \Drupal::entityManager()->getStorage('config_test')->load('override')->delete();
+  }
+
+  /**
    * Tests entity list builder methods.
    */
   function testList() {
@@ -48,21 +58,24 @@ class ConfigEntityListTest extends WebTestBase {
       'edit' => array (
         'title' => t('Edit'),
         'weight' => 10,
-      ) + $entity->urlInfo()->toArray(),
+        'url' => $entity->urlInfo(),
+      ),
       'disable' => array(
         'title' => t('Disable'),
         'weight' => 40,
-      ) + $entity->urlInfo('disable')->toArray(),
+        'url' => $entity->urlInfo('disable'),
+      ),
       'delete' => array (
         'title' => t('Delete'),
         'weight' => 100,
-      ) + $entity->urlInfo('delete-form')->toArray(),
+        'url' => $entity->urlInfo('delete-form'),
+      ),
     );
 
     $actual_operations = $controller->getOperations($entity);
     // Sort the operations to normalize link order.
     uasort($actual_operations, array('Drupal\Component\Utility\SortArray', 'sortByWeightElement'));
-    $this->assertIdentical($expected_operations, $actual_operations, 'The operations are identical.');
+    $this->assertEqual($expected_operations, $actual_operations, 'The operations are identical.');
 
     // Test buildHeader() method.
     $expected_items = array(
@@ -71,7 +84,7 @@ class ConfigEntityListTest extends WebTestBase {
       'operations' => 'Operations',
     );
     $actual_items = $controller->buildHeader();
-    $this->assertIdentical($expected_items, $actual_items, 'Return value from buildHeader matches expected.');
+    $this->assertEqual($expected_items, $actual_items, 'Return value from buildHeader matches expected.');
 
     // Test buildRow() method.
     $build_operations = $controller->buildOperations($entity);
@@ -83,7 +96,7 @@ class ConfigEntityListTest extends WebTestBase {
       ),
     );
     $actual_items = $controller->buildRow($entity);
-    $this->assertIdentical($expected_items, $actual_items, 'Return value from buildRow matches expected.');
+    $this->assertEqual($expected_items, $actual_items, 'Return value from buildRow matches expected.');
     // Test sorting.
     $storage = $controller->getStorage();
     $entity = $storage->create(array(
@@ -120,17 +133,19 @@ class ConfigEntityListTest extends WebTestBase {
       'edit' => array(
         'title' => t('Edit'),
         'weight' => 10,
-      ) + $entity->urlInfo()->toArray(),
+        'url' => $entity->urlInfo(),
+      ),
       'delete' => array(
         'title' => t('Delete'),
         'weight' => 100,
-      ) + $entity->urlInfo('delete-form')->toArray(),
+        'url' => $entity->urlInfo('delete-form'),
+      ),
     );
 
     $actual_operations = $controller->getOperations($entity);
     // Sort the operations to normalize link order.
     uasort($actual_operations, array('Drupal\Component\Utility\SortArray', 'sortByWeightElement'));
-    $this->assertIdentical($expected_operations, $actual_operations, 'The operations are identical.');
+    $this->assertEqual($expected_operations, $actual_operations, 'The operations are identical.');
   }
 
   /**
@@ -209,7 +224,7 @@ class ConfigEntityListTest extends WebTestBase {
     $this->assertLinkByHref('admin/structure/config_test/manage/albatross/delete');
     $this->clickLink('Delete', 1);
     $this->assertResponse(200);
-    $this->assertTitle('Are you sure you want to delete Albatross | Drupal');
+    $this->assertTitle('Are you sure you want to delete the test configuration Albatross? | Drupal');
     $this->drupalPostForm(NULL, array(), t('Delete'));
 
     // Verify that the text of the label and machine name does not appear in
@@ -220,7 +235,7 @@ class ConfigEntityListTest extends WebTestBase {
     // Delete the original entity using the operations link.
     $this->clickLink('Delete');
     $this->assertResponse(200);
-    $this->assertTitle('Are you sure you want to delete Default | Drupal');
+    $this->assertTitle('Are you sure you want to delete the test configuration Default? | Drupal');
     $this->drupalPostForm(NULL, array(), t('Delete'));
 
     // Verify that the text of the label and machine name does not appear in
@@ -230,6 +245,36 @@ class ConfigEntityListTest extends WebTestBase {
 
     // Confirm that the empty text is displayed.
     $this->assertText('There is no Test configuration yet.');
+  }
+
+  /**
+   * Test paging.
+   */
+  public function testPager() {
+    $storage = \Drupal::entityManager()->getListBuilder('config_test')->getStorage();
+
+    // Create 51 test entities.
+    for ($i = 1; $i < 52; $i++) {
+      $storage->create(array(
+        'id' => str_pad($i, 2, '0', STR_PAD_LEFT),
+        'label' => 'Test config entity ' . $i,
+        'weight' => $i,
+        'protected_property' => $i,
+      ))->save();
+    }
+
+    // Load the listing page.
+    $this->drupalGet('admin/structure/config_test');
+
+    // Item 51 should not be present.
+    $this->assertRaw('Test config entity 50', 'Config entity 50 is shown.');
+    $this->assertNoRaw('Test config entity 51', 'Config entity 51 is on the next page.');
+
+    // Browse to the next page.
+    $this->clickLink(t('Page 2'));
+    $this->assertNoRaw('Test config entity 50', 'Test config entity 50 is on the previous page.');
+    $this->assertRaw('dotted.default', 'Default config entity appears on page 2.');
+    $this->assertRaw('Test config entity 51', 'Test config entity 51 is on page 2.');
   }
 
 }

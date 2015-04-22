@@ -22,7 +22,7 @@
       function initFileValidation(selector) {
         $context.find(selector)
           .once('fileValidate')
-          .on('change.fileValidate', { extensions: elements[selector] }, Drupal.file.validateExtension);
+          .on('change.fileValidate', {extensions: elements[selector]}, Drupal.file.validateExtension);
       }
 
       if (settings.file && settings.file.elements) {
@@ -134,10 +134,10 @@
      * Prevent file uploads when using buttons not intended to upload.
      */
     disableFields: function (event) {
-      var $clickedButton = $(this);
+      var $clickedButton = $(this).findOnce('ajax');
 
       // Only disable upload fields for Ajax buttons.
-      if (!$clickedButton.hasClass('ajax-processed')) {
+      if (!$clickedButton.length) {
         return;
       }
 

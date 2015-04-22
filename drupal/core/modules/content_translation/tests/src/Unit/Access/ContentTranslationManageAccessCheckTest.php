@@ -25,7 +25,7 @@ class ContentTranslationManageAccessCheckTest extends UnitTestCase {
   /**
    * Tests the create access method.
    *
-   * @covers ::access()
+   * @covers ::access
    */
   public function testCreateAccess() {
     // Set the mock translation handler.
@@ -70,8 +70,8 @@ class ContentTranslationManageAccessCheckTest extends UnitTestCase {
       ->with()
       ->will($this->returnValue(array()));
     $entity->expects($this->once())
-      ->method('getCacheTag')
-      ->will($this->returnValue(array('node' => 1337)));
+      ->method('getCacheTags')
+      ->will($this->returnValue(array('node:1337')));
 
     // Set the route requirements.
     $route = new Route('test_route');

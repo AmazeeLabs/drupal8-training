@@ -1,33 +1,46 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies:
+  content:
+    - entity_test:entity_test:aa0c61cb-b7bb-4795-972a-493dabcf529c
+id: test_entity_area
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
       defaults:
-        fields: '0'
-        pager: '0'
-        pager_options: '0'
-        sorts: '0'
+        fields: false
+        pager: false
+        sorts: false
       header:
         entity_entity_test:
           field: entity_entity_test
           id: entity_entity_test
           table: views
-          entity_id: 1
+          target: 'aa0c61cb-b7bb-4795-972a-493dabcf529c'
           view_mode: full
           plugin_id: entity
-          provider: views
       footer:
         entity_entity_test:
           field: entity_entity_test
           id: entity_entity_test
           table: views
-          entity_id: '!1'
+          target: '!1'
           view_mode: full
           plugin_id: entity
-          provider: views
+        entity_block:
+          field: entity_block
+          id: entity_block
+          table: views
+          target: 'test_block'
+          view_mode: full
+          plugin_id: entity
       fields:
         id:
           field: id
@@ -35,23 +48,17 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views_test_data
       arguments:
         id:
           id: id
           table: views_test_data
           field: id
           plugin_id: numeric
-          provider: views_test_data
       pager:
         options:
-          offset: '0'
+          offset: 0
         type: none
-      pager_options: {  }
     display_plugin: default
     display_title: Master
     id: default
     position: 0
-label: ''
-id: test_entity_area
-tag: ''

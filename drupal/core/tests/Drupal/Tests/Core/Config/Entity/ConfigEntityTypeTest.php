@@ -38,7 +38,7 @@ class ConfigEntityTypeTest extends UnitTestCase {
    * Tests that we get an exception when the length of the config prefix that is
    * returned by getConfigPrefix() exceeds the maximum defined prefix length.
    *
-   * @covers ::getConfigPrefix()
+   * @covers ::getConfigPrefix
    */
   public function testConfigPrefixLengthExceeds() {
     $message_text = 'The configuration file name prefix @config_prefix exceeds the maximum character limit of @max_char.';
@@ -61,7 +61,7 @@ class ConfigEntityTypeTest extends UnitTestCase {
    * Tests that a valid config prefix returned by getConfigPrefix()
    * does not throw an exception and is formatted as expected.
    *
-   * @covers ::getConfigPrefix()
+   * @covers ::getConfigPrefix
    */
   public function testConfigPrefixLengthValid() {
     // A provider length of 24 and config_prefix length of 58 (+1 for the .)
@@ -73,6 +73,40 @@ class ConfigEntityTypeTest extends UnitTestCase {
     $config_entity = $this->setUpConfigEntityType($definition);
     $expected_prefix = $definition['provider'] . '.' . $definition['config_prefix'];
     $this->assertEquals($expected_prefix, $config_entity->getConfigPrefix());
+  }
+
+  /**
+   * @covers ::__construct
+   */
+  public function testConstruct() {
+    $config_entity = new ConfigEntityType([
+      'id' => 'example_config_entity_type',
+    ]);
+    $this->assertEquals('Drupal\Core\Config\Entity\ConfigEntityStorage', $config_entity->getStorageClass());
+  }
+
+  /**
+   * @covers ::__construct
+   *
+   * @expectedException \Drupal\Core\Config\Entity\Exception\ConfigEntityStorageClassException
+   * @expectedExceptionMessage \Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage is not \Drupal\Core\Config\Entity\ConfigEntityStorage or it does not extend it
+   */
+  public function testConstructBadStorage() {
+    new ConfigEntityType([
+      'id' => 'example_config_entity_type',
+      'handlers' => ['storage' => '\Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage']
+    ]);
+  }
+
+  /**
+   * @covers ::setStorageClass
+   *
+   * @expectedException \Drupal\Core\Config\Entity\Exception\ConfigEntityStorageClassException
+   * @expectedExceptionMessage \Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage is not \Drupal\Core\Config\Entity\ConfigEntityStorage or it does not extend it
+   */
+  public function testSetStorageClass() {
+    $config_entity = $this->setUpConfigEntityType([]);
+    $config_entity->setStorageClass('\Drupal\Core\Entity\KeyValueStore\KeyValueEntityStorage');
   }
 
 }

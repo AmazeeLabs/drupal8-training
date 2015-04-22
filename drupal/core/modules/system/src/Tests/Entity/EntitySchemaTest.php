@@ -11,6 +11,8 @@ use Drupal\Component\Utility\String;
 
 /**
  * Tests adding a custom bundle field.
+ *
+ * @group system
  */
 class EntitySchemaTest extends EntityUnitTestBase  {
 
@@ -27,17 +29,6 @@ class EntitySchemaTest extends EntityUnitTestBase  {
    * @var array
    */
   public static $modules = array('menu_link');
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Entity Schema',
-      'description' => 'Tests entity field schema API for base and bundle fields.',
-      'group' => 'Entity API',
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -72,7 +63,6 @@ class EntitySchemaTest extends EntityUnitTestBase  {
     $this->assertTrue($this->database->schema()->tableExists($table), 'Table created');
 
     // Make sure the field schema can be deleted.
-    $this->uninstallModule('entity_schema_test');
     $this->entityManager->onFieldStorageDefinitionDelete($storage_definitions['custom_base_field']);
     $this->entityManager->onFieldStorageDefinitionDelete($storage_definitions['custom_bundle_field']);
     $this->assertFalse($this->database->schema()->fieldExists($base_table, $base_column), 'Table column dropped');
@@ -138,6 +128,22 @@ class EntitySchemaTest extends EntityUnitTestBase  {
   protected function refreshServices() {
     parent::refreshServices();
     $this->database = $this->container->get('database');
+  }
+
+  /**
+   * Tests that modifying the UUID field for a translatable entity works.
+   */
+  public function testModifyingTranslatableColumnSchema() {
+    $this->installModule('entity_schema_test');
+    $this->updateEntityType(TRUE);
+    $fields = ['revision_log', 'uuid'];
+    foreach ($fields as $field_name) {
+      $original_definition = $this->entityManager->getBaseFieldDefinitions('entity_test')[$field_name];
+      $new_definition = clone $original_definition;
+      $new_definition->setLabel($original_definition->getLabel() . ', the other one');
+      $this->assertTrue($this->entityManager->getStorage('entity_test')
+        ->requiresFieldDataMigration($new_definition, $original_definition));
+    }
   }
 
 }

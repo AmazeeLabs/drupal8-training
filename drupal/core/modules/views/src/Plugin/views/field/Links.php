@@ -7,7 +7,9 @@
 
 namespace Drupal\views\Plugin\views\field;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url as UrlObject;
 
 /**
  * A abstract handler which provides a collection of links.
@@ -24,19 +26,19 @@ abstract class Links extends FieldPluginBase {
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::defineOptions().
+   * {@inheritdoc}
    */
   public function defineOptions() {
     $options = parent::defineOptions();
 
     $options['fields'] = array('default' => array());
-    $options['destination'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['destination'] = array('default' => TRUE);
 
     return $options;
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::defineOptions().
+   * {@inheritdoc}
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
@@ -44,15 +46,15 @@ abstract class Links extends FieldPluginBase {
     $field_options = $this->getPreviousFieldLabels();
     $form['fields'] = array(
       '#type' => 'checkboxes',
-      '#title' => t('Fields'),
-      '#description' => t('Fields to be included as links.'),
+      '#title' => $this->t('Fields'),
+      '#description' => $this->t('Fields to be included as links.'),
       '#options' => $field_options,
       '#default_value' => $this->options['fields'],
     );
     $form['destination'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Include destination'),
-      '#description' => t('Include a "destination" parameter in the link to return the user to the original view upon completing the link action.'),
+      '#title' => $this->t('Include destination'),
+      '#description' => $this->t('Include a "destination" parameter in the link to return the user to the original view upon completing the link action.'),
       '#default_value' => $this->options['destination'],
     );
   }
@@ -71,15 +73,19 @@ abstract class Links extends FieldPluginBase {
       }
       $title = $this->view->field[$field]->last_render_text;
       $path = '';
+      $url = NULL;
       if (!empty($this->view->field[$field]->options['alter']['path'])) {
         $path = $this->view->field[$field]->options['alter']['path'];
       }
+      elseif (!empty($this->view->field[$field]->options['alter']['url']) && $this->view->field[$field]->options['alter']['url'] instanceof UrlObject) {
+        $url = $this->view->field[$field]->options['alter']['url'];
+      }
       // Make sure that tokens are replaced for this paths as well.
       $tokens = $this->getRenderTokens(array());
-      $path = strip_tags(decode_entities(strtr($path, $tokens)));
+      $path = strip_tags(String::decodeEntities($this->viewsTokenReplace($path, $tokens)));
 
       $links[$field] = array(
-        'href' => $path,
+        'url' => $path ? UrlObject::fromUri('internal:/' . $path) : $url,
         'title' => $title,
       );
       if (!empty($this->options['destination'])) {
@@ -91,7 +97,7 @@ abstract class Links extends FieldPluginBase {
   }
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::query().
+   * {@inheritdoc}
    */
   public function query() {
   }

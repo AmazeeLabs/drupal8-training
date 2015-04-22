@@ -1,7 +1,14 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_cache
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_plugin: default
@@ -15,22 +22,19 @@ display:
           table: views_test_data
           field: id
           relationship: none
-          provider: views_test_data
         name:
           id: name
           table: views_test_data
           field: name
           relationship: none
-          provider: views_test_data
         age:
           id: age
           table: views_test_data
           field: age
           relationship: none
-          provider: views_test_data
       defaults:
-        fields: '0'
-        sorts: '0'
+        fields: false
+        sorts: false
       sorts:
         id:
           order: ASC
@@ -38,8 +42,15 @@ display:
           table: views_test_data
           field: id
           relationship: none
-          provider: views_test_data
-label: ''
-id: test_cache
-tag: ''
-base_field: nid
+
+  page_1:
+    display_plugin: page
+    id: page_1
+    display_options:
+      defaults:
+        pager: false
+      pager:
+        type: full
+        options:
+          items_per_page: 2
+

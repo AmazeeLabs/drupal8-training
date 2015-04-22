@@ -87,7 +87,7 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
     foreach ($this->availableMethods() as $method) {
       $lowered_method = strtolower($method);
       $permissions["restful $lowered_method $this->pluginId"] = array(
-        'title' => t('Access @method on %label resource', array('@method' => $method, '%label' => $definition['label'])),
+        'title' => $this->t('Access @method on %label resource', array('@method' => $method, '%label' => $definition['label'])),
       );
     }
     return $permissions;
@@ -206,8 +206,6 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
       // The HTTP method is a requirement for this route.
       '_method' => $method,
       '_permission' => "restful $lower_method $this->pluginId",
-    ), array(
-      '_access_mode' => AccessManagerInterface::ACCESS_MODE_ANY,
     ));
     return $route;
   }

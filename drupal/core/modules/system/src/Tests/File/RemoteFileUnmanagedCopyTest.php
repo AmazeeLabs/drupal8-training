@@ -33,10 +33,10 @@ class RemoteFileUnmanagedCopyTest extends UnmanagedCopyTest {
    *
    * @var string
    */
-  protected $classname = 'Drupal\file_test\DummyRemoteStreamWrapper';
+  protected $classname = 'Drupal\file_test\StreamWrapper\DummyRemoteStreamWrapper';
 
   protected function setUp() {
     parent::setUp();
-    \Drupal::config('system.file')->set('default_scheme', 'dummy-remote')->save();
+    $this->config('system.file')->set('default_scheme', 'dummy-remote')->save();
   }
 }

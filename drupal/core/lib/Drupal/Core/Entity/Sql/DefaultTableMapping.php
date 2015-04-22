@@ -7,12 +7,21 @@
 
 namespace Drupal\Core\Entity\Sql;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
  * Defines a default table mapping class.
  */
 class DefaultTableMapping implements TableMappingInterface {
+
+  /**
+   * The entity type definition.
+   *
+   * @var \Drupal\Core\Entity\ContentEntityTypeInterface
+   */
+  protected $entityType;
 
   /**
    * The field storage definitions of this mapping.
@@ -75,11 +84,14 @@ class DefaultTableMapping implements TableMappingInterface {
   /**
    * Constructs a DefaultTableMapping.
    *
+   * @param \Drupal\Core\Entity\ContentEntityTypeInterface $entity_type
+   *   The entity type definition.
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface[] $storage_definitions
    *   A list of field storage definitions that should be available for the
    *   field columns of this table mapping.
    */
-  public function __construct(array $storage_definitions) {
+  public function __construct(ContentEntityTypeInterface $entity_type, array $storage_definitions) {
+    $this->entityType = $entity_type;
     $this->fieldStorageDefinitions = $storage_definitions;
   }
 
@@ -128,20 +140,81 @@ class DefaultTableMapping implements TableMappingInterface {
   /**
    * {@inheritdoc}
    */
-  public function getColumnNames($field_name) {
-    if (!isset($this->columnMapping[$field_name])) {
-      $column_names = array_keys($this->fieldStorageDefinitions[$field_name]->getColumns());
-      if (count($column_names) == 1) {
-        $this->columnMapping[$field_name] = array(reset($column_names) => $field_name);
+  public function getFieldTableName($field_name) {
+    $result = NULL;
+
+    if (isset($this->fieldStorageDefinitions[$field_name])) {
+      // Since a field may be stored in more than one table, we inspect tables
+      // in order of relevance: the data table if present is the main place
+      // where field data is stored, otherwise the base table is responsible for
+      // storing field data. Revision metadata is an exception as it's stored
+      // only in the revision table.
+      // @todo The table mapping itself should know about entity tables. See
+      //   https://www.drupal.org/node/2274017.
+      /** @var \Drupal\Core\Entity\Sql\SqlContentEntityStorage $storage */
+      $storage = \Drupal::entityManager()->getStorage($this->entityType->id());
+      $table_names = array(
+        $storage->getDataTable(),
+        $storage->getBaseTable(),
+        $storage->getRevisionTable(),
+      );
+
+      // Collect field columns.
+      $field_columns = array();
+      $storage_definition = $this->fieldStorageDefinitions[$field_name];
+      foreach (array_keys($storage_definition->getColumns()) as $property_name) {
+        $field_columns[] = $this->getFieldColumnName($storage_definition, $property_name);
       }
-      else {
-        $this->columnMapping[$field_name] = array();
-        foreach ($column_names as $column_name) {
-          $this->columnMapping[$field_name][$column_name] = $field_name . '__' . $column_name;
+
+      foreach (array_filter($table_names) as $table_name) {
+        $columns = $this->getAllColumns($table_name);
+        // We assume finding one field column belonging to the mapping is enough
+        // to identify the field table.
+        if (array_intersect($columns, $field_columns)) {
+          $result = $table_name;
+          break;
         }
       }
     }
+
+    if (!isset($result)) {
+      throw new SqlContentEntityStorageException(String::format('Table information not available for the "@field_name" field.', array('@field_name' => $field_name)));
+    }
+
+    return $result;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getColumnNames($field_name) {
+    if (!isset($this->columnMapping[$field_name])) {
+      $this->columnMapping[$field_name] = array();
+      $storage_definition = $this->fieldStorageDefinitions[$field_name];
+      foreach (array_keys($this->fieldStorageDefinitions[$field_name]->getColumns()) as $property_name) {
+        $this->columnMapping[$field_name][$property_name] = $this->getFieldColumnName($storage_definition, $property_name);
+      }
+    }
     return $this->columnMapping[$field_name];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldColumnName(FieldStorageDefinitionInterface $storage_definition, $property_name) {
+    $field_name = $storage_definition->getName();
+
+    if ($this->allowsSharedTableStorage($storage_definition)) {
+      $column_name = count($storage_definition->getColumns()) == 1 ? $field_name :  $field_name . '__' . $property_name;
+    }
+    elseif ($this->requiresDedicatedTableStorage($storage_definition)) {
+      $column_name = !in_array($property_name, $this->getReservedColumns()) ? $field_name . '_' . $property_name : $property_name;
+    }
+    else {
+      throw new SqlContentEntityStorageException(String::format('Column information not available for the "@field_name" field.', array('@field_name' => $field_name)));
+    }
+
+    return $column_name;
   }
 
   /**
@@ -317,13 +390,6 @@ class DefaultTableMapping implements TableMappingInterface {
       $table_name = $entity_type . $separator . $field_hash;
     }
     return $table_name;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getFieldColumnName(FieldStorageDefinitionInterface $storage_definition, $column) {
-    return in_array($column, $this->getReservedColumns()) ? $column : $storage_definition->getName() . '_' . $column;
   }
 
 }

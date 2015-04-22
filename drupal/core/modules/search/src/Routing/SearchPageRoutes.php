@@ -57,7 +57,7 @@ class SearchPageRoutes implements ContainerInjectionInterface {
       $routes['search.view'] = new Route(
         '/search',
         array(
-          '_content' => 'Drupal\search\Controller\SearchController::redirectSearchPage',
+          '_controller' => 'Drupal\search\Controller\SearchController::redirectSearchPage',
           '_title' => 'Search',
           'entity' => $default_page,
         ),
@@ -79,8 +79,28 @@ class SearchPageRoutes implements ContainerInjectionInterface {
       $routes["search.view_$entity_id"] = new Route(
         '/search/' . $entity->getPath(),
         array(
-          '_content' => 'Drupal\search\Controller\SearchController::view',
+          '_controller' => 'Drupal\search\Controller\SearchController::view',
           '_title' => 'Search',
+          'entity' => $entity_id,
+        ),
+        array(
+          '_entity_access' => 'entity.view',
+          '_permission' => 'search content',
+        ),
+        array(
+          'parameters' => array(
+            'entity' => array(
+              'type' => 'entity:search_page',
+            ),
+          ),
+        )
+      );
+
+      $routes["search.help_$entity_id"] = new Route(
+        '/search/' . $entity->getPath() . '/help',
+        array(
+          '_controller' => 'Drupal\search\Controller\SearchController::searchHelp',
+          '_title' => 'Search help',
           'entity' => $entity_id,
         ),
         array(

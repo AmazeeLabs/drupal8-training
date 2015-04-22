@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+2.6.0
+-----
+
+ * added a new serializer: `PropertyNormalizer`. Like `GetSetMethodNormalizer`,
+   this normalizer will map an object's properties to an array.
+ * added circular references handling for `GetSetMethodNormalizer`
+
 2.5.0
 -----
 

@@ -7,8 +7,7 @@
 
 namespace Drupal\aggregator\Plugin\views\row;
 
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\Plugin\views\row\RowPluginBase;
+use Drupal\views\Plugin\views\row\RssPluginBase;
 
 /**
  * Defines a row plugin which loads an aggregator item and renders as RSS.
@@ -22,7 +21,7 @@ use Drupal\views\Plugin\views\row\RowPluginBase;
  *   display_types = {"feed"}
  * )
  */
-class Rss extends RowPluginBase {
+class Rss extends RssPluginBase {
 
   /**
    * The table the aggregator item is using for storage.
@@ -41,30 +40,7 @@ class Rss extends RowPluginBase {
   /**
    * {@inheritdoc}
    */
-  protected function defineOptions() {
-    $options = parent::defineOptions();
-
-    $options['view_mode'] = array('default' => 'default');
-
-    return $options;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
-    $form['view_mode'] = array(
-      '#type' => 'select',
-      '#title' => t('Display type'),
-      '#options' => array(
-        'fulltext' => t('Full text'),
-        'teaser' => t('Title plus teaser'),
-        'title' => t('Title only'),
-        'default' => t('Use default RSS settings'),
-      ),
-      '#default_value' => $this->options['view_mode'],
-    );
-  }
+  protected $entityTypeId = 'aggregator_item';
 
   /**
    * {@inheritdoc}
@@ -73,9 +49,9 @@ class Rss extends RowPluginBase {
     $entity = $row->_entity;
 
     $item = new \stdClass();
-    foreach ($entity->getProperties() as $name => $value) {
+    foreach ($entity as $name => $field) {
       // views_view_row_rss takes care about the escaping.
-      $item->{$name} = $value->value;
+      $item->{$name} = $field->value;
     }
 
     $item->elements = array(
@@ -103,7 +79,7 @@ class Rss extends RowPluginBase {
       '#options' => $this->options,
       '#row' => $item,
     );
-    return drupal_render($build);
+    return drupal_render_root($build);
   }
 
 }

@@ -10,6 +10,8 @@ namespace Drupal\comment\Tests;
 use Drupal\comment\CommentManagerInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\comment\Entity\Comment;
+use Drupal\user\RoleInterface;
+use Drupal\filter\Entity\FilterFormat;
 
 /**
  * Tests comment user interfaces.
@@ -19,32 +21,38 @@ use Drupal\comment\Entity\Comment;
 class CommentInterfaceTest extends CommentTestBase {
 
   /**
-   * Tests the comment interface.
+   * Set up comments to have subject and preview disabled.
    */
-  function testCommentInterface() {
-    // Set comments to have subject and preview disabled.
-    $this->drupalLogin($this->admin_user);
+  public function setUp() {
+    parent::setUp();
+    $this->drupalLogin($this->adminUser);
     $this->setCommentPreview(DRUPAL_DISABLED);
     $this->setCommentForm(TRUE);
     $this->setCommentSubject(FALSE);
     $this->setCommentSettings('default_mode', CommentManagerInterface::COMMENT_MODE_THREADED, 'Comment paging changed.');
     $this->drupalLogout();
+  }
+
+  /**
+   * Tests the comment interface.
+   */
+  public function testCommentInterface() {
 
     // Post comment #1 without subject or preview.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $comment_text = $this->randomMachineName();
     $comment = $this->postComment($this->node, $comment_text);
     $this->assertTrue($this->commentExists($comment), 'Comment found.');
 
     // Set comments to have subject and preview to required.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentSubject(TRUE);
     $this->setCommentPreview(DRUPAL_REQUIRED);
     $this->drupalLogout();
 
     // Create comment #2 that allows subject and requires preview.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $subject_text = $this->randomMachineName();
     $comment_text = $this->randomMachineName();
     $comment = $this->postComment($this->node, $comment_text, $subject_text, TRUE);
@@ -52,20 +60,20 @@ class CommentInterfaceTest extends CommentTestBase {
 
     // Comment as anonymous with preview required.
     $this->drupalLogout();
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access content', 'access comments', 'post comments', 'skip comment approval'));
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array('access content', 'access comments', 'post comments', 'skip comment approval'));
     $anonymous_comment = $this->postComment($this->node, $this->randomMachineName(), $this->randomMachineName(), TRUE);
     $this->assertTrue($this->commentExists($anonymous_comment), 'Comment found.');
     $anonymous_comment->delete();
 
     // Check comment display.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $this->drupalGet('node/' . $this->node->id());
     $this->assertText($subject_text, 'Individual comment subject found.');
     $this->assertText($comment_text, 'Individual comment body found.');
 
     // Set comments to have subject and preview to optional.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentSubject(TRUE);
     $this->setCommentPreview(DRUPAL_OPTIONAL);
 
@@ -87,19 +95,19 @@ class CommentInterfaceTest extends CommentTestBase {
 
     // Test changing the comment author to a verified user.
     $this->drupalGet('comment/' . $comment->id() . '/edit');
-    $comment = $this->postComment(NULL, $comment->comment_body->value, $comment->getSubject(), array('name' => $this->web_user->getUsername()));
-    $this->assertTrue($comment->getAuthorName() == $this->web_user->getUsername() && $comment->getOwnerId() == $this->web_user->id(), 'Comment author successfully changed to a registered user.');
+    $comment = $this->postComment(NULL, $comment->comment_body->value, $comment->getSubject(), array('name' => $this->webUser->getUsername()));
+    $this->assertTrue($comment->getAuthorName() == $this->webUser->getUsername() && $comment->getOwnerId() == $this->webUser->id(), 'Comment author successfully changed to a registered user.');
 
     $this->drupalLogout();
 
     // Reply to comment #2 creating comment #3 with optional preview and no
     // subject though field enabled.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     // Deliberately use the wrong url to test
     // \Drupal\comment\Controller\CommentController::redirectNode().
     $this->drupalGet('comment/' . $this->node->id() . '/reply');
     // Verify we were correctly redirected.
-    $this->assertUrl(url('comment/reply/node/' . $this->node->id() . '/comment', array('absolute' => TRUE)));
+    $this->assertUrl(\Drupal::url('comment.reply', array('entity_type' => 'node', 'entity' => $this->node->id(), 'field_name' => 'comment'), array('absolute' => TRUE)));
     $this->drupalGet('comment/reply/node/' . $this->node->id() . '/comment/' . $comment->id());
     $this->assertText($subject_text, 'Individual comment-reply subject found.');
     $this->assertText($comment_text, 'Individual comment-reply body found.');
@@ -172,7 +180,7 @@ class CommentInterfaceTest extends CommentTestBase {
 
     // Delete comment and make sure that reply is also removed.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->deleteComment($comment);
     $this->deleteComment($comment_new_page);
 
@@ -181,19 +189,96 @@ class CommentInterfaceTest extends CommentTestBase {
     $this->assertFalse($this->commentExists($reply, TRUE), 'Reply not found.');
 
     // Enabled comment form on node page.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentForm(TRUE);
     $this->drupalLogout();
 
     // Submit comment through node form.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $this->drupalGet('node/' . $this->node->id());
     $form_comment = $this->postComment(NULL, $this->randomMachineName(), $this->randomMachineName(), TRUE);
     $this->assertTrue($this->commentExists($form_comment), 'Form comment found.');
 
     // Disable comment form on node page.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentForm(FALSE);
   }
+
+  /**
+   * Test that the subject is automatically filled if disabled or left blank.
+   *
+   * When the subject field is blank or disabled, the first 29 characters of the
+   * comment body are used for the subject. If this would break within a word,
+   * then the break is put at the previous word boundary instead.
+   */
+  public function testAutoFilledSubject() {
+    $this->drupalLogin($this->webUser);
+    $this->drupalGet('node/' . $this->node->id());
+
+    // Break when there is a word boundary before 29 characters.
+    $body_text = 'Lorem ipsum Lorem ipsum Loreming ipsum Lorem ipsum';
+    $comment1 = $this->postComment(NULL, $body_text, '', TRUE);
+    $this->assertTrue($this->commentExists($comment1), 'Form comment found.');
+    $this->assertEqual('Lorem ipsum Lorem ipsum', $comment1->getSubject());
+
+    // Break at 29 characters where there's no boundary before that.
+    $body_text2 = 'LoremipsumloremipsumLoremingipsumLoremipsum';
+    $comment2 = $this->postComment(NULL, $body_text2, '', TRUE);
+    $this->assertEqual('LoremipsumloremipsumLoremingi', $comment2->getSubject());
+  }
+
+  /**
+   * Test that automatic subject is correctly created from HTML comment text.
+   *
+   * This is the same test as in CommentInterfaceTest::testAutoFilledSubject()
+   * with the additional check that HTML is stripped appropriately prior to
+   * character-counting.
+   */
+  public function testAutoFilledHtmlSubject() {
+    // Set up two default (i.e. filtered HTML) input formats, because then we
+    // can select one of them. Then create a user that can use these formats,
+    // log the user in, and then GET the node page on which to test the
+    // comments.
+    $filtered_html_format = FilterFormat::create(array(
+      'format' => 'filtered_html',
+      'name' => 'Filtered HTML',
+    ));
+    $filtered_html_format->save();
+    $full_html_format = FilterFormat::create(array(
+      'format' => 'full_html',
+      'name' => 'Full HTML',
+    ));
+    $full_html_format->save();
+    $html_user = $this->drupalCreateUser(array(
+      'access comments',
+      'post comments',
+      'edit own comments',
+      'skip comment approval',
+      'access content',
+      $filtered_html_format->getPermissionName(),
+      $full_html_format->getPermissionName(),
+    ));
+    $this->drupalLogin($html_user);
+    $this->drupalGet('node/' . $this->node->id());
+
+    // HTML should not be included in the character count.
+    $body_text1 = '<span></span><strong> </strong><span> </span><strong></strong>Hello World<br />';
+    $edit1 = array(
+      'comment_body[0][value]' => $body_text1,
+      'comment_body[0][format]' => 'filtered_html',
+    );
+    $this->drupalPostForm(NULL, $edit1, t('Save'));
+    $this->assertEqual('Hello World', Comment::load(1)->getSubject());
+
+    // If there's nothing other than HTML, the subject should be '(No subject)'.
+    $body_text2 = '<span></span><strong> </strong><span> </span><strong></strong> <br />';
+    $edit2 = array(
+      'comment_body[0][value]' => $body_text2,
+      'comment_body[0][format]' => 'filtered_html',
+    );
+    $this->drupalPostForm(NULL, $edit2, t('Save'));
+    $this->assertEqual('(No subject)', Comment::load(2)->getSubject());
+  }
+
 }

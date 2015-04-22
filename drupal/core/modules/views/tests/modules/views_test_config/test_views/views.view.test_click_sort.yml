@@ -1,7 +1,13 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_click_sort
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -12,38 +18,34 @@ display:
           field: id
           label: ID
           plugin_id: numeric
-          provider: views_test_data
         name:
           id: name
           table: views_test_data
           field: name
           label: Name
           plugin_id: string
-          provider: views_test_data
         created:
           id: created
           table: views_test_data
           field: created
           label: created
           plugin_id: date
-          provider: views_test_data
-      display_options:
-        access:
-          type: none
-        cache:
-          type: none
+      access:
+        type: none
+      cache:
+        type: none
       style:
         type: table
         options:
           info:
             id:
-              sortable: 1
+              sortable: true
               default_sort_order: asc
             name:
-              sortable: 1
+              sortable: true
               default_sort_order: desc
             created:
-              sortable: 0
+              sortable: false
     display_plugin: default
     display_title: Master
     id: default
@@ -55,6 +57,3 @@ display:
     display_title: Page
     id: page_1
     position: 0
-label: {  }
-id: test_click_sort
-tag: ''

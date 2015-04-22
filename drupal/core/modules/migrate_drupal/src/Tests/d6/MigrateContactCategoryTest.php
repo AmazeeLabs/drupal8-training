@@ -7,16 +7,17 @@
 
 namespace Drupal\migrate_drupal\Tests\d6;
 
+use Drupal\contact\Entity\ContactForm;
 use Drupal\migrate\MigrateExecutable;
 use Drupal\migrate\MigrateMessage;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Migrate contact categories to contact.form.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateContactCategoryTest extends MigrateDrupalTestBase {
+class MigrateContactCategoryTest extends MigrateDrupal6TestBase {
 
   /**
    * Modules to enable.
@@ -32,7 +33,7 @@ class MigrateContactCategoryTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_contact_category');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6ContactCategory.php',
+      $this->getDumpDirectory() . '/Contact.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -44,23 +45,23 @@ class MigrateContactCategoryTest extends MigrateDrupalTestBase {
    */
   public function testContactCategory() {
     /** @var \Drupal\contact\Entity\ContactForm $contact_form */
-    $contact_form = entity_load('contact_form', 'website_feedback');
-    $this->assertEqual($contact_form->label(), 'Website feedback');
-    $this->assertEqual($contact_form->getRecipients(), array('admin@example.com'));
-    $this->assertEqual($contact_form->getReply(), '');
-    $this->assertEqual($contact_form->getWeight(), 0);
+    $contact_form = ContactForm::load('website_feedback');
+    $this->assertIdentical('Website feedback', $contact_form->label());
+    $this->assertIdentical(array('admin@example.com'), $contact_form->getRecipients());
+    $this->assertIdentical('', $contact_form->getReply());
+    $this->assertIdentical(0, $contact_form->getWeight());
 
-    $contact_form = entity_load('contact_form', 'some_other_category');
-    $this->assertEqual($contact_form->label(), 'Some other category');
-    $this->assertEqual($contact_form->getRecipients(), array('test@example.com'));
-    $this->assertEqual($contact_form->getReply(), 'Thanks for contacting us, we will reply ASAP!');
-    $this->assertEqual($contact_form->getWeight(), 1);
+    $contact_form = ContactForm::load('some_other_category');
+    $this->assertIdentical('Some other category', $contact_form->label());
+    $this->assertIdentical(array('test@example.com'), $contact_form->getRecipients());
+    $this->assertIdentical('Thanks for contacting us, we will reply ASAP!', $contact_form->getReply());
+    $this->assertIdentical(1, $contact_form->getWeight());
 
-    $contact_form = entity_load('contact_form', 'a_category_much_longer_than_thir');
-    $this->assertEqual($contact_form->label(), 'A category much longer than thirty two characters');
-    $this->assertEqual($contact_form->getRecipients(), array('fortyninechars@example.com'));
-    $this->assertEqual($contact_form->getReply(), '');
-    $this->assertEqual($contact_form->getWeight(), 2);
+    $contact_form = ContactForm::load('a_category_much_longer_than_thir');
+    $this->assertIdentical('A category much longer than thirty two characters', $contact_form->label());
+    $this->assertIdentical(array('fortyninechars@example.com'), $contact_form->getRecipients());
+    $this->assertIdentical('', $contact_form->getReply());
+    $this->assertIdentical(2, $contact_form->getWeight());
   }
 
 }

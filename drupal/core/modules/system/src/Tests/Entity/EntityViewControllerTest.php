@@ -70,6 +70,11 @@ class EntityViewControllerTest extends WebTestBase {
       $this->assertRaw($entity->label());
       $this->assertRaw('full');
     }
+
+    // As entity_test IDs must be integers, make sure requests for non-integer
+    // IDs return a page not found error.
+    $this->drupalGet('entity_test/invalid');
+    $this->assertResponse(404);
   }
 
   /**
@@ -95,7 +100,7 @@ class EntityViewControllerTest extends WebTestBase {
 
     // Enable the RDF module to ensure that two modules can add attributes to
     // the same field item.
-    \Drupal::moduleHandler()->install(array('rdf'));
+    \Drupal::service('module_installer')->install(array('rdf'));
     $this->resetAll();
 
     // Set an RDF mapping for the field_test_text field. This RDF mapping will

@@ -8,9 +8,11 @@
 namespace Drupal\language\Plugin\Block;
 
 use Drupal\Core\Block\BlockBase;
+use Drupal\Core\Path\PathMatcherInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -33,6 +35,13 @@ class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface
   protected $languageManager;
 
   /**
+   * The path matcher.
+   *
+   * @var \Drupal\Core\Path\PathMatcherInterface
+   */
+  protected $pathMatcher;
+
+  /**
    * Constructs an LanguageBlock object.
    *
    * @param array $configuration
@@ -43,10 +52,13 @@ class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface
    *   The plugin implementation definition.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
+   * @param \Drupal\Core\Path\PathMatcherInterface $path_matcher
+   *   The path matcher.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, LanguageManagerInterface $language_manager) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, LanguageManagerInterface $language_manager, PathMatcherInterface $path_matcher) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->languageManager = $language_manager;
+    $this->pathMatcher = $path_matcher;
   }
 
 
@@ -58,7 +70,8 @@ class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface
       $configuration,
       $plugin_id,
       $plugin_definition,
-      $container->get('language_manager')
+      $container->get('language_manager'),
+      $container->get('path.matcher')
     );
   }
 
@@ -75,9 +88,9 @@ class LanguageBlock extends BlockBase implements ContainerFactoryPluginInterface
    */
   public function build() {
     $build = array();
-    $path = drupal_is_front_page() ? '<front>' : current_path();
+    $route_name = $this->pathMatcher->isFrontPage() ? '<front>' : '<current>';
     $type = $this->getDerivativeId();
-    $links = $this->languageManager->getLanguageSwitchLinks($type, $path);
+    $links = $this->languageManager->getLanguageSwitchLinks($type, Url::fromRoute($route_name));
 
     if (isset($links->links)) {
       $build = array(

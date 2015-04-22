@@ -1,4 +1,7 @@
 id: anonymous
-label: Anonymous user
+label: 'Anonymous user'
 weight: 0
 langcode: en
+status: true
+is_admin: false
+dependencies: {  }

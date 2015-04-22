@@ -36,7 +36,7 @@ class LegacyTest extends TaxonomyTestBase {
     $field_name = 'field_' . $vocabulary->id();
 
     entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -62,8 +62,7 @@ class LegacyTest extends TaxonomyTestBase {
       ))
       ->save();
 
-    $this->admin_user = $this->drupalCreateUser(array('administer taxonomy', 'administer nodes', 'bypass node access'));
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->drupalCreateUser(['administer taxonomy', 'administer nodes', 'bypass node access']));
   }
 
   /**

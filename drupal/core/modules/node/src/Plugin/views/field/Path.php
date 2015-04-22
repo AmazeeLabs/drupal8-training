@@ -23,7 +23,7 @@ use Drupal\views\ViewExecutable;
 class Path extends FieldPluginBase {
 
   /**
-   * Overrides \Drupal\views\Plugin\views\field\FieldPluginBase::init().
+   * {@inheritdoc}
    */
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
@@ -31,24 +31,33 @@ class Path extends FieldPluginBase {
     $this->additional_fields['nid'] = 'nid';
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['absolute'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['absolute'] = array('default' => FALSE);
 
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
     $form['absolute'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Use absolute link (begins with "http://")'),
+      '#title' => $this->t('Use absolute link (begins with "http://")'),
       '#default_value' => $this->options['absolute'],
-      '#description' => t('Enable this option to output an absolute link. Required if you want to use the path as a link destination (as in "output this field as a link" above).'),
+      '#description' => $this->t('Enable this option to output an absolute link. Required if you want to use the path as a link destination (as in "output this field as a link" above).'),
       '#fieldset' => 'alter',
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {
     $this->ensureMyTable();
     $this->addAdditionalFields();
@@ -59,7 +68,7 @@ class Path extends FieldPluginBase {
    */
   public function render(ResultRow $values) {
     $nid = $this->getValue($values, 'nid');
-    return url("node/$nid", array('absolute' => $this->options['absolute']));
+    return \Drupal::url('entity.node.canonical', ['node' => $nid], ['absolute' => $this->options['absolute']]);
   }
 
 }

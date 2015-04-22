@@ -114,7 +114,7 @@ class DefaultMenuLinkTreeManipulators {
       $nids = array_keys($node_links);
 
       $query = $this->queryFactory->get('node');
-      $query->condition('nid', $nids);
+      $query->condition('nid', $nids, 'IN');
 
       // Allows admins to view all nodes, by both disabling node_access
       // query rewrite as well as not checking for the node status. The
@@ -230,33 +230,6 @@ class DefaultMenuLinkTreeManipulators {
         $tree += $this->flatten($tree[$key]->subtree);
       }
       $tree[$key]->subtree = array();
-    }
-    return $tree;
-  }
-
-  /**
-   * Extracts a subtree of the active trail.
-   *
-   * @param \Drupal\Core\Menu\MenuLinkTreeElement[] $tree
-   *   The menu link tree to manipulate.
-   * @param int $level
-   *   The level in the active trail to extract.
-   *
-   * @return \Drupal\Core\Menu\MenuLinkTreeElement[]
-   *   The manipulated menu link tree.
-   */
-  public function extractSubtreeOfActiveTrail(array $tree, $level) {
-    // Go down the active trail until the right level is reached.
-    while ($level-- > 0 && $tree) {
-      // Loop through the current level's elements  until we find one that is in
-      // the active trail.
-      while ($element = array_shift($tree)) {
-        if ($element->inActiveTrail) {
-          // If the element is in the active trail, we continue in the subtree.
-          $tree = $element->subtree;
-          break;
-        }
-      }
     }
     return $tree;
   }

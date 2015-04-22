@@ -8,11 +8,13 @@ source:
     is_public: true
 process:
   filename: filename
+  uid: uid
   uri:
     plugin: file_uri
     source:
       - picture
       - file_directory_path
+      - temp_directory_path
       - 'constants/is_public'
 destination:
   plugin: entity:file

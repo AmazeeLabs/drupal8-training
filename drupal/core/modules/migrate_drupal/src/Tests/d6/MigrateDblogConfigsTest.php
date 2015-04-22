@@ -10,14 +10,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to dblog.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateDblogConfigsTest extends MigrateDrupalTestBase {
+class MigrateDblogConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -35,7 +35,7 @@ class MigrateDblogConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_dblog_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6DblogSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -46,8 +46,8 @@ class MigrateDblogConfigsTest extends MigrateDrupalTestBase {
    * Tests migration of dblog variables to dblog.settings.yml.
    */
   public function testBookSettings() {
-    $config = \Drupal::config('dblog.settings');
-    $this->assertIdentical($config->get('row_limit'), 1000);
+    $config = $this->config('dblog.settings');
+    $this->assertIdentical(1000, $config->get('row_limit'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'dblog.settings', $config->get());
   }
 

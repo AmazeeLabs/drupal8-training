@@ -8,6 +8,13 @@
 namespace Drupal\image\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Routing\UrlGeneratorInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
+use Drupal\Core\Utility\LinkGeneratorInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
@@ -21,7 +28,66 @@ use Drupal\Core\Form\FormStateInterface;
  *   }
  * )
  */
-class ImageFormatter extends ImageFormatterBase {
+class ImageFormatter extends ImageFormatterBase implements ContainerFactoryPluginInterface {
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $currentUser;
+
+  /**
+   * The link generator.
+   *
+   * @var \Drupal\Core\Utility\LinkGeneratorInterface
+   */
+  protected $linkGenerator;
+
+  /**
+   * Constructs an ImageFormatter object.
+   *
+   * @param string $plugin_id
+   *   The plugin_id for the formatter.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+   *   The definition of the field to which the formatter is associated.
+   * @param array $settings
+   *   The formatter settings.
+   * @param string $label
+   *   The formatter label display setting.
+   * @param string $view_mode
+   *   The view mode.
+   * @param array $third_party_settings
+   *   Any third party settings settings.
+   * @param \Drupal\Core\Session\AccountInterface $current_user
+   *   The current user.
+   * @param \Drupal\Core\Utility\LinkGeneratorInterface $link_generator
+   *   The link generator service.
+   */
+  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, $label, $view_mode, array $third_party_settings, AccountInterface $current_user, LinkGeneratorInterface $link_generator) {
+    parent::__construct($plugin_id, $plugin_definition, $field_definition, $settings, $label, $view_mode, $third_party_settings);
+    $this->currentUser = $current_user;
+    $this->linkGenerator = $link_generator;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $plugin_id,
+      $plugin_definition,
+      $configuration['field_definition'],
+      $configuration['settings'],
+      $configuration['label'],
+      $configuration['view_mode'],
+      $configuration['third_party_settings'],
+      $container->get('current_user'),
+      $container->get('link_generator')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -44,8 +110,11 @@ class ImageFormatter extends ImageFormatterBase {
       '#default_value' => $this->getSetting('image_style'),
       '#empty_option' => t('None (original image)'),
       '#options' => $image_styles,
+      '#description' => array(
+        '#markup' => $this->linkGenerator->generate($this->t('Configure Image Styles'), new Url('entity.image_style.collection')),
+        '#access' => $this->currentUser->hasPermission('administer image styles'),
+      ),
     );
-
     $link_types = array(
       'content' => t('Content'),
       'file' => t('File'),
@@ -98,15 +167,20 @@ class ImageFormatter extends ImageFormatterBase {
    */
   public function viewElements(FieldItemListInterface $items) {
     $elements = array();
+    $files = $this->getEntitiesToView($items);
 
+    // Early opt-out if the field is empty.
+    if (empty($files)) {
+      return $elements;
+    }
+
+    $url = NULL;
     $image_link_setting = $this->getSetting('image_link');
     // Check if the formatter involves a link.
     if ($image_link_setting == 'content') {
       $entity = $items->getEntity();
       if (!$entity->isNew()) {
-        // @todo Remove when theme_image_formatter() has support for route name.
-        $uri['path'] = $entity->getSystemPath();
-        $uri['options'] = $entity->urlInfo()->getOptions();
+        $url = $entity->urlInfo();
       }
     }
     elseif ($image_link_setting == 'file') {
@@ -119,35 +193,31 @@ class ImageFormatter extends ImageFormatterBase {
     $cache_tags = array();
     if (!empty($image_style_setting)) {
       $image_style = entity_load('image_style', $image_style_setting);
-      $cache_tags = $image_style->getCacheTag();
+      $cache_tags = $image_style->getCacheTags();
     }
 
-    foreach ($items as $delta => $item) {
-      if ($item->entity) {
-        if (isset($link_file)) {
-          $image_uri = $item->entity->getFileUri();
-          $uri = array(
-            'path' => file_create_url($image_uri),
-            'options' => array(),
-          );
-        }
-
-        // Extract field item attributes for the theme function, and unset them
-        // from the $item so that the field template does not re-render them.
-        $item_attributes = $item->_attributes;
-        unset($item->_attributes);
-
-        $elements[$delta] = array(
-          '#theme' => 'image_formatter',
-          '#item' => $item,
-          '#item_attributes' => $item_attributes,
-          '#image_style' => $image_style_setting,
-          '#path' => isset($uri) ? $uri : '',
-          '#cache' => array(
-            'tags' => $cache_tags,
-          ),
-        );
+    foreach ($files as $delta => $file) {
+      if (isset($link_file)) {
+        $image_uri = $file->getFileUri();
+        $url = Url::fromUri(file_create_url($image_uri));
       }
+
+      // Extract field item attributes for the theme function, and unset them
+      // from the $item so that the field template does not re-render them.
+      $item = $file->_referringItem;
+      $item_attributes = $item->_attributes;
+      unset($item->_attributes);
+
+      $elements[$delta] = array(
+        '#theme' => 'image_formatter',
+        '#item' => $item,
+        '#item_attributes' => $item_attributes,
+        '#image_style' => $image_style_setting,
+        '#url' => $url,
+        '#cache' => array(
+          'tags' => $cache_tags,
+        ),
+      );
     }
 
     return $elements;

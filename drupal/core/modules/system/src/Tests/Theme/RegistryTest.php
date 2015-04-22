@@ -7,7 +7,8 @@
 
 namespace Drupal\system\Tests\Theme;
 
-use Drupal\simpletest\WebTestBase;
+use Drupal\Core\Theme\Registry;
+use Drupal\simpletest\KernelTestBase;
 use Drupal\Core\Utility\ThemeRegistry;
 
 /**
@@ -15,16 +16,26 @@ use Drupal\Core\Utility\ThemeRegistry;
  *
  * @group Theme
  */
-class RegistryTest extends WebTestBase {
+class RegistryTest extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('theme_test');
+  public static $modules = array('theme_test', 'system');
 
   protected $profile = 'testing';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+     parent::setUp();
+
+     $this->installSchema('system', ['router']);
+  }
+
   /**
    * Tests the behavior of the theme registry class.
    */
@@ -38,7 +49,7 @@ class RegistryTest extends WebTestBase {
     // entry to be written in __construct().
     $cache = \Drupal::cache();
     $lock_backend = \Drupal::lock();
-    $registry = new ThemeRegistry($cid, $cache, $lock_backend, array('theme_registry' => TRUE), $this->container->get('module_handler')->isLoaded());
+    $registry = new ThemeRegistry($cid, $cache, $lock_backend, array('theme_registry'), $this->container->get('module_handler')->isLoaded());
 
     $this->assertTrue(\Drupal::cache()->get($cid), 'Cache entry was created.');
 
@@ -58,8 +69,60 @@ class RegistryTest extends WebTestBase {
     // Create a new instance of the class. Confirm that both the offset
     // requested previously, and one that has not yet been requested are both
     // available.
-    $registry = new ThemeRegistry($cid, $cache, $lock_backend, array('theme_registry' => TRUE), $this->container->get('module_handler')->isLoaded());
+    $registry = new ThemeRegistry($cid, $cache, $lock_backend, array('theme_registry'), $this->container->get('module_handler')->isLoaded());
     $this->assertTrue($registry->get('theme_test_template_test'), 'Offset was returned correctly from the theme registry');
     $this->assertTrue($registry->get('theme_test_template_test_2'), 'Offset was returned correctly from the theme registry');
   }
+
+  /**
+   * Tests the theme registry with multiple subthemes.
+   */
+  public function testMultipleSubThemes() {
+    $theme_handler = \Drupal::service('theme_handler');
+    $theme_handler->install(['test_basetheme', 'test_subtheme', 'test_subsubtheme']);
+
+    $registry_subsub_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_subsubtheme');
+    $registry_subsub_theme->setThemeManager(\Drupal::theme());
+    $registry_sub_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_subtheme');
+    $registry_sub_theme->setThemeManager(\Drupal::theme());
+    $registry_base_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_basetheme');
+    $registry_base_theme->setThemeManager(\Drupal::theme());
+
+    $preprocess_functions = $registry_subsub_theme->get()['theme_test_template_test']['preprocess functions'];
+    $this->assertIdentical([
+      'template_preprocess',
+      'test_basetheme_preprocess_theme_test_template_test',
+      'test_subtheme_preprocess_theme_test_template_test',
+      'test_subsubtheme_preprocess_theme_test_template_test',
+    ], $preprocess_functions);
+
+    $preprocess_functions = $registry_sub_theme->get()['theme_test_template_test']['preprocess functions'];
+    $this->assertIdentical([
+      'template_preprocess',
+      'test_basetheme_preprocess_theme_test_template_test',
+      'test_subtheme_preprocess_theme_test_template_test',
+    ], $preprocess_functions);
+
+    $preprocess_functions = $registry_base_theme->get()['theme_test_template_test']['preprocess functions'];
+    $this->assertIdentical([
+      'template_preprocess',
+      'test_basetheme_preprocess_theme_test_template_test',
+    ], $preprocess_functions);
+  }
+
+  /**
+   * Tests that the theme registry can be altered by themes.
+   */
+  public function testThemeRegistryAlterByTheme() {
+
+    /** @var \Drupal\Core\Extension\ThemeHandlerInterface $theme_handler */
+    $theme_handler = \Drupal::service('theme_handler');
+    $theme_handler->install(['test_theme']);
+    $theme_handler->setDefault('test_theme');
+
+    $registry = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_theme');
+    $registry->setThemeManager(\Drupal::theme());
+    $this->assertEqual('value', $registry->get()['theme_test_template_test']['variables']['additional']);
+  }
+
 }

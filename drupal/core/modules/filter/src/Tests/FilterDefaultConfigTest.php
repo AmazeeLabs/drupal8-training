@@ -7,21 +7,22 @@
 
 namespace Drupal\filter\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests text format default configuration.
  *
  * @group filter
  */
-class FilterDefaultConfigTest extends DrupalUnitTestBase {
+class FilterDefaultConfigTest extends KernelTestBase {
 
-  public static $modules = array('system', 'user', 'filter', 'filter_test', 'entity');
+  public static $modules = array('system', 'user', 'filter', 'filter_test');
 
   protected function setUp() {
     parent::setUp();
 
-    // Drupal\filter\FilterPermissions::permissions() calls into url() to output
+    // Drupal\filter\FilterPermissions::permissions() builds an URL to output
     // a link in the description.
     $this->installSchema('system', 'url_alias');
 
@@ -49,8 +50,8 @@ class FilterDefaultConfigTest extends DrupalUnitTestBase {
     $this->assertEqual($format->get('roles'), NULL);
     // Verify that the defined roles in the default config have been processed.
     $this->assertEqual(array_keys(filter_get_roles_by_format($format)), array(
-      DRUPAL_ANONYMOUS_RID,
-      DRUPAL_AUTHENTICATED_RID,
+      RoleInterface::ANONYMOUS_ID,
+      RoleInterface::AUTHENTICATED_ID,
     ));
 
     // Verify enabled filters.
@@ -78,21 +79,21 @@ class FilterDefaultConfigTest extends DrupalUnitTestBase {
     // Verify role permissions declared in default config.
     $format = entity_load('filter_format', 'filter_test');
     $this->assertEqual(array_keys(filter_get_roles_by_format($format)), array(
-      DRUPAL_ANONYMOUS_RID,
-      DRUPAL_AUTHENTICATED_RID,
+      RoleInterface::ANONYMOUS_ID,
+      RoleInterface::AUTHENTICATED_ID,
     ));
 
     // Attempt to change roles.
     $format->set('roles', array(
-      DRUPAL_AUTHENTICATED_RID,
+      RoleInterface::AUTHENTICATED_ID,
     ));
     $format->save();
 
     // Verify that roles have not been updated.
     $format = entity_load('filter_format', 'filter_test');
     $this->assertEqual(array_keys(filter_get_roles_by_format($format)), array(
-      DRUPAL_ANONYMOUS_RID,
-      DRUPAL_AUTHENTICATED_RID,
+      RoleInterface::ANONYMOUS_ID,
+      RoleInterface::AUTHENTICATED_ID,
     ));
   }
 

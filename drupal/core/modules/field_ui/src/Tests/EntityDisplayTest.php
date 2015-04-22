@@ -17,11 +17,18 @@ use Drupal\simpletest\KernelTestBase;
  */
 class EntityDisplayTest extends KernelTestBase {
 
+  /**
+   * Modules to install.
+   *
+   * @var string[]
+   */
   public static $modules = array('field_ui', 'field', 'entity_test', 'user', 'text', 'field_test', 'node', 'system');
 
   protected function setUp() {
     parent::setUp();
-    $this->installConfig(array('field'));
+    $this->installSchema('system', array('router'));
+    $this->installEntitySchema('node');
+    $this->installConfig(array('field', 'node'));
   }
 
   /**
@@ -39,15 +46,15 @@ class EntityDisplayTest extends KernelTestBase {
     // Check that providing no 'weight' results in the highest current weight
     // being assigned. The 'name' field's formatter has weight -5, therefore
     // these follow.
-    $expected['component_1'] = array('weight' => -4);
-    $expected['component_2'] = array('weight' => -3);
+    $expected['component_1'] = array('weight' => -4, 'settings' => array(), 'third_party_settings' => array());
+    $expected['component_2'] = array('weight' => -3, 'settings' => array(), 'third_party_settings' => array());
     $display->setComponent('component_1');
     $display->setComponent('component_2');
     $this->assertEqual($display->getComponent('component_1'), $expected['component_1']);
     $this->assertEqual($display->getComponent('component_2'), $expected['component_2']);
 
     // Check that arbitrary options are correctly stored.
-    $expected['component_3'] = array('weight' => 10, 'foo' => 'bar');
+    $expected['component_3'] = array('weight' => 10, 'third_party_settings' => array('field_test' => array('foo' => 'bar')), 'settings' => array());
     $display->setComponent('component_3', $expected['component_3']);
     $this->assertEqual($display->getComponent('component_3'), $expected['component_3']);
 
@@ -68,7 +75,9 @@ class EntityDisplayTest extends KernelTestBase {
       'label' => 'hidden',
       'type' => 'string',
       'weight' => -5,
-      'settings' => array(),
+      'settings' => array(
+        'link_to_entity' => FALSE,
+      ),
       'third_party_settings' => array(),
     );
     $this->assertEqual($display->getComponents(), $expected);
@@ -84,16 +93,35 @@ class EntityDisplayTest extends KernelTestBase {
 
     // Check that CreateCopy() creates a new component that can be correclty
     // saved.
-    EntityViewMode::create(array('id' => $display->targetEntityType . '.other_view_mode', 'targetEntityType' => $display->targetEntityType))->save();
+    EntityViewMode::create(array('id' => $display->getTargetEntityTypeId() . '.other_view_mode', 'targetEntityType' => $display->getTargetEntityTypeId()))->save();
     $new_display = $display->createCopy('other_view_mode');
     $new_display->save();
     $new_display = entity_load('entity_view_display', $new_display->id());
     $dependencies = $new_display->calculateDependencies();
-    $this->assertEqual(array('entity' => array('core.entity_view_mode.entity_test.other_view_mode'), 'module' => array('entity_test')), $dependencies);
-    $this->assertEqual($new_display->targetEntityType, $display->targetEntityType);
-    $this->assertEqual($new_display->bundle, $display->bundle);
-    $this->assertEqual($new_display->mode, 'other_view_mode');
+    $this->assertEqual(array('config' => array('core.entity_view_mode.entity_test.other_view_mode'), 'module' => array('entity_test')), $dependencies);
+    $this->assertEqual($new_display->getTargetEntityTypeId(), $display->getTargetEntityTypeId());
+    $this->assertEqual($new_display->getTargetBundle(), $display->getTargetBundle());
+    $this->assertEqual($new_display->getMode(), 'other_view_mode');
     $this->assertEqual($new_display->getComponents(), $display->getComponents());
+  }
+
+  /**
+   *  Test sorting of components by name on basic CRUD operations
+   */
+  public function testEntityDisplayCRUDSort() {
+    $display = entity_create('entity_view_display', array(
+      'targetEntityType' => 'entity_test',
+      'bundle' => 'entity_test',
+      'mode' => 'default',
+    ));
+    $display->setComponent('component_3');
+    $display->setComponent('component_1');
+    $display->setComponent('component_2');
+    $display->removeComponent('name');
+    $display->save();
+    $components = array_keys($display->getComponents());
+    $expected = array ( 0 => 'component_1', 1 => 'component_2',  2 => 'component_3',);
+    $this->assertIdentical($components, $expected);
   }
 
   /**
@@ -106,14 +134,14 @@ class EntityDisplayTest extends KernelTestBase {
     $this->assertTrue($display->isNew());
 
     // Add some components and save the display.
-    $display->setComponent('component_1', array('weight' => 10))
+    $display->setComponent('component_1', array('weight' => 10, 'settings' => array()))
       ->save();
 
     // Check that entity_get_display() returns the correct object.
     $display = entity_get_display('entity_test', 'entity_test', 'default');
     $this->assertFalse($display->isNew());
-    $this->assertEqual($display->id, 'entity_test.entity_test.default');
-    $this->assertEqual($display->getComponent('component_1'), array('weight' => 10));
+    $this->assertEqual($display->id(), 'entity_test.entity_test.default');
+    $this->assertEqual($display->getComponent('component_1'), array( 'weight' => 10, 'settings' => array(), 'third_party_settings' => array()));
   }
 
   /**
@@ -136,7 +164,7 @@ class EntityDisplayTest extends KernelTestBase {
     $display->removeComponent('display_extra_field');
     $display->setComponent('display_extra_field_hidden', array('weight' => 10));
     $this->assertNull($display->getComponent('display_extra_field'));
-    $this->assertEqual($display->getComponent('display_extra_field_hidden'), array('weight' => 10));
+    $this->assertEqual($display->getComponent('display_extra_field_hidden'), array('weight' => 10, 'settings' => array(), 'third_party_settings' => array()));
   }
 
   /**
@@ -146,7 +174,7 @@ class EntityDisplayTest extends KernelTestBase {
     $field_name = 'test_field';
     // Create a field storage and a field.
     $field_storage = entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'test_field'
     ));
@@ -165,7 +193,7 @@ class EntityDisplayTest extends KernelTestBase {
 
     // Check that providing no options results in default values being used.
     $display->setComponent($field_name);
-    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field_storage->type);
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field_storage->getType());
     $default_formatter = $field_type_info['default_formatter'];
     $formatter_settings =  \Drupal::service('plugin.manager.field.formatter')->getDefaultSettings($default_formatter);
     $expected = array(
@@ -200,7 +228,7 @@ class EntityDisplayTest extends KernelTestBase {
     // Check that the display has dependencies on the field and the module that
     // provides the formatter.
     $dependencies = $display->calculateDependencies();
-    $this->assertEqual(array('entity' => array('field.field.entity_test.entity_test.test_field'), 'module' => array('entity_test', 'field_test')), $dependencies);
+    $this->assertEqual(array('config' => array('field.field.entity_test.entity_test.test_field'), 'module' => array('entity_test', 'field_test')), $dependencies);
   }
 
   /**
@@ -239,7 +267,7 @@ class EntityDisplayTest extends KernelTestBase {
     // Check that saving the display only writes data for fields whose display
     // is configurable.
     $display->save();
-    $config = \Drupal::config('core.entity_view_display.' . $display->id());
+    $config = $this->config('core.entity_view_display.' . $display->id());
     $data = $config->get();
     $this->assertFalse(isset($data['content']['test_no_display']));
     $this->assertFalse(isset($data['hidden']['test_no_display']));
@@ -268,31 +296,30 @@ class EntityDisplayTest extends KernelTestBase {
    * Tests renaming and deleting a bundle.
    */
   public function testRenameDeleteBundle() {
-    $this->installEntitySchema('node');
-
     // Create a node bundle, display and form display object.
-    entity_create('node_type', array('type' => 'article'))->save();
+    $type = entity_create('node_type', array('type' => 'article'));
+    $type->save();
+    node_add_body_field($type);
     entity_get_display('node', 'article', 'default')->save();
     entity_get_form_display('node', 'article', 'default')->save();
 
     // Rename the article bundle and assert the entity display is renamed.
-    $type = node_type_load('article');
     $type->old_type = 'article';
-    $type->type = 'article_rename';
+    $type->set('type', 'article_rename');
     $type->save();
     $old_display = entity_load('entity_view_display', 'node.article.default');
     $this->assertFalse((bool) $old_display);
     $old_form_display = entity_load('entity_form_display', 'node.article.default');
     $this->assertFalse((bool) $old_form_display);
     $new_display = entity_load('entity_view_display', 'node.article_rename.default');
-    $this->assertEqual('article_rename', $new_display->bundle);
-    $this->assertEqual('node.article_rename.default', $new_display->id);
+    $this->assertEqual('article_rename', $new_display->getTargetBundle());
+    $this->assertEqual('node.article_rename.default', $new_display->id());
     $new_form_display = entity_load('entity_form_display', 'node.article_rename.default');
-    $this->assertEqual('article_rename', $new_form_display->bundle);
-    $this->assertEqual('node.article_rename.default', $new_form_display->id);
+    $this->assertEqual('article_rename', $new_form_display->getTargetBundle());
+    $this->assertEqual('node.article_rename.default', $new_form_display->id());
 
     $expected_view_dependencies = array(
-      'entity' => array('field.field.node.article_rename.body', 'node.type.article_rename'),
+      'config' => array('field.field.node.article_rename.body', 'node.type.article_rename'),
       'module' => array('entity_test', 'text', 'user')
     );
     // Check that the display has dependencies on the bundle, fields and the
@@ -304,7 +331,7 @@ class EntityDisplayTest extends KernelTestBase {
     // the modules that provide the formatters.
     $dependencies = $new_form_display->calculateDependencies();
     $expected_form_dependencies = array(
-      'entity' => array('field.field.node.article_rename.body', 'node.type.article_rename'),
+      'config' => array('field.field.node.article_rename.body', 'node.type.article_rename'),
       'module' => array('text')
     );
     $this->assertEqual($expected_form_dependencies, $dependencies);
@@ -324,7 +351,7 @@ class EntityDisplayTest extends KernelTestBase {
     $field_name = 'test_field';
     // Create a field storage and a field.
     $field_storage = entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'test_field'
     ));
@@ -373,7 +400,7 @@ class EntityDisplayTest extends KernelTestBase {
     $field_name = 'test_field';
     // Create a field.
     $field_storage = entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'text'
     ));

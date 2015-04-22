@@ -37,13 +37,6 @@ class EntityResolverManagerTest extends UnitTestCase {
   protected $entityManager;
 
   /**
-   * The mocked controller resolver.
-   *
-   * @var \Drupal\Core\Controller\ControllerResolverInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $controllerResolver;
-
-  /**
    * The mocked class resolver.
    *
    * @var \Drupal\Core\DependencyInjection\ClassResolverInterface|\PHPUnit_Framework_MockObject_MockObject
@@ -60,15 +53,14 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * {@inheritdoc}
    *
-   * @covers ::__construct()
+   * @covers ::__construct
    */
   protected function setUp() {
     $this->entityManager = $this->getMock('Drupal\Core\Entity\EntityManagerInterface');
-    $this->controllerResolver = $this->getMock('Drupal\Core\Controller\ControllerResolverInterface');
     $this->container = $this->getMock('Symfony\Component\DependencyInjection\ContainerInterface');
     $this->classResolver = $this->getClassResolverStub();
 
-    $this->entityResolverManager = new EntityResolverManager($this->entityManager, $this->controllerResolver, $this->classResolver);
+    $this->entityResolverManager = new EntityResolverManager($this->entityManager, $this->classResolver);
   }
 
   /**
@@ -76,8 +68,8 @@ class EntityResolverManagerTest extends UnitTestCase {
    *
    * We don't have any entity type involved, so we don't need any upcasting.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
    *
    * @dataProvider providerTestSetRouteOptionsWithStandardRoute
    */
@@ -85,7 +77,6 @@ class EntityResolverManagerTest extends UnitTestCase {
     $route = new Route('/example', array(
       '_controller' => $controller,
     ));
-    $this->setupControllerResolver($route->getDefault('_controller'));
 
     $defaults = $route->getDefaults();
     $this->entityResolverManager->setRouteOptions($route);
@@ -106,8 +97,8 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with a controller with a non entity argument.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
    *
    * @dataProvider providerTestSetRouteOptionsWithStandardRouteWithArgument
    */
@@ -116,7 +107,6 @@ class EntityResolverManagerTest extends UnitTestCase {
       '_controller' => $controller,
       'argument' => 'test',
     ));
-    $this->setupControllerResolver($route->getDefault('_controller'));
 
     $defaults = $route->getDefaults();
     $this->entityResolverManager->setRouteOptions($route);
@@ -137,17 +127,16 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with a _content default.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
    *
    * @dataProvider providerTestSetRouteOptionsWithContentController
    */
   public function testSetRouteOptionsWithContentController($controller) {
     $route = new Route('/example/{argument}', array(
-      '_content' => $controller,
+      '_controller' => $controller,
       'argument' => 'test',
     ));
-    $this->setupControllerResolver($route->getDefault('_content'));
 
     $defaults = $route->getDefaults();
     $this->entityResolverManager->setRouteOptions($route);
@@ -168,10 +157,10 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an entity type parameter.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
    *
    * @dataProvider providerTestSetRouteOptionsWithEntityTypeNoUpcasting
    */
@@ -179,9 +168,8 @@ class EntityResolverManagerTest extends UnitTestCase {
     $this->setupEntityTypes();
 
     $route = new Route('/example/{entity_test}', array(
-      '_content' => $controller,
+      '_controller' => $controller,
     ));
-    $this->setupControllerResolver($route->getDefault('_content'));
 
     $defaults = $route->getDefaults();
     $this->entityResolverManager->setRouteOptions($route);
@@ -202,10 +190,10 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an entity type parameter, upcasting.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
    *
    * @dataProvider providerTestSetRouteOptionsWithEntityTypeUpcasting
    */
@@ -213,9 +201,8 @@ class EntityResolverManagerTest extends UnitTestCase {
     $this->setupEntityTypes();
 
     $route = new Route('/example/{entity_test}', array(
-      '_content' => $controller,
+      '_controller' => $controller,
     ));
-    $this->setupControllerResolver($route->getDefault('_content'));
 
     $defaults = $route->getDefaults();
     $this->entityResolverManager->setRouteOptions($route);
@@ -237,10 +224,10 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an entity type parameter form.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
    */
   public function testSetRouteOptionsWithEntityFormUpcasting() {
     $this->setupEntityTypes();
@@ -259,10 +246,10 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with entity form upcasting, no create method.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
    */
   public function testSetRouteOptionsWithEntityUpcastingNoCreate() {
     $this->setupEntityTypes();
@@ -281,10 +268,10 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an form parameter without interface.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
    */
   public function testSetRouteOptionsWithEntityFormNoUpcasting() {
     $this->setupEntityTypes();
@@ -302,11 +289,11 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an _entity_view route.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
-   * @covers ::setParametersFromEntityInformation()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
+   * @covers ::setParametersFromEntityInformation
    */
   public function testSetRouteOptionsWithEntityViewRouteAndManualParameters() {
     $this->setupEntityTypes();
@@ -334,11 +321,11 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an _entity_view route.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
-   * @covers ::setParametersFromEntityInformation()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
+   * @covers ::setParametersFromEntityInformation
    */
   public function testSetRouteOptionsWithEntityViewRoute() {
     $this->setupEntityTypes();
@@ -356,11 +343,11 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an _entity_list route.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
-   * @covers ::setParametersFromEntityInformation()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
+   * @covers ::setParametersFromEntityInformation
    */
   public function testSetRouteOptionsWithEntityListRoute() {
     $this->setupEntityTypes();
@@ -378,11 +365,11 @@ class EntityResolverManagerTest extends UnitTestCase {
   /**
    * Tests setRouteOptions() with an _entity_form route.
    *
-   * @covers ::setRouteOptions()
-   * @covers ::getController()
-   * @covers ::getEntityTypes()
-   * @covers ::setParametersFromReflection()
-   * @covers ::setParametersFromEntityInformation()
+   * @covers ::setRouteOptions
+   * @covers ::getControllerClass
+   * @covers ::getEntityTypes
+   * @covers ::setParametersFromReflection
+   * @covers ::setParametersFromEntityInformation
    */
   public function testSetRouteOptionsWithEntityFormRoute() {
     $this->setupEntityTypes();
@@ -395,29 +382,6 @@ class EntityResolverManagerTest extends UnitTestCase {
     $this->assertEquals($defaults, $route->getDefaults());
     $parameters = $route->getOption('parameters');
     $this->assertEquals(array('entity_test' => array('type' => 'entity:entity_test')), $parameters);
-  }
-
-  /**
-   * Setups the controller resolver to return the given controller definition.
-   *
-   * @param string $controller_definition
-   *   The definition of a controller
-   */
-  protected function setupControllerResolver($controller_definition) {
-    $controller = $controller_definition;
-
-    if (strpos($controller, '::')) {
-      list($class, $method) = explode('::', $controller);
-      $expected = array(new $class(), $method);
-    }
-    else {
-      $expected = $controller;
-    }
-
-    $this->controllerResolver->expects($this->atLeastOnce())
-      ->method('getControllerFromDefinition')
-      ->with($controller_definition)
-      ->will($this->returnValue($expected));
   }
 
   /**

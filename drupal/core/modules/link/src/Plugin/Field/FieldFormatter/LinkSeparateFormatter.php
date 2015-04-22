@@ -12,6 +12,7 @@
 
 namespace Drupal\link\Plugin\Field\FieldFormatter;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Field\FieldItemListInterface;
 
 /**
@@ -32,7 +33,7 @@ class LinkSeparateFormatter extends LinkFormatter {
    */
   public static function defaultSettings() {
     return array(
-      'trim_length' => '80',
+      'trim_length' => 80,
       'rel' => '',
       'target' => '',
     ) + parent::defaultSettings();
@@ -53,8 +54,8 @@ class LinkSeparateFormatter extends LinkFormatter {
 
       // If the link text field value is available, use it for the text.
       if (empty($settings['url_only']) && !empty($item->title)) {
-        // Unsanitized token replacement here because $options['html'] is FALSE
-        // by default in l().
+        // Unsanitized token replacement here because the entire link title
+        // gets auto-escaped during link generation.
         $link_title = \Drupal::token()->replace($item->title, array($entity->getEntityTypeId() => $entity), array('sanitize' => FALSE, 'clear' => TRUE));
       }
 
@@ -67,8 +68,8 @@ class LinkSeparateFormatter extends LinkFormatter {
       }
       $url_title = $url->toString();
       if (!empty($settings['trim_length'])) {
-        $link_title = truncate_utf8($link_title, $settings['trim_length'], FALSE, TRUE);
-        $url_title = truncate_utf8($url_title, $settings['trim_length'], FALSE, TRUE);
+        $link_title = Unicode::truncate($link_title, $settings['trim_length'], FALSE, TRUE);
+        $url_title = Unicode::truncate($url_title, $settings['trim_length'], FALSE, TRUE);
       }
 
       $element[$delta] = array(

@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\views\cache;
 
 use Drupal\Core\Datetime\DateFormatter;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Render\RendererInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Form\FormStateInterface;
 
@@ -46,12 +47,14 @@ class Time extends CachePluginBase {
    *   The plugin_id for the plugin instance.
    * @param mixed $plugin_definition
    *   The plugin implementation definition.
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The HTML renderer.
    * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
    *   The date formatter service.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, DateFormatter $date_formatter) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RendererInterface $renderer, DateFormatter $date_formatter) {
     $this->dateFormatter = $date_formatter;
-    parent::__construct($configuration, $plugin_id, $plugin_definition);
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $renderer);
   }
 
   /**
@@ -62,6 +65,7 @@ class Time extends CachePluginBase {
       $configuration,
       $plugin_id,
       $plugin_definition,
+      $container->get('renderer'),
       $container->get('date.formatter')
     );
   }
@@ -80,21 +84,21 @@ class Time extends CachePluginBase {
     parent::buildOptionsForm($form, $form_state);
     $options = array(60, 300, 1800, 3600, 21600, 518400);
     $options = array_map(array($this->dateFormatter, 'formatInterval'), array_combine($options, $options));
-    $options = array(-1 => t('Never cache')) + $options + array('custom' => t('Custom'));
+    $options = array(-1 => $this->t('Never cache')) + $options + array('custom' => $this->t('Custom'));
 
     $form['results_lifespan'] = array(
       '#type' => 'select',
-      '#title' => t('Query results'),
-      '#description' => t('The length of time raw query results should be cached.'),
+      '#title' => $this->t('Query results'),
+      '#description' => $this->t('The length of time raw query results should be cached.'),
       '#options' => $options,
       '#default_value' => $this->options['results_lifespan'],
     );
     $form['results_lifespan_custom'] = array(
       '#type' => 'textfield',
-      '#title' => t('Seconds'),
+      '#title' => $this->t('Seconds'),
       '#size' => '25',
       '#maxlength' => '30',
-      '#description' => t('Length of time in seconds raw query results should be cached.'),
+      '#description' => $this->t('Length of time in seconds raw query results should be cached.'),
       '#default_value' => $this->options['results_lifespan_custom'],
       '#states' => array(
         'visible' => array(
@@ -104,17 +108,17 @@ class Time extends CachePluginBase {
     );
     $form['output_lifespan'] = array(
       '#type' => 'select',
-      '#title' => t('Rendered output'),
-      '#description' => t('The length of time rendered HTML output should be cached.'),
+      '#title' => $this->t('Rendered output'),
+      '#description' => $this->t('The length of time rendered HTML output should be cached.'),
       '#options' => $options,
       '#default_value' => $this->options['output_lifespan'],
     );
     $form['output_lifespan_custom'] = array(
       '#type' => 'textfield',
-      '#title' => t('Seconds'),
+      '#title' => $this->t('Seconds'),
       '#size' => '25',
       '#maxlength' => '30',
-      '#description' => t('Length of time in seconds rendered HTML output should be cached.'),
+      '#description' => $this->t('Length of time in seconds rendered HTML output should be cached.'),
       '#default_value' => $this->options['output_lifespan_custom'],
       '#states' => array(
         'visible' => array(
@@ -129,7 +133,7 @@ class Time extends CachePluginBase {
     foreach ($custom_fields as $field) {
       $cache_options = $form_state->getValue('cache_options');
       if ($cache_options[$field] == 'custom' && !is_numeric($cache_options[$field . '_custom'])) {
-        $form_state->setError($form[$field .'_custom'], t('Custom time values must be numeric.'));
+        $form_state->setError($form[$field .'_custom'], $this->t('Custom time values must be numeric.'));
       }
     }
   }

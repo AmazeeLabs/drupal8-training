@@ -8,9 +8,8 @@
 namespace Drupal\Core\Authentication\Provider;
 
 use Drupal\Core\Authentication\AuthenticationProviderInterface;
-use Drupal\Core\Session\SessionManagerInterface;
+use Drupal\Core\Session\SessionConfigurationInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent;
 
 /**
  * Cookie based authentication provider.
@@ -18,53 +17,40 @@ use Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent;
 class Cookie implements AuthenticationProviderInterface {
 
   /**
-   * The session manager.
+   * The session configuration.
    *
-   * @var \Drupal\Core\Session\SessionManagerInterface
+   * @var \Drupal\Core\Session\SessionConfigurationInterface
    */
-  protected $sessionManager;
+  protected $sessionConfiguration;
 
   /**
-   * Constructs a new Cookie authentication provider instance.
+   * Constructs a new cookie authentication provider.
    *
-   * @param \Drupal\Core\Session\SessionManagerInterface $session_manager
-   *   The session manager.
+   * @param \Drupal\Core\Session\SessionConfigurationInterface $session_configuration
+   *   The session configuration.
    */
-  public function __construct(SessionManagerInterface $session_manager) {
-    $this->sessionManager = $session_manager;
+  public function __construct(SessionConfigurationInterface $session_configuration) {
+    $this->sessionConfiguration = $session_configuration;
   }
 
   /**
    * {@inheritdoc}
    */
   public function applies(Request $request) {
-    return TRUE;
+    return $request->hasSession() && $this->sessionConfiguration->hasSession($request);
   }
 
   /**
    * {@inheritdoc}
    */
   public function authenticate(Request $request) {
-    // Global $user is deprecated, but the session system is still based on it.
-    global $user;
-    $this->sessionManager->start();
-    if ($this->sessionManager->isStarted()) {
-      return $user;
+    if ($request->getSession()->start()) {
+      // @todo Remove global in https://www.drupal.org/node/2228393
+      global $_session_user;
+      return $_session_user;
     }
+
     return NULL;
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function cleanup(Request $request) {
-    $this->sessionManager->save();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function handleException(GetResponseForExceptionEvent $event) {
-    return FALSE;
-  }
 }

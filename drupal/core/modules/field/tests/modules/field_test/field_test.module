@@ -92,7 +92,7 @@ function field_test_entity_display_build_alter(&$output, $context) {
   }
 
   if (isset($output['test_field'])) {
-    $output['test_field'][] = array('#markup' => 'entity language is ' . $context['entity']->language()->id);
+    $output['test_field'][] = array('#markup' => 'entity language is ' . $context['entity']->language()->getId());
   }
 }
 
@@ -145,4 +145,26 @@ function field_test_query_efq_metadata_test_alter(&$query) {
 function field_test_entity_extra_field_info_alter(&$info) {
   // Remove all extra fields from the 'no_fields' content type;
   unset($info['node']['no_fields']);
+}
+
+/**
+ * Implements hook_entity_bundle_field_info_alter().
+ */
+function field_test_entity_bundle_field_info_alter(&$fields, \Drupal\Core\Entity\EntityTypeInterface $entity_type, $bundle) {
+  if (($field_name = \Drupal::state()->get('field_test_set_constraint', FALSE)) && $entity_type->id() == 'entity_test' && $bundle == 'entity_test' && !empty($fields[$field_name])) {
+    $fields[$field_name]->setPropertyConstraints('value', [
+      'Range' => [
+        'min' => 0,
+        'max' => 32,
+      ],
+    ]);
+  }
+  if (($field_name = \Drupal::state()->get('field_test_add_constraint', FALSE)) && $entity_type->id() == 'entity_test' && $bundle == 'entity_test' && !empty($fields[$field_name])) {
+    $fields[$field_name]->addPropertyConstraints('value', [
+      'Range' => [
+        'min' => 0,
+        'max' => 32,
+      ],
+    ]);
+  }
 }

@@ -7,30 +7,24 @@
 
 namespace Drupal\taxonomy;
 
-use Drupal\views\EntityViewsDataInterface;
+use Drupal\views\EntityViewsData;
 
 /**
  * Provides the views data for the taxonomy entity type.
  */
-class TermViewsData implements EntityViewsDataInterface {
+class TermViewsData extends EntityViewsData {
 
   /**
    * {@inheritdoc}
    */
   public function getViewsData() {
-    $data = array();
+    $data = parent::getViewsData();
 
-    $data['taxonomy_term_data']['table']['group']  = t('Taxonomy term');
-    $data['taxonomy_term_data']['table']['base'] = array(
-      'field' => 'tid',
-      'title' => t('Term'),
-      'help' => t('Taxonomy terms are attached to nodes.'),
-      'access query tag' => 'term_access',
-    );
-    $data['taxonomy_term_data']['table']['entity type'] = 'taxonomy_term';
-    $data['taxonomy_term_data']['table']['wizard_id'] = 'taxonomy_term';
+    $data['taxonomy_term_field_data']['table']['base']['help'] = t('Taxonomy terms are attached to nodes.');
+    $data['taxonomy_term_field_data']['table']['base']['access query tag'] = 'term_access';
+    $data['taxonomy_term_field_data']['table']['wizard_id'] = 'taxonomy_term';
 
-    $data['taxonomy_term_data']['table']['join'] = array(
+    $data['taxonomy_term_field_data']['table']['join'] = array(
       // This is provided for the many_to_one argument.
       'taxonomy_index' => array(
         'field' => 'tid',
@@ -38,38 +32,19 @@ class TermViewsData implements EntityViewsDataInterface {
       ),
     );
 
-    $data['taxonomy_term_field_data']['table']['group'] = t('Taxonomy term');
-    $data['taxonomy_term_field_data']['table']['entity type'] = 'taxonomy_term';
-    $data['taxonomy_term_field_data']['table']['join']['taxonomy_term_data'] = array(
-      'type' => 'INNER',
-      'left_field' => 'tid',
-      'field' => 'tid',
-    );
+    $data['taxonomy_term_field_data']['tid']['help'] = t('The tid of a taxonomy term.');
 
-    $data['taxonomy_term_data']['tid'] = array(
-      'title' => t('Term ID'),
-      'help' => t('The tid of a taxonomy term.'),
-      'field' => array(
-        'id' => 'numeric',
-      ),
-      'sort' => array(
-        'id' => 'standard',
-      ),
-      'argument' => array(
-        'id' => 'taxonomy',
-        'name field' => 'name',
-        'zero is null' => TRUE,
-      ),
-      'filter' => array(
-        'title' => t('Term'),
-        'help' => t('Taxonomy term chosen from autocomplete or select widget.'),
-        'id' => 'taxonomy_index_tid',
-        'hierarchy table' => 'taxonomy_term_hierarchy',
-        'numeric' => TRUE,
-      ),
-    );
+    $data['taxonomy_term_field_data']['tid']['argument']['id'] = 'taxonomy';
+    $data['taxonomy_term_field_data']['tid']['argument']['name field'] = 'name';
+    $data['taxonomy_term_field_data']['tid']['argument']['zero is null'] = TRUE;
 
-    $data['taxonomy_term_data']['tid_raw'] = array(
+    $data['taxonomy_term_field_data']['tid']['filter']['id'] = 'taxonomy_index_tid';
+    $data['taxonomy_term_field_data']['tid']['filter']['title'] = t('Term');
+    $data['taxonomy_term_field_data']['tid']['filter']['help'] = t('Taxonomy term chosen from autocomplete or select widget.');
+    $data['taxonomy_term_field_data']['tid']['filter']['hierarchy table'] = 'taxonomy_term_hierarchy';
+    $data['taxonomy_term_field_data']['tid']['filter']['numeric'] = TRUE;
+
+    $data['taxonomy_term_field_data']['tid_raw'] = array(
       'title' => t('Term ID'),
       'help' => t('The tid of a taxonomy term.'),
       'real field' => 'tid',
@@ -79,97 +54,26 @@ class TermViewsData implements EntityViewsDataInterface {
       ),
     );
 
-    $data['taxonomy_term_data']['tid_representative'] = array(
+    $data['taxonomy_term_field_data']['tid_representative'] = array(
       'relationship' => array(
         'title' => t('Representative node'),
         'label'  => t('Representative node'),
         'help' => t('Obtains a single representative node for each term, according to a chosen sort criterion.'),
         'id' => 'groupwise_max',
         'relationship field' => 'tid',
-        'outer field' => 'taxonomy_term_data.tid',
+        'outer field' => 'taxonomy_term_field_data.tid',
         'argument table' => 'taxonomy_term_field_data',
         'argument field' =>  'tid',
-        'base'   => 'node',
+        'base'   => 'node_field_data',
         'field'  => 'nid',
-        'relationship' => 'node:term_node_tid'
+        'relationship' => 'node_field_data:term_node_tid'
       ),
     );
 
-    $data['taxonomy_term_field_data']['name'] = array(
-      'title' => t('Name'),
-      'help' => t('The taxonomy term name.'),
-      'field' => array(
-        'id' => 'taxonomy',
-      ),
-      'sort' => array(
-        'id' => 'standard',
-      ),
-      'filter' => array(
-        'id' => 'string',
-        'help' => t('Taxonomy term name.'),
-      ),
-      'argument' => array(
-        'id' => 'string',
-        'help' => t('Taxonomy term name.'),
-        'many to one' => TRUE,
-        'empty field name' => t('Uncategorized'),
-      ),
-    );
-
-    $data['taxonomy_term_field_data']['weight'] = array(
-      'title' => t('Weight'),
-      'help' => t('The term weight field'),
-      'field' => array(
-        'id' => 'numeric',
-      ),
-      'sort' => array(
-        'id' => 'standard',
-      ),
-      'filter' => array(
-        'id' => 'numeric',
-      ),
-      'argument' => array(
-        'id' => 'numeric',
-      ),
-    );
-
-    $data['taxonomy_term_field_data']['description__value'] = array(
-      'title' => t('Term description'),
-      'help' => t('The description associated with a taxonomy term.'),
-      'field' => array(
-        'id' => 'markup',
-        'format' => array('field' => 'description__format'),
-        'click sortable' => FALSE,
-      ),
-      'filter' => array(
-        'id' => 'string',
-      ),
-    );
-
-    $data['taxonomy_term_data']['vid'] = array(
-      'title' => t('Vocabulary'),
-      'help' => t('Filter the results of "Taxonomy: Term" to a particular vocabulary.'),
-      'filter' => array(
-        'id' => 'bundle',
-      ),
-    );
-
-    $data['taxonomy_term_field_data']['langcode'] = array(
-      'title' => t('Language'), // The item it appears as on the UI,
-      'help' => t('Language of the term'),
-      'field' => array(
-        'id' => 'taxonomy_term_language',
-      ),
-      'sort' => array(
-        'id' => 'standard',
-      ),
-      'filter' => array(
-        'id' => 'language',
-      ),
-      'argument' => array(
-        'id' => 'language',
-      ),
-    );
+    $data['taxonomy_term_field_data']['vid']['help'] = t('Filter the results of "Taxonomy: Term" to a particular vocabulary.');
+    unset($data['taxonomy_term_field_data']['vid']['field']);
+    unset($data['taxonomy_term_field_data']['vid']['argument']);
+    unset($data['taxonomy_term_field_data']['vid']['sort']);
 
     $data['taxonomy_term_data']['edit_term'] = array(
       'field' => array(
@@ -180,19 +84,24 @@ class TermViewsData implements EntityViewsDataInterface {
       ),
     );
 
-    $data['taxonomy_term_field_data']['changed'] = array(
-      'title' => t('Updated date'),
-      'help' => t('The date the term was last updated.'),
-      'field' => array(
-        'id' => 'date',
-      ),
-      'sort' => array(
-        'id' => 'date'
-      ),
-      'filter' => array(
-        'id' => 'date',
-      ),
-    );
+    if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
+      $data['taxonomy_term_data']['translation_link'] = array(
+        'title' => t('Translation link'),
+        'help' => t('Provide a link to the translations overview for taxonomy terms.'),
+        'field' => array(
+          'id' => 'content_translation_link',
+        ),
+      );
+    }
+
+    $data['taxonomy_term_field_data']['name']['field']['id'] = 'taxonomy';
+    $data['taxonomy_term_field_data']['name']['argument']['many to one'] = TRUE;
+    $data['taxonomy_term_field_data']['name']['argument']['empty field name'] = t('Uncategorized');
+
+    $data['taxonomy_term_field_data']['description__value']['field']['click sortable'] = FALSE;
+
+    $data['taxonomy_term_field_data']['changed']['title'] = t('Updated date');
+    $data['taxonomy_term_field_data']['changed']['help'] = t('The date the term was last updated.');
 
     $data['taxonomy_term_field_data']['changed_fulldate'] = array(
       'title' => t('Updated date'),
@@ -248,16 +157,6 @@ class TermViewsData implements EntityViewsDataInterface {
       ),
     );
 
-    if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
-      $data['taxonomy_term_data']['translation_link'] = array(
-        'title' => t('Translation link'),
-        'help' => t('Provide a link to the translations overview for taxonomy terms.'),
-        'field' => array(
-          'id' => 'content_translation_link',
-        ),
-      );
-    }
-
     $data['taxonomy_index']['table']['group']  = t('Taxonomy term');
 
     $data['taxonomy_index']['table']['join'] = array(
@@ -266,7 +165,7 @@ class TermViewsData implements EntityViewsDataInterface {
         'left_field' => 'tid',
         'field' => 'tid',
       ),
-      'node' => array(
+      'node_field_data' => array(
         // links directly to node via nid
         'left_field' => 'nid',
         'field' => 'nid',
@@ -301,43 +200,52 @@ class TermViewsData implements EntityViewsDataInterface {
         'name field' => 'name',
         'empty field name' => t('Uncategorized'),
         'numeric' => TRUE,
-        'skip base' => 'taxonomy_term_data',
+        'skip base' => 'taxonomy_term_field_data',
       ),
       'filter' => array(
         'title' => t('Has taxonomy term'),
         'id' => 'taxonomy_index_tid',
         'hierarchy table' => 'taxonomy_term_hierarchy',
         'numeric' => TRUE,
-        'skip base' => 'taxonomy_term_data',
+        'skip base' => 'taxonomy_term_field_data',
         'allow empty' => TRUE,
       ),
     );
 
+    $data['taxonomy_index']['status'] = [
+      'title' => t('Publish status'),
+      'help' => t('Whether or not the content related to a term is published.'),
+      'filter' => [
+        'id' => 'boolean',
+        'label' => t('Published status'),
+        'type' => 'yes-no',
+      ],
+    ];
 
-  $data['taxonomy_index']['sticky'] = [
-    'title' => t('Sticky status'),
-    'help' => t('Whether or not the content related to a term is sticky.'),
-    'filter' => [
-      'id' => 'boolean',
-      'label' => t('Sticky status'),
-      'type' => 'yes-no',
-    ],
-    'sort' => [
-      'id' => 'standard',
-      'help' => t('Whether or not the content related to a term is sticky. To list sticky content first, set this to descending.'),
-    ],
-  ];
+    $data['taxonomy_index']['sticky'] = [
+      'title' => t('Sticky status'),
+      'help' => t('Whether or not the content related to a term is sticky.'),
+      'filter' => [
+        'id' => 'boolean',
+        'label' => t('Sticky status'),
+        'type' => 'yes-no',
+      ],
+      'sort' => [
+        'id' => 'standard',
+        'help' => t('Whether or not the content related to a term is sticky. To list sticky content first, set this to descending.'),
+      ],
+    ];
 
-  $data['taxonomy_index']['created'] = [
-    'title' => t('Post date'),
-    'help' => t('The date the content related to a term was posted.'),
-    'sort' => [
-      'id' => 'date'
-    ],
-    'filter' => [
-      'id' => 'date',
-    ],
-  ];
+    $data['taxonomy_index']['created'] = [
+      'title' => t('Post date'),
+      'help' => t('The date the content related to a term was posted.'),
+      'sort' => [
+        'id' => 'date'
+      ],
+      'filter' => [
+        'id' => 'date',
+      ],
+    ];
 
     $data['taxonomy_term_hierarchy']['table']['group']  = t('Taxonomy term');
 
@@ -377,4 +285,3 @@ class TermViewsData implements EntityViewsDataInterface {
   }
 
 }
-

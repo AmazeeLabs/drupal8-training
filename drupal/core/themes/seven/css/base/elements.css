@@ -12,8 +12,11 @@ a,
   text-decoration: none;
 }
 a:hover,
-.link:hover {
+.link:hover,
+a:focus,
+.link:focus {
   text-decoration: underline;
+  outline: 0;
 }
 hr {
   margin: 0;
@@ -27,29 +30,49 @@ summary,
   font-weight: bold;
   text-transform: uppercase;
 }
+.simpletest-results-form summary {
+  text-transform: none;
+}
+
+/**
+ * Reusable heading classes are included to help modules change the styling of
+ * headings on a page without affecting accessibility.
+ */
 h1,
+.heading-a {
+  font-weight: bold;
+  margin: 0;
+  font-size: 1.625em;
+  line-height: 1.875em;
+}
 h2,
-h3,
-h4,
-h5,
-h6 {
+.heading-b {
   font-weight: bold;
   margin: 10px 0;
-}
-h1 {
-  font-size: 1.538em;
-}
-h2 {
   font-size: 1.385em;
 }
-h3 {
+h3,
+.heading-c {
+  font-weight: bold;
+  margin: 10px 0;
   font-size: 1.231em;
 }
-h4 {
+h4,
+.heading-d {
+  font-weight: bold;
+  margin: 10px 0;
   font-size: 1.154em;
 }
 h5,
-h6 {
+.heading-e {
+  font-weight: bold;
+  margin: 10px 0;
+  font-size: 1.077em;
+}
+h6,
+.heading-f {
+  font-weight: bold;
+  margin: 10px 0;
   font-size: 1.077em;
 }
 p {
@@ -111,7 +134,8 @@ ul {
   margin: 0.25em 0 0.25em 1.5em; /* LTR */
 }
 [dir="rtl"] ul {
-  margin: 0.25em 1.5em 0.25em 0;
+  margin-left: 0;
+  margin-right: 1.5em;
 }
 ol {
   list-style-type: decimal;
@@ -119,7 +143,8 @@ ol {
   padding: 0;
 }
 [dir="rtl"] ol {
-  margin: 0.25em 2em 0.25em 0;
+  margin-left: 0;
+  margin-right: 2em;
 }
 quote,
 code {
@@ -140,4 +165,10 @@ details {
 details summary {
   padding-top: 0.5em;
   padding-bottom: 0.5em;
+}
+details summary:focus {
+  border-top: 3px solid #0074bd;
+  outline: none;
+  color: #0074bd;
+  margin-top: -3px;
 }

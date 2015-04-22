@@ -7,6 +7,8 @@
 
 namespace Drupal\search\Tests;
 
+use Drupal\Core\Url;
+
 /**
  * Verify the search config settings form.
  *
@@ -19,36 +21,36 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
    *
    * @var array
    */
-  public static $modules = array('block', 'search_extra_type');
+  public static $modules = array('block', 'search_extra_type', 'test_page_test');
 
   /**
    * User who can search and administer search.
    *
    * @var \Drupal\user\UserInterface
    */
-  public $search_user;
+  protected $searchUser;
 
   /**
    * Node indexed for searching.
    *
    * @var \Drupal\node\NodeInterface
    */
-  public $search_node;
+  protected $searchNode;
 
   protected function setUp() {
     parent::setUp();
 
     // Login as a user that can create and search content.
-    $this->search_user = $this->drupalCreateUser(array('search content', 'administer search', 'administer nodes', 'bypass node access', 'access user profiles', 'administer users', 'administer blocks', 'access site reports'));
-    $this->drupalLogin($this->search_user);
+    $this->searchUser = $this->drupalCreateUser(array('search content', 'administer search', 'administer nodes', 'bypass node access', 'access user profiles', 'administer users', 'administer blocks', 'access site reports'));
+    $this->drupalLogin($this->searchUser);
 
     // Add a single piece of content and index it.
     $node = $this->drupalCreateNode();
-    $this->search_node = $node;
+    $this->searchNode = $node;
     // Link the node to itself to test that it's only indexed once. The content
     // also needs the word "pizza" so we can use it as the search keyword.
     $body_key = 'body[0][value]';
-    $edit[$body_key] = l($node->label(), 'node/' . $node->id()) . ' pizza sandwich';
+    $edit[$body_key] = \Drupal::l($node->label(), $node->urlInfo()) . ' pizza sandwich';
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save and keep published'));
 
     $this->container->get('plugin.manager.search')->createInstance('node_search')->updateIndex();
@@ -71,7 +73,7 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
     $this->drupalPostForm('admin/config/search/pages', array(), t('Re-index site'));
     $this->assertText(t('Are you sure you want to re-index the site'));
     $this->drupalPostForm('admin/config/search/pages/reindex', array(), t('Re-index site'));
-    $this->assertText(t('The index will be rebuilt'));
+    $this->assertText(t('All search indexes will be rebuilt'));
     $this->drupalGet('admin/config/search/pages');
     $this->assertText(t('There is 1 item left to index.'));
 
@@ -133,11 +135,11 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
     $plugin_info = array(
       'node_search' => array(
         'keys' => 'pizza',
-        'text' => $this->search_node->label(),
+        'text' => $this->searchNode->label(),
       ),
       'user_search' => array(
-        'keys' => $this->search_user->getUsername(),
-        'text' => $this->search_user->getEmail(),
+        'keys' => $this->searchUser->getUsername(),
+        'text' => $this->searchUser->getEmail(),
       ),
       'dummy_search_type' => array(
         'keys' => 'foo',
@@ -215,8 +217,8 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
   public function testDefaultSearchPageOrdering() {
     $this->drupalGet('search');
     $elements = $this->xpath('//*[contains(@class, :class)]//a', array(':class' => 'tabs primary'));
-    $this->assertIdentical((string) $elements[0]['href'], url('search/node'));
-    $this->assertIdentical((string) $elements[1]['href'], url('search/user'));
+    $this->assertIdentical((string) $elements[0]['href'], \Drupal::url('search.view_node_search'));
+    $this->assertIdentical((string) $elements[1]['href'], \Drupal::url('search.view_user_search'));
   }
 
   /**
@@ -269,8 +271,8 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
     // Ensure both search pages have their tabs displayed.
     $this->drupalGet('search');
     $elements = $this->xpath('//*[contains(@class, :class)]//a', array(':class' => 'tabs primary'));
-    $this->assertIdentical((string) $elements[0]['href'], url('search/' . $first['path']));
-    $this->assertIdentical((string) $elements[1]['href'], url('search/' . $second['path']));
+    $this->assertIdentical((string) $elements[0]['href'], Url::fromRoute('search.view_' . $first_id)->toString());
+    $this->assertIdentical((string) $elements[1]['href'], Url::fromRoute('search.view_' . $second_id)->toString());
 
     // Switch the weight of the search pages and check the order of the tabs.
     $edit = array(
@@ -280,8 +282,8 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
     $this->drupalPostForm('admin/config/search/pages', $edit, t('Save configuration'));
     $this->drupalGet('search');
     $elements = $this->xpath('//*[contains(@class, :class)]//a', array(':class' => 'tabs primary'));
-    $this->assertIdentical((string) $elements[0]['href'], url('search/' . $second['path']));
-    $this->assertIdentical((string) $elements[1]['href'], url('search/' . $first['path']));
+    $this->assertIdentical((string) $elements[0]['href'], Url::fromRoute('search.view_' . $second_id)->toString());
+    $this->assertIdentical((string) $elements[1]['href'], Url::fromRoute('search.view_' . $first_id)->toString());
 
     // Check the initial state of the search pages.
     $this->drupalGet('admin/config/search/pages');
@@ -309,9 +311,9 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
 
     // Test deleting.
     $this->clickLink(t('Delete'));
-    $this->assertRaw(t('Are you sure you want to delete the %label search page?', array('%label' => $first['label'])));
+    $this->assertRaw(t('Are you sure you want to delete the search page %label?', array('%label' => $first['label'])));
     $this->drupalPostForm(NULL, array(), t('Delete'));
-    $this->assertRaw(t('The %label search page has been deleted.', array('%label' => $first['label'])));
+    $this->assertRaw(t('The search page %label has been deleted.', array('%label' => $first['label'])));
     $this->verifySearchPageOperations($first_id, FALSE, FALSE, FALSE, FALSE);
   }
 

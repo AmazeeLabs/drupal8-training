@@ -7,6 +7,8 @@
 
 namespace Drupal\node\Tests;
 
+use Drupal\comment\Tests\CommentTestTrait;
+
 /**
  * Tests node title.
  *
@@ -14,21 +16,32 @@ namespace Drupal\node\Tests;
  */
 class NodeTitleTest extends NodeTestBase {
 
+  use CommentTestTrait;
+
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('comment', 'views');
+  public static $modules = array('comment', 'views', 'block');
 
-  protected $admin_user;
+  /**
+   * A user with permission to bypass access content.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $adminUser;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
+    $this->drupalPlaceBlock('system_breadcrumb_block');
 
-    $this->admin_user = $this->drupalCreateUser(array('administer nodes', 'create article content', 'create page content', 'post comments'));
-    $this->drupalLogin($this->admin_user);
-    $this->container->get('comment.manager')->addDefaultField('node', 'page');
+    $this->adminUser = $this->drupalCreateUser(array('administer nodes', 'create article content', 'create page content', 'post comments'));
+    $this->drupalLogin($this->adminUser);
+    $this->addDefaultCommentField('node', 'page');
   }
 
   /**

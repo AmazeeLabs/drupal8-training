@@ -20,7 +20,7 @@ use Drupal\Core\Extension\ExtensionDiscovery;
  *   For $type 'theme', the array values are objects representing the
  *   respective database row, with the 'info' property already unserialized.
  *
- * @see list_themes()
+ * @see \Drupal\Core\Extension\ThemeHandler::listInfo()
  */
 function system_list($type) {
   $lists = &drupal_static(__FUNCTION__);
@@ -60,16 +60,6 @@ function system_list_reset() {
   drupal_static_reset('system_list');
   drupal_static_reset('system_rebuild_module_data');
   \Drupal::cache('bootstrap')->delete('system_list');
-
-  // Clear the library info cache.
-  // Libraries may be provided by all extension types, and may be altered by any
-  // other extensions (types) due to the nature of
-  // \Drupal\Core\Extension\ModuleHandler::alter() and the fact that profiles
-  // are recorded and handled as modules.
-  // @todo Trigger an event upon module install/uninstall and theme
-  //   enable/disable, and move this into an event subscriber.
-  // @see https://drupal.org/node/2206347
-  Cache::invalidateTags(array('extension' => TRUE));
 }
 
 /**
@@ -152,34 +142,10 @@ function module_load_include($type, $module, $name = NULL) {
 }
 
 /**
- * Installs a given list of modules.
- *
- * @see \Drupal\Core\Extension\ModuleHandlerInterface::install()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0. Use
- *   \Drupal::moduleHandler()->install($module_list, $enable_dependencies = TRUE).
- */
-function module_install($module_list, $enable_dependencies = TRUE) {
-  return \Drupal::moduleHandler()->install($module_list, $enable_dependencies);
-}
-
-/**
- * Installs a given list of modules.
- *
- * @see \Drupal\Core\Extension\ModuleHandlerInterface::module_install()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0. Use
- *   \Drupal::moduleHandler()->uninstall($module_list, $enable_dependencies = TRUE).
- */
-function module_uninstall($module_list = array(), $uninstall_dependents = TRUE) {
-  return \Drupal::moduleHandler()->uninstall($module_list, $uninstall_dependents);
-}
-
-/**
  * Returns an array of modules required by core.
  */
 function drupal_required_modules() {
-  $listing = new ExtensionDiscovery();
+  $listing = new ExtensionDiscovery(\Drupal::root());
   $files = $listing->scan('module');
   $required = array();
 
@@ -211,8 +177,7 @@ function drupal_required_modules() {
  *   An integer representing the weight of the module.
  */
 function module_set_weight($module, $weight) {
-  // Update the module weight in the config file that contains it.
-  $extension_config = \Drupal::config('core.extension');
+  $extension_config = \Drupal::configFactory()->getEditable('core.extension');
   if ($extension_config->get("module.$module") !== NULL) {
     $extension_config
       ->set("module.$module", $weight)

@@ -1,8 +1,17 @@
-base_field: nid
-base_table: node
-core: 8.x
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - user
+id: test_contextual_links
+label: 'Contextual links'
+module: node
 description: ''
-status: '1'
+tag: default
+base_table: node_field_data
+base_field: nid
+core: 8.x
 display:
   default:
     display_options:
@@ -19,12 +28,12 @@ display:
           items_per_page: 10
           offset: 0
           id: 0
-          total_pages: ''
+          total_pages: null
           expose:
             items_per_page: false
             items_per_page_label: 'Items per page'
             items_per_page_options: '5, 10, 25, 50'
-            items_per_page_options_all: '0'
+            items_per_page_options_all: false
             items_per_page_options_all_label: '- All -'
             offset: false
             offset_label: Offset
@@ -45,8 +54,6 @@ display:
       row:
         type: 'entity:node'
         options:
-          build_mode: teaser
-          comments: false
           view_mode: teaser
       style:
         type: default
@@ -69,28 +76,24 @@ display:
     display_options:
       path: node/%/contextual-links
       defaults:
-        arguments: '0'
+        arguments: false
       arguments:
         nid:
           field: nid
           id: nid
           relationship: none
-          table: node
+          table: node_field_data
           plugin_id: numeric
-          provider: views
+          entity_type: node
+          entity_field: nid
       menu:
         type: tab
         title: 'Test contextual link'
         description: ''
-        name: tools
+        menu_name: tools
         weight: 0
-        context: true
+        context: '1'
     display_plugin: page
     display_title: Page
     id: page_1
     position: 1
-label: Contextual links
-module: node
-id: test_contextual_links
-tag: default
-langcode: en

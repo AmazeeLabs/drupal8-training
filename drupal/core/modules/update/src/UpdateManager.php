@@ -7,7 +7,9 @@
 namespace Drupal\update;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -17,6 +19,7 @@ use Drupal\Core\Utility\ProjectInfo;
  * Default implementation of UpdateManagerInterface.
  */
 class UpdateManager implements UpdateManagerInterface {
+  use DependencySerializationTrait;
   use StringTranslationTrait;
 
   /**
@@ -62,6 +65,13 @@ class UpdateManager implements UpdateManagerInterface {
   protected $availableReleasesTempStore;
 
   /**
+   * The theme handler.
+   *
+   * @var \Drupal\Core\Extension\ThemeHandlerInterface
+   */
+  protected $themeHandler;
+
+  /**
    * Constructs a UpdateManager.
    *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
@@ -74,13 +84,16 @@ class UpdateManager implements UpdateManagerInterface {
    *   The translation service.
    * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $key_value_expirable_factory
    *   The expirable key/value factory.
+   * @param \Drupal\Core\Extension\ThemeHandlerInterface $theme_handler
+   *   The theme handler.
    */
-  public function __construct(ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler, UpdateProcessorInterface $update_processor, TranslationInterface $translation, KeyValueFactoryInterface $key_value_expirable_factory) {
+  public function __construct(ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler, UpdateProcessorInterface $update_processor, TranslationInterface $translation, KeyValueFactoryInterface $key_value_expirable_factory, ThemeHandlerInterface $theme_handler) {
     $this->updateSettings = $config_factory->get('update.settings');
     $this->moduleHandler = $module_handler;
     $this->updateProcessor = $update_processor;
     $this->stringTranslation = $translation;
     $this->keyValueStore = $key_value_expirable_factory->get('update');
+    $this->themeHandler = $theme_handler;
     $this->availableReleasesTempStore = $key_value_expirable_factory->get('update_available_releases');
     $this->projects = array();
   }
@@ -121,7 +134,7 @@ class UpdateManager implements UpdateManagerInterface {
       if (empty($this->projects)) {
         // Still empty, so we have to rebuild.
         $module_data = system_rebuild_module_data();
-        $theme_data = system_rebuild_theme_data();
+        $theme_data = $this->themeHandler->rebuildThemeData();
         $project_info = new ProjectInfo();
         $project_info->processInfoList($this->projects, $module_data, 'module', TRUE);
         $project_info->processInfoList($this->projects, $theme_data, 'theme', TRUE);
@@ -146,18 +159,22 @@ class UpdateManager implements UpdateManagerInterface {
 
     // On certain paths, we should clear the data and recompute the projects for
     // update status of the site to avoid presenting stale information.
-    $paths = array(
-      'admin/modules',
-      'admin/modules/update',
-      'admin/appearance',
-      'admin/appearance/update',
-      'admin/reports',
-      'admin/reports/updates',
-      'admin/reports/updates/update',
-      'admin/reports/status',
-      'admin/reports/updates/check',
+    $route_names = array(
+      'update.theme_update',
+      'system.modules_list',
+      'system.theme_install',
+      'update.module_update',
+      'update.module_install',
+      'update.status',
+      'update.report_update',
+      'update.report_install',
+      'update.settings',
+      'system.status',
+      'update.manual_status',
+      'update.confirmation_page',
+      'system.themes_page',
     );
-    if (in_array(current_path(), $paths)) {
+    if (in_array(\Drupal::routeMatch()->getRouteName(), $route_names)) {
       $this->keyValueStore->delete($key);
     }
     else {

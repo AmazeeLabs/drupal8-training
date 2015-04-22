@@ -38,8 +38,10 @@ class NodeCreationTest extends NodeTestBase {
    * Creates a "Basic page" node and verifies its consistency in the database.
    */
   function testNodeCreation() {
+    $node_type_storage = \Drupal::entityManager()->getStorage('node_type');
+
     // Test /node/add page with only one content type.
-    entity_load('node_type', 'article')->delete();
+    $node_type_storage->load('article')->delete();
     $this->drupalGet('node/add');
     $this->assertResponse(200);
     $this->assertUrl('node/add/page');
@@ -62,7 +64,8 @@ class NodeCreationTest extends NodeTestBase {
     $this->assertNoText(format_date($node->getCreatedTime()));
 
     // Change the node type setting to show submitted by information.
-    $node_type = entity_load('node_type', 'page');
+    /** @var \Drupal\node\NodeTypeInterface $node_type */
+    $node_type = $node_type_storage->load('page');
     $node_type->setDisplaySubmitted(TRUE);
     $node_type->save();
 
@@ -105,12 +108,12 @@ class NodeCreationTest extends NodeTestBase {
       $this->assertTrue($node, 'Transactions not supported, and node found in database.');
 
       // Check that the failed rollback was logged.
-      $records = db_query("SELECT wid FROM {watchdog} WHERE message LIKE 'Explicit rollback failed%'")->fetchAll();
+      $records = static::getWatchdogIdsForFailedExplicitRollback();
       $this->assertTrue(count($records) > 0, 'Transactions not supported, and rollback error logged to watchdog.');
     }
 
     // Check that the rollback error was logged.
-    $records = db_query("SELECT wid FROM {watchdog} WHERE variables LIKE '%Test exception for rollback.%'")->fetchAll();
+    $records = static::getWatchdogIdsForTestExceptionRollback();
     $this->assertTrue(count($records) > 0, 'Rollback explanatory error logged to watchdog.');
   }
 
@@ -119,7 +122,7 @@ class NodeCreationTest extends NodeTestBase {
    */
   function testUnpublishedNodeCreation() {
     // Set the front page to the test page.
-    \Drupal::config('system.site')->set('page.front', 'test-page')->save();
+    $this->config('system.site')->set('page.front', 'test-page')->save();
 
     // Set "Basic page" content type to be unpublished by default.
     $fields = \Drupal::entityManager()->getFieldDefinitions('node', 'page');
@@ -158,7 +161,7 @@ class NodeCreationTest extends NodeTestBase {
 
     $this->drupalGet('node/add/page');
 
-    $result = $this->xpath('//input[@id="edit-uid-0-target-id" and contains(@data-autocomplete-path, "/entity_reference/autocomplete/tags/uid/node/page")]');
+    $result = $this->xpath('//input[@id="edit-uid-0-target-id" and contains(@data-autocomplete-path, "/entity_reference_autocomplete/user/default")]');
     $this->assertEqual(count($result), 1, 'Ensure that the user does have access to the autocompletion');
   }
 
@@ -171,7 +174,7 @@ class NodeCreationTest extends NodeTestBase {
     $this->assertNoLinkByHref('/admin/structure/types/add');
 
     // Test /node/add page without content types.
-    foreach (entity_load_multiple('node_type') as $entity ) {
+    foreach (\Drupal::entityManager()->getStorage('node_type')->loadMultiple() as $entity ) {
       $entity->delete();
     }
 
@@ -185,4 +188,33 @@ class NodeCreationTest extends NodeTestBase {
 
     $this->assertLinkByHref('/admin/structure/types/add');
   }
+
+  /**
+   * Returns log records with the rollback exception message.
+   *
+   * @return array
+   */
+  protected static function getWatchdogIdsForTestExceptionRollback() {
+    // PostgreSQL doesn't support bytea LIKE queries, so we need to unserialize
+    // first to check for the rollback exception message.
+    $matches = array();
+    $query = db_query("SELECT wid, variables FROM {watchdog}");
+    foreach ($query as $row) {
+      $variables = (array) unserialize($row->variables);
+      if (isset($variables['!message']) && $variables['!message'] === 'Test exception for rollback.') {
+        $matches[] = $row->wid;
+      }
+    }
+    return $matches;
+  }
+
+  /**
+   * Returns log records with the explicit rollback failed exception message.
+   *
+   * @return array
+   */
+  protected static function getWatchdogIdsForFailedExplicitRollback() {
+    return db_query("SELECT wid FROM {watchdog} WHERE message LIKE 'Explicit rollback failed%'")->fetchAll();
+  }
+
 }

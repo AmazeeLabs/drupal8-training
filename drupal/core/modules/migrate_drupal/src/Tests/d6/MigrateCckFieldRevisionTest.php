@@ -30,7 +30,7 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
     parent::setUp();
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-      'name' => 'field_test',
+      'field_name' => 'field_test',
       'type' => 'text',
     ))->save();
     entity_create('field_config', array(
@@ -40,7 +40,7 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
     ))->save();
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-      'name' => 'field_test_two',
+      'field_name' => 'field_test_two',
       'type' => 'integer',
       'cardinality' => -1,
     ))->save();
@@ -64,11 +64,6 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
       ),
     );
     $this->prepareMigrations($id_mappings);
-    $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6NodeRevision.php',
-    );
-    $this->loadDumps($dumps);
-
     $migrations = entity_load_multiple('migration', array('d6_cck_field_revision:*'));
     foreach ($migrations as $migration) {
       $executable = new MigrateExecutable($migration, $this);
@@ -81,8 +76,8 @@ class MigrateCckFieldRevisionTest extends MigrateNodeTestBase {
    */
   public function testCckFieldRevision() {
     $node = \Drupal::entityManager()->getStorage('node')->loadRevision(2);
-    $this->assertEqual($node->id(), 1, 'Node 1 loaded.');
-    $this->assertEqual($node->getRevisionId(), 2, 'Node 1 revision 2loaded.');
+    $this->assertIdentical('1', $node->id(), 'Node 1 loaded.');
+    $this->assertIdentical('2', $node->getRevisionId(), 'Node 1 revision 2loaded.');
   }
 
 }

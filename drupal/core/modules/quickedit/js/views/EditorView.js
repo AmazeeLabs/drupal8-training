@@ -77,14 +77,14 @@
      *  - Boolean padding: indicates whether padding should be applied to the
      *    edited element, to guarantee legibility of text.
      *  - Boolean unifiedToolbar: provides the in-place editor with the ability
-     *    to insert its own toolbar UI into Quick Edit's tightly integrated
+     *    to insert its own toolbar UI into Quick Edit's tightly integrated
      *    toolbar.
      *  - Boolean fullWidthToolbar: indicates whether Quick Edit's tightly
      *    integrated toolbar should consume the full width of the element,
      *    rather than being just long enough to accommodate a label.
      */
     getQuickEditUISettings: function () {
-      return { padding: false, unifiedToolbar: false, fullWidthToolbar: false, popup: false };
+      return {padding: false, unifiedToolbar: false, fullWidthToolbar: false, popup: false};
     },
 
     /**
@@ -197,12 +197,13 @@
         $el: this.$el,
         nocssjs: true,
         other_view_modes: fieldModel.findOtherViewModes(),
-        // Reset an existing entry for this entity in the TempStore (if any) when
-        // saving the field. Logically speaking, this should happen in a separate
-        // request because this is an entity-level operation, not a field-level
-        // operation. But that would require an additional request, that might not
-        // even be necessary: it is only when a user saves a first changed field
-        // for an entity that this needs to happen: precisely now!
+        // Reset an existing entry for this entity in the PrivateTempStore (if
+        // any) when saving the field. Logically speaking, this should happen in
+        // a separate request because this is an entity-level operation, not a
+        // field-level operation. But that would require an additional request,
+        // that might not even be necessary: it is only when a user saves a
+        // first changed field for an entity that this needs to happen:
+        // precisely now!
         reset: !this.fieldModel.get('entity').get('inTempStore')
       };
 
@@ -211,7 +212,7 @@
         // Create a backstage area for storing forms that are hidden from view
         // (hence "backstage" — since the editing doesn't happen in the form, it
         // happens "directly" in the content, the form is only used for saving).
-        var $backstage = $(Drupal.theme('quickeditBackstage', { id: backstageId })).appendTo('body');
+        var $backstage = $(Drupal.theme('quickeditBackstage', {id: backstageId})).appendTo('body');
         // Hidden forms are stuffed into the backstage container for this field.
         var $form = $(form).appendTo($backstage);
         // Disable the browser's HTML5 validation; we only care about server-

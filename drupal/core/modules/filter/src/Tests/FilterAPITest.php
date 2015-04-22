@@ -7,6 +7,8 @@
 
 namespace Drupal\filter\Tests;
 
+use Drupal\Component\Utility\String;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\TypedData\OptionsProviderInterface;
 use Drupal\Core\TypedData\DataDefinition;
@@ -27,7 +29,8 @@ class FilterAPITest extends EntityUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->installConfig(array('system', 'filter'));
+    $this->installSchema('system', array('router'));
+    $this->installConfig(array('system', 'filter', 'filter_test'));
   }
 
   /**
@@ -215,6 +218,10 @@ class FilterAPITest extends EntityUnitTestBase {
           'weight' => 0,
           'status' => TRUE,
         ),
+        'filter_test_cache_contexts' => array(
+          'weight' => 0,
+          'status' => TRUE,
+        ),
         'filter_test_post_render_cache' => array(
           'weight' => 1,
           'status' => TRUE,
@@ -234,7 +241,7 @@ class FilterAPITest extends EntityUnitTestBase {
       '#text' => '<p>Hello, world!</p>',
       '#format' => 'element_test',
     );
-    drupal_render($build);
+    drupal_render_root($build);
 
     // Verify the assets, cache tags and #post_render_cache callbacks.
     $expected_assets = array(
@@ -246,16 +253,17 @@ class FilterAPITest extends EntityUnitTestBase {
     $this->assertEqual($expected_assets, $build['#attached'], 'Expected assets present');
     $expected_cache_tags = array(
       // The cache tag set by the processed_text element itself.
-      'filter_format' => array(
-        'element_test',
-      ),
+      'config:filter.format.element_test',
       // The cache tags set by the filter_test_cache_tags filter.
-      'foo' => array(
-        'bar',
-        'baz',
-      ),
+      'foo:bar',
+      'foo:baz',
     );
     $this->assertEqual($expected_cache_tags, $build['#cache']['tags'], 'Expected cache tags present.');
+    $expected_cache_contexts = [
+      // The cache context set by the filter_test_cache_contexts filter.
+      'languages:' . LanguageInterface::TYPE_CONTENT,
+    ];
+    $this->assertEqual($expected_cache_contexts, $build['#cache']['contexts'], 'Expected cache contexts present.');
     $expected_markup = '<p>Hello, world!</p><p>This is a dynamic llama.</p>';
     $this->assertEqual($expected_markup, $build['#markup'], 'Expected #post_render_cache callback has been applied.');
   }
@@ -354,21 +362,21 @@ class FilterAPITest extends EntityUnitTestBase {
     $crazy_format->save();
     // Use config to directly load the configuration and check that only enabled
     // or customized plugins are saved to configuration.
-    $filters = \Drupal::config('filter.format.crazy')->get('filters');
+    $filters = $this->config('filter.format.crazy')->get('filters');
     $this->assertEqual(array('filter_html_escape', 'filter_html'), array_keys($filters));
 
     // Disable a plugin to ensure that disabled plugins with custom settings are
     // stored in configuration.
     $crazy_format->setFilterConfig('filter_html_escape', array('status' => FALSE));
     $crazy_format->save();
-    $filters = \Drupal::config('filter.format.crazy')->get('filters');
+    $filters = $this->config('filter.format.crazy')->get('filters');
     $this->assertEqual(array('filter_html_escape', 'filter_html'), array_keys($filters));
 
     // Set the settings as per default to ensure that disable plugins in this
     // state are not stored in configuration.
     $crazy_format->setFilterConfig('filter_html_escape', array('weight' => -10));
     $crazy_format->save();
-    $filters = \Drupal::config('filter.format.crazy')->get('filters');
+    $filters = $this->config('filter.format.crazy')->get('filters');
     $this->assertEqual(array('filter_html'), array_keys($filters));
   }
 
@@ -390,4 +398,68 @@ class FilterAPITest extends EntityUnitTestBase {
     }
     $this->assertTrue($filter_format_violation_found, format_string('Validation violation for invalid value "%invalid_value" found', array('%invalid_value' => $invalid_value)));
   }
+
+  /**
+   * Tests that filter format dependency removal works.
+   *
+   * Ensure that modules providing filter plugins are required when the plugin
+   * is in use, and that only disabled plugins are removed from format
+   * configuration entities rather than the configuration entities being
+   * deleted.
+   *
+   * @see \Drupal\filter\Entity\FilterFormat::onDependencyRemoval()
+   * @see filter_system_info_alter()
+   */
+  public function testDependencyRemoval() {
+    $this->installSchema('user', array('users_data'));
+    $filter_format = \Drupal\filter\Entity\FilterFormat::load('filtered_html');
+
+    // Enable the filter_test_restrict_tags_and_attributes filter plugin on the
+    // filtered_html filter format.
+    $filter_config = [
+      'weight' => 10,
+      'status' => 1,
+    ];
+    $filter_format->setFilterConfig('filter_test_restrict_tags_and_attributes', $filter_config)->save();
+
+    $module_data = _system_rebuild_module_data();
+    $this->assertTrue($module_data['filter_test']->info['required'], 'The filter_test module is required.');
+    $this->assertEqual($module_data['filter_test']->info['explanation'], String::format('Provides a filter plugin that is in use in the following filter formats: %formats', array('%formats' => $filter_format->label())));
+
+    // Disable the filter_test_restrict_tags_and_attributes filter plugin but
+    // have custom configuration so that the filter plugin is still configured
+    // in filtered_html the filter format.
+    $filter_config = [
+      'weight' => 20,
+      'status' => 0,
+    ];
+    $filter_format->setFilterConfig('filter_test_restrict_tags_and_attributes', $filter_config)->save();
+    // Use the get method to match the assert after the module has been
+    // uninstalled.
+    $filters = $filter_format->get('filters');
+    $this->assertTrue(isset($filters['filter_test_restrict_tags_and_attributes']), 'The filter plugin filter_test_restrict_tags_and_attributes is configured by the filtered_html filter format.');
+
+    drupal_static_reset('filter_formats');
+    \Drupal::entityManager()->getStorage('filter_format')->resetCache();
+    $module_data = _system_rebuild_module_data();
+    $this->assertFalse(isset($module_data['filter_test']->info['required']), 'The filter_test module is required.');
+
+    // Verify that a dependency exists on the module that provides the filter
+    // plugin since it has configuration for the disabled plugin.
+    $this->assertEqual(['module' => ['filter_test']], $filter_format->getDependencies());
+
+    // Uninstall the module.
+    \Drupal::service('module_installer')->uninstall(array('filter_test'));
+
+    // Verify the filter format still exists but the dependency and filter is
+    // gone.
+    \Drupal::entityManager()->getStorage('filter_format')->resetCache();
+    $filter_format = \Drupal\filter\Entity\FilterFormat::load('filtered_html');
+    $this->assertEqual([], $filter_format->getDependencies());
+    // Use the get method since the FilterFormat::filters() method only returns
+    // existing plugins.
+    $filters = $filter_format->get('filters');
+    $this->assertFalse(isset($filters['filter_test_restrict_tags_and_attributes']), 'The filter plugin filter_test_restrict_tags_and_attributes is not configured by the filtered_html filter format.');
+  }
+
 }

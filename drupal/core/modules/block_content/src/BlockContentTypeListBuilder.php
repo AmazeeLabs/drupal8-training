@@ -44,8 +44,8 @@ class BlockContentTypeListBuilder extends ConfigEntityListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
-    $row['type'] = \Drupal::linkGenerator()->generateFromUrl($entity->label(), $entity->urlInfo());
-    $row['description'] = Xss::filterAdmin($entity->description);
+    $row['type'] = $entity->link();
+    $row['description'] = Xss::filterAdmin($entity->getDescription());
     return $row + parent::buildRow($entity);
   }
 

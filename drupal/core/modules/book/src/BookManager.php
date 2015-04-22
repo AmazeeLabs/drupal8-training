@@ -9,7 +9,6 @@ namespace Drupal\book;
 
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\Cache;
-use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -28,13 +27,6 @@ class BookManager implements BookManagerInterface {
    * Defines the maximum supported depth of the book tree.
    */
   const BOOK_MAX_DEPTH = 9;
-
-  /**
-   * Database Service Object.
-   *
-   * @var \Drupal\Core\Database\Connection
-   */
-  protected $connection;
 
   /**
    * Entity manager Service Object.
@@ -58,6 +50,13 @@ class BookManager implements BookManagerInterface {
   protected $books;
 
   /**
+   * Book outline storage.
+   *
+   * @var \Drupal\book\BookOutlineStorageInterface
+   */
+  protected $bookOutlineStorage;
+
+  /**
    * Stores flattened book trees.
    *
    * @var array
@@ -67,11 +66,11 @@ class BookManager implements BookManagerInterface {
   /**
    * Constructs a BookManager object.
    */
-  public function __construct(Connection $connection, EntityManagerInterface $entity_manager, TranslationInterface $translation, ConfigFactoryInterface $config_factory) {
-    $this->connection = $connection;
+  public function __construct(EntityManagerInterface $entity_manager, TranslationInterface $translation, ConfigFactoryInterface $config_factory, BookOutlineStorageInterface $book_outline_storage) {
     $this->entityManager = $entity_manager;
     $this->stringTranslation = $translation;
     $this->configFactory = $config_factory;
+    $this->bookOutlineStorage = $book_outline_storage;
   }
 
   /**
@@ -89,16 +88,10 @@ class BookManager implements BookManagerInterface {
    */
   protected function loadBooks() {
     $this->books = array();
-    $nids = $this->connection->query("SELECT DISTINCT(bid) FROM {book}")->fetchCol();
+    $nids = $this->bookOutlineStorage->getBooks();
 
     if ($nids) {
-      $query = $this->connection->select('book', 'b', array('fetch' => \PDO::FETCH_ASSOC));
-      $query->fields('b');
-      $query->condition('b.nid', $nids);
-      $query->addTag('node_access');
-      $query->addMetaData('base_table', 'book');
-      $book_links = $query->execute();
-
+      $book_links = $this->bookOutlineStorage->loadMultiple($nids);
       $nodes = $this->entityManager->getStorage('node')->loadMultiple($nids);
       // @todo: Sort by weight and translated title.
 
@@ -106,7 +99,7 @@ class BookManager implements BookManagerInterface {
       foreach ($book_links as $link) {
         $nid = $link['nid'];
         if (isset($nodes[$nid]) && $nodes[$nid]->status) {
-          $link['link_path'] = 'node/' . $nid;
+          $link['url'] = $nodes[$nid]->urlInfo();
           $link['title'] = $nodes[$nid]->label();
           $link['type'] = $nodes[$nid]->bundle();
           $this->books[$link['bid']] = $link;
@@ -148,21 +141,7 @@ class BookManager implements BookManagerInterface {
    *   the passed book link.
    */
   protected function findChildrenRelativeDepth(array $book_link) {
-    $query = $this->connection->select('book');
-    $query->addField('book', 'depth');
-    $query->condition('bid', $book_link['bid']);
-    $query->orderBy('depth', 'DESC');
-    $query->range(0, 1);
-
-    $i = 1;
-    $p = 'p1';
-    while ($i <= static::BOOK_MAX_DEPTH && $book_link[$p]) {
-      $query->condition($p, $book_link[$p]);
-      $p = 'p' . ++$i;
-    }
-
-    $max_depth = $query->execute()->fetchField();
-
+    $max_depth = $this->bookOutlineStorage->getChildRelativeDepth($book_link, static::BOOK_MAX_DEPTH);
     return ($max_depth > $book_link['depth']) ? $max_depth - $book_link['depth'] : 0;
   }
 
@@ -264,9 +243,14 @@ class BookManager implements BookManagerInterface {
       return FALSE;
     }
 
-    if (!empty($node->book['bid']) && $node->book['bid'] == 'new') {
-      // New nodes that are their own book.
-      $node->book['bid'] = $node->id();
+    if (!empty($node->book['bid'])) {
+      if ($node->book['bid'] == 'new') {
+        // New nodes that are their own book.
+        $node->book['bid'] = $node->id();
+      }
+      elseif (!isset($node->book['original_bid'])) {
+        $node->book['original_bid'] = $node->book['bid'];
+      }
     }
 
     // Ensure we create a new book link if either the node itself is new, or the
@@ -333,7 +317,8 @@ class BookManager implements BookManagerInterface {
    *   A parent selection form element.
    */
   protected function addParentSelectFormElements(array $book_link) {
-    if ($this->configFactory->get('book.settings')->get('override_parent_selector')) {
+    $config = $this->configFactory->get('book.settings');
+    if ($config->get('override_parent_selector')) {
       return array();
     }
     // Offer a message or a drop-down to choose a different parent page.
@@ -368,6 +353,7 @@ class BookManager implements BookManagerInterface {
         '#suffix' => '</div>',
       );
     }
+    $form['#cache']['tags'] = Cache::mergeTags(isset($form['#cache']['tags']) ? $form['#cache']['tags'] : [],  $config->getCacheTags());
 
     return $form;
   }
@@ -436,14 +422,12 @@ class BookManager implements BookManagerInterface {
    */
   public function deleteFromBook($nid) {
     $original = $this->loadBookLink($nid, FALSE);
-    $this->connection->delete('book')
-      ->condition('nid', $nid)
-      ->execute();
+    $this->bookOutlineStorage->delete($nid);
+
     if ($nid == $original['bid']) {
       // Handle deletion of a top-level post.
-      $result = $this->connection->query("SELECT * FROM {book} WHERE pid = :nid", array(
-        ':nid' => $nid
-      ))->fetchAllAssoc('nid', \PDO::FETCH_ASSOC);
+      $result = $this->bookOutlineStorage->loadBookChildren($nid);
+
       foreach ($result as $child) {
         $child['bid'] = $child['nid'];
         $this->updateOutline($child);
@@ -451,7 +435,7 @@ class BookManager implements BookManagerInterface {
     }
     $this->updateOriginalParent($original);
     $this->books = NULL;
-    \Drupal::cache('data')->deleteTags(array('bid' => $original['bid']));
+    Cache::invalidateTags(array('bid:' . $original['bid']));
   }
 
   /**
@@ -466,7 +450,7 @@ class BookManager implements BookManagerInterface {
     $nid = isset($link['nid']) ? $link['nid'] : 0;
     // Generate a cache ID (cid) specific for this $bid, $link, $language, and
     // depth.
-    $cid = 'book-links:' . $bid . ':all:' . $nid . ':' . $language_interface->id . ':' . (int) $max_depth;
+    $cid = 'book-links:' . $bid . ':all:' . $nid . ':' . $language_interface->getId() . ':' . (int) $max_depth;
 
     if (!isset($tree[$cid])) {
       // If the tree data was not in the static cache, build $tree_parameters.
@@ -521,29 +505,21 @@ class BookManager implements BookManagerInterface {
 
     $num_items = count($items);
     foreach ($items as $i => $data) {
-      $class = array();
-      if ($i == 0) {
-        $class[] = 'first';
-      }
-      if ($i == $num_items - 1) {
-        $class[] = 'last';
-      }
+      $class = ['menu-item'];
       // Set a class for the <li>-tag. Since $data['below'] may contain local
       // tasks, only set 'expanded' class if the link also has children within
       // the current book.
       if ($data['link']['has_children'] && $data['below']) {
-        $class[] = 'expanded';
+        $class[] = 'menu-item--expanded';
       }
       elseif ($data['link']['has_children']) {
-        $class[] = 'collapsed';
+        $class[] = 'menu-item--collapsed';
       }
-      else {
-        $class[] = 'leaf';
-      }
+
       // Set a class if the link is in the active trail.
       if ($data['link']['in_active_trail']) {
-        $class[] = 'active-trail';
-        $data['link']['localized_options']['attributes']['class'][] = 'active-trail';
+        $class[] = 'menu-item--active-trail';
+        $data['link']['localized_options']['attributes']['class'][] = 'menu-item--active-trail';
       }
 
       // Allow book-specific theme overrides.
@@ -551,7 +527,7 @@ class BookManager implements BookManagerInterface {
       $element['#attributes']['class'] = $class;
       $element['#title'] = $data['link']['title'];
       $node = $this->entityManager->getStorage('node')->load($data['link']['nid']);
-      $element['#href'] = $node->url();
+      $element['#url'] = $node->urlInfo();
       $element['#localized_options'] = !empty($data['link']['localized_options']) ? $data['link']['localized_options'] : array();
       $element['#below'] = $data['below'] ? $this->bookTreeOutput($data['below']) : $data['below'];
       $element['#original_link'] = $data['link'];
@@ -619,7 +595,7 @@ class BookManager implements BookManagerInterface {
     if (isset($parameters['expanded'])) {
       sort($parameters['expanded']);
     }
-    $tree_cid = 'book-links:' . $bid . ':tree-data:' . $language_interface->id . ':' . hash('sha256', serialize($parameters));
+    $tree_cid = 'book-links:' . $bid . ':tree-data:' . $language_interface->getId() . ':' . hash('sha256', serialize($parameters));
 
     // If we do not have this tree in the static cache, check {cache_data}.
     if (!isset($trees[$tree_cid])) {
@@ -630,32 +606,11 @@ class BookManager implements BookManagerInterface {
     }
 
     if (!isset($trees[$tree_cid])) {
-      $query = $this->connection->select('book');
-      $query->fields('book');
-      for ($i = 1; $i <= static::BOOK_MAX_DEPTH; $i++) {
-        $query->orderBy('p' . $i, 'ASC');
-      }
-      $query->condition('bid', $bid);
-      if (!empty($parameters['expanded'])) {
-        $query->condition('pid', $parameters['expanded'], 'IN');
-      }
       $min_depth = (isset($parameters['min_depth']) ? $parameters['min_depth'] : 1);
-      if ($min_depth != 1) {
-        $query->condition('depth', $min_depth, '>=');
-      }
-      if (isset($parameters['max_depth'])) {
-        $query->condition('depth', $parameters['max_depth'], '<=');
-      }
-      // Add custom query conditions, if any were passed.
-      if (isset($parameters['conditions'])) {
-        foreach ($parameters['conditions'] as $column => $value) {
-          $query->condition($column, $value);
-        }
-      }
+      $result = $this->bookOutlineStorage->getBookMenuTree($bid, $parameters, $min_depth, static::BOOK_MAX_DEPTH);
 
       // Build an ordered array of links using the query result object.
       $links = array();
-      $result = $query->execute();
       foreach ($result as $link) {
         $link = (array) $link;
         $links[$link['nid']] = $link;
@@ -666,7 +621,7 @@ class BookManager implements BookManagerInterface {
       $this->bookTreeCollectNodeLinks($data['tree'], $data['node_links']);
 
       // Cache the data, if it is not already in the cache.
-      \Drupal::cache('data')->set($tree_cid, $data, Cache::PERMANENT, array('bid' => $bid));
+      \Drupal::cache('data')->set($tree_cid, $data, Cache::PERMANENT, array('bid:' . $bid));
       $trees[$tree_cid] = $data;
     }
 
@@ -734,7 +689,7 @@ class BookManager implements BookManagerInterface {
    * {@inheritdoc}
    */
   public function loadBookLinks($nids, $translate = TRUE) {
-    $result = $this->connection->query("SELECT * FROM {book} WHERE nid IN (:nids)", array(':nids' =>  $nids), array('fetch' => \PDO::FETCH_ASSOC));
+    $result = $this->bookOutlineStorage->loadMultiple($nids, $translate);
     $links = array();
     foreach ($result as $link) {
       if ($translate) {
@@ -755,14 +710,9 @@ class BookManager implements BookManagerInterface {
     $link += $this->getLinkDefaults($link['nid']);
     if ($new) {
       // Insert new.
-      $this->connection->insert('book')
-        ->fields(array(
-            'nid' => $link['nid'],
-            'bid' => $link['bid'],
-            'pid' => $link['pid'],
-            'weight' => $link['weight'],
-          ) + $this->getBookParents($link, (array) $this->loadBookLink($link['pid'], FALSE)))
-        ->execute();
+      $parents = $this->getBookParents($link, (array) $this->loadBookLink($link['pid'], FALSE));
+      $this->bookOutlineStorage->insert($link, $parents);
+
       // Update the has_children status of the parent.
       $this->updateParent($link);
     }
@@ -797,14 +747,17 @@ class BookManager implements BookManagerInterface {
         $this->updateParent($link);
       }
       // Update the weight and pid.
-      $query = $this->connection->update('book');
-      $query->fields(array('weight' => $link['weight'], 'pid' => $link['pid'], 'bid' => $link['bid']));
-      $query->condition('nid', $link['nid']);
-      $query->execute();
+      $this->bookOutlineStorage->update($link['nid'], array(
+        'weight' => $link['weight'],
+        'pid' => $link['pid'],
+        'bid' => $link['bid'],
+      ));
     }
+    $cache_tags = [];
     foreach ($affected_bids as $bid) {
-      \Drupal::cache('data')->deleteTags(array('bid' => $bid));
+      $cache_tags[] = 'bid:' . $bid;
     }
+    Cache::invalidateTags($cache_tags);
     return $link;
   }
 
@@ -817,10 +770,6 @@ class BookManager implements BookManagerInterface {
    *   The original parent of $link.
    */
   protected function moveChildren(array $link, array $original) {
-    $query = $this->connection->update('book');
-
-    $query->fields(array('bid' => $link['bid']));
-
     $p = 'p1';
     $expressions = array();
     for ($i = 1; $i <= $link['depth']; $p = 'p' . ++$i) {
@@ -842,18 +791,8 @@ class BookManager implements BookManagerInterface {
       // @see http://dev.mysql.com/doc/refman/5.0/en/update.html
       $expressions = array_reverse($expressions);
     }
-    foreach ($expressions as $expression) {
-      $query->expression($expression[0], $expression[1], $expression[2]);
-    }
 
-    $query->expression('depth', 'depth + :depth', array(':depth' => $shift));
-    $query->condition('bid', $original['bid']);
-    $p = 'p1';
-    for ($i = 1; !empty($original[$p]); $p = 'p' . ++$i) {
-      $query->condition($p, $original[$p]);
-    }
-
-    $query->execute();
+    $this->bookOutlineStorage->updateMovedChildren($link['bid'], $original, $expressions, $shift);
   }
 
   /**
@@ -875,10 +814,7 @@ class BookManager implements BookManagerInterface {
       // Nothing to update.
       return TRUE;
     }
-    $query = $this->connection->update('book');
-    $query->fields(array('has_children' => 1))
-      ->condition('nid', $link['pid']);
-    return $query->execute();
+    return $this->bookOutlineStorage->update($link['pid'], array('has_children' => 1));
   }
 
   /**
@@ -901,22 +837,13 @@ class BookManager implements BookManagerInterface {
       return TRUE;
     }
     // Check if $original had at least one child.
-    $original_number_of_children = $this->connection->select('book', 'b')
-      ->condition('bid', $original['bid'])
-      ->condition('pid', $original['pid'])
-      ->condition('nid', $original['nid'], '<>')
-      ->countQuery()
-      ->execute()
-      ->fetchField();
+    $original_number_of_children = $this->bookOutlineStorage->countOriginalLinkChildren($original);
 
     $parent_has_children = ((bool) $original_number_of_children) ? 1 : 0;
     // Update the parent. If the original link did not have children, then the
     // parent now does not have children. If the original had children, then the
     // the parent has children now (still).
-    $query = $this->connection->update('book');
-    $query->fields(array('has_children' => $parent_has_children))
-        ->condition('nid', $original['pid']);
-    return $query->execute();
+    return $this->bookOutlineStorage->update($original['pid'], array('has_children' => $parent_has_children));
   }
 
   /**
@@ -949,15 +876,14 @@ class BookManager implements BookManagerInterface {
     if ($node_links) {
       // @todo Extract that into its own method.
       $nids = array_keys($node_links);
-      $select = $this->connection->select('node_field_data', 'n');
-      $select->addField('n', 'nid');
+
       // @todo This should be actually filtering on the desired node status field
       //   language and just fall back to the default language.
-      $select->condition('n.status', 1);
+      $nids = \Drupal::entityQuery('node')
+        ->condition('nid', $nids, 'IN')
+        ->condition('status', 1)
+        ->execute();
 
-      $select->condition('n.nid', $nids, 'IN');
-      $select->addTag('node_access');
-      $nids = $select->execute()->fetchCol();
       foreach ($nids as $nid) {
         foreach ($node_links[$nid] as $mlid => $link) {
           $node_links[$nid][$mlid]['access'] = TRUE;
@@ -1103,17 +1029,9 @@ class BookManager implements BookManagerInterface {
 
       // If the subtree data was not in the cache, $data will be NULL.
       if (!isset($data)) {
-        $query = db_select('book', 'b', array('fetch' => \PDO::FETCH_ASSOC));
-        $query->fields('b');
-        $query->condition('b.bid', $link['bid']);
-        for ($i = 1; $i <= static::BOOK_MAX_DEPTH && $link["p$i"]; ++$i) {
-          $query->condition("p$i", $link["p$i"]);
-        }
-        for ($i = 1; $i <= static::BOOK_MAX_DEPTH; ++$i) {
-          $query->orderBy("p$i");
-        }
+        $result = $this->bookOutlineStorage->getBookSubtree($link, static::BOOK_MAX_DEPTH);
         $links = array();
-        foreach ($query->execute() as $item) {
+        foreach ($result as $item) {
           $links[] = $item;
         }
         $data['tree'] = $this->buildBookOutlineData($links, array(), $link['depth']);
@@ -1124,10 +1042,10 @@ class BookManager implements BookManagerInterface {
         // Cache the data, if it is not already in the cache.
 
         if (!\Drupal::cache('data')->get($tree_cid)) {
-          \Drupal::cache('data')->set($tree_cid, $data, Cache::PERMANENT, array('bid' => $link['bid']));
+          \Drupal::cache('data')->set($tree_cid, $data, Cache::PERMANENT, array('bid:' . $link['bid']));
         }
         // Cache the cid of the (shared) data using the book and item-specific cid.
-        \Drupal::cache('data')->set($cid, $tree_cid, Cache::PERMANENT, array('bid' => $link['bid']));
+        \Drupal::cache('data')->set($cid, $tree_cid, Cache::PERMANENT, array('bid:' . $link['bid']));
       }
       // Check access for the current user to each item in the tree.
       $this->bookTreeCheckAccess($data['tree'], $data['node_links']);

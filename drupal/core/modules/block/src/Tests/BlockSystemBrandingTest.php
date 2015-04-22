@@ -15,7 +15,7 @@ namespace Drupal\block\Tests;
 class BlockSystemBrandingTest extends BlockTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -27,7 +27,7 @@ class BlockSystemBrandingTest extends BlockTestBase {
   protected function setUp() {
     parent::setUp();
     // Set a site slogan.
-    \Drupal::config('system.site')
+    $this->config('system.site')
       ->set('slogan', 'Community plumbing')
       ->save();
     // Add the system branding block to the page.
@@ -51,9 +51,10 @@ class BlockSystemBrandingTest extends BlockTestBase {
     $this->assertTrue(!empty($site_logo_element), 'The branding block logo was found.');
     $this->assertTrue(!empty($site_name_element), 'The branding block site name was found.');
     $this->assertTrue(!empty($site_slogan_element), 'The branding block slogan was found.');
+    $this->assertCacheTag('config:system.site');
 
     // Turn just the logo off.
-    \Drupal::config('block.block.site-branding')
+    $this->config('block.block.site-branding')
       ->set('settings.use_site_logo', 0)
       ->save();
     $this->drupalGet('');
@@ -64,9 +65,10 @@ class BlockSystemBrandingTest extends BlockTestBase {
     $this->assertTrue(empty($site_logo_element), 'The branding block logo was disabled.');
     $this->assertTrue(!empty($site_name_element), 'The branding block site name was found.');
     $this->assertTrue(!empty($site_slogan_element), 'The branding block slogan was found.');
+    $this->assertCacheTag('config:system.site');
 
     // Turn just the site name off.
-    \Drupal::config('block.block.site-branding')
+    $this->config('block.block.site-branding')
       ->set('settings.use_site_logo', 1)
       ->set('settings.use_site_name', 0)
       ->save();
@@ -78,9 +80,10 @@ class BlockSystemBrandingTest extends BlockTestBase {
     $this->assertTrue(!empty($site_logo_element), 'The branding block logo was found.');
     $this->assertTrue(empty($site_name_element), 'The branding block site name was disabled.');
     $this->assertTrue(!empty($site_slogan_element), 'The branding block slogan was found.');
+    $this->assertCacheTag('config:system.site');
 
     // Turn just the site slogan off.
-    \Drupal::config('block.block.site-branding')
+    $this->config('block.block.site-branding')
       ->set('settings.use_site_name', 1)
       ->set('settings.use_site_slogan', 0)
       ->save();
@@ -92,9 +95,10 @@ class BlockSystemBrandingTest extends BlockTestBase {
     $this->assertTrue(!empty($site_logo_element), 'The branding block logo was found.');
     $this->assertTrue(!empty($site_name_element), 'The branding block site name was found.');
     $this->assertTrue(empty($site_slogan_element), 'The branding block slogan was disabled.');
+    $this->assertCacheTag('config:system.site');
 
     // Turn the site name and the site slogan off.
-    \Drupal::config('block.block.site-branding')
+    $this->config('block.block.site-branding')
       ->set('settings.use_site_name', 0)
       ->set('settings.use_site_slogan', 0)
       ->save();
@@ -106,6 +110,7 @@ class BlockSystemBrandingTest extends BlockTestBase {
     $this->assertTrue(!empty($site_logo_element), 'The branding block logo was found.');
     $this->assertTrue(empty($site_name_element), 'The branding block site name was disabled.');
     $this->assertTrue(empty($site_slogan_element), 'The branding block slogan was disabled.');
+    $this->assertCacheTag('config:system.site');
   }
 
 }

@@ -10,8 +10,9 @@ namespace Drupal\views_ui\Controller;
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Controller\ControllerBase;
+use Drupal\Core\Url;
 use Drupal\views\ViewExecutable;
-use Drupal\views\ViewStorageInterface;
+use Drupal\views\ViewEntityInterface;
 use Drupal\views\Views;
 use Drupal\views_ui\ViewUI;
 use Drupal\views\ViewsData;
@@ -91,7 +92,7 @@ class ViewsUIController extends ControllerBase {
     foreach ($fields as $field_name => $views) {
       $rows[$field_name]['data'][0] = String::checkPlain($field_name);
       foreach ($views as $view) {
-        $rows[$field_name]['data'][1][] = $this->l($view, 'entity.view.edit_form', array('view' => $view));
+        $rows[$field_name]['data'][1][] = $this->l($view, new Url('entity.view.edit_form', array('view' => $view)));
       }
       $rows[$field_name]['data'][1] = SafeMarkup::set(implode(', ', $rows[$field_name]['data'][1]));
     }
@@ -119,7 +120,7 @@ class ViewsUIController extends ControllerBase {
     foreach ($rows as &$row) {
       // Link each view name to the view itself.
       foreach ($row['views'] as $row_name => $view) {
-        $row['views'][$row_name] = $this->l($view, 'entity.view.edit_form', array('view' => $view));
+        $row['views'][$row_name] = $this->l($view, new Url('entity.view.edit_form', array('view' => $view)));
       }
       $row['views'] = SafeMarkup::set(implode(', ', $row['views']));
     }
@@ -137,7 +138,7 @@ class ViewsUIController extends ControllerBase {
   /**
    * Calls a method on a view and reloads the listing page.
    *
-   * @param \Drupal\views\ViewStorageInterface $view
+   * @param \Drupal\views\ViewEntityInterface $view
    *   The view being acted upon.
    * @param string $op
    *   The operation to perform, e.g., 'enable' or 'disable'.
@@ -149,7 +150,7 @@ class ViewsUIController extends ControllerBase {
    *   back to the listing page.
    *
    */
-  public function ajaxOperation(ViewStorageInterface $view, $op, Request $request) {
+  public function ajaxOperation(ViewEntityInterface $view, $op, Request $request) {
     // Perform the operation.
     $view->$op()->save();
 
@@ -162,7 +163,7 @@ class ViewsUIController extends ControllerBase {
     }
 
     // Otherwise, redirect back to the page.
-    return $this->redirect('views_ui.list');
+    return $this->redirect('entity.view.collection');
   }
 
   /**

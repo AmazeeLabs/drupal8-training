@@ -138,9 +138,13 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
 
     $storage_definition = $this->getFieldStorageDefinition();
 
+    // Filter out unknown settings and make sure all settings are present, so
+    // that a complete field definition is passed to the various hooks and
+    // written to config.
+    $default_settings = $field_type_manager->getDefaultFieldSettings($storage_definition->getType());
+    $this->settings = array_intersect_key($this->settings, $default_settings) + $default_settings;
+
     if ($this->isNew()) {
-      // Set the default field settings.
-      $this->settings += $field_type_manager->getDefaultFieldSettings($storage_definition->type);
       // Notify the entity storage.
       $entity_manager->getStorage($this->entity_type)->onFieldDefinitionCreate($this);
     }
@@ -155,8 +159,6 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
       if ($storage_definition->uuid() != $this->original->getFieldStorageDefinition()->uuid()) {
         throw new FieldException("Cannot change an existing field's storage.");
       }
-      // Set the default field settings.
-      $this->settings += $field_type_manager->getDefaultFieldSettings($storage_definition->type);
       // Notify the entity storage.
       $entity_manager->getStorage($this->entity_type)->onFieldDefinitionUpdate($this, $this->original);
     }
@@ -170,7 +172,7 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
   public function calculateDependencies() {
     parent::calculateDependencies();
     // Mark the field_storage_config as a a dependency.
-    $this->addDependency('entity', $this->getFieldStorageDefinition()->getConfigDependencyName());
+    $this->addDependency('config', $this->getFieldStorageDefinition()->getConfigDependencyName());
     return $this->dependencies;
   }
 
@@ -180,6 +182,7 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
   public static function preDelete(EntityStorageInterface $storage, array $fields) {
     $state = \Drupal::state();
 
+    parent::preDelete($storage, $fields);
     // Keep the field definitions in the state storage so we can use them
     // later during field_purge_batch().
     $deleted_fields = $state->get('field.field.deleted') ?: array();
@@ -215,40 +218,18 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
       return;
     }
 
-    // Delete field storages that have no more fields.
+    // Delete the associated field storages if they are not used anymore and are
+    // not persistent.
     $storages_to_delete = array();
     foreach ($fields as $field) {
       $storage_definition = $field->getFieldStorageDefinition();
-      if (!$field->deleted && empty($field->noFieldDelete) && !$field->isUninstalling() && count($storage_definition->getBundles()) == 0) {
+      if (!$field->deleted && !$field->isUninstalling() && $storage_definition->isDeletable()) {
         // Key by field UUID to avoid deleting the same storage twice.
         $storages_to_delete[$storage_definition->uuid()] = $storage_definition;
       }
     }
     if ($storages_to_delete) {
       \Drupal::entityManager()->getStorage('field_storage_config')->delete($storages_to_delete);
-    }
-
-    // Cleanup entity displays.
-    $displays_to_update = array();
-    foreach ($fields as $field) {
-      if (!$field->deleted) {
-        $view_modes = \Drupal::entityManager()->getViewModeOptions($field->entity_type, TRUE);
-        foreach (array_keys($view_modes) as $mode) {
-          $displays_to_update['entity_view_display'][$field->entity_type . '.' . $field->bundle . '.' . $mode][] = $field->getName();
-        }
-        $form_modes = \Drupal::entityManager()->getFormModeOptions($field->entity_type, TRUE);
-        foreach (array_keys($form_modes) as $mode) {
-          $displays_to_update['entity_form_display'][$field->entity_type . '.' . $field->bundle . '.' . $mode][] = $field->getName();
-        }
-      }
-    }
-    foreach ($displays_to_update as $type => $ids) {
-      foreach (entity_load_multiple($type, array_keys($ids)) as $id => $display) {
-        foreach ($ids[$id] as $field_name) {
-          $display->removeComponent($field_name);
-        }
-        $display->save();
-      }
     }
   }
 
@@ -258,12 +239,12 @@ class FieldConfig extends FieldConfigBase implements FieldConfigInterface {
   protected function linkTemplates() {
     $link_templates = parent::linkTemplates();
     if (\Drupal::moduleHandler()->moduleExists('field_ui')) {
-      $link_templates['edit-form'] = 'field_ui.field_edit_' . $this->entity_type;
-      $link_templates['storage-edit-form'] = 'field_ui.storage_edit_' . $this->entity_type;
-      $link_templates['delete-form'] = 'field_ui.delete_' . $this->entity_type;
+      $link_templates["{$this->entity_type}-field-edit-form"] = 'entity.field_config.' . $this->entity_type . '_field_edit_form';
+      $link_templates["{$this->entity_type}-storage-edit-form"] = 'entity.field_config.' . $this->entity_type . '_storage_edit_form';
+      $link_templates["{$this->entity_type}-field-delete-form"] = 'entity.field_config.' . $this->entity_type . '_field_delete_form';
 
-      if (isset($link_templates['drupal:config-translation-overview'])) {
-        $link_templates['drupal:config-translation-overview'] .= $link_templates['edit-form'];
+      if (isset($link_templates['config-translation-overview'])) {
+        $link_templates["config-translation-overview.{$this->entity_type}"] = "entity.field_config.config_translation_overview.{$this->entity_type}";
       }
     }
     return $link_templates;

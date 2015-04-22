@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade image variables to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemImageTest extends MigrateDrupalTestBase {
+class MigrateSystemImageTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemImageTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_image');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemImage.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,8 +36,8 @@ class MigrateSystemImageTest extends MigrateDrupalTestBase {
    * Tests migration of system (image) variables to system.image.yml.
    */
   public function testSystemImage() {
-    $config = \Drupal::config('system.image');
-    $this->assertIdentical($config->get('toolkit'), 'gd');
+    $config = $this->config('system.image');
+    $this->assertIdentical('gd', $config->get('toolkit'));
   }
 
 }

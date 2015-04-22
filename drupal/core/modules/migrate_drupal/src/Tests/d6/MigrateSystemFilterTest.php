@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade filter variables to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemFilterTest extends MigrateDrupalTestBase {
+class MigrateSystemFilterTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemFilterTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_filter');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemFilter.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,8 +36,8 @@ class MigrateSystemFilterTest extends MigrateDrupalTestBase {
    * Tests migration of system (filter) variables to system.filter.yml.
    */
   public function testSystemFilter() {
-    $config = \Drupal::config('system.filter');
-    $this->assertIdentical($config->get('protocols'), array('http', 'https', 'ftp', 'news', 'nntp', 'tel', 'telnet', 'mailto', 'irc', 'ssh', 'sftp', 'webcal', 'rtsp'));
+    $config = $this->config('system.filter');
+    $this->assertIdentical(array('http', 'https', 'ftp', 'news', 'nntp', 'tel', 'telnet', 'mailto', 'irc', 'ssh', 'sftp', 'webcal', 'rtsp'), $config->get('protocols'));
   }
 
 }

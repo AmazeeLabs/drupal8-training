@@ -7,6 +7,8 @@
 
 namespace Drupal\update\Tests;
 
+use Drupal\Core\Url;
+
 /**
  * Tests the Update Manager module's upload and extraction functionality.
  *
@@ -72,14 +74,16 @@ class UpdateUploadTest extends UpdateTestBase {
   function testUpdateManagerCoreSecurityUpdateMessages() {
     $setting = array(
       '#all' => array(
-        'version' => '7.0',
+        'version' => '8.0.0',
       ),
     );
-    \Drupal::config('update_test.settings')
+    $this->config('update_test.settings')
       ->set('system_info', $setting)
-      ->set('xml_map', array('drupal' => '2-sec'))
+      ->set('xml_map', array('drupal' => '0.2-sec'))
       ->save();
-    \Drupal::config('update.settings')->set('fetch.url', url('update-test', array('absolute' => TRUE)))->save();
+    $this->config('update.settings')
+      ->set('fetch.url', Url::fromRoute('update_test.update_test')->setAbsolute()->toString())
+      ->save();
     // Initialize the update status.
     $this->drupalGet('admin/reports/updates');
 

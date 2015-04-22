@@ -7,6 +7,9 @@
 
 namespace Drupal\Core\Render\Element;
 
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\Html as HtmlUtility;
+
 /**
  * Provides a link render element.
  *
@@ -32,21 +35,17 @@ class Link extends RenderElement {
    * Doing so during pre_render gives modules a chance to alter the link parts.
    *
    * @param array $element
-   *   A structured array whose keys form the arguments to l():
-   *   - #title: The link text to pass as argument to l().
-   *   - One of the following
-   *     - #route_name and (optionally) a #route_parameters array; The route
-   *       name and route parameters which will be passed into the link
-   *       generator.
-   *     - #href: The system path or URL to pass as argument to l().
-   *   - #options: (optional) An array of options to pass to l() or the link
+   *   A structured array whose keys form the arguments to _l():
+   *   - #title: The link text to pass as argument to _l().
+   *   - #url: The URL info either pointing to a route or a non routed path.
+   *   - #options: (optional) An array of options to pass to _l() or the link
    *     generator.
    *
    * @return array
    *   The passed-in element containing a rendered link in '#markup'.
    */
   public static function preRenderLink($element) {
-    // By default, link options to pass to l() are normally set in #options.
+    // By default, link options to pass to _l() are normally set in #options.
     $element += array('#options' => array());
     // However, within the scope of renderable elements, #attributes is a valid
     // way to specify attributes, too. Take them into account, but do not override
@@ -71,22 +70,14 @@ class Link extends RenderElement {
     if (isset($element['#ajax']) && !isset($element['#ajax_processed'])) {
       // If no HTML ID was found above, automatically create one.
       if (!isset($element['#id'])) {
-        $element['#id'] = $element['#options']['attributes']['id'] = drupal_html_id('ajax-link');
-      }
-      // If #ajax['path] was not specified, use the href as Ajax request URL.
-      if (!isset($element['#ajax']['path'])) {
-        $element['#ajax']['path'] = $element['#href'];
-        $element['#ajax']['options'] = $element['#options'];
+        $element['#id'] = $element['#options']['attributes']['id'] = HtmlUtility::getUniqueId('ajax-link');
       }
       $element = static::preRenderAjaxForm($element);
     }
 
-    if (isset($element['#route_name'])) {
-      $element['#route_parameters'] = empty($element['#route_parameters']) ? array() : $element['#route_parameters'];
-      $element['#markup'] = \Drupal::linkGenerator()->generate($element['#title'], $element['#route_name'], $element['#route_parameters'], $element['#options']);
-    }
-    else {
-      $element['#markup'] = l($element['#title'], $element['#href'], $element['#options']);
+    if (!empty($element['#url'])) {
+      $options = NestedArray::mergeDeep($element['#url']->getOptions(), $element['#options']);
+      $element['#markup'] = \Drupal::l($element['#title'], $element['#url']->setOptions($options));
     }
     return $element;
   }

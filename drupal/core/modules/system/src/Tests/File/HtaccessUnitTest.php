@@ -8,22 +8,22 @@
 namespace Drupal\system\Tests\File;
 
 use Drupal\Component\Utility\String;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests .htaccess file saving.
  *
  * @group File
  */
-class HtaccessUnitTest extends DrupalUnitTestBase {
+class HtaccessUnitTest extends KernelTestBase {
 
   /**
    * Tests file_save_htaccess().
    */
   function testHtaccessSave() {
     // Prepare test directories.
-    $public = $this->public_files_directory . '/test/public';
-    $private = $this->public_files_directory . '/test/private';
+    $public = $this->publicFilesDirectory . '/test/public';
+    $private = $this->publicFilesDirectory . '/test/private';
     $stream = 'public://test/stream';
 
     // Verify that file_save_htaccess() returns FALSE if .htaccess cannot be

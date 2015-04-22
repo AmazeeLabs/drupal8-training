@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade rss variable to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemRssTest extends MigrateDrupalTestBase {
+class MigrateSystemRssTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemRssTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_rss');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemRss.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,8 +36,9 @@ class MigrateSystemRssTest extends MigrateDrupalTestBase {
    * Tests migration of system (rss) variables to system.rss.yml.
    */
   public function testSystemRss() {
-    $config = \Drupal::config('system.rss');
-    $this->assertIdentical($config->get('items.limit'), 10);
+    $config = $this->config('system.rss');
+    $this->assertIdentical(10, $config->get('items.limit'));
+    $this->assertIdentical('title', $config->get('items.view_mode'));
   }
 
 }

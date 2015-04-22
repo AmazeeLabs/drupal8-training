@@ -12,7 +12,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface;
-use Drupal\Core\Page\DefaultHtmlPageRenderer;
+use Drupal\Core\Render\BareHtmlPageRendererInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\State\StateInterface;
@@ -69,8 +69,24 @@ class DbUpdateController extends ControllerBase {
   protected $entityDefinitionUpdateManager;
 
   /**
+   * The bare HTML page renderer.
+   *
+   * @var \Drupal\Core\Render\BareHtmlPageRendererInterface
+   */
+  protected $bareHtmlPageRenderer;
+
+  /**
+   * The app root.
+   *
+   * @var string
+   */
+  protected $root;
+
+  /**
    * Constructs a new UpdateController.
    *
+   * @param string $root
+   *   The app root.
    * @param \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $key_value_expirable_factory
    *   The keyvalue expirable factory.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
@@ -83,14 +99,18 @@ class DbUpdateController extends ControllerBase {
    *   The current user.
    * @param \Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface $entity_definition_update_manager
    *   The entity definition update manager.
+   * @param \Drupal\Core\Render\BareHtmlPageRendererInterface $bare_html_page_renderer
+   *   The bare HTML page renderer.
    */
-  public function __construct(KeyValueExpirableFactoryInterface $key_value_expirable_factory, CacheBackendInterface $cache, StateInterface $state, ModuleHandlerInterface $module_handler, AccountInterface $account, EntityDefinitionUpdateManagerInterface $entity_definition_update_manager) {
+  public function __construct($root, KeyValueExpirableFactoryInterface $key_value_expirable_factory, CacheBackendInterface $cache, StateInterface $state, ModuleHandlerInterface $module_handler, AccountInterface $account, EntityDefinitionUpdateManagerInterface $entity_definition_update_manager, BareHtmlPageRendererInterface $bare_html_page_renderer) {
+    $this->root = $root;
     $this->keyValueExpirableFactory = $key_value_expirable_factory;
     $this->cache = $cache;
     $this->state = $state;
     $this->moduleHandler = $module_handler;
     $this->account = $account;
     $this->entityDefinitionUpdateManager = $entity_definition_update_manager;
+    $this->bareHtmlPageRenderer = $bare_html_page_renderer;
   }
 
   /**
@@ -98,12 +118,14 @@ class DbUpdateController extends ControllerBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
+      $container->get('app.root'),
       $container->get('keyvalue.expirable'),
       $container->get('cache.default'),
       $container->get('state'),
       $container->get('module_handler'),
       $container->get('current_user'),
-      $container->get('entity.definition_update_manager')
+      $container->get('entity.definition_update_manager'),
+      $container->get('bare_html_page_renderer')
     );
   }
 
@@ -123,8 +145,8 @@ class DbUpdateController extends ControllerBase {
    *   A response object object.
    */
   public function handle($op, Request $request) {
-    require_once DRUPAL_ROOT . '/core/includes/install.inc';
-    require_once DRUPAL_ROOT . '/core/includes/update.inc';
+    require_once $this->root . '/core/includes/install.inc';
+    require_once $this->root . '/core/includes/update.inc';
 
     drupal_load_updates();
     update_fix_compatibility();
@@ -164,7 +186,7 @@ class DbUpdateController extends ControllerBase {
 
         // Regular batch ops : defer to batch processing API.
         default:
-          require_once DRUPAL_ROOT . '/core/includes/batch.inc';
+          require_once $this->root . '/core/includes/batch.inc';
           $regions['sidebar_first'] = $this->updateTasksList('run');
           $output = _batch_page($request);
           break;
@@ -176,7 +198,7 @@ class DbUpdateController extends ControllerBase {
     }
     $title = isset($output['#title']) ? $output['#title'] : $this->t('Drupal database update');
 
-    return new Response(DefaultHtmlPageRenderer::renderPage($output, $title, 'maintenance', $regions));
+    return new Response($this->bareHtmlPageRenderer->renderBarePage($output, $title, 'maintenance_page', $regions));
   }
 
   /**
@@ -216,7 +238,8 @@ class DbUpdateController extends ControllerBase {
       '#type' => 'link',
       '#title' => $this->t('Continue'),
       '#attributes' => array('class' => array('button', 'button--primary')),
-    ) + $url->toRenderArray();
+      '#url' => $url,
+    );
     return $build;
   }
 
@@ -347,7 +370,8 @@ class DbUpdateController extends ControllerBase {
         '#title' => $this->t('Apply pending updates'),
         '#attributes' => array('class' => array('button', 'button--primary')),
         '#weight' => 5,
-      ) + $url->toRenderArray();
+        '#url' => $url,
+      );
     }
 
     return $build;
@@ -506,7 +530,7 @@ class DbUpdateController extends ControllerBase {
     );
 
     $task_list = array(
-      '#theme' => 'task_list',
+      '#theme' => 'maintenance_task_list',
       '#items' => $tasks,
       '#active' => $active,
     );
@@ -577,7 +601,7 @@ class DbUpdateController extends ControllerBase {
     );
     batch_set($batch);
 
-    return batch_process('update.php/results', 'update.php/batch');
+    return batch_process('update.php/results', Url::fromRoute('system.db_update'));
   }
 
   /**
@@ -620,12 +644,12 @@ class DbUpdateController extends ControllerBase {
   protected function helpfulLinks() {
     $links['front'] = array(
       'title' => $this->t('Front page'),
-      'href' => '<front>',
+      'url' => Url::fromRoute('<front>'),
     );
     if ($this->account->hasPermission('access administration pages')) {
       $links['admin-pages'] = array(
         'title' => $this->t('Administration pages'),
-        'href' => 'admin',
+        'url' => Url::fromRoute('system.admin'),
       );
     }
     return $links;

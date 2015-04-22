@@ -90,16 +90,30 @@ interface TableMappingInterface {
   public function getReservedColumns();
 
   /**
-   * Generates a column name for a field.
+   * Generates a column name for a field property.
    *
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface $storage_definition
    *   The field storage definition.
-   * @param string $column
-   *   The name of the column.
+   * @param string $property_name
+   *   The name of the property.
    *
    * @return string
    *   A string containing a generated column name for a field data table that is
    *   unique among all other fields.
    */
-  public function getFieldColumnName(FieldStorageDefinitionInterface $storage_definition, $column);
+  public function getFieldColumnName(FieldStorageDefinitionInterface $storage_definition, $property_name);
+
+  /**
+   * Returns the table name for a given column.
+   *
+   * @param string $field_name
+   *   The name of the entity field to return the column mapping for.
+   *
+   * @return string
+   *   Table name for the given field.
+   *
+   * @throws \Drupal\Core\Entity\Sql\SqlContentEntityStorageException
+   */
+  public function getFieldTableName($field_name);
+
 }

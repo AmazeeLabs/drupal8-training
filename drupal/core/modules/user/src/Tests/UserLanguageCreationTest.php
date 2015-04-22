@@ -42,7 +42,7 @@ class UserLanguageCreationTest extends WebTestBase {
       'language_interface[enabled][language-url]' => TRUE,
     );
     $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
-    $this->assertText(t('Language negotiation configuration saved.'), 'Set language negotiation.');
+    $this->assertText(t('Language detection configuration saved.'), 'Set language negotiation.');
 
     // Check if the language selector is available on admin/people/create and
     // set to the currently active language.
@@ -63,7 +63,7 @@ class UserLanguageCreationTest extends WebTestBase {
 
     $user = user_load_by_name($username);
     $this->assertEqual($user->getPreferredLangcode(), $langcode, 'New user has correct preferred language set.');
-    $this->assertEqual($user->language()->id, $langcode, 'New user has correct profile language set.');
+    $this->assertEqual($user->language()->getId(), $langcode, 'New user has correct profile language set.');
 
     // Register a new user and check if the language selector is hidden.
     $this->drupalLogout();
@@ -81,7 +81,7 @@ class UserLanguageCreationTest extends WebTestBase {
 
     $user = user_load_by_name($username);
     $this->assertEqual($user->getPreferredLangcode(), $langcode, 'New user has correct preferred language set.');
-    $this->assertEqual($user->language()->id, $langcode, 'New user has correct profile language set.');
+    $this->assertEqual($user->language()->getId(), $langcode, 'New user has correct profile language set.');
 
     // Test if the admin can use the language selector and if the
     // correct language is was saved.

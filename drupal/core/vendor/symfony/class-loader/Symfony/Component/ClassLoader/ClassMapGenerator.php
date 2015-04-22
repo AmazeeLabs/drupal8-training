@@ -11,15 +11,23 @@
 
 namespace Symfony\Component\ClassLoader;
 
+if (!defined('SYMFONY_TRAIT')) {
+    if (PHP_VERSION_ID >= 50400) {
+        define('SYMFONY_TRAIT', T_TRAIT);
+    } else {
+        define('SYMFONY_TRAIT', 0);
+    }
+}
+
 /**
- * ClassMapGenerator
+ * ClassMapGenerator.
  *
  * @author Gyula Sallai <salla016@gmail.com>
  */
 class ClassMapGenerator
 {
     /**
-     * Generate a class map file
+     * Generate a class map file.
      *
      * @param array|string $dirs Directories or a single path to search in
      * @param string       $file The name of the class map file
@@ -37,7 +45,7 @@ class ClassMapGenerator
     }
 
     /**
-     * Iterate over all files in the given directory searching for classes
+     * Iterate over all files in the given directory searching for classes.
      *
      * @param \Iterator|string $dir The directory to search in or an iterator
      *
@@ -67,14 +75,13 @@ class ClassMapGenerator
             foreach ($classes as $class) {
                 $map[$class] = $path;
             }
-
         }
 
         return $map;
     }
 
     /**
-     * Extract the classes in the given file
+     * Extract the classes in the given file.
      *
      * @param string $path The file to check
      *
@@ -83,8 +90,7 @@ class ClassMapGenerator
     private static function findClasses($path)
     {
         $contents = file_get_contents($path);
-        $tokens   = token_get_all($contents);
-        $T_TRAIT  = version_compare(PHP_VERSION, '5.4', '<') ? -1 : T_TRAIT;
+        $tokens = token_get_all($contents);
 
         $classes = array();
 
@@ -111,7 +117,7 @@ class ClassMapGenerator
                     break;
                 case T_CLASS:
                 case T_INTERFACE:
-                case $T_TRAIT:
+                case SYMFONY_TRAIT:
                     // Find the classname
                     while (($t = $tokens[++$i]) && is_array($t)) {
                         if (T_STRING === $t[0]) {

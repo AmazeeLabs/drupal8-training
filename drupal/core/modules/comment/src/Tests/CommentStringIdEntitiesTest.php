@@ -18,7 +18,7 @@ use Drupal\simpletest\KernelTestBase;
 class CommentStringIdEntitiesTest extends KernelTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -29,6 +29,7 @@ class CommentStringIdEntitiesTest extends KernelTestBase {
     'field_ui',
     'entity',
     'entity_test',
+    'system',
     'text',
   );
 
@@ -36,6 +37,9 @@ class CommentStringIdEntitiesTest extends KernelTestBase {
     parent::setUp();
     $this->installEntitySchema('comment');
     $this->installSchema('comment', array('comment_entity_statistics'));
+    $this->installSchema('system', array('router'));
+    // Create the comment body field storage.
+    $this->installConfig(array('field'));
   }
 
   /**
@@ -51,7 +55,7 @@ class CommentStringIdEntitiesTest extends KernelTestBase {
       ));
       $bundle->save();
       $field_storage = entity_create('field_storage_config', array(
-        'name' => 'foo',
+        'field_name' => 'foo',
         'entity_type' => 'entity_test_string_id',
         'settings' => array(
           'comment_type' => 'entity_test_string_id',

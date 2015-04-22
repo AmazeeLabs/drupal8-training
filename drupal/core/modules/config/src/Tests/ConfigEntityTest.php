@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityMalformedException;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
 use Drupal\Core\Config\Entity\Exception\ConfigEntityIdLengthException;
+use Drupal\Core\Url;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -37,7 +38,7 @@ class ConfigEntityTest extends WebTestBase {
    * Tests CRUD operations.
    */
   function testCRUD() {
-    $default_langcode = \Drupal::languageManager()->getDefaultLanguage()->id;
+    $default_langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
     // Verify default properties on a newly created empty entity.
     $empty = entity_create('config_test');
     $this->assertTrue($empty->uuid());
@@ -122,7 +123,7 @@ class ConfigEntityTest extends WebTestBase {
     }
 
     // The entity path can only be checked after saving.
-    $this->assertIdentical($config_test->getSystemPath(), 'admin/structure/config_test/manage/' . $expected['id']);
+    $this->assertIdentical($config_test->url(), Url::fromRoute('entity.config_test.edit_form', ['config_test' => $expected['id']])->toString());
 
     // Verify that the correct status is returned and properties did not change.
     $this->assertIdentical($status, SAVED_NEW);
@@ -240,7 +241,7 @@ class ConfigEntityTest extends WebTestBase {
     $label3 = $this->randomMachineName();
     $message_insert = format_string('%label configuration has been created.', array('%label' => $label1));
     $message_update = format_string('%label configuration has been updated.', array('%label' => $label2));
-    $message_delete = format_string('%label configuration has been deleted.', array('%label' => $label2));
+    $message_delete = format_string('The test configuration %label has been deleted.', array('%label' => $label2));
 
     // Create a configuration entity.
     $edit = array(
@@ -318,6 +319,44 @@ class ConfigEntityTest extends WebTestBase {
     $this->drupalPostForm('admin/structure/config_test/manage/0/delete', array(), 'Delete');
     $this->assertFalse(entity_load('config_test', '0'), 'Test entity deleted');
 
+    // Create a configuration entity with a property that uses AJAX to show
+    // extra form elements.
+    $this->drupalGet('admin/structure/config_test/add');
+
+    // Test that the dependent element is not shown initially.
+    $this->assertFieldByName('size');
+    $this->assertNoFieldByName('size_value');
+
+    $id = strtolower($this->randomMachineName());
+    $edit = [
+      'id' => $id,
+      'label' => $this->randomString(),
+      'size' => 'custom',
+    ];
+    $this->drupalPostAjaxForm(NULL, $edit, 'size');
+
+    // Check that the dependent element is shown after selecting a 'size' value.
+    $this->assertFieldByName('size');
+    $this->assertFieldByName('size_value');
+
+    // Test the same scenario but it in a non-JS case by using a 'js-hidden'
+    // submit button.
+    $this->drupalGet('admin/structure/config_test/add');
+    $this->assertFieldByName('size');
+    $this->assertNoFieldByName('size_value');
+
+    $this->drupalPostForm(NULL, $edit, 'Change size');
+    $this->assertFieldByName('size');
+    $this->assertFieldByName('size_value');
+
+    // Submit the form with the regular 'Save' button and check that the entity
+    // values are correct.
+    $edit += ['size_value' => 'medium'];
+    $this->drupalPostForm(NULL, $edit, 'Save');
+
+    $entity = entity_load('config_test', $id);
+    $this->assertEqual($entity->get('size'), 'custom');
+    $this->assertEqual($entity->get('size_value'), 'medium');
   }
 
 }

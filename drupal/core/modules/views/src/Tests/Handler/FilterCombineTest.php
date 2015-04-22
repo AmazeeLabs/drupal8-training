@@ -24,7 +24,12 @@ class FilterCombineTest extends ViewUnitTestBase {
    */
   public static $testViews = array('test_view');
 
-  protected $column_map = array(
+  /**
+   * Map column names.
+   *
+   * @var array
+   */
+  protected $columnMap = array(
     'views_test_data_name' => 'name',
     'views_test_data_job' => 'job',
   );
@@ -78,7 +83,55 @@ class FilterCombineTest extends ViewUnitTestBase {
         'job' => NULL,
       ),
     );
-    $this->assertIdenticalResultset($view, $resultset, $this->column_map);
+    $this->assertIdenticalResultset($view, $resultset, $this->columnMap);
+  }
+
+  /**
+   * Tests if the filter can handle removed fields.
+   *
+   * Tests the combined filter handler when a field overwrite is done
+   * and fields set in the combine filter are removed from the display
+   * but not from the combined filter settings.
+   */
+  public function testFilterCombineContainsFieldsOverwritten() {
+    $view = Views::getView('test_view');
+    $view->setDisplay();
+
+    $fields = $view->displayHandlers->get('default')->getOption('fields');
+    $view->displayHandlers->get('default')->overrideOption('fields', $fields + array(
+      'job' => array(
+        'id' => 'job',
+        'table' => 'views_test_data',
+        'field' => 'job',
+        'relationship' => 'none',
+      ),
+    ));
+
+    // Change the filtering.
+    $view->displayHandlers->get('default')->overrideOption('filters', array(
+      'age' => array(
+        'id' => 'combine',
+        'table' => 'views',
+        'field' => 'combine',
+        'relationship' => 'none',
+        'operator' => 'contains',
+        'fields' => array(
+          'name',
+          'job',
+          // Add a dummy field to the combined fields to simulate
+          // a removed or deleted field.
+          'dummy',
+        ),
+        'value' => 'ing',
+      ),
+    ));
+
+    $this->executeView($view);
+    // Make sure this view will not get displayed.
+    $this->assertTrue($view->build_info['fail'], "View build has been marked as failed.");
+    // Make sure this view does not pass validation with the right error.
+    $errors = $view->validate();
+    $this->assertEqual(reset($errors['default']), t('Field %field set in %filter is not set in this display.', array('%field' => 'dummy', '%filter' => 'Global: Combine fields filter')));
   }
 
   /**

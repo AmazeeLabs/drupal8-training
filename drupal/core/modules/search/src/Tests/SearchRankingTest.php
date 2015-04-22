@@ -8,6 +8,8 @@
 namespace Drupal\search\Tests;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
+use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Core\Url;
 
 /**
  * Indexes content and tests ranking factors.
@@ -15,6 +17,8 @@ use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
  * @group search
  */
 class SearchRankingTest extends SearchTestBase {
+
+  use CommentTestTrait;
 
   /**
    * The node search page.
@@ -42,7 +46,7 @@ class SearchRankingTest extends SearchTestBase {
 
   public function testRankings() {
     // Add a comment field.
-    $this->container->get('comment.manager')->addDefaultField('node', 'page');
+    $this->addDefaultCommentField('node', 'page');
 
     // Build a list of the rankings to test.
     $node_ranks = array('sticky', 'promote', 'relevance', 'recent', 'comments', 'views');
@@ -94,7 +98,7 @@ class SearchRankingTest extends SearchTestBase {
     $this->drupalPostForm(NULL, $edit, t('Save'));
 
     // Enable counting of statistics.
-    \Drupal::config('statistics.settings')->set('count_content_views', 1)->save();
+    $this->config('statistics.settings')->set('count_content_views', 1)->save();
 
     // Simulating content views is kind of difficult in the test. Leave that
     // to the Statistics module. So instead go ahead and manually update the
@@ -113,17 +117,17 @@ class SearchRankingTest extends SearchTestBase {
 
     // Check that all rankings are visible and set to 0.
     foreach ($node_ranks as $node_rank) {
-      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '"]//option[@value="0"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 0.');
+      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '-value"]//option[@value="0"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 0.');
     }
 
     // Test each of the possible rankings.
     $edit = array();
     foreach ($node_ranks as $node_rank) {
       // Enable the ranking we are testing.
-      $edit['rankings_' . $node_rank] = 10;
+      $edit['rankings[' . $node_rank . '][value]'] = 10;
       $this->drupalPostForm('admin/config/search/pages/manage/node_search', $edit, t('Save search page'));
       $this->drupalGet('admin/config/search/pages/manage/node_search');
-      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '"]//option[@value="10"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 10.');
+      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '-value"]//option[@value="10"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 10.');
 
       // Reload the plugin to get the up-to-date values.
       $this->nodeSearch = entity_load('search_page', 'node_search');
@@ -133,7 +137,7 @@ class SearchRankingTest extends SearchTestBase {
       $this->assertEqual($set[0]['node']->id(), $nodes[$node_rank][1]->id(), 'Search ranking "' . $node_rank . '" order.');
 
       // Clear this ranking for the next test.
-      $edit['rankings_' . $node_rank] = 0;
+      $edit['rankings[' . $node_rank . '][value]'] = 0;
     }
 
     // Save the final node_rank change then check that all rankings are visible
@@ -141,7 +145,7 @@ class SearchRankingTest extends SearchTestBase {
     $this->drupalPostForm('admin/config/search/pages/manage/node_search', $edit, t('Save search page'));
     $this->drupalGet('admin/config/search/pages/manage/node_search');
     foreach ($node_ranks as $node_rank) {
-      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '"]//option[@value="0"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 0.');
+      $this->assertTrue($this->xpath('//select[@id="edit-rankings-' . $node_rank . '-value"]//option[@value="0"]'), 'Select list to prioritize ' . $node_rank . ' for node ranks is visible and set to 0.');
     }
 
     // Try with sticky, then promoted. This is a test for issue
@@ -218,7 +222,7 @@ class SearchRankingTest extends SearchTestBase {
     foreach ($shuffled_tags as $tag) {
       switch ($tag) {
         case 'a':
-          $settings['body'] = array(array('value' => l('Drupal Rocks', 'node'), 'format' => 'full_html'));
+          $settings['body'] = array(array('value' => \Drupal::l('Drupal Rocks', new Url('<front>')), 'format' => 'full_html'));
           break;
         case 'notag':
           $settings['body'] = array(array('value' => 'Drupal Rocks'));

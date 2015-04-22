@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemFileTest extends MigrateDrupalTestBase {
+class MigrateSystemFileTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemFileTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_file');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemFile.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,12 +36,9 @@ class MigrateSystemFileTest extends MigrateDrupalTestBase {
    * Tests migration of system (file) variables to system.file.yml.
    */
   public function testSystemFile() {
-    $old_state = \Drupal::configFactory()->getOverrideState();
-    \Drupal::configFactory()->setOverrideState(FALSE);
-    $config = \Drupal::config('system.file');
-    $this->assertIdentical($config->get('path.private'), 'core/modules/simpletest/files');
-    $this->assertIdentical($config->get('path.temporary'), 'files/temp');
-    \Drupal::configFactory()->setOverrideState($old_state);
+    $config = \Drupal::configFactory()->getEditable('system.file');
+    $this->assertIdentical('files/temp', $config->get('path.temporary'));
+    $this->assertIdentical(TRUE, $config->get('allow_insecure_uploads'));
   }
 
 }

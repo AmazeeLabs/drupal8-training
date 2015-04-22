@@ -95,7 +95,7 @@ abstract class PathFormBase extends FormBase {
       '#maxlength' => 255,
       '#size' => 45,
       '#description' => $this->t('Specify the existing path you wish to alias. For example: node/28, forum/1, taxonomy/term/1.'),
-      '#field_prefix' => url(NULL, array('absolute' => TRUE)),
+      '#field_prefix' => $this->url('<none>', [], ['absolute' => TRUE]),
       '#required' => TRUE,
     );
     $form['alias'] = array(
@@ -104,8 +104,8 @@ abstract class PathFormBase extends FormBase {
       '#default_value' => $this->path['alias'],
       '#maxlength' => 255,
       '#size' => 45,
-      '#description' => $this->t('Specify an alternative path by which this data can be accessed. For example, type "about" when writing an about page. Use a relative path and don\'t add a trailing slash or the URL alias won\'t work.'),
-      '#field_prefix' => url(NULL, array('absolute' => TRUE)),
+      '#description' => $this->t('Specify an alternative path by which this data can be accessed. For example, type "about" when writing an about page. Use a relative path.'),
+      '#field_prefix' => $this->url('<none>', [], ['absolute' => TRUE]),
       '#required' => TRUE,
     );
 
@@ -114,7 +114,7 @@ abstract class PathFormBase extends FormBase {
       $languages = \Drupal::languageManager()->getLanguages();
       $language_options = array();
       foreach ($languages as $langcode => $language) {
-        $language_options[$langcode] = $language->name;
+        $language_options[$langcode] = $language->getName();
       }
 
       $form['langcode'] = array(
@@ -150,12 +150,14 @@ abstract class PathFormBase extends FormBase {
   public function validateForm(array &$form, FormStateInterface $form_state) {
     $source = &$form_state->getValue('source');
     $source = $this->aliasManager->getPathByAlias($source);
-    $alias = $form_state->getValue('alias');
+    $alias = &$form_state->getValue('alias');
+    // Trim the submitted value of whitespace and slashes.
+    $alias = trim(trim($alias), " \\/");
     // Language is only set if language.module is enabled, otherwise save for all
     // languages.
     $langcode = $form_state->getValue('langcode', LanguageInterface::LANGCODE_NOT_SPECIFIED);
 
-    if ($this->aliasStorage->aliasExists($alias, $langcode, $source)) {
+    if ($this->aliasStorage->aliasExists($alias, $langcode, $this->path['source'])) {
       $form_state->setErrorByName('alias', t('The alias %alias is already in use in this language.', array('%alias' => $alias)));
     }
     if (!$this->pathValidator->isValid($source)) {
@@ -171,8 +173,7 @@ abstract class PathFormBase extends FormBase {
     $form_state->cleanValues();
 
     $pid = $form_state->getValue('pid', 0);
-    $source = &$form_state->getValue('source');
-    $source = $this->aliasManager->getPathByAlias($source);
+    $source = $form_state->getValue('source');
     $alias = $form_state->getValue('alias');
     // Language is only set if language.module is enabled, otherwise save for all
     // languages.

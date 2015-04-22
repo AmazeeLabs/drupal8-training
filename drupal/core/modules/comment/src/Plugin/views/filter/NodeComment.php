@@ -20,10 +20,10 @@ use Drupal\views\Plugin\views\filter\InOperator;
 class NodeComment extends InOperator {
 
   public function getValueOptions() {
-    $this->value_options = array(
-      CommentItemInterface::HIDDEN => t('Hidden'),
-      CommentItemInterface::CLOSED => t('Closed'),
-      CommentItemInterface::OPEN => t('Open'),
+    $this->valueOptions = array(
+      CommentItemInterface::HIDDEN => $this->t('Hidden'),
+      CommentItemInterface::CLOSED => $this->t('Closed'),
+      CommentItemInterface::OPEN => $this->t('Open'),
     );
   }
 

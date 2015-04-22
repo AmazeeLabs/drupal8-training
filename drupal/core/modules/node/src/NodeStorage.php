@@ -42,6 +42,13 @@ class NodeStorage extends SqlContentEntityStorage implements NodeStorageInterfac
   /**
    * {@inheritdoc}
    */
+  public function countDefaultLanguageRevisions(NodeInterface $node) {
+    return $this->database->query('SELECT COUNT(*) FROM {node_field_revision} WHERE nid = :nid AND default_langcode = 1', array(':nid' => $node->id()))->fetchField();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function updateType($old_type, $new_type) {
     return $this->database->update('node')
       ->fields(array('type' => $new_type))
@@ -52,10 +59,10 @@ class NodeStorage extends SqlContentEntityStorage implements NodeStorageInterfac
   /**
    * {@inheritdoc}
    */
-  public function clearRevisionsLanguage($language) {
+  public function clearRevisionsLanguage(LanguageInterface $language) {
     return $this->database->update('node_revision')
       ->fields(array('langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED))
-      ->condition('langcode', $language->id)
+      ->condition('langcode', $language->getId())
       ->execute();
   }
 

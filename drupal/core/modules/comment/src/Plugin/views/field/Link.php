@@ -11,6 +11,7 @@ use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Url;
 use Drupal\views\ResultRow;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -59,13 +60,19 @@ class Link extends FieldPluginBase {
     $this->entityManager = $entity_manager;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['text'] = array('default' => '', 'translatable' => TRUE);
-    $options['link_to_entity'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['text'] = array('default' => '');
+    $options['link_to_entity'] = array('default' => FALSE);
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['text'] = array(
       '#type' => 'textfield',
@@ -73,13 +80,16 @@ class Link extends FieldPluginBase {
       '#default_value' => $this->options['text'],
     );
     $form['link_to_entity'] = array(
-      '#title' => t('Link field to the entity if there is no comment'),
+      '#title' => $this->t('Link field to the entity if there is no comment'),
       '#type' => 'checkbox',
       '#default_value' => $this->options['link_to_entity'],
     );
     parent::buildOptionsForm($form, $form_state);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {}
 
   /**
@@ -102,7 +112,7 @@ class Link extends FieldPluginBase {
    *   Returns a string for the link text.
    */
   protected function renderLink($data, ResultRow $values) {
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('View');
+    $text = !empty($this->options['text']) ? $this->options['text'] : $this->t('View');
     /** @var \Drupal\comment\CommentInterface $comment */
     $comment = $data;
     $cid = $comment->id();
@@ -111,13 +121,13 @@ class Link extends FieldPluginBase {
     $this->options['alter']['html'] = TRUE;
 
     if (!empty($cid)) {
-      $this->options['alter']['path'] = "comment/" . $cid;
+      $this->options['alter']['url'] = Url::fromRoute('entity.comment.canonical', ['comment' => $cid]);
       $this->options['alter']['fragment'] = "comment-" . $cid;
     }
     // If there is no comment link to the node.
     elseif ($this->options['link_to_node']) {
       $entity = $comment->getCommentedEntity();
-      $this->options['alter']['path'] = $entity->getSystemPath();
+      $this->options['alter']['url'] = $entity->urlInfo();
     }
 
     return $text;

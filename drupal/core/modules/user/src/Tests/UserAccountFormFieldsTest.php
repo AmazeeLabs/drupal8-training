@@ -8,7 +8,7 @@
 namespace Drupal\user\Tests;
 
 use Drupal\Core\Form\FormState;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Verifies that the field order in user account forms is compatible with
@@ -16,21 +16,21 @@ use Drupal\simpletest\DrupalUnitTestBase;
  *
  * @group user
  */
-class UserAccountFormFieldsTest extends DrupalUnitTestBase {
+class UserAccountFormFieldsTest extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('system', 'user', 'entity', 'field');
+  public static $modules = array('system', 'user', 'field');
 
   /**
    * Tests the root user account form section in the "Configure site" form.
    */
   function testInstallConfigureForm() {
-    require_once DRUPAL_ROOT . '/core/includes/install.core.inc';
-    require_once DRUPAL_ROOT . '/core/includes/install.inc';
+    require_once \Drupal::root() . '/core/includes/install.core.inc';
+    require_once \Drupal::root() . '/core/includes/install.inc';
     $install_state = install_state_defaults();
     $form_state = new FormState();
     $form_state->addBuildInfo('args', [&$install_state]);
@@ -55,8 +55,7 @@ class UserAccountFormFieldsTest extends DrupalUnitTestBase {
     $this->installConfig(array('user'));
 
     // Disable email confirmation to unlock the password field.
-    $this->container->get('config.factory')
-      ->get('user.settings')
+    $this->config('user.settings')
       ->set('verify_mail', FALSE)
       ->save();
 
@@ -78,6 +77,10 @@ class UserAccountFormFieldsTest extends DrupalUnitTestBase {
   function testUserEditForm() {
     // Install default configuration; required for AccountFormController.
     $this->installConfig(array('user'));
+
+    // Install the router table and then rebuild.
+    $this->installSchema('system', ['router']);
+    \Drupal::service('router.builder')->rebuild();
 
     $form = $this->buildAccountForm('default');
 

@@ -88,7 +88,7 @@ class AjaxFormsTestCommandsForm extends FormBase {
 
     // Shows the Ajax 'css' command.
     $form['css_command_example'] = array(
-      '#value' => $this->t("Set the the '#box' div to be blue."),
+      '#value' => $this->t("Set the '#box' div to be blue."),
       '#type' => 'submit',
       '#ajax' => array(
         'callback' => 'ajax_forms_test_advanced_commands_css_callback',
@@ -191,18 +191,6 @@ class AjaxFormsTestCommandsForm extends FormBase {
       '#value' => $this->t("AJAX 'add_css' command"),
       '#ajax' => array(
         'callback' => 'ajax_forms_test_advanced_commands_add_css_callback',
-      ),
-    );
-
-    // Tests the 'settings' command with a callback which sets the same
-    // setting multiple times. This is used to check that settings are
-    // merged properly (e.g., array_merge_recursive() merges settings
-    // incorrectly, #1356170).
-    $form['settings_command_with_merging_example'] = array(
-      '#type' => 'submit',
-      '#value' => $this->t("AJAX 'settings' command with setting merging"),
-      '#ajax' => array(
-        'callback' => 'ajax_forms_test_advanced_commands_settings_with_merging_callback',
       ),
     );
 

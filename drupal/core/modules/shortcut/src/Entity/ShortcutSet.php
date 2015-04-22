@@ -36,9 +36,10 @@ use Drupal\shortcut\ShortcutSetInterface;
  *     "label" = "label"
  *   },
  *   links = {
- *     "customize-form" = "entity.shortcut_set.customize_form",
- *     "delete-form" = "entity.shortcut_set.delete_form",
- *     "edit-form" = "entity.shortcut_set.edit_form"
+ *     "customize-form" = "/admin/config/user-interface/shortcut/manage/{shortcut_set}/customize",
+ *     "delete-form" = "/admin/config/user-interface/shortcut/manage/{shortcut_set}/delete",
+ *     "edit-form" = "/admin/config/user-interface/shortcut/manage/{shortcut_set}",
+ *     "collection" = "/admin/config/user-interface/shortcut",
  *   }
  * )
  */
@@ -49,14 +50,14 @@ class ShortcutSet extends ConfigEntityBase implements ShortcutSetInterface {
    *
    * @var string
    */
-  public $id;
+  protected $id;
 
   /**
    * The human-readable name of the configuration entity.
    *
    * @var string
    */
-  public $label;
+  protected $label;
 
   /**
    * {@inheritdoc}
@@ -116,7 +117,9 @@ class ShortcutSet extends ConfigEntityBase implements ShortcutSetInterface {
    * {@inheritdoc}
    */
   public function getShortcuts() {
-    return \Drupal::entityManager()->getStorage('shortcut')->loadByProperties(array('shortcut_set' => $this->id()));
+    $shortcuts = \Drupal::entityManager()->getStorage('shortcut')->loadByProperties(array('shortcut_set' => $this->id()));
+    uasort($shortcuts, array('\Drupal\shortcut\Entity\Shortcut', 'sort'));
+    return $shortcuts;
   }
 
 }

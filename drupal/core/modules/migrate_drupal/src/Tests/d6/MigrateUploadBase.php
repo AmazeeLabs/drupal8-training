@@ -7,12 +7,12 @@
 
 namespace Drupal\migrate_drupal\Tests\d6;
 
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Base class for file/upload migration tests.
  */
-abstract class MigrateUploadBase extends MigrateDrupalTestBase {
+abstract class MigrateUploadBase extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -50,7 +50,7 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
 
     // Add a file field.
     entity_create('field_storage_config', array(
-      'name' => 'upload',
+      'field_name' => 'upload',
       'entity_type' => 'node',
       'type' => 'file',
       'cardinality' => -1,
@@ -85,8 +85,11 @@ abstract class MigrateUploadBase extends MigrateDrupalTestBase {
       }
     }
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6Node.php',
-      $this->getDumpDirectory() . '/Drupal6Upload.php',
+      $this->getDumpDirectory() . '/Node.php',
+      $this->getDumpDirectory() . '/NodeRevisions.php',
+      $this->getDumpDirectory() . '/ContentTypeStory.php',
+      $this->getDumpDirectory() . '/ContentTypeTestPlanet.php',
+      $this->getDumpDirectory() . '/Upload.php',
     );
     $this->loadDumps($dumps);
   }

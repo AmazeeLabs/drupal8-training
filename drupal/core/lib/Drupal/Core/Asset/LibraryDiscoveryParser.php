@@ -13,6 +13,7 @@ use Drupal\Core\Asset\Exception\LibraryDefinitionMissingLicenseException;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Component\Serialization\Exception\InvalidDataTypeException;
 use Drupal\Component\Serialization\Yaml;
+use Drupal\Component\Utility\NestedArray;
 
 /**
  * Parses library files to get extension data.
@@ -27,10 +28,22 @@ class LibraryDiscoveryParser {
   protected $moduleHandler;
 
   /**
+   * The app root.
+   *
+   * @var string
+   */
+  protected $root;
+
+  /**
+   * Constructs a new LibraryDiscoveryParser instance.
+   *
+   * @param string $root
+   *   The app root.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
    */
-  public function __construct(ModuleHandlerInterface $module_handler) {
+  public function __construct($root, ModuleHandlerInterface $module_handler) {
+    $this->root = $root;
     $this->moduleHandler = $module_handler;
   }
 
@@ -65,17 +78,17 @@ class LibraryDiscoveryParser {
       $path = $this->drupalGetPath($extension_type, $extension);
     }
 
-    $library_file = $path . '/' . $extension . '.libraries.yml';
-
-    if ($library_file && file_exists(DRUPAL_ROOT . '/' . $library_file)) {
-      $libraries = $this->parseLibraryInfo($extension, $library_file);
-    }
+    $libraries = $this->parseLibraryInfo($extension, $path);
 
     foreach ($libraries as $id => &$library) {
-      if (!isset($library['js']) && !isset($library['css']) && !isset($library['settings'])) {
-        throw new IncompleteLibraryDefinitionException(sprintf("Incomplete library definition for '%s' in %s", $id, $library_file));
+      if (!isset($library['js']) && !isset($library['css']) && !isset($library['drupalSettings'])) {
+        throw new IncompleteLibraryDefinitionException(sprintf("Incomplete library definition for definition '%s' in extension '%s'", $id, $extension));
       }
       $library += array('dependencies' => array(), 'js' => array(), 'css' => array());
+
+      if (isset($library['header']) && !is_bool($library['header'])) {
+        throw new \LogicException(sprintf("The 'header' key in the library definition '%s' in extension '%s' is invalid: it must be a boolean.", $id, $extension));
+      }
 
       if (isset($library['version'])) {
         // @todo Retrieve version of a non-core extension.
@@ -90,7 +103,7 @@ class LibraryDiscoveryParser {
 
       // If this is a 3rd party library, the license info is required.
       if (isset($library['remote']) && !isset($library['license'])) {
-        throw new LibraryDefinitionMissingLicenseException(sprintf("Missing license information in library definition for '%s' in %s: it has a remote, but no license.", $id, $library_file));
+        throw new LibraryDefinitionMissingLicenseException(sprintf("Missing license information in library definition for definition '%s' extension '%s': it has a remote, but no license.", $id, $extension));
       }
 
       // Assign Drupal's license to libraries that don't have license info.
@@ -185,20 +198,6 @@ class LibraryDiscoveryParser {
           $library[$type][] = $options;
         }
       }
-
-      // @todo Introduce drupal_add_settings().
-      if (isset($library['settings'])) {
-        $library['js'][] = array(
-          'type' => 'setting',
-          'data' => $library['settings'],
-        );
-        unset($library['settings']);
-      }
-      // @todo Convert all uses of #attached[library][]=array('provider','name')
-      //   into #attached[library][]='provider/name' and remove this.
-      foreach ($library['dependencies'] as $i => $dependency) {
-        $library['dependencies'][$i] = $dependency;
-      }
     }
 
     return $libraries;
@@ -211,8 +210,8 @@ class LibraryDiscoveryParser {
    *
    * @param string $extension
    *   The name of the extension that registered a library.
-   * @param string $library_file
-   *   The relative filename to the DRUPAL_ROOT of the wanted library file.
+   * @param string $path
+   *   The relative path to the extension.
    *
    * @return array
    *   An array of parsed library data.
@@ -220,14 +219,26 @@ class LibraryDiscoveryParser {
    * @throws \Drupal\Core\Asset\Exception\InvalidLibraryFileException
    *   Thrown when a parser exception got thrown.
    */
-  protected function parseLibraryInfo($extension, $library_file) {
-    try {
-      $libraries = Yaml::decode(file_get_contents(DRUPAL_ROOT . '/' . $library_file));
+  protected function parseLibraryInfo($extension, $path) {
+    $libraries = [];
+
+    $library_file = $path . '/' . $extension . '.libraries.yml';
+    if (file_exists($this->root . '/' . $library_file)) {
+      try {
+        $libraries = Yaml::decode(file_get_contents($this->root . '/' . $library_file));
+      }
+      catch (InvalidDataTypeException $e) {
+        // Rethrow a more helpful exception to provide context.
+        throw new InvalidLibraryFileException(sprintf('Invalid library definition in %s: %s', $library_file, $e->getMessage()), 0, $e);
+      }
     }
-    catch (InvalidDataTypeException $e) {
-      // Rethrow a more helpful exception to provide context.
-      throw new InvalidLibraryFileException(sprintf('Invalid library definition in %s: %s', $library_file, $e->getMessage()), 0, $e);
+
+    // Allow modules to add dynamic library definitions.
+    $hook = 'library_info_build';
+    if ($this->moduleHandler->implementsHook($extension, $hook)) {
+      $libraries = NestedArray::mergeDeep($libraries, $this->moduleHandler->invoke($extension, $hook));
     }
+
     // Allow modules to alter the module's registered libraries.
     $this->moduleHandler->alter('library_info', $libraries, $extension);
 

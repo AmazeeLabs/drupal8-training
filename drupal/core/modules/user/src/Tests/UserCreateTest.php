@@ -27,7 +27,7 @@ class UserCreateTest extends WebTestBase {
    * Create a user through the administration interface and ensure that it
    * displays in the user list.
    */
-  protected function testUserAdd() {
+  public function testUserAdd() {
     $user = $this->drupalCreateUser(array('administer users'));
     $this->drupalLogin($user);
 
@@ -37,7 +37,7 @@ class UserCreateTest extends WebTestBase {
     // Create a field.
     $field_name = 'test_field';
     entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'user',
       'module' => 'image',
       'type' => 'image',
@@ -77,7 +77,7 @@ class UserCreateTest extends WebTestBase {
     $this->assertNoRaw('data-user-info-from-browser', 'Ensure form attribute, data-user-info-from-browser, does not exist.');
 
     // Test that the password strength indicator displays.
-    $config = \Drupal::config('user.settings');
+    $config = $this->config('user.settings');
 
     $config->set('password_strength', TRUE)->save();
     $this->drupalGet('admin/people/create');

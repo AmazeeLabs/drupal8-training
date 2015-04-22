@@ -225,8 +225,9 @@ class OverviewTerms extends FormBase {
         '#prefix' => !empty($indentation) ? drupal_render($indentation) : '',
         '#type' => 'link',
         '#title' => $term->getName(),
-      ) + $term->urlInfo()->toRenderArray();
-      if ($taxonomy_vocabulary->hierarchy != TAXONOMY_HIERARCHY_MULTIPLE && count($tree) > 1) {
+        '#url' => $term->urlInfo(),
+      );
+      if ($taxonomy_vocabulary->getHierarchy() != TAXONOMY_HIERARCHY_MULTIPLE && count($tree) > 1) {
         $parent_fields = TRUE;
         $form['terms'][$key]['term']['tid'] = array(
           '#type' => 'hidden',
@@ -268,17 +269,20 @@ class OverviewTerms extends FormBase {
         'edit' => array(
           'title' => $this->t('Edit'),
           'query' => $destination,
-        ) + $term->urlInfo('edit-form')->toArray(),
+          'url' => $term->urlInfo('edit-form'),
+        ),
         'delete' => array(
           'title' => $this->t('Delete'),
           'query' => $destination,
-        ) + $term->urlInfo('delete-form')->toArray(),
+          'url' => $term->urlInfo('delete-form'),
+        ),
       );
       if ($this->moduleHandler->moduleExists('content_translation') && content_translation_translate_access($term)->isAllowed()) {
         $operations['translate'] = array(
           'title' => $this->t('Translate'),
           'query' => $destination,
-        ) + $term->urlInfo('drupal:content-translation-overview')->toArray();
+          'url' => $term->urlInfo('drupal:content-translation-overview'),
+        );
       }
       $form['terms'][$key]['operations'] = array(
         '#type' => 'operations',
@@ -329,10 +333,10 @@ class OverviewTerms extends FormBase {
         'hidden' => FALSE,
       );
       $form['terms']['#attached']['library'][] = 'taxonomy/drupal.taxonomy';
-      $form['terms']['#attached']['js'][] = array(
-        'data' => array('taxonomy' => array('backStep' => $back_step, 'forwardStep' => $forward_step)),
-        'type' => 'setting',
-      );
+      $form['terms']['#attached']['drupalSettings']['taxonomy'] = [
+        'backStep' => $back_step,
+        'forwardStep' => $forward_step,
+      ];
     }
     $form['terms']['#tabledrag'][] = array(
       'action' => 'order',
@@ -340,7 +344,7 @@ class OverviewTerms extends FormBase {
       'group' => 'term-weight',
     );
 
-    if ($taxonomy_vocabulary->hierarchy != TAXONOMY_HIERARCHY_MULTIPLE && count($tree) > 1) {
+    if ($taxonomy_vocabulary->getHierarchy() != TAXONOMY_HIERARCHY_MULTIPLE && count($tree) > 1) {
       $form['actions'] = array('#type' => 'actions', '#tree' => FALSE);
       $form['actions']['submit'] = array(
         '#type' => 'submit',
@@ -450,8 +454,8 @@ class OverviewTerms extends FormBase {
     }
 
     // Update the vocabulary hierarchy to flat or single hierarchy.
-    if ($vocabulary->hierarchy != $hierarchy) {
-      $vocabulary->hierarchy = $hierarchy;
+    if ($vocabulary->getHierarchy() != $hierarchy) {
+      $vocabulary->setHierarchy($hierarchy);
       $vocabulary->save();
     }
     drupal_set_message($this->t('The configuration options have been saved.'));

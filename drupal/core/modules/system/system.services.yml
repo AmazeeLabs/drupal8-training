@@ -9,12 +9,10 @@ services:
       - { name: access_check, applies_to: _access_system_update }
   system.manager:
     class: Drupal\system\SystemManager
-    arguments: ['@module_handler', '@database', '@entity.manager', '@request_stack', '@menu.link_tree', '@menu.active_trail']
-    tags:
-      - { name: backend_overridable }
+    arguments: ['@module_handler', '@entity.manager', '@request_stack', '@menu.link_tree', '@menu.active_trail']
   system.breadcrumb.default:
     class: Drupal\system\PathBasedBreadcrumbBuilder
-    arguments: ['@router.request_context', '@access_manager', '@router', '@path_processor_manager', '@config.factory',  '@title_resolver', '@current_user']
+    arguments: ['@router.request_context', '@access_manager', '@router', '@path_processor_manager', '@config.factory',  '@title_resolver', '@current_user', '@path.current']
     tags:
       - { name: breadcrumb_builder, priority: 0 }
   path_processor.files:
@@ -42,5 +40,10 @@ services:
   system.automatic_cron:
     class: Drupal\system\EventSubscriber\AutomaticCron
     arguments: ['@cron', '@config.factory', '@state']
+    tags:
+      - { name: event_subscriber }
+  system.theme_settings_cache_tag:
+    class: Drupal\system\EventSubscriber\ThemeSettingsCacheTag
+    arguments: ['@theme_handler', '@cache_tags.invalidator']
     tags:
       - { name: event_subscriber }

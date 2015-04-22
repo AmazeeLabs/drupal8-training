@@ -8,29 +8,13 @@
 namespace Drupal\Core\Controller;
 
 use Drupal\Core\Form\FormBuilderInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\DependencyInjection\ClassResolverInterface;
-use Drupal\Core\Controller\ControllerResolverInterface;
 
 /**
  * Wrapping controller for forms that serve as the main page body.
  */
 class HtmlFormController extends FormController {
-
-  /**
-   * The injection container for this object.
-   *
-   * @var \Symfony\Component\DependencyInjection\ContainerInterface
-   */
-  protected $container;
-
-  /**
-   * The name of a class implementing FormInterface that defines a form.
-   *
-   * @var string
-   */
-  protected $formClass;
 
   /**
    * The class resolver.
@@ -41,26 +25,30 @@ class HtmlFormController extends FormController {
 
   /**
    * Constructs a new \Drupal\Core\Routing\Enhancer\FormEnhancer object.
+   *
+   * @param \Drupal\Core\Controller\ControllerResolverInterface $controller_resolver
+   *   The controller resolver.
+   * @param \Drupal\Core\Form\FormBuilderInterface $form_builder
+   *   The form builder.
+   * @param \Drupal\Core\DependencyInjection\ClassResolverInterface $class_resolver
+   *   The class resolver.
    */
-  public function __construct(ClassResolverInterface $class_resolver, ControllerResolverInterface $controller_resolver, ContainerInterface $container, $class, FormBuilderInterface $form_builder) {
+  public function __construct(ControllerResolverInterface $controller_resolver, FormBuilderInterface $form_builder, ClassResolverInterface $class_resolver) {
     parent::__construct($controller_resolver, $form_builder);
     $this->classResolver = $class_resolver;
-    $this->container = $container;
-    $this->formDefinition = $class;
   }
 
   /**
-   * Returns the object used to build the form.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request using this form.
-   * @param string $form_arg
-   *   Either a class name or a service ID.
-   *
-   * @return \Drupal\Core\Form\FormInterface
-   *   The form object to use.
+   * {@inheritdoc}
    */
-  protected function getFormObject(Request $request, $form_arg) {
+  protected function getFormArgument(RouteMatchInterface $route_match) {
+    return $route_match->getRouteObject()->getDefault('_form');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getFormObject(RouteMatchInterface $route_match, $form_arg) {
     return $this->classResolver->getInstanceFromDefinition($form_arg);
   }
 

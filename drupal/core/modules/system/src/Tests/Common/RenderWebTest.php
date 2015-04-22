@@ -8,6 +8,7 @@
 namespace Drupal\system\Tests\Common;
 
 use Drupal\Component\Utility\String;
+use Drupal\Core\Url;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -25,7 +26,8 @@ class RenderWebTest extends WebTestBase {
   public static $modules = array('common_test');
 
   /**
-   * Tests rendering form elements without passing through form_builder().
+   * Tests rendering form elements without passing through
+   * \Drupal::formBuilder()->doBuildForm().
    */
   function testDrupalRenderFormElements() {
     // Define a series of form elements.
@@ -105,13 +107,13 @@ class RenderWebTest extends WebTestBase {
     $element = array(
       '#type' => 'link',
       '#title' => $this->randomMachineName(),
-      '#href' => $this->randomMachineName(),
+      '#url' => Url::fromRoute('common_test.destination'),
       '#options' => array(
         'absolute' => TRUE,
       ),
     );
     $this->assertRenderedElement($element, '//a[@href=:href and contains(., :title)]', array(
-      ':href' => url($element['#href'], array('absolute' => TRUE)),
+      ':href' => \Drupal::urlGenerator()->generateFromPath('common-test/destination', ['absolute' => TRUE]),
       ':title' => $element['#title'],
     ));
 
@@ -147,11 +149,8 @@ class RenderWebTest extends WebTestBase {
    */
   protected function assertRenderedElement(array $element, $xpath, array $xpath_args = array()) {
     $original_element = $element;
-    $this->drupalSetContent(drupal_render($element));
-    $this->verbose('<pre>' .  String::checkPlain(var_export($original_element, TRUE)) . '</pre>'
-      . '<pre>' .  String::checkPlain(var_export($element, TRUE)) . '</pre>'
-      . '<hr />' . $this->drupalGetContent()
-    );
+    $this->setRawContent(drupal_render_root($element));
+    $this->verbose('<hr />' . $this->getRawContent());
 
     // @see \Drupal\simpletest\WebTestBase::xpath()
     $xpath = $this->buildXPathQuery($xpath, $xpath_args);

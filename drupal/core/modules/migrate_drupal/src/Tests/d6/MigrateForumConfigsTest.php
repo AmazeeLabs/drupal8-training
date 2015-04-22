@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to forum.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateForumConfigsTest extends MigrateDrupalTestBase {
+class MigrateForumConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -32,9 +32,14 @@ class MigrateForumConfigsTest extends MigrateDrupalTestBase {
    */
   protected function setUp() {
     parent::setUp();
+    $this->prepareMigrations(array(
+      'd6_taxonomy_vocabulary' => array(
+        array(array(1), array('vocabulary_1_i_0_')),
+      )
+    ));
     $migration = entity_load('migration', 'd6_forum_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6ForumSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -45,16 +50,15 @@ class MigrateForumConfigsTest extends MigrateDrupalTestBase {
    * Tests migration of forum variables to forum.settings.yml.
    */
   public function testForumSettings() {
-    $config = \Drupal::config('forum.settings');
-    $this->assertIdentical($config->get('topics.hot_threshold'), 15);
-    $this->assertIdentical($config->get('topics.page_limit'), 25);
-    $this->assertIdentical($config->get('topics.order'), 1);
-    // The vocabulary vid depends on existing vids when the Forum module was enabled. This would have to be user-selectable based on a query to the D6 vocabulary table.
-    //$this->assertIdentical($config->get('forum_nav_vocabulary'), '1');
+    $config = $this->config('forum.settings');
+    $this->assertIdentical(15, $config->get('topics.hot_threshold'));
+    $this->assertIdentical(25, $config->get('topics.page_limit'));
+    $this->assertIdentical(1, $config->get('topics.order'));
+    $this->assertIdentical('vocabulary_1_i_0_', $config->get('vocabulary'));
     // This is 'forum_block_num_0' in D6, but block:active:limit' in D8.
-    $this->assertIdentical($config->get('block.active.limit'), 5);
+    $this->assertIdentical(5, $config->get('block.active.limit'));
     // This is 'forum_block_num_1' in D6, but 'block:new:limit' in D8.
-    $this->assertIdentical($config->get('block.new.limit'), 5);
+    $this->assertIdentical(5, $config->get('block.new.limit'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'forum.settings', $config->get());
   }
 

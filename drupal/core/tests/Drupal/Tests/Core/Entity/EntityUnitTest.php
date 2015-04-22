@@ -73,11 +73,11 @@ class EntityUnitTest extends UnitTestCase {
   protected $languageManager;
 
   /**
-   * The mocked cache backend.
+   * The mocked cache tags invalidator.
    *
-   * @var \Drupal\Core\Cache\CacheBackendInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Cache\CacheTagsInvalidatorInterface|\PHPUnit_Framework_MockObject_MockObject
    */
-  protected $cacheBackend;
+  protected $cacheTagsInvalidator;
 
   /**
    * The entity values.
@@ -98,6 +98,9 @@ class EntityUnitTest extends UnitTestCase {
     $this->entityTypeId = $this->randomMachineName();
 
     $this->entityType = $this->getMock('\Drupal\Core\Entity\EntityTypeInterface');
+    $this->entityType->expects($this->any())
+      ->method('getListCacheTags')
+      ->willReturn(array($this->entityTypeId . '_list'));
 
     $this->entityManager = $this->getMock('\Drupal\Core\Entity\EntityManagerInterface');
     $this->entityManager->expects($this->any())
@@ -113,14 +116,13 @@ class EntityUnitTest extends UnitTestCase {
       ->with('en')
       ->will($this->returnValue(new Language(array('id' => 'en'))));
 
-    $this->cacheBackend = $this->getMock('Drupal\Core\Cache\CacheBackendInterface');
+    $this->cacheTagsInvalidator = $this->getMock('Drupal\Core\Cache\CacheTagsInvalidator');
 
     $container = new ContainerBuilder();
     $container->set('entity.manager', $this->entityManager);
     $container->set('uuid', $this->uuid);
     $container->set('language_manager', $this->languageManager);
-    $container->set('cache.test', $this->cacheBackend);
-    $container->setParameter('cache_bins', array('cache.test' => 'test'));
+    $container->set('cache_tags.invalidator', $this->cacheTagsInvalidator);
     \Drupal::setContainer($container);
 
     $this->entity = $this->getMockForAbstractClass('\Drupal\Core\Entity\Entity', array($this->values, $this->entityTypeId));
@@ -230,7 +232,12 @@ class EntityUnitTest extends UnitTestCase {
    * @covers ::language
    */
   public function testLanguage() {
-    $this->assertSame('en', $this->entity->language()->id);
+    $this->entityType->expects($this->any())
+      ->method('getKey')
+      ->will($this->returnValueMap(array(
+        array('langcode', 'langcode'),
+      )));
+    $this->assertSame('en', $this->entity->language()->getId());
   }
 
   /**
@@ -248,6 +255,7 @@ class EntityUnitTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->setMethods($methods)
       ->getMock();
+
   }
 
   /**
@@ -389,16 +397,16 @@ class EntityUnitTest extends UnitTestCase {
    * @covers ::postSave
    */
   public function testPostSave() {
-    $this->cacheBackend->expects($this->at(0))
+    $this->cacheTagsInvalidator->expects($this->at(0))
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId . 's' => TRUE, // List cache tag.
+        $this->entityTypeId . '_list', // List cache tag.
       ));
-    $this->cacheBackend->expects($this->at(1))
+    $this->cacheTagsInvalidator->expects($this->at(1))
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId . 's' => TRUE, // List cache tag.
-        $this->entityTypeId => array($this->values['id']), // Own cache tag.
+        $this->entityTypeId . ':' . $this->values['id'], // Own cache tag.
+        $this->entityTypeId . '_list', // List cache tag.
       ));
 
     // This method is internal, so check for errors on calling it only.
@@ -446,22 +454,18 @@ class EntityUnitTest extends UnitTestCase {
    * @covers ::postDelete
    */
   public function testPostDelete() {
-    $this->cacheBackend->expects($this->once())
+    $this->cacheTagsInvalidator->expects($this->once())
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId => array($this->values['id']),
-        $this->entityTypeId . 's' => TRUE,
+        $this->entityTypeId . ':' . $this->values['id'],
+        $this->entityTypeId . '_list',
       ));
     $storage = $this->getMock('\Drupal\Core\Entity\EntityStorageInterface');
+    $storage->expects($this->once())
+      ->method('getEntityType')
+      ->willReturn($this->entityType);
 
-    $entity = $this->getMockBuilder('\Drupal\Core\Entity\Entity')
-      ->setConstructorArgs(array($this->values, $this->entityTypeId))
-      ->setMethods(array('onSaveOrDelete'))
-      ->getMock();
-    $entity->expects($this->once())
-      ->method('onSaveOrDelete');
-
-    $entities = array($this->values['id'] => $entity);
+    $entities = array($this->values['id'] => $this->entity);
     $this->entity->postDelete($storage, $entities);
   }
 

@@ -22,7 +22,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('locale', 'contact');
+  public static $modules = array('locale', 'contact', 'contact_test');
 
   /**
    * {@inheritdoc}
@@ -34,7 +34,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
 
     // Enable import of translations. By default this is disabled for automated
     // tests.
-    \Drupal::config('locale.settings')
+    $this->config('locale.settings')
       ->set('translation.import_enabled', TRUE)
       ->save();
   }
@@ -83,7 +83,7 @@ class LocaleConfigTranslationTest extends WebTestBase {
 
     // Get translation and check we've only got the site name.
     $translation = $wrapper->getTranslation($langcode);
-    $properties = $translation->getProperties();
+    $properties = $translation->getElements();
     $this->assertEqual(count($properties), 1, 'Got the right number of properties after translation');
 
     // Check the translated site name is displayed.
@@ -122,22 +122,24 @@ class LocaleConfigTranslationTest extends WebTestBase {
     $this->assertEqual($formatted_date, 'Tue', 'Got the right formatted date using the date format translation pattern.');
 
     // Assert strings from image module config are not available.
-    $string = $this->storage->findString(array('source' => 'Medium (220x220)', 'context' => '', 'type' => 'configuration'));
+    $string = $this->storage->findString(array('source' => 'Medium (220×220)', 'context' => '', 'type' => 'configuration'));
     $this->assertFalse($string, 'Configuration strings have been created upon installation.');
 
     // Enable the image module.
     $this->drupalPostForm('admin/modules', array('modules[Field types][image][enable]' => "1"), t('Save configuration'));
     $this->rebuildContainer();
 
-    $string = $this->storage->findString(array('source' => 'Medium (220x220)', 'context' => '', 'type' => 'configuration'));
+    $string = $this->storage->findString(array('source' => 'Medium (220×220)', 'context' => '', 'type' => 'configuration'));
     $this->assertTrue($string, 'Configuration strings have been created upon installation.');
     $locations = $string->getLocations();
     $this->assertTrue(isset($locations['configuration']) && isset($locations['configuration']['image.style.medium']), 'Configuration string has been created with the right location');
 
     // Check the string is unique and has no translation yet.
     $translations = $this->storage->getTranslations(array('language' => $langcode, 'type' => 'configuration', 'name' => 'image.style.medium'));
+    $this->assertEqual(count($translations), 1);
     $translation = reset($translations);
-    $this->assertTrue(count($translations) == 1 && $translation->source == $string->source && empty($translation->translation), 'Got only one string for image configuration and has no translation.');
+    $this->assertEqual($translation->source, $string->source);
+    $this->assertTrue(empty($translation->translation));
 
     // Translate using the UI so configuration is refreshed.
     $image_style_label = $this->randomMachineName(20);

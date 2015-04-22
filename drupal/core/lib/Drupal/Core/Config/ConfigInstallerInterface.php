@@ -38,6 +38,24 @@ interface ConfigInstallerInterface {
   public function installDefaultConfig($type, $name);
 
   /**
+   * Installs optional configuration.
+   *
+   * Optional configuration is only installed if:
+   * - the configuration does not exist already.
+   * - it's a configuration entity.
+   * - its dependencies can be met.
+   *
+   * @param \Drupal\Core\Config\StorageInterface
+   *   (optional) The configuration storage to search for optional
+   *   configuration. If not provided, all enabled extension's optional
+   *   configuration directories will be searched.
+   * @param string $prefix
+   *   (optional) If set, limits the installed configuration to only
+   *   configuration beginning with the provided value.
+   */
+  public function installOptionalConfig(StorageInterface $storage = NULL, $prefix = '');
+
+  /**
    * Installs all default configuration in the specified collection.
    *
    * The function is useful if the site needs to respond to an event that has
@@ -60,17 +78,12 @@ interface ConfigInstallerInterface {
   public function setSourceStorage(StorageInterface $storage);
 
   /**
-   * Resets the configuration storage that provides the default configuration.
-   *
-   * @return $this
-   */
-  public function resetSourceStorage();
-
-  /**
    * Sets the status of the isSyncing flag.
    *
    * @param bool $status
    *   The status of the sync flag.
+   *
+   * @return $this
    */
   public function setSyncing($status);
 
@@ -81,5 +94,18 @@ interface ConfigInstallerInterface {
    *   Returns TRUE is syncing flag set.
    */
   public function isSyncing();
+
+  /**
+   * Checks the configuration that will be installed for an extension.
+   *
+   * @param string $type
+   *   Type of extension to install.
+   * @param string $name
+   *   Name of extension to install.
+   *
+   * @throws \Drupal\Core\Config\UnmetDependenciesException
+   * @throws \Drupal\Core\Config\PreExistingConfigException
+   */
+  public function checkConfigurationToInstall($type, $name);
 
 }

@@ -9,6 +9,7 @@ namespace Drupal\session_test\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Controller providing page callbacks for the action admin interface.
  */
 class SessionTestController extends ControllerBase {
+
   /**
    * Prints the stored session value to the screen.
    *
@@ -24,8 +26,8 @@ class SessionTestController extends ControllerBase {
    */
   public function get() {
     return empty($_SESSION['session_test_value'])
-      ? ""
-      : $this->t('The current value of the stored session variable is: %val', array('%val' => $_SESSION['session_test_value']));
+      ? []
+      : ['#markup' => $this->t('The current value of the stored session variable is: %val', array('%val' => $_SESSION['session_test_value']))];
   }
 
   /**
@@ -41,7 +43,7 @@ class SessionTestController extends ControllerBase {
 
     \Drupal::service('session_manager')->save();
 
-    return 'session_id:' . session_id() . "\n";
+    return ['#markup' => 'session_id:' . session_id() . "\n"];
   }
 
   /**
@@ -54,7 +56,7 @@ class SessionTestController extends ControllerBase {
    *   A notification message with session ID.
    */
   public function getIdFromCookie(Request $request) {
-    return 'session_id:' . $request->cookies->get(session_name()) . "\n";
+    return ['#markup' => 'session_id:' . $request->cookies->get(session_name()) . "\n"];
   }
 
   /**
@@ -69,7 +71,7 @@ class SessionTestController extends ControllerBase {
   public function set($test_value) {
     $_SESSION['session_test_value'] = $test_value;
 
-    return $this->t('The current value of the stored session variable has been set to %val', array('%val' => $test_value));
+    return ['#markup' => $this->t('The current value of the stored session variable has been set to %val', array('%val' => $test_value))];
   }
 
   /**
@@ -83,9 +85,9 @@ class SessionTestController extends ControllerBase {
    *   A notification message.
    */
   public function noSet($test_value) {
-    \Drupal::service('session_manager')->disable();
+    \Drupal::service('session_handler.write_safe')->setSessionWritable(FALSE);
     $this->set($test_value);
-    return $this->t('session saving was disabled, and then %val was set', array('%val' => $test_value));
+    return ['#markup' => $this->t('session saving was disabled, and then %val was set', array('%val' => $test_value))];
   }
 
   /**
@@ -109,21 +111,9 @@ class SessionTestController extends ControllerBase {
    *   A notification message.
    */
   public function setMessageButDontSave() {
-    \Drupal::service('session_manager')->disable();
+    \Drupal::service('session_handler.write_safe')->setSessionWritable(FALSE);
     $this->setMessage();
-  }
-
-  /**
-   * Stores a value in $_SESSION['session_test_value'] without
-   * having started the session in advance.
-   *
-   * @return string
-   *   A notification message.
-   */
-  public function setNotStarted() {
-    if (!drupal_session_will_start()) {
-      $this->set($this->t('Session was not started'));
-    }
+    return ['#markup' => ''];
   }
 
   /**
@@ -133,6 +123,30 @@ class SessionTestController extends ControllerBase {
    *   A notification message.
    */
   public function isLoggedIn() {
-    return $this->t('User is logged in.');
+    return ['#markup' => $this->t('User is logged in.')];
   }
+
+  /**
+   * Returns the trace recorded by test proxy session handlers as JSON.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The response.
+   */
+  public function traceHandler() {
+    // Start a session if necessary, set a value and then save and close it.
+    \Drupal::service('session_manager')->start();
+    if (empty($_SESSION['trace-handler'])) {
+      $_SESSION['trace-handler'] = 1;
+    }
+    else {
+      $_SESSION['trace-handler']++;
+    }
+    \Drupal::service('session_manager')->save();
+
+    // Collect traces and return them in JSON format.
+    $trace = \Drupal::service('session_test.session_handler_proxy_trace')->getArrayCopy();
+
+    return new JsonResponse($trace);
+  }
+
 }

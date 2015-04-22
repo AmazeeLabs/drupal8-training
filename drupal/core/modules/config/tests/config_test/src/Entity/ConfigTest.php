@@ -23,7 +23,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
  *     "list_builder" = "Drupal\config_test\ConfigTestListBuilder",
  *     "form" = {
  *       "default" = "Drupal\config_test\ConfigTestForm",
- *       "delete" = "Drupal\config_test\Form\ConfigTestDeleteForm"
+ *       "delete" = "Drupal\Core\Entity\EntityDeleteForm"
  *     },
  *     "access" = "Drupal\config_test\ConfigTestAccessControlHandler"
  *   },
@@ -34,10 +34,11 @@ use Drupal\Core\Entity\EntityStorageInterface;
  *     "status" = "status"
  *   },
  *   links = {
- *     "edit-form" = "entity.config_test.edit_form",
- *     "delete-form" = "entity.config_test.delete_form",
- *     "enable" = "entity.config_test.enable",
- *     "disable" = "entity.config_test.disable"
+ *     "edit-form" = "/admin/structure/config_test/manage/{config_test}",
+ *     "delete-form" = "/admin/structure/config_test/manage/{config_test}/delete",
+ *     "enable" = "/admin/structure/config_test/manage/{config_test}/enable",
+ *     "disable" = "/admin/structure/config_test/manage/{config_test}/disable",
+ *     "collection" = "/admin/structure/config_test",
  *   }
  * )
  */
@@ -70,13 +71,6 @@ class ConfigTest extends ConfigEntityBase implements ConfigTestInterface {
    * @var string
    */
   public $style;
-
-  /**
-   * Test dependencies.
-   *
-   * @var array;
-   */
-  public $test_dependencies = array();
 
   /**
    * A protected property of the configuration entity.
@@ -127,33 +121,44 @@ class ConfigTest extends ConfigEntityBase implements ConfigTestInterface {
   /**
    * {@inheritdoc}
    */
-  public function calculateDependencies() {
-    parent::calculateDependencies();
-    foreach ($this->test_dependencies as $type => $deps) {
-      foreach ($deps as $dep) {
-        $this->addDependency($type, $dep);
+  public function onDependencyRemoval(array $dependencies) {
+    $changed = parent::onDependencyRemoval($dependencies);
+    if (!isset($this->dependencies['enforced']['config'])) {
+      return $changed;
+    }
+    $fix_deps = \Drupal::state()->get('config_test.fix_dependencies', array());
+    foreach ($dependencies['config'] as $entity) {
+      if (in_array($entity->getConfigDependencyName(), $fix_deps)) {
+        $key = array_search($entity->getConfigDependencyName(), $this->dependencies['enforced']['config']);
+        if ($key !== FALSE) {
+          $changed = TRUE;
+          unset($this->dependencies['enforced']['config'][$key]);
+        }
       }
     }
+    return $changed;
+  }
+
+  /**
+   * Sets the enforced dependencies.
+   *
+   * @param array $dependencies
+   *   A config dependency array.
+   *
+   * @return $this
+   *
+   * @see \Drupal\Core\Config\Entity\ConfigDependencyManager
+   */
+  public function setEnforcedDependencies(array $dependencies) {
+    $this->dependencies['enforced'] = $dependencies;
+    return $this;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function onDependencyRemoval(array $dependencies) {
-    $changed = FALSE;
-    $fix_deps = \Drupal::state()->get('config_test.fix_dependencies', array());
-    foreach ($dependencies['entity'] as $entity) {
-      if (in_array($entity->getConfigDependencyName(), $fix_deps)) {
-        $key = array_search($entity->getConfigDependencyName(), $this->test_dependencies['entity']);
-        if ($key !== FALSE) {
-          $changed = TRUE;
-          unset($this->test_dependencies['entity'][$key]);
-        }
-      }
-    }
-    if ($changed) {
-      $this->save();
-    }
+  public function isInstallable() {
+    return $this->id != 'isinstallable' || \Drupal::state()->get('config_test.isinstallable');
   }
 
 }

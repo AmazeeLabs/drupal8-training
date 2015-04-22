@@ -8,9 +8,11 @@
 namespace Drupal\views_ui\Form\Ajax;
 
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\ViewStorageInterface;
+use Drupal\Core\Url;
+use Drupal\views\ViewEntityInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Views;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Provides a form for configuring an item in the Views UI.
@@ -35,7 +37,7 @@ class ConfigHandler extends ViewsFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getForm(ViewStorageInterface $view, $display_id, $js, $type = NULL, $id = NULL) {
+  public function getForm(ViewEntityInterface $view, $display_id, $js, $type = NULL, $id = NULL) {
     $this->setType($type);
     $this->setID($id);
     return parent::getForm($view, $display_id, $js);
@@ -51,7 +53,8 @@ class ConfigHandler extends ViewsFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state) {
+  public function buildForm(array $form, FormStateInterface $form_state, Request $request = NULL) {
+    /** @var \Drupal\views\Entity\View $view */
     $view = $form_state->get('view');
     $display_id = $form_state->get('display_id');
     $type = $form_state->get('type');
@@ -66,7 +69,10 @@ class ConfigHandler extends ViewsFormBase {
     );
     $executable = $view->getExecutable();
     $save_ui_cache = FALSE;
-    $executable->setDisplay($display_id);
+    if (!$executable->setDisplay($display_id)) {
+      $form['markup'] = array('#markup' => $this->t('Invalid display id @display', array('@display' => $display_id)));
+      return $form;
+    }
     $item = $executable->getHandler($display_id, $type, $id);
 
     if ($item) {
@@ -128,6 +134,9 @@ class ConfigHandler extends ViewsFormBase {
             // skips submitting the form.
             $executable->setHandlerOption($display_id, $type, $id, 'relationship', $rel);
             $save_ui_cache = TRUE;
+            // Re-initialize with new relationship.
+            $item['relationship'] = $rel;
+            $handler->init($executable, $executable->display_handler, $item);
           }
 
           $form['options']['relationship'] = array(
@@ -173,7 +182,7 @@ class ConfigHandler extends ViewsFormBase {
         '#submit' => array(array($this, 'remove')),
         '#limit_validation_errors' => array(array('override')),
         '#ajax' => array(
-          'path' => current_path(),
+          'url' => Url::fromRoute('<current>'),
         ),
       );
     }
@@ -241,14 +250,6 @@ class ConfigHandler extends ViewsFormBase {
     // This unpacks only options that are in the definition, ensuring random
     // extra stuff on the form is not sent through.
     $handler->unpackOptions($handler->options, $options, NULL, FALSE);
-
-    // Add any dependencies as the handler is saved. Put it here so
-    // it does not need to be declared in defineOptions().
-    if ($dependencies = $handler->getDependencies()) {
-      $handler->options['dependencies'] = $dependencies;
-    }
-    // Add the module providing the handler as a dependency as well.
-    $handler->options['dependencies']['module'][] = $handler->definition['provider'];
 
     // Store the item back on the view
     $executable->setHandler($display_id, $type, $id, $handler->options);

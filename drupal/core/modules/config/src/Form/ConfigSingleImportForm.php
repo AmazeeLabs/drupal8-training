@@ -227,7 +227,7 @@ class ConfigSingleImportForm extends ConfirmFormBase {
     }
 
     // Store the decoded version of the submitted import.
-    form_set_value($form['import'], $data, $form_state);
+    $form_state->setValueForElement($form['import'], $data);
   }
 
   /**
@@ -243,15 +243,19 @@ class ConfigSingleImportForm extends ConfirmFormBase {
 
     // If a simple configuration file was added, set the data and save.
     if ($this->data['config_type'] === 'system.simple') {
-      $this->config($this->data['config_name'])->setData($this->data['import'])->save();
+      $this->configFactory()->getEditable($this->data['config_name'])->setData($this->data['import'])->save();
       drupal_set_message($this->t('The %name configuration was imported.', array('%name' => $this->data['config_name'])));
     }
-    // For a config entity, create a new entity and save it.
+    // For a config entity, create an entity and save it.
     else {
       try {
-        $entity = $this->entityManager
-          ->getStorage($this->data['config_type'])
-          ->create($this->data['import']);
+        $entity_storage = $this->entityManager->getStorage($this->data['config_type']);
+        if ($this->configExists) {
+          $entity = $entity_storage->updateFromStorageRecord($this->configExists, $this->data['import']);
+        }
+        else {
+          $entity = $entity_storage->createFromStorageRecord($this->data['import']);
+        }
         $entity->save();
         drupal_set_message($this->t('The @entity_type %label was imported.', array('@entity_type' => $entity->getEntityTypeId(), '%label' => $entity->label())));
       }

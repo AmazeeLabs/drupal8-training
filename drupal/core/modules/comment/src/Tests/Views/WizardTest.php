@@ -7,6 +7,7 @@
 
 namespace Drupal\comment\Tests\Views;
 
+use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\views\Views;
 use Drupal\views\Tests\Wizard\WizardTestBase;
 
@@ -18,8 +19,10 @@ use Drupal\views\Tests\Wizard\WizardTestBase;
  */
 class WizardTest extends WizardTestBase {
 
+  use CommentTestTrait;
+
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -33,7 +36,7 @@ class WizardTest extends WizardTestBase {
     parent::setUp();
     $this->drupalCreateContentType(array('type' => 'page', 'name' => t('Basic page')));
     // Add comment field to page node type.
-    $this->container->get('comment.manager')->addDefaultField('node', 'page');
+    $this->addDefaultCommentField('node', 'page');
   }
 
   /**
@@ -68,7 +71,7 @@ class WizardTest extends WizardTestBase {
         $options[] = $item->attributes()->value;
       }
     }
-    $expected_options = array('comment', 'fields');
+    $expected_options = array('entity:comment', 'fields');
     $this->assertEqual($options, $expected_options);
 
     $view['id'] = strtolower($this->randomMachineName(16));

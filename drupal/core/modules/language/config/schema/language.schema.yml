@@ -8,14 +8,14 @@ language_type_negotiation:
       type: sequence
       label: 'Enabled negotiators'
       sequence:
-        - type: integer
-          label: Weight
+        type: integer
+        label: Weight
     method_weights:
       type: sequence
       label: 'Negotiator weights'
       sequence:
-        - type: integer
-          label: Weight
+        type: integer
+        label: Weight
 
 language.types:
   type: mapping
@@ -25,20 +25,20 @@ language.types:
       type: sequence
       label: 'All language types'
       sequence:
-        - type: string
-          label: 'Language type'
+        type: string
+        label: 'Language type'
     configurable:
       type: sequence
       label: 'Configurable language types'
       sequence:
-        - type: string
-          label: 'Language type'
+        type: string
+        label: 'Language type'
     negotiation:
       type: sequence
       label: 'Language negotiation per type settings'
       sequence:
-        - type: language_type_negotiation
-          label: 'Language negotiation per type setting'
+        type: language_type_negotiation
+        label: 'Language negotiation per type setting'
 
 language.negotiation:
   type: mapping
@@ -62,14 +62,14 @@ language.negotiation:
           type: sequence
           label: 'Path prefix configuration'
           sequence:
-            - type: string
-              label: 'Path prefix'
+            type: string
+            label: 'Path prefix'
         domains:
           type: sequence
           label: 'Domain configuration'
           sequence:
-            - type: string
-              label: 'Domain'
+            type: string
+            label: 'Domain'
     selected_langcode:
       type: string
       label: 'Selected language'
@@ -78,8 +78,8 @@ language.mappings:
   type: sequence
   label: 'Language mapping'
   sequence:
-    - type: string
-      label: 'Language'
+    type: string
+    label: 'Language'
 
 language.entity.*:
   type: config_entity
@@ -92,7 +92,7 @@ language.entity.*:
       type: label
       label: 'Label'
     direction:
-      type: integer
+      type: string
       label: 'Direction'
     weight:
       type: integer
@@ -101,34 +101,25 @@ language.entity.*:
       type: boolean
       label: 'Locked'
 
-language.settings:
-  type: mapping
-  label: 'Language settings'
+language.content_settings.*.*:
+  type: config_entity
+  label: 'Content Language Settings'
   mapping:
-    entities:
-      type: sequence
-      label: 'Entity type'
-      sequence:
-        - type: sequence
-          label: 'Bundle'
-          sequence:
-            - type: mapping
-              label: 'Custom language settings'
-              mapping:
-                language:
-                  type: mapping
-                  label: 'Custom language settings'
-                  mapping:
-                    default_configuration:
-                      type: mapping
-                      label: 'Default language'
-                      mapping:
-                        langcode:
-                          type: string
-                          label: 'Default language'
-                        language_show:
-                          type: boolean
-                          label: 'Show language selector on create and edit pages'
+    id:
+      type: string
+      label: 'ID'
+    target_entity_type_id:
+      type: string
+      label: 'Entity Type ID'
+    target_bundle:
+      type:  string
+      label: 'Bundle'
+    default_langcode:
+      type: string
+      label: 'Default language'
+    language_alterable:
+      type: boolean
+      label: 'Allow to alter the language'
 
 condition.plugin.language:
   type: condition.plugin
@@ -136,4 +127,4 @@ condition.plugin.language:
     langcodes:
       type: sequence
       sequence:
-        - type: string
+        type: string

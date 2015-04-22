@@ -15,7 +15,10 @@
       // dialogs. Non-modal dialogs are responsible for creating their own
       // elements, since there can be multiple non-modal dialogs at a time.
       if (!$('#drupal-modal').length) {
-        $('<div id="drupal-modal" />').hide().appendTo('body');
+        // Add 'ui-front' jQuery UI class so jQuery UI widgets like autocomplete
+        // sit on top of dialogs. For more information see
+        // http://api.jqueryui.com/theming/stacking-elements/.
+        $('<div id="drupal-modal" class="ui-front"/>').hide().appendTo('body');
       }
 
       // Special behaviors specific when attaching content within a dialog.
@@ -31,6 +34,13 @@
         // Force focus on the modal when the behavior is run.
         $dialog.dialog('widget').trigger('focus');
       }
+
+      var originalClose = settings.dialog.close;
+      // Overwrite the close method to remove the dialog on closing.
+      settings.dialog.close = function(event) {
+        originalClose.apply(settings.dialog, arguments);
+        $(event.target).remove();
+      };
     },
 
     /**

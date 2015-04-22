@@ -42,7 +42,6 @@ class TestItem extends FieldItemBase {
   public static function defaultFieldSettings() {
     return array(
       'test_field_setting' => 'dummy test string',
-      'test_cached_data' => FALSE,
     ) + parent::defaultFieldSettings();
   }
 
@@ -51,7 +50,8 @@ class TestItem extends FieldItemBase {
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
     $properties['value'] = DataDefinition::create('integer')
-      ->setLabel(t('Test integer value'));
+      ->setLabel(t('Test integer value'))
+      ->setRequired(TRUE);
 
     return $properties;
   }
@@ -65,7 +65,6 @@ class TestItem extends FieldItemBase {
         'value' => array(
           'type' => 'int',
           'size' => 'medium',
-          'not null' => FALSE,
         ),
       ),
       'indexes' => array(
@@ -136,6 +135,42 @@ class TestItem extends FieldItemBase {
    */
   public function isEmpty() {
     return empty($this->value);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function storageSettingsToConfigData(array $settings) {
+    $settings['config_data_from_storage_setting'] = 'TRUE';
+    unset($settings['storage_setting_from_config_data']);
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function storageSettingsFromConfigData(array $settings) {
+    $settings['storage_setting_from_config_data'] = 'TRUE';
+    unset($settings['config_data_from_storage_setting']);
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function fieldSettingsToConfigData(array $settings) {
+    $settings['config_data_from_field_setting'] = 'TRUE';
+    unset($settings['field_setting_from_config_data']);
+    return $settings;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function fieldSettingsFromConfigData(array $settings) {
+    $settings['field_setting_from_config_data'] = 'TRUE';
+    unset($settings['config_data_from_field_setting']);
+    return $settings;
   }
 
 }

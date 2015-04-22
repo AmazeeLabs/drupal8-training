@@ -26,24 +26,16 @@
  * - site_slogan: The slogan of the site. This is empty when displaying the site
  *   slogan has been disabled in theme settings.
  *
- * Navigation:
- * - main_menu: The Main menu links for the site, if they have been configured.
- * - secondary_menu: The Secondary menu links for the site, if they have been
- *   configured.
- * - breadcrumb: The breadcrumb trail for the current page.
- *
  * Page content (in order of occurrence in the default page.html.twig):
  * - title_prefix: Additional output populated by modules, intended to be
  *   displayed in front of the main title tag that appears in the template.
  * - title: The page title, for use in the actual content.
  * - title_suffix: Additional output populated by modules, intended to be
  *   displayed after the main title tag that appears in the template.
- * - messages: Status and error messages. Should be displayed prominently.
  * - tabs: Tabs linking to any sub-pages beneath the current page (e.g., the
  *   view and edit tabs when displaying a node).
  * - action_links: Actions local to the page, such as "Add menu" on the menu
  *   administration interface.
- * - feed_icons: All feed icons for the current page.
  * - node: Fully loaded node, if there is an automatically-loaded node
  *   associated with the page and the node ID is the second argument in the
  *   page's path (e.g. node/12345 and node/12345/revisions, but not
@@ -52,18 +44,20 @@
  * Regions:
  * - page.page_top: Items for the header region.
  * - page.highlighted: Items for the highlighted content region.
+ * - page.messages: Status and error messages. Should be displayed prominently.
  * - page.help: Dynamic help text, mostly for admin pages.
  * - page.content: The main content of the current page.
  * - page.sidebar_first: Items for the first sidebar.
  * - page.sidebar_second: Items for the second sidebar.
  * - page.page_bottom: Items for the footer region.
+ * - page.breadcrumb: Items for the breadcrumb region.
  *
  * @see template_preprocess_page()
  * @see seven_preprocess_page()
  * @see html.html.twig
  */
 #}
-  <header id="branding" class="clearfix">
+  <header class="content-header clearfix">
     <div class="layout-container">
       {{ title_prefix }}
       {% if title %}
@@ -81,13 +75,13 @@
       <div class="tabs-secondary clearfix" role="navigation">{{ secondary_local_tasks }}</div>
     {% endif %}
 
-    {{ breadcrumb }}
+    {{ page.breadcrumb }}
 
-    <main id="content" class="clearfix" role="main">
+    <main class="page-content clearfix" role="main">
       <div class="visually-hidden"><a id="main-content" tabindex="-1"></a></div>
-      {{ messages }}
+      {{ page.messages }}
       {% if page.help %}
-        <div id="help">
+        <div class="help">
           {{ page.help }}
         </div>
       {% endif %}
@@ -98,10 +92,5 @@
       {% endif %}
       {{ page.content }}
     </main>
-    {% if feed_icons %}
-      <footer id="footer" role="contentinfo" class="layout-column">
-          {{ feed_icons }}
-      </footer>
-    {% endif %}
 
   </div>

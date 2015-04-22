@@ -15,9 +15,12 @@ config_test_dynamic:
     style:
       type: string
       label: 'style'
-    test_dependencies:
-      type: config_dependencies
-      label: 'Configuration dependencies'
+    size:
+      type: string
+      label: 'Size'
+    size_value:
+      type: string
+      label: 'Size value'
     protected_property:
       type: string
       label: 'Protected property'
@@ -43,11 +46,11 @@ config_test.query.*:
       type: sequence
       label: 'Array level 1'
       sequence:
-        - type: sequence
-          label: 'Array level 2'
-          sequence:
-            - type: integer
-              label: 'Value'
+        type: sequence
+        label: 'Array level 2'
+        sequence:
+          type: integer
+          label: 'Value'
     number:
       type: integer
       label: 'number'
@@ -60,12 +63,15 @@ config_test.types:
       type: sequence
       label: 'Array'
       sequence:
-        - type: string
-          label: 'Item'
+        type: string
+        label: 'Item'
     boolean:
       type: boolean
       label: 'Boolean'
     float:
+      type: float
+      label: 'Float'
+    float_as_integer:
       type: float
       label: 'Float'
     exp:
@@ -105,6 +111,44 @@ config_test.system:
     foo:
       type: string
       label: 'Foo'
+    baz:
+      type: string
+      label: 'Baz'
     '404':
       type: string
       label: '404'
+
+config_test.new:
+  type: mapping
+  label: 'Configuration test'
+  mapping:
+     key:
+       type: string
+       label: 'Test setting'
+     new_key:
+       type: string
+       label: 'Test setting'
+     uuid:
+       type: string
+       label: 'UUID'
+
+config_test.old:
+  type: config_test.new
+
+config_test.foo:
+  type: mapping
+  label: 'Configuration test'
+  mapping:
+     value:
+       type: mapping
+       label: 'Value'
+       mapping:
+         key:
+           type: string
+           label: 'Key'
+     label:
+       type: label
+       label: 'Label'
+
+config_test.bar:
+  type: config_test.foo

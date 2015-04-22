@@ -8,7 +8,6 @@
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Template\Attribute;
 
 /**
  * Implements hook_toolbar().
@@ -45,15 +44,14 @@ function contextual_toolbar() {
 }
 
 /**
- * Implements hook_page_build().
+ * Implements hook_page_attachments().
  *
  * Adds the drupal.contextual-links library to the page for any user who has the
  * 'access contextual links' permission.
  *
  * @see contextual_preprocess()
  */
-function contextual_page_build(&$page) {
-
+function contextual_page_attachments(array &$page) {
   if (!\Drupal::currentUser()->hasPermission('access contextual links')) {
     return;
   }
@@ -76,7 +74,8 @@ function contextual_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<dd>';
       $output .= t('Contextual links for an area on a page are displayed using a contextual links button. There are two ways to make the contextual links button visible:');
       $output .= '<ol>';
-      $output .= '<li>' . t('Hovering over the area of interest will temporarily make the contextual links button visible (which looks like a pencil in most themes, and is normally displayed in the upper right corner of the area). The icon typically looks like this: <img src="!pencil" alt="contextual links button" />', array('!pencil' => file_create_url('core/misc/icons/bebebe/pencil.svg'))) . '</li>';
+      $sample_picture = '<img src="' . file_create_url('core/misc/icons/bebebe/pencil.svg') . '" alt="' . t('contextual links button') . '" />';
+      $output .= '<li>' . t('Hovering over the area of interest will temporarily make the contextual links button visible (which looks like a pencil in most themes, and is normally displayed in the upper right corner of the area). The icon typically looks like this: !picture', array('!picture' => $sample_picture)) . '</li>';
       $output .= '<li>' . t('If you have the <a href="!toolbar">Toolbar module</a> enabled, clicking the contextual links button in the toolbar (which looks like a pencil) will make all contextual links buttons on the page visible. Clicking this button again will toggle them to invisible.', array('!toolbar' => \Drupal::url('help.page', array('name' => 'toolbar')))) . '</li>';
       $output .= '</ol>';
       $output .= t('Once the contextual links button for the area of interest is visible, click the button to display the links.');
@@ -87,32 +86,10 @@ function contextual_help($route_name, RouteMatchInterface $route_match) {
 }
 
 /**
- * Implements hook_element_info().
- */
-function contextual_element_info() {
-  $types['contextual_links_placeholder'] = array(
-    '#pre_render' => array('contextual_pre_render_placeholder'),
-    '#id' => NULL,
-  );
-  $types['contextual_links'] = array(
-    '#pre_render' => array('contextual_pre_render_links'),
-    '#theme' => 'links__contextual',
-    '#links' => array(),
-    '#attributes' => array('class' => array('contextual-links')),
-    '#attached' => array(
-      'library' => array(
-        'contextual/drupal.contextual-links',
-      ),
-    ),
-  );
-  return $types;
-}
-
-/**
  * Implements hook_preprocess().
  *
  * @see contextual_pre_render_placeholder()
- * @see contextual_page_build()
+ * @see contextual_page_attachments()
  * @see \Drupal\contextual\ContextualController::render()
  */
 function contextual_preprocess(&$variables, $hook, $info) {
@@ -134,99 +111,14 @@ function contextual_preprocess(&$variables, $hook, $info) {
 
     // Renders a contextual links placeholder unconditionally, thus not breaking
     // the render cache. Although the empty placeholder is rendered for all
-    // users, contextual_page_build() only adds the drupal.contextual-links
-    // library for users with the 'access contextual links' permission, thus
-    // preventing unnecessary HTTP requests for users without that permission.
+    // users, contextual_page_attachments() only adds the asset library for
+    // users with the 'access contextual links' permission, thus preventing
+    // unnecessary HTTP requests for users without that permission.
     $variables['title_suffix']['contextual_links'] = array(
       '#type' => 'contextual_links_placeholder',
       '#id' => _contextual_links_to_id($element['#contextual_links']),
     );
   }
-}
-
-/**
- * Pre-render callback: Renders a contextual links placeholder into #markup.
- *
- * Renders an empty (hence invisible) placeholder div with a data-attribute that
- * contains an identifier ("contextual id"), which allows the JavaScript of the
- * drupal.contextual-links library to dynamically render contextual links.
- *
- * @param $element
- *   A structured array with #id containing a "contextual id".
- *
- * @return
- *   The passed-in element with a contextual link placeholder in '#markup'.
- *
- * @see _contextual_links_to_id()
- * @see contextual_element_info()
- */
-function contextual_pre_render_placeholder($element) {
-  $element['#markup'] = '<div' . new Attribute(array('data-contextual-id' => $element['#id'])) . '></div>';
-  return $element;
-}
-
-/**
- * Pre-render callback: Builds a renderable array for contextual links.
- *
- * @param $element
- *   A renderable array containing a #contextual_links property, which is a
- *   keyed array. Each key is the name of the group of contextual links to
- *   render (based on the 'group' key in the *.links.contextual.yml files for
- *   all enabled modules). The value contains an associative array containing
- *   the following keys:
- *   - route_parameters: The route parameters passed to the url generator.
- *   - metadata: Any additional data needed in order to alter the link.
- *   @code
- *     array('#contextual_links' => array(
- *       'block' => array(
- *         'route_parameters' => array('block' => 'system.menu-tools'),
- *       ),
- *       'menu' => array(
- *         'route_parameters' => array('menu' => 'tools'),
- *       ),
- *     ))
- *   @endcode
- *
- * @return
- *   A renderable array representing contextual links.
- *
- * @see contextual_element_info()
- */
-function contextual_pre_render_links($element) {
-  // Retrieve contextual menu links.
-  $items = array();
-
-  /** @var $contextual_links_manager \Drupal\Core\Menu\ContextualLinkManager */
-  $contextual_links_manager = \Drupal::service('plugin.manager.menu.contextual_link');
-  foreach ($element['#contextual_links'] as $group => $args) {
-    $args += array(
-      'route_parameters' => array(),
-      'metadata' => array(),
-    );
-    $items += $contextual_links_manager->getContextualLinksArrayByGroup($group, $args['route_parameters'], $args['metadata']);
-  }
-
-  // Transform contextual links into parameters suitable for links.html.twig.
-  $links = array();
-  foreach ($items as $class => $item) {
-    $class = drupal_html_class($class);
-    $links[$class] = array(
-      'title' => $item['title'],
-      'route_name' => isset($item['route_name']) ? $item['route_name'] : '',
-      'route_parameters' => isset($item['route_parameters']) ? $item['route_parameters'] : array(),
-    );
-  }
-  $element['#links'] = $links;
-
-  // Allow modules to alter the renderable contextual links element.
-  \Drupal::moduleHandler()->alter('contextual_links_view', $element, $items);
-
-  // If there are no links, tell drupal_render() to abort rendering.
-  if (empty($element['#links'])) {
-    $element['#printed'] = TRUE;
-  }
-
-  return $element;
 }
 
 /**

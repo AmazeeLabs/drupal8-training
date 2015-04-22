@@ -7,6 +7,8 @@
 
 namespace Drupal\Core\Config;
 
+use Drupal\Core\Site\Settings;
+
 /**
  * Storage to access configuration and schema in enabled extensions.
  *
@@ -23,6 +25,13 @@ class ExtensionInstallStorage extends InstallStorage {
   protected $configStorage;
 
   /**
+   * Flag to include the profile in the list of enabled modules.
+   *
+   * @var bool
+   */
+  protected $includeProfile = TRUE;
+
+  /**
    * Overrides \Drupal\Core\Config\InstallStorage::__construct().
    *
    * @param \Drupal\Core\Config\StorageInterface $config_storage
@@ -34,11 +43,15 @@ class ExtensionInstallStorage extends InstallStorage {
    * @param string $collection
    *   (optional) The collection to store configuration in. Defaults to the
    *   default collection.
+   * @param bool $include_profile
+   *   (optional) Whether to include the install profile in extensions to
+   *   search and to get overrides from.
    */
-  public function __construct(StorageInterface $config_storage, $directory = self::CONFIG_INSTALL_DIRECTORY, $collection = StorageInterface::DEFAULT_COLLECTION) {
+  public function __construct(StorageInterface $config_storage, $directory = self::CONFIG_INSTALL_DIRECTORY, $collection = StorageInterface::DEFAULT_COLLECTION, $include_profile = TRUE) {
     $this->configStorage = $config_storage;
     $this->directory = $directory;
     $this->collection = $collection;
+    $this->includeProfile = $include_profile;
   }
 
   /**
@@ -69,21 +82,24 @@ class ExtensionInstallStorage extends InstallStorage {
       $this->folders = array();
       $this->folders += $this->getComponentNames('core', array('core'));
 
+      $install_profile = Settings::get('install_profile');
       $extensions = $this->configStorage->read('core.extension');
       if (!empty($extensions['module'])) {
-        $this->folders += $this->getComponentNames('module', array_keys($extensions['module']));
+        $modules = $extensions['module'];
+        // Remove the install profile as this is handled later.
+        unset($modules[$install_profile]);
+        $this->folders += $this->getComponentNames('module', array_keys($modules));
       }
       if (!empty($extensions['theme'])) {
         $this->folders += $this->getComponentNames('theme', array_keys($extensions['theme']));
       }
 
-      // The install profile can override module default configuration. We do
-      // this by replacing the config file path from the module/theme with the
-      // install profile version if there are any duplicates.
-      $profile_folders = $this->getComponentNames('profile', array(drupal_get_profile()));
-      $folders_to_replace = array_intersect_key($profile_folders, $this->folders);
-      if (!empty($folders_to_replace)) {
-        $this->folders = array_merge($this->folders, $folders_to_replace);
+      if ($this->includeProfile) {
+        // The install profile can override module default configuration. We do
+        // this by replacing the config file path from the module/theme with the
+        // install profile version if there are any duplicates.
+        $profile_folders = $this->getComponentNames('profile', array(drupal_get_profile()));
+        $this->folders = $profile_folders + $this->folders;
       }
     }
     return $this->folders;

@@ -28,7 +28,7 @@ class UserSession implements AccountInterface {
    *
    * @var array
    */
-  protected $roles = array('anonymous');
+  protected $roles = array(AccountInterface::ANONYMOUS_ROLE);
 
   /**
    * Session ID.
@@ -126,7 +126,7 @@ class UserSession implements AccountInterface {
     $roles = $this->roles;
 
     if ($exclude_locked_roles) {
-      $roles = array_diff($roles, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID));
+      $roles = array_values(array_diff($roles, array(AccountInterface::ANONYMOUS_ROLE, AccountInterface::AUTHENTICATED_ROLE)));
     }
 
     return $roles;
@@ -183,12 +183,12 @@ class UserSession implements AccountInterface {
    * {@inheritdoc}
    */
   function getPreferredLangcode($fallback_to_default = TRUE) {
-    $language_list = language_list();
+    $language_list = \Drupal::languageManager()->getLanguages();
     if (!empty($this->preferred_langcode) && isset($language_list[$this->preferred_langcode])) {
-      return $language_list[$this->preferred_langcode]->id;
+      return $language_list[$this->preferred_langcode]->getId();
     }
     else {
-      return $fallback_to_default ? language_default()->id : '';
+      return $fallback_to_default ? \Drupal::languageManager()->getDefaultLanguage()->getId() : '';
     }
   }
 
@@ -196,12 +196,12 @@ class UserSession implements AccountInterface {
    * {@inheritdoc}
    */
   function getPreferredAdminLangcode($fallback_to_default = TRUE) {
-    $language_list = language_list();
+    $language_list = \Drupal::languageManager()->getLanguages();
     if (!empty($this->preferred_admin_langcode) && isset($language_list[$this->preferred_admin_langcode])) {
-      return $language_list[$this->preferred_admin_langcode]->id;
+      return $language_list[$this->preferred_admin_langcode]->getId();
     }
     else {
-      return $fallback_to_default ? language_default()->id : '';
+      return $fallback_to_default ? \Drupal::languageManager()->getDefaultLanguage()->getId() : '';
     }
   }
 

@@ -68,9 +68,6 @@ class Connection extends DatabaseConnection {
   public function __construct(\PDO $connection, array $connection_options) {
     parent::__construct($connection, $connection_options);
 
-    // We don't need a specific PDOStatement class here, we simulate it below.
-    $this->statementClass = NULL;
-
     // This driver defaults to transaction support, except if explicitly passed FALSE.
     $this->transactionSupport = $this->transactionalDDLSupport = !isset($connection_options['transactions']) || $connection_options['transactions'] !== FALSE;
 
@@ -122,6 +119,7 @@ class Connection extends DatabaseConnection {
     $pdo->sqliteCreateFunction('length', 'strlen', 1);
     $pdo->sqliteCreateFunction('md5', 'md5', 1);
     $pdo->sqliteCreateFunction('concat', array(__CLASS__, 'sqlFunctionConcat'));
+    $pdo->sqliteCreateFunction('concat_ws', array(__CLASS__, 'sqlFunctionConcatWs'));
     $pdo->sqliteCreateFunction('substring', array(__CLASS__, 'sqlFunctionSubstring'), 3);
     $pdo->sqliteCreateFunction('substring_index', array(__CLASS__, 'sqlFunctionSubstringIndex'), 3);
     $pdo->sqliteCreateFunction('rand', array(__CLASS__, 'sqlFunctionRand'));
@@ -200,6 +198,25 @@ class Connection extends DatabaseConnection {
   }
 
   /**
+   * SQLite compatibility implementation for the CONCAT_WS() SQL function.
+   *
+   * @see http://dev.mysql.com/doc/refman/5.6/en/string-functions.html#function_concat-ws
+   */
+  public static function sqlFunctionConcatWs() {
+    $args = func_get_args();
+    $separator = array_shift($args);
+    // If the separator is NULL, the result is NULL.
+    if ($separator === FALSE || is_null($separator)) {
+      return NULL;
+    }
+    // Skip any NULL values after the separator argument.
+    $args = array_filter($args, function ($value) {
+      return !is_null($value);
+    });
+    return implode($separator, $args);
+  }
+
+  /**
    * SQLite compatibility implementation for the SUBSTRING() SQL function.
    */
   public static function sqlFunctionSubstring($string, $from, $length) {
@@ -237,21 +254,84 @@ class Connection extends DatabaseConnection {
   /**
    * SQLite compatibility implementation for the REGEXP SQL operator.
    *
-   * The REGEXP operator is a special syntax for the regexp() user function.
+   * The REGEXP operator is natively known, but not implemented by default.
+   *
+   * @see http://www.sqlite.org/lang_expr.html#regexp
    */
-  public static function sqlFunctionRegexp($string, $pattern) {
-    return preg_match('#' . str_replace('#', '\#', $pattern) . '#i', $string);
+  public static function sqlFunctionRegexp($pattern, $subject) {
+    // preg_quote() cannot be used here, since $pattern may contain reserved
+    // regular expression characters already (such as ^, $, etc). Therefore,
+    // use a rare character as PCRE delimiter.
+    $pattern = '#' . addcslashes($pattern, '#') . '#i';
+    return preg_match($pattern, $subject);
   }
 
   /**
-   * SQLite-specific implementation of DatabaseConnection::prepare().
-   *
-   * We don't use prepared statements at all at this stage. We just create
-   * a Statement object, that will create a PDOStatement
-   * using the semi-private PDOPrepare() method below.
+   * {@inheritdoc}
    */
-  public function prepare($statement, array $driver_options = array()) {
-    return new Statement($this->connection, $this, $statement, $driver_options);
+  protected function expandArguments(&$query, &$args) {
+    $modified = parent::expandArguments($query, $args);
+
+    // The PDO SQLite driver always replaces placeholders with strings, which
+    // breaks numeric expressions (e.g., COUNT(*) >= :count). Replace numeric
+    // placeholders in the query to work around this bug.
+    // @see http://bugs.php.net/bug.php?id=45259
+    if (empty($args)) {
+      return $modified;
+    }
+    // Check if $args is a simple numeric array.
+    if (range(0, count($args) - 1) === array_keys($args)) {
+      // In that case, we have unnamed placeholders.
+      $count = 0;
+      $new_args = array();
+      foreach ($args as $value) {
+        if (is_float($value) || is_int($value) || is_numeric($value)) {
+          if (is_float($value)) {
+            // Force the conversion to float so as not to loose precision
+            // in the automatic cast.
+            $value = sprintf('%F', $value);
+          }
+          $query = substr_replace($query, $value, strpos($query, '?'), 1);
+        }
+        else {
+          $placeholder = ':db_statement_placeholder_' . $count++;
+          $query = substr_replace($query, $placeholder, strpos($query, '?'), 1);
+          $new_args[$placeholder] = $value;
+        }
+      }
+      $args = $new_args;
+      $modified = TRUE;
+    }
+    // Otherwise this is using named placeholders.
+    else {
+      foreach ($args as $placeholder => $value) {
+        if (is_float($value) || is_int($value) || is_numeric($value)) {
+          if (is_float($value)) {
+            // Force the conversion to float so as not to loose precision
+            // in the automatic cast.
+            $value = sprintf('%F', $value);
+          }
+
+          // We will remove this placeholder from the query as PDO throws an
+          // exception if the number of placeholders in the query and the
+          // arguments does not match.
+          unset($args[$placeholder]);
+          // PDO allows placeholders to not be prefixed by a colon. See
+          // http://marc.info/?l=php-internals&m=111234321827149&w=2 for
+          // more.
+          if ($placeholder[0] != ':') {
+            $placeholder = ":$placeholder";
+          }
+          // When replacing the placeholders, make sure we search for the
+          // exact placeholder. For example, if searching for
+          // ':db_placeholder_1', do not replace ':db_placeholder_11'.
+          $query = preg_replace('/' . preg_quote($placeholder, '/') . '\b/', $value, $query);
+
+          $modified = TRUE;
+        }
+      }
+    }
+    return $modified;
   }
 
   public function queryRange($query, $from, $count, array $args = array(), array $options = array()) {
@@ -336,7 +416,7 @@ class Connection extends DatabaseConnection {
     }
     // A previous rollback to an earlier savepoint may mean that the savepoint
     // in question has already been rolled back.
-    if (!in_array($savepoint_name, $this->transactionLayers)) {
+    if (!isset($this->transactionLayers[$savepoint_name])) {
       return;
     }
 

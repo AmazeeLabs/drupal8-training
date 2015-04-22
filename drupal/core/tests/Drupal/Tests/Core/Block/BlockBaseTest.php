@@ -8,7 +8,6 @@
 namespace Drupal\Tests\Core\Block;
 
 use Drupal\block_test\Plugin\Block\TestBlockInstantiation;
-use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Tests\UnitTestCase;
 
 /**
@@ -23,18 +22,11 @@ class BlockBaseTest extends UnitTestCase {
    * @see \Drupal\Core\Block\BlockBase::getMachineNameSuggestion().
    */
   public function testGetMachineNameSuggestion() {
-    $transliteration = $this->getMockBuilder('Drupal\Core\Transliteration\PHPTransliteration')
-      // @todo Inject the module handler into PHPTransliteration.
+    $module_handler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
+    $transliteration = $this->getMockBuilder('Drupal\Core\Transliteration\PhpTransliteration')
+      ->setConstructorArgs(array(NULL, $module_handler))
       ->setMethods(array('readLanguageOverrides'))
       ->getMock();
-
-    $condition_plugin_manager = $this->getMock('Drupal\Core\Executable\ExecutableManagerInterface');
-    $condition_plugin_manager->expects($this->atLeastOnce())
-      ->method('getDefinitions')
-      ->will($this->returnValue(array()));
-    $container = new ContainerBuilder();
-    $container->set('plugin.manager.condition', $condition_plugin_manager);
-    \Drupal::setContainer($container);
 
     $config = array();
     $definition = array(
@@ -53,54 +45,6 @@ class BlockBaseTest extends UnitTestCase {
     $block_base = new TestBlockInstantiation($config, 'test_block_instantiation', $definition);
     $block_base->setTransliteration($transliteration);
     $this->assertEquals('uberawesome', $block_base->getMachineNameSuggestion());
-  }
-
-  /**
-   * Tests initializing the condition plugins initialization.
-   */
-  public function testConditionsBagInitialization() {
-    $plugin_manager = $this->getMock('Drupal\Core\Executable\ExecutableManagerInterface');
-    $plugin_manager->expects($this->once())
-      ->method('getDefinitions')
-      ->will($this->returnValue(array(
-        'request_path' => array(
-          'id' => 'request_path',
-        ),
-        'user_role' => array(
-          'id' => 'user_role',
-        ),
-        'node_type' => array(
-          'id' => 'node_type',
-        ),
-        'language' => array(
-          'id' => 'language',
-        ),
-      )));
-    $container = new ContainerBuilder();
-    $container->set('plugin.manager.condition', $plugin_manager);
-    \Drupal::setContainer($container);
-    $config = array();
-    $definition = array(
-      'admin_label' => 'Admin label',
-      'provider' => 'block_test',
-    );
-
-    $block_base = new TestBlockInstantiation($config, 'test_block_instantiation', $definition);
-    $conditions_bag = $block_base->getVisibilityConditions();
-
-    $this->assertEquals(4, $conditions_bag->count(), "There are 4 condition plugins");
-
-    $instance_id = $this->randomMachineName();
-    $pages = 'node/1';
-    $condition_config = array('id' => 'request_path', 'pages' => $pages);
-    $block_base->setVisibilityConfig($instance_id, $condition_config);
-
-    $plugin_manager->expects($this->once())->method('createInstance')
-      ->withAnyParameters()->will($this->returnValue('test'));
-
-    $condition = $block_base->getVisibilityCondition($instance_id);
-
-    $this->assertEquals('test', $condition, "The correct condition is returned.");
   }
 
 }

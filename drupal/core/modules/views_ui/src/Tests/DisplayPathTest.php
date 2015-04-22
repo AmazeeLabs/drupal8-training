@@ -16,12 +16,20 @@ namespace Drupal\views_ui\Tests;
 class DisplayPathTest extends UITestBase {
 
   /**
+   * {@inheritdoc}
+   */
+  public static $modules = array('menu_ui');
+
+  /**
    * Views used by this test.
    *
    * @var array
    */
-  public static $testViews = array('test_view');
+  public static $testViews = array('test_view', 'test_page_display_menu');
 
+  /**
+   * Runs the tests.
+   */
   public function testPathUI() {
     $this->doBasicPathUITest();
     $this->doAdvancedPathsValidationTest();
@@ -40,6 +48,10 @@ class DisplayPathTest extends UITestBase {
 
     // Save a path and make sure the summary appears as expected.
     $random_path = $this->randomMachineName();
+    // @todo Once https://www.drupal.org/node/2351379 is resolved, Views will no
+    //   longer use Url::fromUri(), and this path will be able to contain ':'.
+    $random_path = str_replace(':', '', $random_path);
+
     $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => $random_path), t('Apply'));
     $this->assertText('/' . $random_path, 'The custom path appears in the summary.');
     $this->assertLink(t('View @display', array('@display' => 'Page')), 0, 'view page link found on the page.');
@@ -75,13 +87,29 @@ class DisplayPathTest extends UITestBase {
    * Tests the menu and tab option form.
    */
   public function testMenuOptions() {
-    $this->container->get('module_handler')->install(array('menu_ui'));
+    $this->container->get('module_installer')->install(array('menu_ui'));
     $this->drupalGet('admin/structure/views/view/test_view');
 
     // Add a new page display.
     $this->drupalPostForm(NULL, array(), 'Add Page');
+
+    // Add an invalid path (only fragment).
+    $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => '#foo'), t('Apply'));
+    $this->assertText('Path is empty');
+
+    // Add an invalid path with a query.
+    $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => 'foo?bar'), t('Apply'));
+    $this->assertText('No query allowed.');
+
+    // Add an invalid path with just a query.
+    $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => '?bar'), t('Apply'));
+    $this->assertText('Path is empty');
+
+    // Provide a random, valid path string.
+    $random_string = $this->randomMachineName();
+
     // Save a path.
-    $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => $this->randomString()), t('Apply'));
+    $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/path', array('path' => $random_string), t('Apply'));
     $this->drupalGet('admin/structure/views/view/test_view');
 
     $this->drupalPostForm('admin/structure/views/nojs/display/test_view/page_1/menu', array('menu[type]' => 'default tab', 'menu[title]' => 'Test tab title'), t('Apply'));
@@ -96,6 +124,25 @@ class DisplayPathTest extends UITestBase {
     $this->assertLink(t('Tab: @title', array('@title' => 'Test tab title')));
     // If it's a default tab, it should also have an additional settings link.
     $this->assertLinkByHref('admin/structure/views/nojs/display/test_view/page_1/tab_options');
+
+    // Ensure that you can select a parent in case the parent does not exist.
+    $this->drupalGet('admin/structure/views/nojs/display/test_page_display_menu/page_5/menu');
+    $this->assertResponse(200);
+    $menu_parent = $this->xpath('//select[@id="edit-menu-parent"]');
+    $menu_options = (array) $menu_parent[0]->option;
+    unset($menu_options['@attributes']);
+
+    $this->assertEqual([
+      '<User account menu>',
+      '-- My account',
+      '-- Log out',
+      '<Administration>',
+      '<Footer>',
+      '<Main navigation>',
+      '<Tools>',
+      '-- Compose tips (disabled)',
+      '-- Test menu link',
+    ], $menu_options);
   }
 
 }

@@ -20,11 +20,11 @@ class AggregatorTestRssController extends ControllerBase {
   /**
    * Generates a test feed and simulates last-modified and etags.
    *
-   * @param $use_last_modified
+   * @param bool $use_last_modified
    *   Set TRUE to send a last modified header.
-   * @param $use_etag
+   * @param bool $use_etag
    *   Set TRUE to send an etag.
-   * @param Request $request
+   * @param \Symfony\Component\HttpFoundation\Request $request
    *   Information about the current HTTP request.
    *
    * @return \Symfony\Component\HttpFoundation\Response
@@ -75,7 +75,7 @@ class AggregatorTestRssController extends ControllerBase {
    *   A response that redirects users to the test feed.
    */
   public function testRedirect() {
-    return $this->redirect('aggregator_test.feed', array(), 301);
+    return $this->redirect('aggregator_test.feed', [], [], 301);
   }
 
 }

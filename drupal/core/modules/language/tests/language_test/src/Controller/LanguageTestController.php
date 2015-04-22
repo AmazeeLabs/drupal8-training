@@ -9,6 +9,9 @@ namespace Drupal\language_test\Controller;
 
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
@@ -17,6 +20,8 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
  * Controller routines for language_test routes.
  */
 class LanguageTestController implements ContainerInjectionInterface {
+
+  use StringTranslationTrait;
 
   /**
    * The HTTP kernel service.
@@ -51,9 +56,22 @@ class LanguageTestController implements ContainerInjectionInterface {
   }
 
   /**
+   * Route entity upcasting test helper.
+   *
+   * @param \Drupal\language\ConfigurableLanguageInterface $language
+   *   The ConfigurableLanguage object from the route.
+   *
+   * @return string
+   *   Testing feedback based on (translated) entity title.
+   */
+  public function testEntity(ConfigurableLanguageInterface $configurable_language) {
+    return array('#markup' => $this->t('Loaded %label.', array('%label' => $configurable_language->label())));
+  }
+
+  /**
    * Returns links to the current page with different langcodes.
    *
-   * Using #type 'link' causes these links to be rendered with l().
+   * Using #type 'link' causes these links to be rendered with _l().
    */
   public function typeLinkActiveClass() {
     // We assume that 'en' and 'fr' have been configured.
@@ -62,7 +80,7 @@ class LanguageTestController implements ContainerInjectionInterface {
       'no_language' => array(
         '#type' => 'link',
         '#title' => t('Link to the current path with no langcode provided.'),
-        '#href' => current_path(),
+        '#url' => Url::fromRoute('<current>'),
         '#options' => array(
           'attributes' => array(
             'id' => 'no_lang_link',
@@ -73,7 +91,7 @@ class LanguageTestController implements ContainerInjectionInterface {
       'fr' => array(
         '#type' => 'link',
         '#title' => t('Link to a French version of the current path.'),
-        '#href' => current_path(),
+        '#url' => Url::fromRoute('<current>'),
         '#options' => array(
           'language' => $languages['fr'],
           'attributes' => array(
@@ -85,7 +103,7 @@ class LanguageTestController implements ContainerInjectionInterface {
       'en' => array(
         '#type' => 'link',
         '#title' => t('Link to an English version of the current path.'),
-        '#href' => current_path(),
+        '#url' => Url::fromRoute('<current>'),
         '#options' => array(
           'language' => $languages['en'],
           'attributes' => array(

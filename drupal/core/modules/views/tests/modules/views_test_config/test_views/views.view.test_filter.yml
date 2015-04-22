@@ -1,6 +1,16 @@
-base_table: views_test_data
-core: 8
+langcode: en
 status: true
+dependencies:
+  module:
+    - user
+id: test_filter
+label: 'Test filters'
+module: views
+description: ''
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -13,24 +23,22 @@ display:
       fields:
         title:
           alter:
-            ellipsis: '0'
-            word_boundary: '0'
+            ellipsis: false
+            word_boundary: false
           field: name
           id: name
           label: ''
           table: views_test_data
           plugin_id: string
-          provider: views_test_data
       filters:
         type:
           field: name
           id: test_filter
           table: views_test_data
           plugin_id: string
-          provider: views_test_data
       query:
         type: views_query
-      use_more_always: '0'
+      use_more_always: false
       style:
         type: default
       row:
@@ -39,5 +47,3 @@ display:
     display_title: Master
     id: default
     position: 0
-label: 'Test filters'
-id: test_filter

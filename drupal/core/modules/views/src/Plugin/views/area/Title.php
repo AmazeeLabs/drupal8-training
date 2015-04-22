@@ -8,7 +8,6 @@
 namespace Drupal\views\Plugin\views\area;
 
 use Drupal\Core\Form\FormStateInterface;
-use \Drupal\Core\Utility\Title as UtilityTitle;
 
 /**
  * Views area title override handler.
@@ -24,7 +23,7 @@ class Title extends AreaPluginBase {
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['title'] = array('default' => '', 'translatable' => TRUE);
+    $options['title'] = array('default' => '');
     return $options;
   }
 
@@ -36,9 +35,9 @@ class Title extends AreaPluginBase {
 
     $form['title'] = array(
       '#type' => 'textfield',
-      '#title' => t('Overridden title'),
+      '#title' => $this->t('Overridden title'),
       '#default_value' => $this->options['title'],
-      '#description' => t('Override the title of this view when it is empty. The available global tokens below can be used here.'),
+      '#description' => $this->t('Override the title of this view when it is empty. The available global tokens below can be used here.'),
     );
 
     // Don't use the AreaPluginBase tokenForm method, we don't want row tokens.
@@ -54,7 +53,7 @@ class Title extends AreaPluginBase {
     // If a title is provided, process it.
     if (!empty($this->options['title'])) {
       $value = $this->globalTokenReplace($this->options['title']);
-      $this->view->setTitle($this->sanitizeValue($value, 'xss_admin'), UtilityTitle::PASS_THROUGH);
+      $this->view->setTitle($this->sanitizeValue($value, 'xss_admin'));
     }
   }
 

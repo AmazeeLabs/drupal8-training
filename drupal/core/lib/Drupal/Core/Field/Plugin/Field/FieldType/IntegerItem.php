@@ -18,6 +18,7 @@ use Drupal\Core\TypedData\DataDefinition;
  *   id = "integer",
  *   label = @Translation("Number (integer)"),
  *   description = @Translation("This field stores a number in the database as an integer."),
+ *   category = @Translation("Number"),
  *   default_widget = "number",
  *   default_formatter = "number_integer"
  * )
@@ -30,6 +31,9 @@ class IntegerItem extends NumericItemBase {
   public static function defaultStorageSettings() {
     return array(
       'unsigned' => FALSE,
+      // Valid size property values include: 'tiny', 'small', 'medium', 'normal'
+      // and 'big'.
+      'size' => 'normal',
     ) + parent::defaultStorageSettings();
   }
 
@@ -42,9 +46,6 @@ class IntegerItem extends NumericItemBase {
       'max' => '',
       'prefix' => '',
       'suffix' => '',
-      // Valid size property values include: 'tiny', 'small', 'medium', 'normal'
-      // and 'big'.
-      'size' => 'normal',
     ) + parent::defaultFieldSettings();
   }
 
@@ -53,7 +54,8 @@ class IntegerItem extends NumericItemBase {
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
     $properties['value'] = DataDefinition::create('integer')
-      ->setLabel(t('Integer value'));
+      ->setLabel(t('Integer value'))
+      ->setRequired(TRUE);
 
     return $properties;
   }
@@ -92,7 +94,6 @@ class IntegerItem extends NumericItemBase {
       'columns' => array(
         'value' => array(
           'type' => 'int',
-          'not null' => FALSE,
           // Expose the 'unsigned' setting in the field item schema.
           'unsigned' => $field_definition->getSetting('unsigned'),
           // Expose the 'size' setting in the field item schema. For instance,

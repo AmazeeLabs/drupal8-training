@@ -20,7 +20,7 @@ class TermTranslationUITest extends ContentTranslationUITest {
   /**
    * The vocabulary used for creating terms.
    *
-   * @var \Drupal\taxonomy\Entity\Vocabulary
+   * @var \Drupal\taxonomy\VocabularyInterface
    */
   protected $vocabulary;
 
@@ -95,9 +95,9 @@ class TermTranslationUITest extends ContentTranslationUITest {
 
     // Make sure that no row was inserted for taxonomy vocabularies which do
     // not have translations enabled.
-    $rows = db_query('SELECT * FROM {content_translation}')->fetchAll();
+    $rows = db_query('SELECT tid, count(tid) AS count FROM {taxonomy_term_field_data} WHERE vid <> :vid GROUP BY tid', array(':vid' => $this->bundle))->fetchAll();
     foreach ($rows as $row) {
-      $this->assertEqual('taxonomy_term', $row->entity_type, 'Row contains a taxonomy term.');
+      $this->assertTrue($row->count < 2, 'Term does not have translations.');
     }
   }
 
@@ -105,8 +105,7 @@ class TermTranslationUITest extends ContentTranslationUITest {
    * Tests translate link on vocabulary term list.
    */
   function testTranslateLinkVocabularyAdminPage() {
-    $this->admin_user = $this->drupalCreateUser(array_merge(parent::getTranslatorPermissions(), array('access administration pages', 'administer taxonomy')));
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->drupalCreateUser(array_merge(parent::getTranslatorPermissions(), ['access administration pages', 'administer taxonomy'])));
 
     $values = array(
       'name' => $this->randomMachineName(),
@@ -138,6 +137,29 @@ class TermTranslationUITest extends ContentTranslationUITest {
     $this->assertResponse(200);
     $this->assertLinkByHref('term/' . $untranslatable_tid . '/edit');
     $this->assertNoLinkByHref('term/' . $untranslatable_tid . '/translations');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function doTestTranslationEdit() {
+    $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
+    $languages = $this->container->get('language_manager')->getLanguages();
+
+    foreach ($this->langcodes as $langcode) {
+      // We only want to test the title for non-english translations.
+      if ($langcode != 'en') {
+        $options = array('language' => $languages[$langcode]);
+        $url = $entity->urlInfo('edit-form', $options);
+        $this->drupalGet($url);
+
+        $title = t('@title [%language translation]', array(
+          '@title' => $entity->getTranslation($langcode)->label(),
+          '%language' => $languages[$langcode]->getName(),
+        ));
+        $this->assertRaw($title);
+      }
+    }
   }
 
 }

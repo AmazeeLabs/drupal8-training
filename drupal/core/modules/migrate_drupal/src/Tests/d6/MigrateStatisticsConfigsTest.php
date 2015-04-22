@@ -10,14 +10,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to statistics.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateStatisticsConfigsTest extends MigrateDrupalTestBase {
+class MigrateStatisticsConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -35,7 +35,7 @@ class MigrateStatisticsConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_statistics_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6StatisticsSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -46,13 +46,10 @@ class MigrateStatisticsConfigsTest extends MigrateDrupalTestBase {
    * Tests migration of statistics variables to statistics.settings.yml.
    */
   public function testStatisticsSettings() {
-    $config = \Drupal::config('statistics.settings');
-    $this->assertIdentical($config->get('access_log.enabled'), FALSE);
-    $this->assertIdentical($config->get('access_log.max_lifetime'), 259200);
-    $this->assertIdentical($config->get('count_content_views'), 0);
-    $this->assertIdentical($config->get('block.popular.top_day_limit'), 0);
-    $this->assertIdentical($config->get('block.popular.top_all_limit'), 0);
-    $this->assertIdentical($config->get('block.popular.top_recent_limit'), 0);
+    $config = $this->config('statistics.settings');
+    $this->assertIdentical(FALSE, $config->get('access_log.enabled'));
+    $this->assertIdentical(259200, $config->get('access_log.max_lifetime'));
+    $this->assertIdentical(0, $config->get('count_content_views'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'statistics.settings', $config->get());
   }
 

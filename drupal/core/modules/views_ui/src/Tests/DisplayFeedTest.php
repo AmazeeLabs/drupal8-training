@@ -49,7 +49,8 @@ class DisplayFeedTest extends UITestBase {
     $this->drupalGet('admin/structure/views');
     // Verify that the page lists the $view_name view.
     // Regression test: ViewListBuilder::getDisplayPaths() did not properly
-    // check whether a DisplayBag was returned in iterating over all displays.
+    // check whether a DisplayPluginCollection was returned in iterating over
+    // all displays.
     $this->assertText($view_name);
 
     // Check the attach TO interface.
@@ -58,8 +59,8 @@ class DisplayFeedTest extends UITestBase {
     // Load all the options of the checkbox.
     $result = $this->xpath('//div[@id="edit-displays"]/div');
     $options = array();
-    foreach ($result as $value) {
-      foreach ($value->input->attributes() as $attribute => $value) {
+    foreach ($result as $item) {
+      foreach ($item->input->attributes() as $attribute => $value) {
         if ($attribute == 'value') {
           $options[] = (string) $value;
         }

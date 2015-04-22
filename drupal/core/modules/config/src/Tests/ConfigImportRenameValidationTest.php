@@ -13,14 +13,14 @@ use Drupal\Component\Uuid\Php;
 use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Config\ConfigImporterException;
 use Drupal\Core\Config\StorageComparer;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests validating renamed configuration in a configuration import.
  *
  * @group config
  */
-class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
+class ConfigImportRenameValidationTest extends KernelTestBase {
 
   /**
    * Config Importer object used for testing.
@@ -34,7 +34,7 @@ class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('system', 'user', 'node', 'field', 'text', 'entity', 'config_test');
+  public static $modules = array('system', 'user', 'node', 'field', 'text', 'config_test', 'entity_reference');
 
   /**
    * {@inheritdoc}
@@ -44,6 +44,7 @@ class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
 
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
+    $this->installConfig(array('field'));
 
     // Set up the ConfigImporter object for testing.
     $storage_comparer = new StorageComparer(
@@ -55,9 +56,10 @@ class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
       $storage_comparer->createChangelist(),
       $this->container->get('event_dispatcher'),
       $this->container->get('config.manager'),
-      $this->container->get('lock'),
+      $this->container->get('lock.persistent'),
       $this->container->get('config.typed'),
       $this->container->get('module_handler'),
+      $this->container->get('module_installer'),
       $this->container->get('theme_handler'),
       $this->container->get('string_translation')
     );
@@ -120,7 +122,7 @@ class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
   public function testRenameSimpleConfigValidation() {
     $uuid = new Php();
     // Create a simple configuration with a UUID.
-    $config = \Drupal::config('config_test.new');
+    $config = $this->config('config_test.new');
     $uuid_value = $uuid->generate();
     $config->set('uuid', $uuid_value)->save();
 
@@ -130,7 +132,7 @@ class ConfigImportRenameValidationTest extends DrupalUnitTestBase {
     $config->delete();
 
     // Create another simple configuration with the same UUID.
-    $config = \Drupal::config('config_test.old');
+    $config = $this->config('config_test.old');
     $config->set('uuid', $uuid_value)->save();
 
     // Confirm that the staged configuration is detected as a rename since the

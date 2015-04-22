@@ -7,7 +7,9 @@
 
 namespace Drupal\filter\Tests;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests hooks for text formats insert/update/disable.
@@ -41,9 +43,9 @@ class FilterHooksTest extends WebTestBase {
     // Add a text format.
     $name = $this->randomMachineName();
     $edit = array();
-    $edit['format'] = drupal_strtolower($this->randomMachineName());
+    $edit['format'] = Unicode::strtolower($this->randomMachineName());
     $edit['name'] = $name;
-    $edit['roles[' . DRUPAL_ANONYMOUS_RID . ']'] = 1;
+    $edit['roles[' . RoleInterface::ANONYMOUS_ID . ']'] = 1;
     $this->drupalPostForm('admin/config/content/formats/add', $edit, t('Save configuration'));
     $this->assertRaw(t('Added text format %format.', array('%format' => $name)));
     $this->assertText('hook_filter_format_insert invoked.');
@@ -52,7 +54,7 @@ class FilterHooksTest extends WebTestBase {
 
     // Update text format.
     $edit = array();
-    $edit['roles[' . DRUPAL_AUTHENTICATED_RID . ']'] = 1;
+    $edit['roles[' . RoleInterface::AUTHENTICATED_ID . ']'] = 1;
     $this->drupalPostForm('admin/config/content/formats/manage/' . $format_id, $edit, t('Save configuration'));
     $this->assertRaw(t('The text format %format has been updated.', array('%format' => $name)));
     $this->assertText('hook_filter_format_update invoked.');
@@ -63,7 +65,7 @@ class FilterHooksTest extends WebTestBase {
     $edit['title[0][value]'] = $title;
     $edit['body[0][value]'] = $this->randomMachineName(32);
     $edit['body[0][format]'] = $format_id;
-    $this->drupalPostForm("node/add/{$type->type}", $edit, t('Save and publish'));
+    $this->drupalPostForm("node/add/{$type->id()}", $edit, t('Save and publish'));
     $this->assertText(t('@type @title has been created.', array('@type' => $type_name, '@title' => $title)));
 
     // Disable the text format.

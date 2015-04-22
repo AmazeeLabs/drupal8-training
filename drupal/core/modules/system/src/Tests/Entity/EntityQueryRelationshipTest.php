@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\system\Tests\Entity;
+use Drupal\Component\Utility\Unicode;
 
 /**
  * Tests the Entity Query relationship API.
@@ -19,7 +20,7 @@ class EntityQueryRelationshipTest extends EntityUnitTestBase  {
    *
    * @var array
    */
-  public static $modules = array('taxonomy', 'options');
+  public static $modules = array('taxonomy');
 
   /**
    * @var \Drupal\Core\Entity\Query\QueryFactory
@@ -69,18 +70,23 @@ class EntityQueryRelationshipTest extends EntityUnitTestBase  {
     // We want a taxonomy term reference field. It needs a vocabulary, terms,
     // a field storage and a field. First, create the vocabulary.
     $vocabulary = entity_create('taxonomy_vocabulary', array(
-      'vid' => drupal_strtolower($this->randomMachineName()),
+      'vid' => Unicode::strtolower($this->randomMachineName()),
     ));
     $vocabulary->save();
     // Second, create the field.
     $this->fieldName = strtolower($this->randomMachineName());
-    $field = array(
-      'name' => $this->fieldName,
+    entity_create('field_storage_config', array(
+      'field_name' => $this->fieldName,
       'entity_type' => 'entity_test',
       'type' => 'taxonomy_term_reference',
-    );
-    $field['settings']['allowed_values']['vocabulary'] = $vocabulary->id();
-    entity_create('field_storage_config', $field)->save();
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => $vocabulary->id(),
+          ),
+        ),
+      ),
+    ))->save();
     entity_test_create_bundle('test_bundle');
     // Third, create the instance.
     entity_create('field_config', array(

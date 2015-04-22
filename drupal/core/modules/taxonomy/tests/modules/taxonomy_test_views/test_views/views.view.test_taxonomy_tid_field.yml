@@ -3,12 +3,13 @@ status: true
 dependencies:
   module:
     - taxonomy
+    - user
 id: test_taxonomy_tid_field
 label: test_taxonomy_tid_field
 module: views
 description: ''
 tag: ''
-base_table: taxonomy_term_data
+base_table: taxonomy_term_field_data
 base_field: tid
 core: 8.x
 display:
@@ -17,29 +18,22 @@ display:
     id: default
     display_title: Master
     position: 0
-    provider: views
     display_options:
       access:
         type: perm
         options:
           perm: 'access content'
-        provider: user
-        dependencies: {  }
       cache:
         type: none
         options: {  }
-        provider: views
-        dependencies: {  }
       query:
         type: views_query
         options:
           disable_sql_rewrite: false
           distinct: false
           replica: false
-          query_comment: false
+          query_comment: ''
           query_tags: {  }
-        provider: views
-        dependencies: {  }
       exposed_form:
         type: basic
         options:
@@ -50,8 +44,6 @@ display:
           expose_sort_order: true
           sort_asc_label: Asc
           sort_desc_label: Desc
-        provider: views
-        dependencies: {  }
       pager:
         type: full
         options:
@@ -73,8 +65,6 @@ display:
             first: '« first'
             last: 'last »'
           quantity: 9
-        provider: views
-        dependencies: {  }
       style:
         type: default
         options:
@@ -82,8 +72,6 @@ display:
           row_class: ''
           default_row_class: true
           uses_fields: false
-        provider: views
-        dependencies: {  }
       row:
         type: fields
         options:
@@ -91,8 +79,6 @@ display:
           separator: ''
           hide_empty: false
           default_field_elements: true
-        provider: views
-        dependencies: {  }
       fields:
         name:
           id: name
@@ -101,9 +87,6 @@ display:
           relationship: none
           group_type: group
           admin_label: ''
-          dependencies:
-            module:
-              - taxonomy
           label: Name
           exclude: false
           alter:
@@ -123,7 +106,7 @@ display:
             suffix: ''
             target: ''
             nl2br: false
-            max_length: ''
+            max_length: 0
             word_boundary: true
             ellipsis: true
             more_link: false
@@ -148,29 +131,26 @@ display:
           link_to_taxonomy: true
           convert_spaces: false
           plugin_id: taxonomy
-          provider: taxonomy
+          entity_type: taxonomy_term
+          entity_field: name
       filters: {  }
       sorts:
         tid:
           id: tid
-          table: taxonomy_term_data
+          table: taxonomy_term_field_data
           field: tid
           relationship: none
           group_type: group
           admin_label: ''
-          dependencies:
-            module:
-              - views
           order: ASC
           exposed: false
           expose:
             label: ''
           plugin_id: standard
-          provider: views
+          entity_type: taxonomy_term
+          entity_field: tid
       header: {  }
       footer: {  }
       empty: {  }
       relationships: {  }
       arguments: {  }
-      field_langcode: '***LANGUAGE_language_content***'
-      field_langcode_add_to_query: null

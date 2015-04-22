@@ -12,6 +12,7 @@ use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\Query\SelectInterface;
@@ -40,6 +41,13 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
    * @var \Drupal\Core\Cache\CacheBackendInterface
    */
   protected $menuCacheBackend;
+
+  /**
+   * The cache tags invalidator.
+   *
+   * @var \Drupal\Core\Cache\CacheTagsInvalidatorInterface
+   */
+  protected $cacheTagsInvalidator;
 
   /**
    * The database table name.
@@ -109,14 +117,17 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
    *   A Database connection to use for reading and writing configuration data.
    * @param \Drupal\Core\Cache\CacheBackendInterface $menu_cache_backend
    *   Cache backend instance for the extracted tree data.
+   * @param \Drupal\Core\Cache\CacheTagsInvalidatorInterface $cache_tags_invalidator
+   *   The cache tags invalidator.
    * @param string $table
    *   A database table name to store configuration data in.
    * @param array $options
    *   (optional) Any additional database connection options to use in queries.
    */
-  public function __construct(Connection $connection, CacheBackendInterface $menu_cache_backend, $table, array $options = array()) {
+  public function __construct(Connection $connection, CacheBackendInterface $menu_cache_backend, CacheTagsInvalidatorInterface $cache_tags_invalidator, $table, array $options = array()) {
     $this->connection = $connection;
     $this->menuCacheBackend = $menu_cache_backend;
+    $this->cacheTagsInvalidator = $cache_tags_invalidator;
     $this->table = $table;
     $this->options = $options;
   }
@@ -171,20 +182,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
         $this->saveRecursive($id, $children, $links);
       }
     }
-    // Find any previously discovered menu links that no longer exist.
-    if ($definitions) {
-      $query = $this->connection->select($this->table, NULL, $this->options);
-      $query->addField($this->table, 'id');
-      $query->condition('discovered', 1);
-      $query->condition('id', array_keys($definitions), 'NOT IN');
-      // Starting from links with the greatest depth will minimize the amount
-      // of re-parenting done by the menu storage.
-      $query->orderBy('depth', 'DESC');
-      $result = $query->execute()->fetchCol();
-    }
-    else {
-      $result = array();
-    }
+    $result = $this->findNoLongerExistingLinks($definitions);
 
     // Remove all such items.
     if ($result) {
@@ -193,7 +191,8 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
     $this->resetDefinitions();
     $affected_menus = $this->getMenuNames() + $before_menus;
     // Invalidate any cache tagged with any menu name.
-    Cache::invalidateTags(array('menu' => $affected_menus));
+    $cache_tags = Cache::buildTags('config:system.menu', $affected_menus, '.');
+    $this->cacheTagsInvalidator->invalidateTags($cache_tags);
     $this->resetDefinitions();
     // Every item in the cache bin should have one of the menu cache tags but it
     // is not guaranteed, so invalidate everything in the bin.
@@ -217,9 +216,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
         }
       }
     }
-    $query = $this->connection->delete($this->table, $this->options);
-    $query->condition('id', $ids, 'IN');
-    $query->execute();
+    $this->doDeleteMultiple($ids);
   }
 
   /**
@@ -255,7 +252,8 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
   public function save(array $link) {
     $affected_menus = $this->doSave($link);
     $this->resetDefinitions();
-    Cache::invalidateTags(array('menu' => $affected_menus));
+    $cache_tags = Cache::buildTags('config:system.menu', $affected_menus, '.');
+    $this->cacheTagsInvalidator->invalidateTags($cache_tags);
     return $affected_menus;
   }
 
@@ -371,34 +369,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
     foreach ($this->serializedFields() as $name) {
       $fields[$name] = serialize($fields[$name]);
     }
-
-    // Directly fill parents for top-level links.
-    if (empty($link['parent'])) {
-      $fields['p1'] = $link['mlid'];
-      for ($i = 2; $i <= $this->maxDepth(); $i++) {
-        $fields["p$i"] = 0;
-      }
-      $fields['depth'] = 1;
-    }
-    // Otherwise, ensure that this link's depth is not beyond the maximum depth
-    // and fill parents based on the parent link.
-    else {
-      // @todo We want to also check $original['has_children'] here, but that
-      //   will be 0 even if there are children if those are not enabled.
-      //   has_children is really just the rendering hint. So, we either need
-      //   to define another column (has_any_children), or do the extra query.
-      //   https://www.drupal.org/node/2302149
-      if ($original) {
-        $limit = $this->maxDepth() - $this->doFindChildrenRelativeDepth($original) - 1;
-      }
-      else {
-        $limit = $this->maxDepth() - 1;
-      }
-      if ($parent['depth'] > $limit) {
-        throw new PluginException(String::format('The link with ID @id or its children exceeded the maximum depth of @depth', array('@id' => $link['id'], '@depth' => $this->maxDepth())));
-      }
-      $this->setParents($fields, $parent);
-    }
+    $this->setParents($fields, $parent, $original);
 
     // Need to check both parent and menu_name, since parent can be empty in any
     // menu.
@@ -429,14 +400,12 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
         $this->save($child);
       }
 
-      $this->connection->delete($this->table, $this->options)
-        ->condition('id', $id)
-        ->execute();
+      $this->doDeleteMultiple([$id]);
 
       $this->updateParentalStatus($item);
       // Many children may have moved.
       $this->resetDefinitions();
-      Cache::invalidateTags(array('menu' => $item['menu_name']));
+      $this->cacheTagsInvalidator->invalidateTags(['config:system.menu.' . $item['menu_name']]);
     }
   }
 
@@ -478,22 +447,50 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
    *
    * @param array $fields
    *   The menu link.
-   * @param array $parent
+   * @param array|false $parent
    *   The parent menu link.
+   * @param array $original
+   *   The original menu link.
    */
-  protected function setParents(array &$fields, array $parent) {
-    $fields['depth'] = $parent['depth'] + 1;
-    $i = 1;
-    while ($i < $fields['depth']) {
-      $p = 'p' . $i++;
-      $fields[$p] = $parent[$p];
+  protected function setParents(array &$fields, $parent, array $original) {
+    // Directly fill parents for top-level links.
+    if (empty($fields['parent'])) {
+      $fields['p1'] = $fields['mlid'];
+      for ($i = 2; $i <= $this->maxDepth(); $i++) {
+        $fields["p$i"] = 0;
+      }
+      $fields['depth'] = 1;
     }
-    $p = 'p' . $i++;
-    // The parent (p1 - p9) corresponding to the depth always equals the mlid.
-    $fields[$p] = $fields['mlid'];
-    while ($i <= static::MAX_DEPTH) {
+    // Otherwise, ensure that this link's depth is not beyond the maximum depth
+    // and fill parents based on the parent link.
+    else {
+      // @todo We want to also check $original['has_children'] here, but that
+      //   will be 0 even if there are children if those are not enabled.
+      //   has_children is really just the rendering hint. So, we either need
+      //   to define another column (has_any_children), or do the extra query.
+      //   https://www.drupal.org/node/2302149
+      if ($original) {
+        $limit = $this->maxDepth() - $this->doFindChildrenRelativeDepth($original) - 1;
+      }
+      else {
+        $limit = $this->maxDepth() - 1;
+      }
+      if ($parent['depth'] > $limit) {
+        throw new PluginException(String::format('The link with ID @id or its children exceeded the maximum depth of @depth', array('@id' => $fields['id'], '@depth' => $this->maxDepth())));
+      }
+      $fields['depth'] = $parent['depth'] + 1;
+      $i = 1;
+      while ($i < $fields['depth']) {
+        $p = 'p' . $i++;
+        $fields[$p] = $parent[$p];
+      }
       $p = 'p' . $i++;
-      $fields[$p] = 0;
+      // The parent (p1 - p9) corresponding to the depth always equals the mlid.
+      $fields[$p] = $fields['mlid'];
+      while ($i <= static::MAX_DEPTH) {
+        $p = 'p' . $i++;
+        $fields[$p] = 0;
+      }
     }
   }
 
@@ -823,7 +820,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
     // Build the cache ID; sort 'expanded' and 'conditions' to prevent duplicate
     // cache items.
     sort($parameters->expandedParents);
-    sort($parameters->conditions);
+    asort($parameters->conditions);
     $tree_cid = "tree-data:$menu_name:" . serialize($parameters);
     $cache = $this->menuCacheBackend->get($tree_cid);
     if ($cache && isset($cache->data)) {
@@ -837,7 +834,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
       $data['tree'] = $this->doBuildTreeData($links, $parameters->activeTrail, $parameters->minDepth);
       $data['definitions'] = array();
       $data['route_names'] = $this->collectRoutesAndDefinitions($data['tree'], $data['definitions']);
-      $this->menuCacheBackend->set($tree_cid, $data, Cache::PERMANENT, array('menu' => $menu_name));
+      $this->menuCacheBackend->set($tree_cid, $data, Cache::PERMANENT, ['config:system.menu.' . $menu_name]);
       // The definitions were already added to $this->definitions in
       // $this->doBuildTreeData()
       unset($data['definitions']);
@@ -1276,7 +1273,7 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
           'not null' => FALSE,
         ),
         'options' => array(
-          'description' => 'A serialized array of options to be passed to the url() or l() function, such as a query string or HTML attributes.',
+          'description' => 'A serialized array of URL options, such as a query string or HTML attributes.',
           'type' => 'blob',
           'size' => 'big',
           'not null' => FALSE,
@@ -1438,6 +1435,43 @@ class MenuTreeStorage implements MenuTreeStorageInterface {
     );
 
     return $schema;
+  }
+
+  /**
+   * Find any previously discovered menu links that no longer exist.
+   *
+   * @param array $definitions
+   *   The new menu link definitions.
+   * @return array
+   *   A list of menu link IDs that no longer exist.
+   */
+  protected function findNoLongerExistingLinks(array $definitions) {
+    if ($definitions) {
+      $query = $this->connection->select($this->table, NULL, $this->options);
+      $query->addField($this->table, 'id');
+      $query->condition('discovered', 1);
+      $query->condition('id', array_keys($definitions), 'NOT IN');
+      // Starting from links with the greatest depth will minimize the amount
+      // of re-parenting done by the menu storage.
+      $query->orderBy('depth', 'DESC');
+      $result = $query->execute()->fetchCol();
+    }
+    else {
+      $result = array();
+    }
+    return $result;
+  }
+
+  /**
+   * Purge menu links from the database.
+   *
+   * @param array $ids
+   *   A list of menu link IDs to be purged.
+   */
+  protected function doDeleteMultiple(array $ids) {
+    $this->connection->delete($this->table, $this->options)
+      ->condition('id', $ids, 'IN')
+      ->execute();
   }
 
 }

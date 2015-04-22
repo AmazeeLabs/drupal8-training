@@ -27,27 +27,36 @@ class EntityLink extends FieldPluginBase {
    */
   protected $build;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['teaser'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['teaser'] = array('default' => FALSE);
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['teaser'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Show teaser-style link'),
+      '#title' => $this->t('Show teaser-style link'),
       '#default_value' => $this->options['teaser'],
-      '#description' => t('Show the comment link in the form used on standard entity teasers, rather than the full entity form.'),
+      '#description' => $this->t('Show the comment link in the form used on standard entity teasers, rather than the full entity form.'),
     );
 
     parent::buildOptionsForm($form, $form_state);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {}
 
   /**
-   * Implements \Drupal\views\Plugin\views\field\FieldPluginBase::pre_render().
+   * {@inheritdoc}
    */
   public function preRender(&$values) {
     // Render all nodes, so you can grep the comment links.

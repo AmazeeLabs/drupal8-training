@@ -6,8 +6,10 @@
  */
 
 use Drupal\block\BlockInterface;
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageInterface;
 use Drupal\system\Entity\Menu;
 use Drupal\block\Entity\Block;
 
@@ -23,9 +25,9 @@ function block_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Placing and moving blocks') . '</dt>';
-      $output .= '<dd>' . t('You can place a block by clicking on its title in the in the <em>Place blocks</em> list on the <a href="!blocks">Block layout page</a>. You can then choose the appropriate region from the <em>Region</em> dropdown menu. Once a block has been placed, it can also be moved to a different region by chosing a region from the <em>Region</em> dropdown menu on the Block layout page, or by dragging and dropping it to the right posititon.', array('!blocks' => \Drupal::url('block.admin_display'))) . '</dd>';
+      $output .= '<dd>' . t('You can place a block by clicking on its title in the <em>Place blocks</em> list on the <a href="!blocks">Block layout page</a>. You can then choose the appropriate region from the <em>Region</em> dropdown menu. Once a block has been placed, it can also be moved to a different region by choosing a region from the <em>Region</em> dropdown menu on the Block layout page, or by dragging and dropping it to the right position.', array('!blocks' => \Drupal::url('block.admin_display'))) . '</dd>';
       $output .= '<dt>' . t('Demonstrating block regions for a theme') . '</dt>';
-      $output .= '<dd>' . t('You can see which region is where in a theme by clicking an the <em>Demonstrate block regions</em> link on the <a href="!blocks">Block layout page</a>. Regions are specific to each theme, so you need to toggle to a different theme first to demonstrate its block regions.', array('!blocks' => \Drupal::url('block.admin_display'))) . '</dd>';
+      $output .= '<dd>' . t('You can see which region is where in a theme by clicking on the <em>Demonstrate block regions</em> link on the <a href="!blocks">Block layout page</a>. Regions are specific to each theme, so you need to toggle to a different theme first to demonstrate its block regions.', array('!blocks' => \Drupal::url('block.admin_display'))) . '</dd>';
       $output .= '<dt>' . t('Toggling between different themes') . '</dt>';
       $output .= '<dd>' . t('Blocks are placed and configured specifically for each theme. The Block layout page opens with the default theme, but you can toggle to other installed themes.') . '</dd>';
       $output .= '<dt>' . t('Configuring block settings') . '</dt>';
@@ -33,15 +35,15 @@ function block_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<dt>' . t('Controlling visibility') . '</dt>';
       $output .= '<dd>' . t('You can control the visibility of a block by restricting it to specific pages, content types, and/or roles by setting the appropriate options under <em>Visibility settings</em> of the block configuration.') . '</dd>';
       $output .= '<dt>' . t('Adding custom blocks') . '</dt>';
-      $output .= '<dd>' . t('You can add custom blocks, if the the <em>Custom Block</em> module is enabled on the <a href="!extend">Extend page</a>. For more information, see the <a href="!blockcontent-help">Custom Block help page</a>.', array('!extend' => \Drupal::url('system.modules_list'), '!blockcontent-help' => \Drupal::url('help.page', array('name' => 'block_content')))) . '</dd>';
+      $output .= '<dd>' . t('You can add custom blocks, if the <em>Custom Block</em> module is installed on the <a href="!extend">Extend page</a>. For more information, see the <a href="!blockcontent-help">Custom Block help page</a>.', array('!extend' => \Drupal::url('system.modules_list'), '!blockcontent-help' => \Drupal::url('help.page', array('name' => 'block_content')))) . '</dd>';
       $output .= '</dl>';
       return $output;
   }
   if ($route_name == 'block.admin_display' || $route_name == 'block.admin_display_theme') {
     $demo_theme = $route_match->getParameter('theme') ?: \Drupal::config('system.theme')->get('default');
-    $themes = list_themes();
+    $themes = \Drupal::service('theme_handler')->listInfo();
     $output = '<p>' . t('This page provides a drag-and-drop interface for adding a block to a region, and for controlling the order of blocks within regions. To add a block to a region, or to configure its specific title and visibility settings, click the block title under <em>Place blocks</em>. Since not all themes implement the same regions, or display regions in the same way, blocks are positioned on a per-theme basis. Remember that your changes will not be saved until you click the <em>Save blocks</em> button at the bottom of the page.') . '</p>';
-    $output .= '<p>' . l(t('Demonstrate block regions (!theme)', array('!theme' => $themes[$demo_theme]->info['name'])), 'admin/structure/block/demo/' . $demo_theme) . '</p>';
+    $output .= '<p>' . \Drupal::l(t('Demonstrate block regions (@theme)', array('@theme' => $themes[$demo_theme]->info['name'])), new Url('block.admin_demo', array('theme' => $demo_theme))) . '</p>';
     return $output;
   }
 }
@@ -53,49 +55,31 @@ function block_theme() {
   return array(
     'block' => array(
       'render element' => 'elements',
-      'template' => 'block',
     ),
     'block_list' => array(
       'render element' => 'form',
-      'template' => 'block-list',
     ),
   );
 }
 
 /**
- * Implements hook_page_build().
- *
- * Renders blocks into their regions.
+ * Implements hook_page_top().
  */
-function block_page_build(&$page) {
-  $theme = \Drupal::theme()->getActiveTheme()->getName();
-
-  // Fetch a list of regions for the current theme.
-  $all_regions = system_region_list($theme);
-  if (\Drupal::routeMatch()->getRouteName() != 'block.admin_demo') {
-    // Create a full page display variant, which will load blocks into their
-    // regions.
-    $page += \Drupal::service('plugin.manager.display_variant')
-      ->createInstance('full_page')
-      ->build();
-  }
-  else {
-    // Append region description if we are rendering the regions demo page.
-    $visible_regions = array_keys(system_region_list($theme, REGIONS_VISIBLE));
-    foreach ($visible_regions as $region) {
-      $description = '<div class="block-region">' . $all_regions[$region] . '</div>';
-      $page[$region]['block_description'] = array(
-        '#markup' => $description,
-        '#weight' => 15,
-      );
-    }
-    $page['page_top']['backlink'] = array(
+function block_page_top(array &$page_top) {
+  if (\Drupal::routeMatch()->getRouteName() === 'block.admin_demo') {
+    $theme = \Drupal::theme()->getActiveTheme()->getName();
+    $page_top['backlink'] = array(
       '#type' => 'link',
       '#title' => t('Exit block region demonstration'),
-      '#href' => 'admin/structure/block' . (\Drupal::config('system.theme')->get('default') == $theme ? '' : '/list/' . $theme),
       '#options' => array('attributes' => array('class' => array('block-demo-backlink'))),
       '#weight' => -10,
     );
+    if (\Drupal::config('system.theme')->get('default') == $theme) {
+      $page_top['backlink']['#url'] = Url::fromRoute('block.admin_display');
+    }
+    else {
+      $page_top['backlink']['#url'] = Url::fromRoute('block.admin_display_theme', ['theme' => $theme]);
+    }
   }
 }
 
@@ -120,18 +104,18 @@ function _block_rehash($theme = NULL) {
       unset($blocks[$block_id]);
       continue;
     }
-    $region = $block->get('region');
+    $region = $block->getRegion();
     $status = $block->status();
     // Disable blocks in invalid regions.
     if (!empty($region) && $region != BlockInterface::BLOCK_REGION_NONE && !isset($regions[$region]) && $status) {
       drupal_set_message(t('The block %info was assigned to the invalid region %region and has been disabled.', array('%info' => $block_id, '%region' => $region)), 'warning');
-      // Disabled modules are moved into the BlockInterface::BLOCK_REGION_NONE
+      // Disabled blocks are moved into the BlockInterface::BLOCK_REGION_NONE
       // later so no need to move the block to another region.
       $block->disable()->save();
     }
     // Set region to none if not enabled.
     if (!$status && $region != BlockInterface::BLOCK_REGION_NONE) {
-      $block->set('region', BlockInterface::BLOCK_REGION_NONE);
+      $block->setRegion(BlockInterface::BLOCK_REGION_NONE);
       $block->save();
     }
   }
@@ -176,13 +160,11 @@ function block_theme_initialize($theme) {
       else {
         $id = $theme . '_' . $default_theme_block_id;
       }
-      $block = $default_theme_block->createDuplicate();
-      $block->set('id', $id);
-      $block->set('theme', $theme);
+      $block = $default_theme_block->createDuplicateBlock($id, $theme);
       // If the region isn't supported by the theme, assign the block to the
       // theme's default region.
-      if (!isset($regions[$block->get('region')])) {
-        $block->set('region', system_default_region($theme));
+      if (!isset($regions[$block->getRegion()])) {
+        $block->setRegion(system_default_region($theme));
       }
       $block->save();
     }
@@ -193,7 +175,7 @@ function block_theme_initialize($theme) {
  * Implements hook_rebuild().
  */
 function block_rebuild() {
-  foreach (list_themes() as $name => $data) {
+  foreach (\Drupal::service('theme_handler')->listInfo() as $name => $data) {
     if ($data->status) {
       _block_rehash($name);
     }
@@ -265,12 +247,12 @@ function template_preprocess_block(&$variables) {
 
   // Create a valid HTML ID and make sure it is unique.
   if (!empty($variables['elements']['#id'])) {
-    $variables['attributes']['id'] = drupal_html_id('block-' . $variables['elements']['#id']);
+    $variables['attributes']['id'] = Html::getUniqueId('block-' . $variables['elements']['#id']);
   }
 
   // Proactively add aria-describedby if possible to improve accessibility.
   if ($variables['label'] && isset($variables['attributes']['role'])) {
-    $variables['title_attributes']['id'] = drupal_html_id($variables['label']);
+    $variables['title_attributes']['id'] = Html::getUniqueId($variables['label']);
     $variables['attributes']['aria-describedby'] = $variables['title_attributes']['id'];
   }
 
@@ -299,7 +281,7 @@ function block_user_role_delete($role) {
 function block_menu_delete(Menu $menu) {
   if (!$menu->isSyncing()) {
     foreach (Block::loadMultiple() as $block) {
-      if ($block->get('plugin') == 'system_menu_block:' . $menu->id()) {
+      if ($block->getPluginId() == 'system_menu_block:' . $menu->id()) {
         $block->delete();
       }
     }
@@ -311,14 +293,14 @@ function block_menu_delete(Menu $menu) {
  *
  * Delete the potential block visibility settings of the deleted language.
  */
-function block_configurable_language_delete(ConfigurableLanguage $language) {
+function block_configurable_language_delete(ConfigurableLanguageInterface $language) {
   // Remove the block visibility settings for the deleted language.
   foreach (Block::loadMultiple() as $block) {
     /** @var $block \Drupal\block\BlockInterface */
     $visibility = $block->getVisibility();
     if (isset($visibility['language']['langcodes'][$language->id()])) {
       unset($visibility['language']['langcodes'][$language->id()]);
-      $block->getPlugin()->setVisibilityConfig('language', $visibility['language']);
+      $block->setVisibilityConfig('language', $visibility['language']);
       $block->save();
     }
   }

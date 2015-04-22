@@ -16,6 +16,9 @@ use Drupal\Tests\Core\Menu\LocalTaskIntegrationTest;
  */
 class AggregatorLocalTasksTest extends LocalTaskIntegrationTest {
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     $this->directoryList = array('aggregator' => 'core/modules/aggregator');
     parent::setUp();
@@ -49,7 +52,7 @@ class AggregatorLocalTasksTest extends LocalTaskIntegrationTest {
    */
   public function testAggregatorSourceLocalTasks($route) {
     $this->assertLocalTasks($route, array(
-      0 => array('entity.aggregator_feed.canonical', 'entity.aggregator_feed.edit_form'),
+      0 => array('entity.aggregator_feed.canonical', 'entity.aggregator_feed.edit_form', 'entity.aggregator_feed.delete_form'),
     ));
     ;
   }

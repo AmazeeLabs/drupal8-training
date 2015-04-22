@@ -30,9 +30,18 @@ class DrupalKernelTest extends KernelTestBase {
     $this->settingsSet('php_storage', array('service_container' => array(
       'bin' => 'service_container',
       'class' => 'Drupal\Component\PhpStorage\MTimeProtectedFileStorage',
-      'directory' => DRUPAL_ROOT . '/' . $this->public_files_directory . '/php',
+      'directory' => DRUPAL_ROOT . '/' . $this->publicFilesDirectory . '/php',
       'secret' => Settings::getHashSalt(),
     )));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function prepareConfigDirectories() {
+    \Drupal::setContainer($this->originalContainer);
+    parent::prepareConfigDirectories();
+    \Drupal::unsetContainer();
   }
 
   /**
@@ -52,8 +61,9 @@ class DrupalKernelTest extends KernelTestBase {
    */
   protected function getTestKernel(Request $request, array $modules_enabled = NULL, $read_only = FALSE) {
     // Manually create kernel to avoid replacing settings.
-    $class_loader = require DRUPAL_ROOT . '/core/vendor/autoload.php';
+    $class_loader = require DRUPAL_ROOT . '/autoload.php';
     $kernel = DrupalKernel::createFromRequest($request, $class_loader, 'testing');
+    $this->settingsSet('container_yamls', []);
     $this->settingsSet('hash_salt', $this->databasePrefix);
     if (isset($modules_enabled)) {
       $kernel->updateModules($modules_enabled);
@@ -71,7 +81,7 @@ class DrupalKernelTest extends KernelTestBase {
   /**
    * Tests DIC compilation.
    */
-  function testCompileDIC() {
+  public function testCompileDIC() {
     // @todo: write a memory based storage backend for testing.
     $modules_enabled = array(
       'system' => 'system',
@@ -79,9 +89,7 @@ class DrupalKernelTest extends KernelTestBase {
     );
 
     $request = Request::createFromGlobals();
-    $this->getTestKernel($request, $modules_enabled)
-      // Trigger Kernel dump.
-      ->getContainer();
+    $this->getTestKernel($request, $modules_enabled);
 
     // Instantiate it a second time and we should get the compiled Container
     // class.
@@ -153,6 +161,30 @@ class DrupalKernelTest extends KernelTestBase {
       'pathname' => drupal_get_filename('module', 'service_provider_test'),
       'filename' => NULL,
     ));
+  }
+
+  /**
+   * Test repeated loading of compiled DIC with different environment.
+   */
+  public function testRepeatedBootWithDifferentEnvironment() {
+    $request = Request::createFromGlobals();
+    $class_loader = require DRUPAL_ROOT . '/autoload.php';
+
+    $environments = [
+      'testing1',
+      'testing1',
+      'testing2',
+      'testing2',
+    ];
+
+    foreach ($environments as $environment) {
+      $kernel = DrupalKernel::createFromRequest($request, $class_loader, $environment);
+      $this->settingsSet('container_yamls', []);
+      $this->settingsSet('hash_salt', $this->databasePrefix);
+      $kernel->boot();
+    }
+
+    $this->pass('Repeatedly loaded compiled DIC with different environment');
   }
 
 }

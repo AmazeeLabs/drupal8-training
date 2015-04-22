@@ -10,7 +10,7 @@ namespace Drupal\views\Tests;
 use Drupal\Core\Database\Query\SelectInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\ViewsBundle;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -22,7 +22,9 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @see \Drupal\views\Tests\ViewTestBase
  */
-abstract class ViewUnitTestBase extends DrupalUnitTestBase {
+abstract class ViewUnitTestBase extends KernelTestBase {
+
+  use ViewResultAssertionTrait;
 
   /**
    * Modules to enable.
@@ -34,6 +36,7 @@ abstract class ViewUnitTestBase extends DrupalUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
+    $this->installSchema('system', array('router', 'sequences'));
     $this->setUpFixtures();
   }
 
@@ -44,6 +47,10 @@ abstract class ViewUnitTestBase extends DrupalUnitTestBase {
    * using it, it cannot be enabled normally.
    */
   protected function setUpFixtures() {
+    // First install the system module. Many Views have Page displays have menu
+    // links, and for those to work, the system menus must already be present.
+    $this->installConfig(array('system'));
+
     // Define the schema and views data variable before enabling the test module.
     \Drupal::state()->set('views_test_data_schema', $this->schemaDefinition());
     \Drupal::state()->set('views_test_data_views_data', $this->viewsData());
@@ -53,8 +60,7 @@ abstract class ViewUnitTestBase extends DrupalUnitTestBase {
       $this->installSchema('views_test_data', $table);
     }
 
-    // The router table is required for router rebuilds.
-    $this->installSchema('system', array('router'));
+    \Drupal::service('router.builder')->rebuild();
 
     // Load the test dataset.
     $data_set = $this->dataSet();
@@ -65,126 +71,7 @@ abstract class ViewUnitTestBase extends DrupalUnitTestBase {
     }
     $query->execute();
 
-    // Tests implementing ViewUnitTestBase depend on the theme system being
-    // properly configured.
-    $this->installConfig(array('system'));
     ViewTestData::createTestViews(get_class($this), array('views_test_config'));
-  }
-
-  /**
-   * Verifies that a result set returned by a View matches expected values.
-   *
-   * The comparison is done on the string representation of the columns of the
-   * column map, taking the order of the rows into account, but not the order
-   * of the columns.
-   *
-   * @param \Drupal\views\ViewExecutable $view
-   *   An executed View.
-   * @param array $expected_result
-   *   An expected result set.
-   * @param array $column_map
-   *   (optional) An associative array mapping the columns of the result set
-   *   from the view (as keys) and the expected result set (as values).
-   * @param string $message
-   *   (optional) A custom message to display with the assertion. Defaults to
-   *   'Identical result set.'
-   *
-   * @return bool
-   *   TRUE if the assertion succeeded, or FALSE otherwise.
-   */
-  protected function assertIdenticalResultset($view, $expected_result, $column_map = array(), $message = NULL) {
-    return $this->assertIdenticalResultsetHelper($view, $expected_result, $column_map, 'assertIdentical', $message);
-  }
-
-  /**
-   * Verifies that a result set returned by a View differs from certain values.
-   *
-   * Inverse of ViewsTestCase::assertIdenticalResultset().
-   *
-   * @param \Drupal\views\ViewExecutable $view
-   *   An executed View.
-   * @param array $expected_result
-   *   An expected result set.
-   * @param array $column_map
-   *   (optional) An associative array mapping the columns of the result set
-   *  from the view (as keys) and the expected result set (as values).
-   * @param string $message
-   *   (optional) A custom message to display with the assertion. Defaults to
-   *   'Non-identical result set.'
-   *
-   * @return bool
-   *   TRUE if the assertion succeeded, or FALSE otherwise.
-   */
-  protected function assertNotIdenticalResultset($view, $expected_result, $column_map = array(), $message = NULL) {
-    return $this->assertIdenticalResultsetHelper($view, $expected_result, $column_map, 'assertNotIdentical', $message);
-  }
-
-  /**
-   * Performs View result assertions.
-   *
-   * This is a helper method for ViewTestBase::assertIdenticalResultset() and
-   * ViewTestBase::assertNotIdenticalResultset().
-   *
-   * @param \Drupal\views\ViewExecutable $view
-   *   An executed View.
-   * @param array $expected_result
-   *   An expected result set.
-   * @param array $column_map
-   *   An associative array mapping the columns of the result set
-   *   from the view (as keys) and the expected result set (as values).
-   * @param string $assert_method
-   *   The TestBase assertion method to use (either 'assertIdentical' or
-   *   'assertNotIdentical').
-   * @param string $message
-   *   (optional) The message to display with the assertion.
-   *
-   * @return bool
-   *   TRUE if the assertion succeeded, or FALSE otherwise.
-   *
-   * @see \Drupal\views\Tests\ViewTestBase::assertIdenticalResultset()
-   * @see \Drupal\views\Tests\ViewTestBase::assertNotIdenticalResultset()
-   */
-  protected function assertIdenticalResultsetHelper($view, $expected_result, $column_map, $assert_method, $message = NULL) {
-    // Convert $view->result to an array of arrays.
-    $result = array();
-    foreach ($view->result as $key => $value) {
-      $row = array();
-      foreach ($column_map as $view_column => $expected_column) {
-        // The comparison will be done on the string representation of the value.
-        $row[$expected_column] = (string) $value->$view_column;
-      }
-      $result[$key] = $row;
-    }
-
-    // Remove the columns we don't need from the expected result.
-    foreach ($expected_result as $key => $value) {
-      $row = array();
-      foreach ($column_map as $expected_column) {
-        // The comparison will be done on the string representation of the value.
-        $row[$expected_column] = (string) (is_object($value) ? $value->$expected_column : $value[$expected_column]);
-      }
-      $expected_result[$key] = $row;
-    }
-
-    $this->verbose('<pre style="white-space: pre-wrap;">'
-      . "\n\nQuery:\n" . $view->build_info['query']
-      . "\n\nQuery arguments:\n" . var_export($view->build_info['query_args'], TRUE)
-      . "\n\nActual result:\n" . var_export($result, TRUE)
-      . "\n\nExpected result:\n" . var_export($expected_result, TRUE));
-
-    // Reset the numbering of the arrays.
-    $result = array_values($result);
-    $expected_result = array_values($expected_result);
-
-    // Do the actual comparison.
-    if (!isset($message)) {
-      $not = (strpos($assert_method, 'Not') ? 'not' : '');
-      $message = format_string("Actual result <pre>\n@actual\n</pre> is $not identical to expected <pre>\n@expected\n</pre>", array(
-        '@actual' => var_export($result, TRUE),
-        '@expected' => var_export($expected_result, TRUE),
-      ));
-    }
-    return $this->$assert_method($result, $expected_result, $message);
   }
 
   /**

@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\Field;
 
-use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\TypedData\ListDataDefinitionInterface;
 
 /**
@@ -76,13 +76,39 @@ interface FieldDefinitionInterface extends ListDataDefinitionInterface {
   public function getType();
 
   /**
-   * Gets the bundle the field is defined for.
+   * Returns the ID of the entity type the field is attached to.
+   *
+   * This method should not be confused with EntityInterface::getEntityTypeId()
+   * (configurable fields are config entities, and thus implement both
+   * interfaces):
+   *   - FieldDefinitionInterface::getTargetEntityTypeId() answers "as a field,
+   *     which entity type are you attached to?".
+   *   - EntityInterface::getEntityTypeId() answers "as a (config) entity, what
+   *     is your own entity type?".
+   *
+   * @return string
+   *   The entity type ID.
+   */
+  public function getTargetEntityTypeId();
+
+  /**
+   * Gets the bundle the field is attached to.
+   *
+   * This method should not be confused with EntityInterface::bundle()
+   * (configurable fields are config entities, and thus implement both
+   * interfaces):
+   *   - FieldDefinitionInterface::getTargetBundle() answers "as a field,
+   *     which bundle are you attached to?".
+   *   - EntityInterface::bundle() answers "as a (config) entity, what
+   *     is your own bundle?" (not relevant in our case, the config entity types
+   *     used to store the definitions of configurable fields do not have
+   *     bundles).
    *
    * @return string|null
    *   The bundle the field is defined for, or NULL if it is a base field; i.e.,
    *   it is not bundle-specific.
    */
-  public function getBundle();
+  public function getTargetBundle();
 
   /**
    * Returns whether the display for the field can be configured.
@@ -133,33 +159,35 @@ interface FieldDefinitionInterface extends ListDataDefinitionInterface {
   public function getDisplayOptions($display_context);
 
   /**
-   * Returns whether at least one non-empty item is required for this field.
+   * Returns whether the field can be empty.
    *
-   * Currently, required-ness is only enforced at the Form API level in entity
-   * edit forms, not during direct API saves.
+   * If a field is required, an entity needs to have at least a valid,
+   * non-empty item in that field's FieldItemList in order to pass validation.
+   *
+   * An item is considered empty if its isEmpty() method returns TRUE.
+   * Typically, that is if at least one of its required properties is empty.
    *
    * @return bool
    *   TRUE if the field is required.
+   *
+   * @see \Drupal\Core\TypedData\Plugin\DataType\ItemList::isEmpty()
+   * @see \Drupal\Core\Field\FieldItemInterface::isEmpty()
+   * @see \Drupal\Core\TypedData\DataDefinitionInterface:isRequired()
+   * @see \Drupal\Core\TypedData\TypedDataManager::getDefaultConstraints()
    */
   public function isRequired();
 
   /**
    * Returns the default value for the field in a newly created entity.
    *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The entity for which the default value is generated.
    *
-   * @return mixed
-   *   The default value for the field, as accepted by
-   *   \Drupal\field\Plugin\Core\Entity\FieldItemListInterface::setValue(). This
-   *   can be either:
-   *   - a literal, in which case it will be assigned to the first property of
-   *     the first item.
-   *   - a numerically indexed array of items, each item being a property/value
-   *     array.
-   *   - NULL or array() for no default value.
+   * @return array
+   *   The default value for the field, as a numerically indexed array of items,
+   *   each item being a property/value array (array() for no default value).
    */
-  public function getDefaultValue(ContentEntityInterface $entity);
+  public function getDefaultValue(FieldableEntityInterface $entity);
 
   /**
    * Returns whether the field is translatable.

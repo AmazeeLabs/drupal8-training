@@ -20,9 +20,9 @@ class SearchMultilingualEntityTest extends SearchTestBase {
   /**
    * List of searchable nodes.
    *
-   * @var array
+   * @var \Drupal\node\NodeInterface[]
    */
-  protected $searchable_nodes = array();
+  protected $searchableNodes = array();
 
   /**
    * Node search plugin.
@@ -42,13 +42,14 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     $this->drupalLogin($user);
 
     // Make sure that auto-cron is disabled.
-    \Drupal::config('system.cron')->set('threshold.autorun', 0)->save();
+    $this->config('system.cron')->set('threshold.autorun', 0)->save();
 
     // Set up the search plugin.
     $this->plugin = $this->container->get('plugin.manager.search')->createInstance('node_search');
 
     // Check indexing counts before adding any nodes.
     $this->assertIndexCounts(0, 0, 'before adding nodes');
+    $this->assertDatabaseCounts(0, 0, 'before adding nodes');
 
     // Add two new languages.
     ConfigurableLanguage::createFromLangcode('hu')->save();
@@ -58,7 +59,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // definition. The parent class has already created the article and page
     // content types.
     $field_storage = FieldStorageConfig::loadByName('node', 'body');
-    $field_storage->translatable = TRUE;
+    $field_storage->setTranslatable(TRUE);
     $field_storage->save();
 
     // Create a few page nodes with multilingual body values.
@@ -96,25 +97,26 @@ class SearchMultilingualEntityTest extends SearchTestBase {
       array(
       ),
     );
-    $this->searchable_nodes = array();
+    $this->searchableNodes = array();
     foreach ($nodes as $setting) {
-      $this->searchable_nodes[] = $this->drupalCreateNode($setting);
+      $this->searchableNodes[] = $this->drupalCreateNode($setting);
     }
 
     // Add a single translation to the second node.
-    $translation = $this->searchable_nodes[1]->addTranslation('hu', array('title' => 'Second node hu'));
+    $translation = $this->searchableNodes[1]->addTranslation('hu', array('title' => 'Second node hu'));
     $translation->body->value = $this->randomMachineName(32);
-    $this->searchable_nodes[1]->save();
+    $this->searchableNodes[1]->save();
 
     // Add two translations to the third node.
-    $translation = $this->searchable_nodes[2]->addTranslation('hu', array('title' => 'Third node this is the Hungarian title'));
+    $translation = $this->searchableNodes[2]->addTranslation('hu', array('title' => 'Third node this is the Hungarian title'));
     $translation->body->value = $this->randomMachineName(32);
-    $translation = $this->searchable_nodes[2]->addTranslation('sv', array('title' => 'Third node sv'));
+    $translation = $this->searchableNodes[2]->addTranslation('sv', array('title' => 'Third node sv'));
     $translation->body->value = $this->randomMachineName(32);
-    $this->searchable_nodes[2]->save();
+    $this->searchableNodes[2]->save();
 
     // Verify that we have 8 nodes left to do.
     $this->assertIndexCounts(8, 8, 'before updating the search index');
+    $this->assertDatabaseCounts(0, 0, 'before updating the search index');
   }
 
   /**
@@ -123,7 +125,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
   function testMultilingualSearch() {
     // Index only 2 nodes per cron run. We cannot do this setting in the UI,
     // because it doesn't go this low.
-    \Drupal::config('search.settings')->set('index.cron_limit', 2)->save();
+    $this->config('search.settings')->set('index.cron_limit', 2)->save();
     // Get a new search plugin, to make sure it has this setting.
     $this->plugin = $this->container->get('plugin.manager.search')->createInstance('node_search');
 
@@ -134,17 +136,27 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // function manually is needed to finish the indexing process.
     search_update_totals();
     $this->assertIndexCounts(6, 8, 'after updating partially');
+    $this->assertDatabaseCounts(2, 0, 'after updating partially');
 
     // Now index the rest of the nodes.
     // Make sure index throttle is high enough, via the UI.
     $this->drupalPostForm('admin/config/search/pages', array('cron_limit' => 20), t('Save configuration'));
-    $this->assertEqual(20, \Drupal::config('search.settings')->get('index.cron_limit', 100), 'Config setting was saved correctly');
+    $this->assertEqual(20, $this->config('search.settings')->get('index.cron_limit', 100), 'Config setting was saved correctly');
     // Get a new search plugin, to make sure it has this setting.
     $this->plugin = $this->container->get('plugin.manager.search')->createInstance('node_search');
 
     $this->plugin->updateIndex();
     search_update_totals();
     $this->assertIndexCounts(0, 8, 'after updating fully');
+    $this->assertDatabaseCounts(8, 0, 'after updating fully');
+
+    // Click the reindex button on the admin page, verify counts, and reindex.
+    $this->drupalPostForm('admin/config/search/pages', array(), t('Re-index site'));
+    $this->drupalPostForm(NULL, array(), t('Re-index site'));
+    $this->assertIndexCounts(8, 8, 'after reindex');
+    $this->assertDatabaseCounts(8, 0, 'after reindex');
+    $this->plugin->updateIndex();
+    search_update_totals();
 
     // Test search results.
 
@@ -184,7 +196,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
 
     // Mark one of the nodes for reindexing, using the API function, and
     // verify indexing status.
-    search_reindex($this->searchable_nodes[0]->id(), 'node_search');
+    search_mark_for_reindex('node_search', $this->searchableNodes[0]->id());
     $this->assertIndexCounts(1, 8, 'after marking one node to reindex via API function');
 
     // Update the index and verify the totals again.
@@ -194,7 +206,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     $this->assertIndexCounts(0, 8, 'after indexing again');
 
     // Mark one node for reindexing by saving it, and verify indexing status.
-    $this->searchable_nodes[1]->save();
+    $this->searchableNodes[1]->save();
     $this->assertIndexCounts(1, 8, 'after marking one node to reindex via save');
 
     // The request time is always the same throughout test runs. Update the
@@ -208,14 +220,45 @@ class SearchMultilingualEntityTest extends SearchTestBase {
       ->execute();
 
     // Save the node again. Verify that the request time on it is not updated.
-    $this->searchable_nodes[1]->save();
+    $this->searchableNodes[1]->save();
     $result = db_select('search_dataset', 'd')
       ->fields('d', array('reindex'))
       ->condition('type', 'node_search')
-      ->condition('sid', $this->searchable_nodes[1]->id())
+      ->condition('sid', $this->searchableNodes[1]->id())
       ->execute()
       ->fetchField();
     $this->assertEqual($result, $old, 'Reindex time was not updated if node was already marked');
+
+    // Add a bogus entry to the search index table using a different search
+    // type. This will not appear in the index status, because it is not
+    // managed by a plugin.
+    search_index('foo', $this->searchableNodes[0]->id(), 'en', 'some text');
+    $this->assertIndexCounts(1, 8, 'after adding a different index item');
+
+    // Mark just this "foo" index for reindexing.
+    search_mark_for_reindex('foo');
+    $this->assertIndexCounts(1, 8, 'after reindexing the other search type');
+
+    // Mark everything for reindexing.
+    search_mark_for_reindex();
+    $this->assertIndexCounts(8, 8, 'after reindexing everything');
+
+    // Clear one item from the index, but with wrong language.
+    $this->assertDatabaseCounts(8, 1, 'before clear');
+    search_index_clear('node_search', $this->searchableNodes[0]->id(), 'hu');
+    $this->assertDatabaseCounts(8, 1, 'after clear with wrong language');
+    // Clear using correct language.
+    search_index_clear('node_search', $this->searchableNodes[0]->id(), 'en');
+    $this->assertDatabaseCounts(7, 1, 'after clear with right language');
+    // Don't specify language.
+    search_index_clear('node_search', $this->searchableNodes[1]->id());
+    $this->assertDatabaseCounts(6, 1, 'unspecified language clear');
+    // Clear everything in 'foo'.
+    search_index_clear('foo');
+    $this->assertDatabaseCounts(6, 0, 'other index clear');
+    // Clear everything.
+    search_index_clear();
+    $this->assertDatabaseCounts(0, 0, 'complete clear');
   }
 
   /**
@@ -235,7 +278,9 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     $this->assertEqual($status['total'], $total, 'Total items ' . $message . ' is ' . $total);
 
     // Check text in progress section of Search settings page. Note that this
-    // test avoids using format_plural(), so it tests for fragments of text.
+    // test avoids using
+    // \Drupal\Core\StringTranslation\TranslationInterface::formatPlural(), so
+    // it tests for fragments of text.
     $indexed = $total - $remaining;
     $percent = ($total > 0) ? floor(100 * $indexed / $total) : 100;
     $this->drupalGet('admin/config/search/pages');
@@ -250,5 +295,35 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     $this->assertText('Search index progress', 'Search status section header is present on status report page');
     $this->assertText($percent . '%', 'Correct percentage is shown on status report page at: ' . $message);
     $this->assertText('(' . $remaining . ' remaining)', 'Correct remaining value is shown on status report page at: ' . $message);
+  }
+
+  /**
+   * Checks actual database counts of items in the search index.
+   *
+   * @param int $count_node
+   *   Count of node items to assert.
+   * @param int $count_foo
+   *   Count of "foo" items to assert.
+   * @param string $message
+   *   Message suffix to use.
+   */
+  protected function assertDatabaseCounts($count_node, $count_foo, $message) {
+    // Count number of distinct nodes by ID.
+    $results = db_select('search_dataset', 'i')
+      ->fields('i', array('sid'))
+      ->condition('type', 'node_search')
+      ->groupBy('sid')
+      ->execute()
+      ->fetchCol();
+    $this->assertEqual($count_node, count($results), 'Node count was ' . $count_node . ' for ' . $message);
+
+    // Count number of "foo" records.
+    $results = db_select('search_dataset', 'i')
+      ->fields('i', array('sid'))
+      ->condition('type', 'foo')
+      ->execute()
+      ->fetchCol();
+    $this->assertEqual($count_foo, count($results), 'Foo count was ' . $count_foo . ' for ' . $message);
+
   }
 }

@@ -7,6 +7,8 @@
 
 namespace Drupal\Core\Database\Install;
 
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\String;
 use Drupal\Core\Database\Database;
 
 /**
@@ -150,11 +152,11 @@ abstract class Tasks {
     $message = '';
     foreach ($this->results as $result => $success) {
       if (!$success) {
-        $message .= '<p class="error">' . $result  . '</p>';
+        $message = SafeMarkup::isSafe($result) ? $result : String::checkPlain($result);
       }
     }
     if (!empty($message)) {
-      $message = '<p>In order for Drupal to work, and to continue with the installation process, you must resolve all issues reported below. For more help with configuring your database server, see the <a href="http://drupal.org/getting-started/install">installation handbook</a>. If you are unsure what any of this means you should probably contact your hosting provider.</p>' . $message;
+      $message = SafeMarkup::set('Resolve all issues below to continue the installation. For help configuring your database server, see the <a href="http://drupal.org/getting-started/install">installation handbook</a>, or contact your hosting provider.' . $message);
       throw new TaskException($message);
     }
   }
@@ -182,7 +184,7 @@ abstract class Tasks {
    */
   protected function runTestQuery($query, $pass, $fail, $fatal = FALSE) {
     try {
-      db_query($query);
+      Database::getConnection()->query($query);
       $this->pass(t($pass));
     }
     catch (\Exception $e) {
@@ -257,7 +259,7 @@ abstract class Tasks {
       '#title' => t('Table name prefix'),
       '#default_value' => empty($database['prefix']) ? '' : $database['prefix'],
       '#size' => 45,
-      '#description' => t('If more than one application will be sharing this database, a unique table name prefix–such as %prefix–will prevent collisions.', array('%prefix' => $db_prefix)),
+      '#description' => t('If more than one application will be sharing this database, a unique table name prefix – such as %prefix – will prevent collisions.', array('%prefix' => $db_prefix)),
       '#weight' => 10,
     );
 

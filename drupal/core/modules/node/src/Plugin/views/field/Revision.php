@@ -8,6 +8,7 @@
 namespace Drupal\node\Plugin\views\field;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -35,7 +36,7 @@ class Revision extends Node {
   }
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['link_to_node_revision'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['link_to_node_revision'] = array('default' => FALSE);
     return $options;
   }
 
@@ -44,8 +45,8 @@ class Revision extends Node {
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_node_revision'] = array(
-      '#title' => t('Link this field to its content revision'),
-      '#description' => t('This will override any other link you have set.'),
+      '#title' => $this->t('Link this field to its content revision'),
+      '#description' => $this->t('This will override any other link you have set.'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['link_to_node_revision']),
     );
@@ -68,7 +69,7 @@ class Revision extends Node {
       $this->options['alter']['make_link'] = TRUE;
       $nid = $this->getValue($values, 'nid');
       $vid = $this->getValue($values, 'vid');
-      $this->options['alter']['path'] = "node/" . $nid . '/revisions/' . $vid . '/view';
+      $this->options['alter']['url'] = Url::fromRoute('node.revision_show', ['node' => $nid, 'node_revision' => $vid]);
     }
     else {
       return parent::renderLink($data, $values);

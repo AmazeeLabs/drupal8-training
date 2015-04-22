@@ -17,6 +17,7 @@ use Drupal\simpletest\KernelTestBase;
  * @group config
  */
 class SchemaCheckTraitTest extends KernelTestBase {
+
   use SchemaCheckTrait;
 
   /**
@@ -47,11 +48,11 @@ class SchemaCheckTraitTest extends KernelTestBase {
    */
   public function testTrait() {
     // Test a non existing schema.
-    $ret = $this->checkConfigSchema($this->typedConfig, 'config_schema_test.noschema', \Drupal::config('config_schema_test.noschema')->get());
+    $ret = $this->checkConfigSchema($this->typedConfig, 'config_schema_test.noschema', $this->config('config_schema_test.noschema')->get());
     $this->assertIdentical($ret, FALSE);
 
     // Test an existing schema with valid data.
-    $config_data = \Drupal::config('config_test.types')->get();
+    $config_data = $this->config('config_test.types')->get();
     $ret = $this->checkConfigSchema($this->typedConfig, 'config_test.types', $config_data);
     $this->assertIdentical($ret, TRUE);
 
@@ -61,9 +62,9 @@ class SchemaCheckTraitTest extends KernelTestBase {
     $config_data['boolean'] = array();
     $ret = $this->checkConfigSchema($this->typedConfig, 'config_test.types', $config_data);
     $expected = array(
-      'config_test.types:new_key' => 'Missing schema.',
-      'config_test.types:new_array' => 'Missing schema.',
-      'config_test.types:boolean' => 'Non-scalar value but not defined as an array (such as mapping or sequence).',
+      'config_test.types:new_key' => 'missing schema',
+      'config_test.types:new_array' => 'missing schema',
+      'config_test.types:boolean' => 'non-scalar value but not defined as an array (such as mapping or sequence)',
     );
     $this->assertIdentical($ret, $expected);
   }

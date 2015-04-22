@@ -34,6 +34,11 @@ function entity_schema_test_entity_base_field_info(EntityTypeInterface $entity_t
       ->setLabel(t('A custom base field'));
     if (\Drupal::state()->get('entity_schema_update')) {
       $definitions += EntityTestMulRev::baseFieldDefinitions($entity_type);
+      // And add a revision log.
+      $definitions['revision_log'] = BaseFieldDefinition::create('string_long')
+        ->setLabel(t('Revision log message'))
+        ->setDescription(t('The log entry explaining the changes in this revision.'))
+        ->setRevisionable(TRUE);
     }
     return $definitions;
   }
@@ -71,7 +76,7 @@ function entity_schema_test_entity_bundle_delete($entity_type_id, $bundle) {
     $field_definitions = entity_schema_test_entity_bundle_field_info($entity_type, $bundle);
     $field_definitions['custom_bundle_field']
       ->setTargetEntityTypeId($entity_type_id)
-      ->setBundle($bundle);
+      ->setTargetBundle($bundle);
     // Notify the entity storage that our field is gone.
     \Drupal::entityManager()->getStorage($entity_type_id)
       ->onFieldDefinitionDelete($field_definitions['custom_bundle_field']);

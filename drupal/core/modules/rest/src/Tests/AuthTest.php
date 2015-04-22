@@ -7,6 +7,7 @@
 
 namespace Drupal\rest\Tests;
 
+use Drupal\Core\Url;
 use Drupal\rest\Tests\RESTTestBase;
 
 /**
@@ -17,7 +18,7 @@ use Drupal\rest\Tests\RESTTestBase;
 class AuthTest extends RESTTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -37,7 +38,7 @@ class AuthTest extends RESTTestBase {
     $entity->save();
 
     // Try to read the resource as an anonymous user, which should not work.
-    $this->httpRequest($entity->getSystemPath(), 'GET', NULL, $this->defaultMimeType);
+    $this->httpRequest($entity->urlInfo(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse('401', 'HTTP response code is 401 when the request is not authenticated and the user is anonymous.');
     $this->assertRaw(json_encode(['error' => 'A fatal error occurred: No authentication credentials provided.']));
 
@@ -54,16 +55,16 @@ class AuthTest extends RESTTestBase {
 
     // Try to read the resource with session cookie authentication, which is
     // not enabled and should not work.
-    $this->httpRequest($entity->getSystemPath(), 'GET', NULL, $this->defaultMimeType);
-    $this->assertResponse('401', 'HTTP response code is 401 when the request is authenticated but not authorized.');
+    $this->httpRequest($entity->urlInfo(), 'GET', NULL, $this->defaultMimeType);
+    $this->assertResponse('403', 'HTTP response code is 403 when the request was authenticated by the wrong authentication provider.');
 
     // Ensure that cURL settings/headers aren't carried over to next request.
     unset($this->curlHandle);
 
     // Now read it with the Basic authentication which is enabled and should
     // work.
-    $this->basicAuthGet($entity->getSystemPath(), $account->getUsername(), $account->pass_raw);
-    $this->assertResponse('200', 'HTTP response code is 200 for successfully authorized requests.');
+    $this->basicAuthGet($entity->urlInfo(), $account->getUsername(), $account->pass_raw, $this->defaultMimeType);
+    $this->assertResponse('200', 'HTTP response code is 200 for successfully authenticated requests.');
     $this->curlClose();
   }
 
@@ -73,28 +74,34 @@ class AuthTest extends RESTTestBase {
    * We do not use \Drupal\simpletest\WebTestBase::drupalGet because we need to
    * set curl settings for basic authentication.
    *
-   * @param string $path
-   *   The request path.
+   * @param \Drupal\Core\Url $url
+   *   An Url object.
    * @param string $username
    *   The user name to authenticate with.
    * @param string $password
    *   The password.
+   * @param string $mime_type
+   *   The MIME type for the Accept header.
    *
    * @return string
    *   Curl output.
    */
-  protected function basicAuthGet($path, $username, $password) {
+  protected function basicAuthGet(Url $url, $username, $password, $mime_type = NULL) {
+    if (!isset($mime_type)) {
+      $mime_type = $this->defaultMimeType;
+    }
     $out = $this->curlExec(
       array(
         CURLOPT_HTTPGET => TRUE,
-        CURLOPT_URL => url($path, array('absolute' => TRUE)),
+        CURLOPT_URL => $url->setAbsolute()->toString(),
         CURLOPT_NOBODY => FALSE,
         CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
         CURLOPT_USERPWD => $username . ':' . $password,
+        CURLOPT_HTTPHEADER => array('Accept: ' . $mime_type),
       )
     );
 
-    $this->verbose('GET request to: ' . $path .
+    $this->verbose('GET request to: ' . $url->toString() .
       '<hr />' . $out);
 
     return $out;

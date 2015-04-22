@@ -7,6 +7,8 @@
 
 namespace Drupal\Core\Mail\Plugin\Mail;
 
+use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Mail\MailFormatHelper;
 use Drupal\Core\Mail\MailInterface;
 use Drupal\Core\Site\Settings;
 
@@ -34,9 +36,9 @@ class PhpMail implements MailInterface {
     // Join the body array into one string.
     $message['body'] = implode("\n\n", $message['body']);
     // Convert any HTML to plain-text.
-    $message['body'] = drupal_html_to_text($message['body']);
+    $message['body'] = MailFormatHelper::htmlToText($message['body']);
     // Wrap the mail body for sending.
-    $message['body'] = drupal_wrap_mail($message['body']);
+    $message['body'] = MailFormatHelper::wrapMail($message['body']);
 
     return $message;
   }
@@ -51,7 +53,7 @@ class PhpMail implements MailInterface {
    *   TRUE if the mail was successfully accepted, otherwise FALSE.
    *
    * @see http://php.net/manual/en/function.mail.php
-   * @see drupal_mail()
+   * @see \Drupal\Core\Mail\MailManagerInterface::mail()
    */
   public function mail(array $message) {
     // If 'Return-Path' isn't already set in php.ini, we pass it separately
@@ -65,11 +67,11 @@ class PhpMail implements MailInterface {
     }
     $mimeheaders = array();
     foreach ($message['headers'] as $name => $value) {
-      $mimeheaders[] = $name . ': ' . mime_header_encode($value);
+      $mimeheaders[] = $name . ': ' . Unicode::mimeHeaderEncode($value);
     }
     $line_endings = Settings::get('mail_line_endings', PHP_EOL);
     // Prepare mail commands.
-    $mail_subject = mime_header_encode($message['subject']);
+    $mail_subject = Unicode::mimeHeaderEncode($message['subject']);
     // Note: email uses CRLF for line-endings. PHP's API requires LF
     // on Unix and CRLF on Windows. Drupal automatically guesses the
     // line-ending format appropriate for your system. If you need to

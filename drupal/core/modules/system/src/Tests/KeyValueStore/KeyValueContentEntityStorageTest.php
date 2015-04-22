@@ -23,7 +23,7 @@ class KeyValueContentEntityStorageTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('entity', 'user', 'entity_test', 'keyvalue_test');
+  public static $modules = array('user', 'entity_test', 'keyvalue_test');
 
   /**
    * {@inheritdoc}
@@ -37,7 +37,7 @@ class KeyValueContentEntityStorageTest extends KernelTestBase {
    * Tests CRUD operations.
    */
   function testCRUD() {
-    $default_langcode = language_default()->id;
+    $default_langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
     // Verify default properties on a newly created empty entity.
     $empty = entity_create('entity_test_label');
     $this->assertIdentical($empty->id->value, NULL);

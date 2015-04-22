@@ -82,7 +82,7 @@ class TranslationStatusForm extends FormBase {
 
       // Build data options for the select table.
       foreach ($updates as $langcode => $update) {
-        $title = String::checkPlain($languages[$langcode]->name);
+        $title = String::checkPlain($languages[$langcode]->getName());
         $locale_translation_update_info = array('#theme' => 'locale_translation_update_info');
         foreach (array('updates', 'not_found') as $update_status) {
           if (isset($update[$update_status])) {
@@ -98,14 +98,14 @@ class TranslationStatusForm extends FormBase {
             ),
           ),
           'status' => array(
-            'class' => array('description', 'expand', 'priority-low'),
+            'class' => array('description', 'priority-low'),
             'data' => drupal_render($locale_translation_update_info),
           ),
         );
         if (!empty($update['not_found'])) {
           $languages_not_found[$langcode] = $langcode;
         }
-        elseif (!empty($update['updates'])) {
+        if (!empty($update['updates'])) {
           $languages_update[$langcode] = $langcode;
         }
       }
@@ -135,7 +135,7 @@ class TranslationStatusForm extends FormBase {
 
     if (!$languages) {
       $empty = $this->t('No translatable languages available. <a href="@add_language">Add a language</a> first.', array(
-        '@add_language' => $this->url('language.admin_overview'),
+        '@add_language' => $this->url('entity.configurable_language.collection'),
       ));
     }
     elseif ($status) {
@@ -167,7 +167,6 @@ class TranslationStatusForm extends FormBase {
     );
 
     $form['#attached']['library'][] = 'locale/drupal.locale.admin';
-    $form['#attached']['css'] = array(drupal_get_path('module', 'locale') . '/css/locale.admin.css');
 
     $form['actions'] = array('#type' => 'actions');
     if ($languages_update) {
@@ -215,7 +214,7 @@ class TranslationStatusForm extends FormBase {
           $remote = isset($project_info->files[LOCALE_TRANSLATION_REMOTE]) ? $project_info->files[LOCALE_TRANSLATION_REMOTE] : NULL;
           $recent = _locale_translation_source_compare($local, $remote) == LOCALE_TRANSLATION_SOURCE_COMPARE_LT ? $remote : $local;
           $updates[$langcode]['updates'][] = array(
-            'name' => $project_data[$project_info->name]->info['name'],
+            'name' => $project_info->name == 'drupal' ? $this->t('Drupal core') : $project_data[$project_info->name]->info['name'],
             'version' => $project_info->version,
             'timestamp' => $recent->timestamp,
           );
@@ -277,6 +276,8 @@ class TranslationStatusForm extends FormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->moduleHandler->loadInclude('locale', 'fetch.inc');
+    $this->moduleHandler->loadInclude('locale', 'bulk.inc');
+
     $langcodes = array_filter($form_state->getValue('langcodes'));
     $projects = array_filter($form_state->getValue('projects_update'));
 
@@ -294,8 +295,13 @@ class TranslationStatusForm extends FormBase {
       batch_set($batch);
     }
     else {
+      // Set a batch to download and import translations.
       $batch = locale_translation_batch_fetch_build($projects, $langcodes, $options);
       batch_set($batch);
+      // Set a batch to update configuration as well.
+      if ($batch = locale_config_batch_update_components($options, $langcodes)) {
+        batch_set($batch);
+      }
     }
   }
 

@@ -9,14 +9,14 @@ namespace Drupal\system\Tests\Theme;
 
 use Drupal\Core\Config\InstallStorage;
 use Drupal\Core\Extension\ExtensionDiscovery;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests theme settings functionality.
  *
  * @group Theme
  */
-class ThemeSettingsTest extends DrupalUnitTestBase {
+class ThemeSettingsTest extends KernelTestBase {
 
   /**
    * Modules to enable.
@@ -34,11 +34,12 @@ class ThemeSettingsTest extends DrupalUnitTestBase {
 
   protected function setUp() {
     parent::setUp();
+    $this->installSchema('system', array('router'));
     // Theme settings rely on System module's system.theme.global configuration.
     $this->installConfig(array('system'));
 
     if (!isset($this->availableThemes)) {
-      $discovery = new ExtensionDiscovery();
+      $discovery = new ExtensionDiscovery(\Drupal::root());
       $this->availableThemes = $discovery->scan('theme');
     }
   }

@@ -14,8 +14,9 @@ use Drupal\Component\Utility\Xss;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\LanguageNegotiatorInterface;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationSelected;
@@ -24,7 +25,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Configure the selected language negotiation method for this site.
  */
-class NegotiationConfigureForm extends FormBase {
+class NegotiationConfigureForm extends ConfigFormBase {
 
   /**
    * Stores the configuration object for language.types.
@@ -85,7 +86,8 @@ class NegotiationConfigureForm extends FormBase {
    *   The block storage, or NULL if not available.
    */
   public function __construct(ConfigFactoryInterface $config_factory, ConfigurableLanguageManagerInterface $language_manager, LanguageNegotiatorInterface $negotiator, BlockManagerInterface $block_manager, ThemeHandlerInterface $theme_handler, EntityStorageInterface $block_storage = NULL) {
-    $this->languageTypes = $config_factory->get('language.types');
+    parent::__construct($config_factory);
+    $this->languageTypes = $this->config('language.types');
     $this->languageManager = $language_manager;
     $this->negotiator = $negotiator;
     $this->blockManager = $block_manager;
@@ -114,6 +116,13 @@ class NegotiationConfigureForm extends FormBase {
    */
   public function getFormID() {
     return 'language_negotiation_configure_form';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames() {
+    return ['language.types'];
   }
 
   /**
@@ -200,7 +209,7 @@ class NegotiationConfigureForm extends FormBase {
     $this->blockManager->clearCachedDefinitions();
 
     $form_state->setRedirect('language.negotiation');
-    drupal_set_message($this->t('Language negotiation configuration saved.'));
+    drupal_set_message($this->t('Language detection configuration saved.'));
   }
 
   /**
@@ -295,10 +304,10 @@ class NegotiationConfigureForm extends FormBase {
         $table_form['description'][$method_id] = array('#markup' => Xss::filterAdmin($method['description']));
 
         $config_op = array();
-        if (isset($method['config_path'])) {
+        if (isset($method['config_route_name'])) {
           $config_op['configure'] = array(
             'title' => $this->t('Configure'),
-            'href' => $method['config_path'],
+            'url' => Url::fromRoute($method['config_route_name']),
           );
           // If there is at least one operation enabled show the operation
           // column.
@@ -325,7 +334,7 @@ class NegotiationConfigureForm extends FormBase {
     $blocks = $this->blockStorage->loadByProperties(array('theme' => $theme));
     foreach ($language_types as $language_type) {
       foreach ($blocks as $block) {
-        if (strpos($block->id, 'language_switcher_' . substr($language_type, 9)) !== FALSE) {
+        if ($block->getPluginId() == 'language_block:' . $language_type) {
           $block->delete();
         }
       }

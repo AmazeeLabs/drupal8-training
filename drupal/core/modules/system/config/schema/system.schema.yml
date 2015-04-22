@@ -38,6 +38,9 @@ system.site:
     langcode:
       type: string
       label: 'Default language'
+    mail_notification:
+      type: string
+      label: 'Notification email address'
 
 system.maintenance:
   type: mapping
@@ -137,8 +140,8 @@ system.filter:
       type: sequence
       label: 'Allowed protocols'
       sequence:
-        - type: string
-          label: 'Protocol'
+        type: string
+        label: 'Protocol'
 
 system.logging:
   type: mapping
@@ -299,9 +302,6 @@ system.file:
       type: mapping
       label: 'Path settings'
       mapping:
-        private:
-          type: string
-          label: 'Private file system path'
         temporary:
           type: string
           label: 'Temporary directory'
@@ -330,12 +330,11 @@ system.mail:
   label: 'Mail system'
   mapping:
     interface:
-      type: mapping
-      label: 'Interface'
-      mapping:
-        default:
-          type: string
-          label: 'Default'
+      type: sequence
+      label: 'Interfaces'
+      sequence:
+        type: string
+        label: 'Interface'
 
 system.theme.global:
   type: theme_settings

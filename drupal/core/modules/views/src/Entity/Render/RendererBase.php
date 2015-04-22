@@ -8,6 +8,7 @@
 namespace Drupal\views\Entity\Render;
 
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\views\Plugin\views\query\QueryPluginBase;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
@@ -22,7 +23,14 @@ abstract class RendererBase {
    *
    * @var \Drupal\views\ViewExecutable
    */
-  public $view = NULL;
+  public $view;
+
+  /**
+   * The language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManagerInterface
+   */
+  protected $languageManager;
 
   /**
    * The type of the entity being rendered.
@@ -43,13 +51,27 @@ abstract class RendererBase {
    *
    * @param \Drupal\views\ViewExecutable $view
    *   The entity row being rendered.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type.
    */
-  public function __construct(ViewExecutable $view, EntityTypeInterface $entity_type) {
+  public function __construct(ViewExecutable $view, LanguageManagerInterface $language_manager, EntityTypeInterface $entity_type) {
     $this->view = $view;
+    $this->languageManager = $language_manager;
     $this->entityType = $entity_type;
   }
+
+  /**
+   * Returns the language code associated to the given row.
+   *
+   * @param \Drupal\views\ResultRow $row
+   *   The result row.
+   *
+   * @return string
+   *   A language code.
+   */
+  abstract public function getLangcode(ResultRow $row);
 
   /**
    * Alters the query if needed.

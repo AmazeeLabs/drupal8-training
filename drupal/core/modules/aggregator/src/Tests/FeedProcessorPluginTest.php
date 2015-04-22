@@ -7,16 +7,20 @@
 
 namespace Drupal\aggregator\Tests;
 
+use Drupal\aggregator\Entity\Feed;
+use Drupal\aggregator\Entity\Item;
+
 /**
  * Tests the processor plugins functionality and discoverability.
  *
  * @group aggregator
+ *
  * @see \Drupal\aggregator_test\Plugin\aggregator\processor\TestProcessor.
  */
 class FeedProcessorPluginTest extends AggregatorTestBase {
 
   /**
-   * Overrides \Drupal\simpletest\WebTestBase::setUp().
+   * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
@@ -33,7 +37,7 @@ class FeedProcessorPluginTest extends AggregatorTestBase {
     $feed = $this->createFeed();
     $this->updateFeedItems($feed);
     foreach ($feed->items as $iid) {
-      $item = entity_load('aggregator_item', $iid);
+      $item = Item::load($iid);
       $this->assertTrue(strpos($item->label(), 'testProcessor') === 0);
     }
   }
@@ -55,8 +59,11 @@ class FeedProcessorPluginTest extends AggregatorTestBase {
   public function testPostProcess() {
     $feed = $this->createFeed(NULL, array('refresh' => 1800));
     $this->updateFeedItems($feed);
+    $feed_id = $feed->id();
+    // Reset entity cache manually.
+    \Drupal::entityManager()->getStorage('aggregator_feed')->resetCache(array($feed_id));
     // Reload the feed to get new values.
-    $feed = entity_load('aggregator_feed', $feed->id(), TRUE);
+    $feed = Feed::load($feed_id);
     // Make sure its refresh rate doubled.
     $this->assertEqual($feed->getRefreshRate(), 3600);
   }

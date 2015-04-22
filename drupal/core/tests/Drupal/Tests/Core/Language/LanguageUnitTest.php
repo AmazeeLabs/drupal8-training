@@ -18,7 +18,21 @@ use Drupal\Tests\UnitTestCase;
 class LanguageUnitTest extends UnitTestCase {
 
   /**
-   * @covers ::getName()
+   * @covers ::__construct
+   */
+  public function testConstruct() {
+    $name = $this->randomMachineName();
+    $language_code = $this->randomMachineName(2);
+    $uuid = $this->randomMachineName();
+    $language = new Language(array('id' => $language_code, 'name' => $name, 'uuid' => $uuid));
+    // Test that nonexistent properties are not added to the language object.
+    $this->assertTrue(property_exists($language, 'id'));
+    $this->assertTrue(property_exists($language, 'name'));
+    $this->assertFalse(property_exists($language, 'uuid'));
+  }
+
+  /**
+   * @covers ::getName
    */
   public function testGetName() {
     $name = $this->randomMachineName();
@@ -28,7 +42,7 @@ class LanguageUnitTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::getId()
+   * @covers ::getId
    */
   public function testGetLangcode() {
     $language_code = $this->randomMachineName(2);
@@ -37,7 +51,7 @@ class LanguageUnitTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::getDirection()
+   * @covers ::getDirection
    */
   public function testGetDirection() {
     $language_code = $this->randomMachineName(2);
@@ -46,7 +60,7 @@ class LanguageUnitTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::isDefault()
+   * @covers ::isDefault
    */
   public function testIsDefault() {
     $language_default = $this->getMockBuilder('Drupal\Core\Language\LanguageDefault')->disableOriginalConstructor()->getMock();
@@ -74,7 +88,7 @@ class LanguageUnitTest extends UnitTestCase {
   /**
    * Tests sorting an array of language objects.
    *
-   * @covers ::sort()
+   * @covers ::sort
    *
    * @dataProvider providerTestSortArrayOfLanguages
    *

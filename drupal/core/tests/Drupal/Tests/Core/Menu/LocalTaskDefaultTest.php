@@ -8,14 +8,14 @@
 namespace Drupal\Tests\Core\Menu;
 
 use Drupal\Core\Menu\LocalTaskDefault;
+use Drupal\Core\Routing\RouteMatch;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Tests\UnitTestCase;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
 
 /**
- * @coversDefaultClass \Drupal\Core\Menu\LocalTaskDefaultTest
+ * @coversDefaultClass \Drupal\Core\Menu\LocalTaskDefault
  * @group Menu
  */
 class LocalTaskDefaultTest extends UnitTestCase {
@@ -83,9 +83,7 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getRouteParameters for a static route.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getRouteParameters()
+   * @covers ::getRouteParameters
    */
   public function testGetRouteParametersForStaticRoute() {
     $this->pluginDefinition = array(
@@ -99,12 +97,12 @@ class LocalTaskDefaultTest extends UnitTestCase {
 
     $this->setupLocalTaskDefault();
 
-    $request = Request::create('/');
-    $this->assertEquals(array(), $this->localTaskBase->getRouteParameters($request));
+    $route_match = new RouteMatch('', new Route('/'));
+    $this->assertEquals(array(), $this->localTaskBase->getRouteParameters($route_match));
   }
 
   /**
-   * Tests the getRouteParameters for a route with the parameters in the plugin definition.
+   * @covers ::getRouteParameters
    */
   public function testGetRouteParametersInPluginDefinitions() {
     $this->pluginDefinition = array(
@@ -119,63 +117,55 @@ class LocalTaskDefaultTest extends UnitTestCase {
 
     $this->setupLocalTaskDefault();
 
-    $request = new Request();
-
-    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($request));
+    $route_match = new RouteMatch('', new Route('/'));
+    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($route_match));
   }
 
   /**
-   * Tests the getRouteParameters method for a route with dynamic non upcasted parameters.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getRouteParameters()
+   * @covers ::getRouteParameters
    */
-  public function testGetRouteParametersForDynamicRoute() {
+  public function testGetRouteParametersForDynamicRouteWithNonUpcastedParameters() {
     $this->pluginDefinition = array(
       'route_name' => 'test_route'
     );
 
+    $route = new Route('/test-route/{parameter}');
     $this->routeProvider->expects($this->once())
       ->method('getRouteByName')
       ->with('test_route')
-      ->will($this->returnValue(new Route('/test-route/{parameter}')));
+      ->will($this->returnValue($route));
 
     $this->setupLocalTaskDefault();
 
-    $request = new Request(array(), array(), array('parameter' => 'example'));
+    $route_match = new RouteMatch('', $route, array(), array('parameter' => 'example'));
 
-    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($request));
+    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($route_match));
   }
 
   /**
    * Tests the getRouteParameters method for a route with upcasted parameters.
    *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getRouteParameters()
+   * @covers ::getRouteParameters
    */
   public function testGetRouteParametersForDynamicRouteWithUpcastedParameters() {
     $this->pluginDefinition = array(
       'route_name' => 'test_route'
     );
 
+    $route = new Route('/test-route/{parameter}');
     $this->routeProvider->expects($this->once())
       ->method('getRouteByName')
       ->with('test_route')
-      ->will($this->returnValue(new Route('/test-route/{parameter}')));
+      ->will($this->returnValue($route));
 
     $this->setupLocalTaskDefault();
 
-    $request = new Request();
-    $raw_variables = new ParameterBag();
-    $raw_variables->set('parameter', 'example');
-    $request->attributes->set('parameter', (object) array('example2'));
-    $request->attributes->set('_raw_variables', $raw_variables);
-
-    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($request));
+    $route_match = new RouteMatch('', $route, array('parameter' => (object) 'example2'), array('parameter' => 'example'));
+    $this->assertEquals(array('parameter' => 'example'), $this->localTaskBase->getRouteParameters($route_match));
   }
 
   /**
-   * Defines a test provider for getWeight()
-   *
-   * @see self::getWeight()
+   * Defines a data provider for testGetWeight().
    *
    * @return array
    *   A list or test plugin definition and expected weight.
@@ -218,11 +208,8 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getWeight method.
-   *
    * @dataProvider providerTestGetWeight
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getWeight()
+   * @covers ::getWeight
    */
   public function testGetWeight($plugin_definition, $plugin_id, $expected_weight) {
     $this->pluginDefinition = $plugin_definition;
@@ -233,10 +220,8 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests getActive/setActive() method.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getActive()
-   * @see \Drupal\Core\Menu\LocalTaskDefault::setActive()
+   * @covers ::getActive
+   * @covers ::setActive
    */
   public function testActive() {
     $this->setupLocalTaskDefault();
@@ -247,11 +232,9 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getTitle method without a translation context.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getTitle()
+   * @covers ::getTitle
    */
-  public function testGetTitle() {
+  public function testGetTitleWithoutContext() {
     $this->pluginDefinition['title'] = 'Example';
     $this->stringTranslation->expects($this->once())
       ->method('translate')
@@ -263,9 +246,7 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getTitle method with a translation context.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getTitle()
+   * @covers ::getTitle
    */
   public function testGetTitleWithContext() {
     $this->pluginDefinition['title'] = 'Example';
@@ -280,7 +261,7 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getTitle method with title arguments.
+   * @covers ::getTitle
    */
   public function testGetTitleWithTitleArguments() {
     $this->pluginDefinition['title'] = 'Example @test';
@@ -296,9 +277,7 @@ class LocalTaskDefaultTest extends UnitTestCase {
   }
 
   /**
-   * Tests the getOption method.
-   *
-   * @see \Drupal\Core\Menu\LocalTaskDefault::getOption()
+   * @covers ::getOptions
    */
   public function testGetOptions() {
     $this->pluginDefinition['options'] = array(
@@ -307,8 +286,8 @@ class LocalTaskDefaultTest extends UnitTestCase {
 
     $this->setupLocalTaskDefault();
 
-    $request = Request::create('/');
-    $this->assertEquals($this->pluginDefinition['options'], $this->localTaskBase->getOptions($request));
+    $route_match = new RouteMatch('', new Route('/'));
+    $this->assertEquals($this->pluginDefinition['options'], $this->localTaskBase->getOptions($route_match));
 
     $this->localTaskBase->setActive(TRUE);
 
@@ -319,7 +298,7 @@ class LocalTaskDefaultTest extends UnitTestCase {
           'active'
         )
       )
-    ), $this->localTaskBase->getOptions($request));
+    ), $this->localTaskBase->getOptions($route_match));
   }
 
 }

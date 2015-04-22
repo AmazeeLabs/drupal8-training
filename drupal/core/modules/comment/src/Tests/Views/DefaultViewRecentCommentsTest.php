@@ -8,6 +8,7 @@
 namespace Drupal\comment\Tests\Views;
 
 use Drupal\comment\CommentInterface;
+use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\views\Views;
 use Drupal\views\Tests\ViewTestBase;
 
@@ -18,8 +19,10 @@ use Drupal\views\Tests\ViewTestBase;
  */
 class DefaultViewRecentCommentsTest extends ViewTestBase {
 
+  use CommentTestTrait;
+
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -68,10 +71,10 @@ class DefaultViewRecentCommentsTest extends ViewTestBase {
 
     // Add a node of the new content type.
     $node_data = array(
-      'type' => $content_type->type,
+      'type' => $content_type->id(),
     );
 
-    $this->container->get('comment.manager')->addDefaultField('node', $content_type->type);
+    $this->addDefaultCommentField('node', $content_type->id());
     $this->node = $this->drupalCreateNode($node_data);
 
     // Force a flush of the in-memory storage.

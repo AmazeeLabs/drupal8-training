@@ -37,8 +37,8 @@ namespace Symfony\Component\ClassLoader;
  *     // register classes with namespaces
  *     $loader->registerNamespaces(array(
  *         'Symfony\Component' => __DIR__.'/component',
- *         'Symfony'           => __DIR__.'/framework',
- *         'Sensio'            => array(__DIR__.'/src', __DIR__.'/vendor'),
+ *         'Symfony' => __DIR__.'/framework',
+ *         'Sensio' => array(__DIR__.'/src', __DIR__.'/vendor'),
  *     ));
  *
  *     // register a library using the PEAR naming convention
@@ -59,6 +59,8 @@ namespace Symfony\Component\ClassLoader;
  * @author Kris Wallsmith <kris@symfony.com>
  *
  * @api
+ *
+ * @deprecated Deprecated since version 2.4, to be removed in 3.0. Use the ApcClassLoader class instead.
  */
 class ApcUniversalClassLoader extends UniversalClassLoader
 {

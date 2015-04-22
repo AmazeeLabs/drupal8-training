@@ -8,6 +8,7 @@
 namespace Drupal\comment\Plugin\views\field;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -50,10 +51,13 @@ class Comment extends FieldPluginBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['link_to_comment'] = array('default' => TRUE, 'bool' => TRUE);
-    $options['link_to_entity'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['link_to_comment'] = array('default' => TRUE);
+    $options['link_to_entity'] = array('default' => FALSE);
 
     return $options;
   }
@@ -63,13 +67,13 @@ class Comment extends FieldPluginBase {
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_comment'] = array(
-      '#title' => t('Link this field to its comment'),
-      '#description' => t("Enable to override this field's links."),
+      '#title' => $this->t('Link this field to its comment'),
+      '#description' => $this->t("Enable to override this field's links."),
       '#type' => 'checkbox',
       '#default_value' => $this->options['link_to_comment'],
     );
     $form['link_to_entity'] = array(
-      '#title' => t('Link field to the entity if there is no comment'),
+      '#title' => $this->t('Link field to the entity if there is no comment'),
       '#type' => 'checkbox',
       '#default_value' => $this->options['link_to_entity'],
     );
@@ -92,7 +96,7 @@ class Comment extends FieldPluginBase {
       $this->options['alter']['make_link'] = TRUE;
       $cid = $this->getValue($values, 'cid');
       if (!empty($cid)) {
-        $this->options['alter']['path'] = "comment/" . $cid;
+        $this->options['alter']['url'] = Url::fromRoute('entity.comment.canonical', ['comment' => $cid]);
         $this->options['alter']['fragment'] = "comment-" . $cid;
       }
       // If there is no comment link to the entity.
@@ -100,7 +104,7 @@ class Comment extends FieldPluginBase {
         $entity_id = $this->getValue($values, 'entity_id');
         $entity_type = $this->getValue($values, 'entity_type');
         $entity = entity_load($entity_type, $entity_id);
-        $this->options['alter']['path'] = $entity->getSystemPath();
+        $this->options['alter']['url'] = $entity->urlInfo();
       }
     }
 

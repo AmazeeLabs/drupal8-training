@@ -6,6 +6,7 @@
  */
 
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\views\Plugin\views\PluginBase;
 
 /**
  * @defgroup views_overview Views overview
@@ -142,6 +143,12 @@ function hook_views_data() {
   // a field, filter, etc. you can also filter by the group.
   $data['example_table']['table']['group'] = t('Example table');
 
+  // Within 'table', the value of 'provider' is the module that provides schema
+  // or the entity type that causes the table to exist. Setting this ensures
+  // that views have the correct dependencies. This is automatically set to the
+  // module that implements hook_views_data().
+  $data['example_table']['table']['provider'] = 'example_module';
+
   // Some tables are "base" tables, meaning that they can be the base tables
   // for views. Non-base tables can only be brought in via relationships in
   // views based on other tables. To define a table to be a base table, add
@@ -176,11 +183,33 @@ function hook_views_data() {
     // for the other tables, given in their hook_views_data() implementations.
     // If the table listed here is from another module's hook_views_data()
     // implementation, make sure your module depends on that other module.
-    'node' => array(
+    'node_field_data' => array(
       // Primary key field in node to use in the join.
       'left_field' => 'nid',
       // Foreign key field in example_table to use in the join.
       'field' => 'nid',
+      // An array of extra conditions on the join.
+      'extra' => array(
+        0 => array(
+          // Adds AND node.published = TRUE to the join.
+          'field' => 'published',
+          'value' => TRUE,
+        ),
+        1 => array(
+          // Adds AND example_table.numeric_field = 1 to the join.
+          'left_field' => 'numeric_field',
+          'value' => 1,
+          // If true, the value will not be surrounded in quotes.
+          'numeric' => TRUE,
+        ),
+        2 => array(
+          // Adds AND example_table.boolean_field <> node.published to the join.
+          'field' => 'published',
+          'left_field' => 'boolean_field',
+          // The operator used, Defaults to "=".
+          'operator' => '!=',
+        ),
+      ),
     ),
   );
 
@@ -424,7 +453,7 @@ function hook_views_data_alter(array &$data) {
  * in other modules.
  *
  * If no hook implementation exists, hook_views_data() falls back to
- * field_views_field_default_views_data().
+ * views_field_default_views_data().
  *
  * @param \Drupal\field\FieldStorageConfigInterface $field_storage
  *   The field storage config entity.
@@ -433,12 +462,12 @@ function hook_views_data_alter(array &$data) {
  *   An array of views data, in the same format as the return value of
  *   hook_views_data().
  *
- * @see field_views_data()
+ * @see views_views_data()
  * @see hook_field_views_data_alter()
  * @see hook_field_views_data_views_data_alter()
  */
 function hook_field_views_data(\Drupal\field\FieldStorageConfigInterface $field_storage) {
-  $data = field_views_field_default_views_data($field_storage);
+  $data = views_field_default_views_data($field_storage);
   foreach ($data as $table_name => $table_data) {
     // Add the relationship only on the target_id field.
     $data[$table_name][$field_storage->getName() . '_target_id']['relationship'] = array(
@@ -457,7 +486,7 @@ function hook_field_views_data(\Drupal\field\FieldStorageConfigInterface $field_
  *
  * This is called on all modules even if there is no hook_field_views_data()
  * implementation for the field, and therefore may be used to alter the
- * default data that field_views_field_default_views_data() supplies for the
+ * default data that views_field_default_views_data() supplies for the
  * field storage.
  *
  *  @param array $data
@@ -466,18 +495,18 @@ function hook_field_views_data(\Drupal\field\FieldStorageConfigInterface $field_
  *  @param \Drupal\field\FieldStorageConfigInterface $field_storage
  *    The field storage config entity.
  *
- * @see field_views_data()
+ * @see views_views_data()
  * @see hook_field_views_data()
  * @see hook_field_views_data_views_data_alter()
  */
 function hook_field_views_data_alter(array &$data, \Drupal\field\FieldStorageConfigInterface $field_storage) {
-  $entity_type_id = $field_storage->entity_type;
+  $entity_type_id = $field_storage->getTargetEntityTypeId();
   $field_name = $field_storage->getName();
   $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
   $pseudo_field_name = 'reverse_' . $field_name . '_' . $entity_type_id;
   $table_mapping = \Drupal::entityManager()->getStorage($entity_type_id)->getTableMapping();
 
-  list($label) = field_views_field_label($entity_type_id, $field_name);
+  list($label) = views_entity_field_label($entity_type_id, $field_name);
 
   $data['file_managed'][$pseudo_field_name]['relationship'] = array(
     'title' => t('@entity using @field', array('@entity' => $entity_type->getLabel(), '@field' => $label)),
@@ -524,7 +553,7 @@ function hook_field_views_data_alter(array &$data, \Drupal\field\FieldStorageCon
  *
  * @see hook_field_views_data()
  * @see hook_field_views_data_alter()
- * @see field_views_data_alter()
+ * @see views_views_data_alter()
  */
 function hook_field_views_data_views_data_alter(array &$data, \Drupal\field\FieldStorageConfigInterface $field) {
   $field_name = $field->getName();
@@ -532,7 +561,7 @@ function hook_field_views_data_views_data_alter(array &$data, \Drupal\field\Fiel
   $entity_type_id = $field->entity_type;
   $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
   $pseudo_field_name = 'reverse_' . $field_name . '_' . $entity_type_id;
-  list($label) = field_views_field_label($entity_type_id, $field_name);
+  list($label) = views_entity_field_label($entity_type_id, $field_name);
   $table_mapping = \Drupal::entityManager()->getStorage($entity_type_id)->getTableMapping();
 
   // Views data for this field is in $data[$data_key].
@@ -578,8 +607,8 @@ function hook_views_query_substitutions(ViewExecutable $view) {
   return array(
     '***CURRENT_VERSION***' => \Drupal::VERSION,
     '***CURRENT_TIME***' => REQUEST_TIME,
-    '***LANGUAGE_language_content***' => \Drupal::languageManager()->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->id,
-    '***LANGUAGE_site_default***' => \Drupal::languageManager()->getDefaultLanguage()->id,
+    '***LANGUAGE_language_content***' => \Drupal::languageManager()->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId(),
+    PluginBase::VIEWS_QUERY_LANGUAGE_SITE_DEFAULT => \Drupal::languageManager()->getDefaultLanguage()->getId(),
   );
 }
 
@@ -719,7 +748,7 @@ function hook_views_post_execute(ViewExecutable $view) {
  *
  * At this point the query has been executed, and the preRender() phase has
  * already happened for handlers, so all data should be available. This hook
- * can be utilized by themes.
+ * can be used by themes.
  *
  * Output can be added to the view by setting $view->attachment_before
  * and $view->attachment_after.
@@ -742,7 +771,7 @@ function hook_views_pre_render(ViewExecutable $view) {
  * This can be valuable to be able to cache a view and still have some level of
  * dynamic output. In an ideal world, the actual output will include HTML
  * comment-based tokens, and then the post process can replace those tokens.
- * This hook can be utilized by themes.
+ * This hook can be used by themes.
  *
  * Example usage. If it is known that the view is a node view and that the
  * primary field will be a nid, you can do something like this:
@@ -790,7 +819,7 @@ function hook_views_query_alter(ViewExecutable $view, QueryPluginBase $query) {
   // (Example assuming a view with an exposed filter on node title.)
   // If the input for the title filter is a positive integer, filter against
   // node ID instead of node title.
-  if ($view->name == 'my_view' && is_numeric($view->exposed_raw_input['title']) && $view->exposed_raw_input['title'] > 0) {
+  if ($view->id() == 'my_view' && is_numeric($view->exposed_raw_input['title']) && $view->exposed_raw_input['title'] > 0) {
     // Traverse through the 'where' part of the query.
     foreach ($query->where as &$condition_group) {
       foreach ($condition_group['conditions'] as &$condition) {
@@ -825,7 +854,7 @@ function hook_views_query_alter(ViewExecutable $view, QueryPluginBase $query) {
  *   The view object.
  *
  * @see \Drupal\views_ui\ViewUI
- * @see theme_table()
+ * @see table.html.twig
  */
 function hook_views_preview_info_alter(array &$rows, ViewExecutable $view) {
   // Adds information about the tables being queried by the view to the query
@@ -868,7 +897,7 @@ function hook_views_ui_display_top_links_alter(array &$links, ViewExecutable $vi
  * @see views_invalidate_cache()
  */
 function hook_views_invalidate_cache() {
-  \Drupal\Core\Cache\Cache::invalidateTags(array('views' => TRUE));
+  \Drupal\Core\Cache\Cache::invalidateTags(array('views'));
 }
 
 /**
@@ -1078,6 +1107,102 @@ function hook_views_plugins_style_alter(array &$plugins) {
 function hook_views_plugins_wizard_alter(array &$plugins) {
   // Change the title of a plugin.
   $plugins['node_revision']['title'] = t('Node revision wizard');
+}
+
+/**
+ * Modify the list of available views area handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_area_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
+}
+
+/**
+ * Modify the list of available views argument handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_argument_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
+}
+
+/**
+ * Modify the list of available views field handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_field_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
+}
+
+/**
+ * Modify the list of available views filter handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_filter_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
+}
+
+/**
+ * Modify the list of available views relationship handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_relationship_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
+}
+
+/**
+ * Modify the list of available views sort handler plugins.
+ *
+ * This hook may be used to modify handler properties after they have been
+ * specified by other modules.
+ *
+ * @param array $plugins
+ *   An array of all the existing handler definitions, passed by reference.
+ *
+ * @see \Drupal\views\Plugin\ViewsHandlerManager
+ */
+function hook_views_plugins_sort_alter(array &$plugins) {
+  // Change the 'title' handler class.
+  $plugins['title']['class'] = 'Drupal\\example\\ExampleClass';
 }
 
 /**

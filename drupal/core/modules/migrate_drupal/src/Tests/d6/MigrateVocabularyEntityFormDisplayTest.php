@@ -8,14 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Vocabulary entity form display migration.
  *
  * @group migrate_drupal
  */
-class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
+class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupal6TestBase {
 
   /**
    * The modules to be enabled during the test.
@@ -32,7 +32,7 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
 
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-      'name' => 'tags',
+      'field_name' => 'tags',
       'type' => 'taxonomy_term_reference',
     ))->save();
 
@@ -61,7 +61,8 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
 
     $migration = entity_load('migration', 'd6_vocabulary_entity_form_display');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6VocabularyField.php',
+      $this->getDumpDirectory() . '/Vocabulary.php',
+      $this->getDumpDirectory() . '/VocabularyNodeTypes.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -75,10 +76,10 @@ class MigrateVocabularyEntityFormDisplayTest extends MigrateDrupalTestBase {
   public function testVocabularyEntityFormDisplay() {
     // Test that the field exists.
     $component = entity_get_form_display('node', 'page', 'default')->getComponent('tags');
-    $this->assertEqual($component['type'], 'options_select');
-    $this->assertEqual($component['weight'], 20);
+    $this->assertIdentical('options_select', $component['type']);
+    $this->assertIdentical(20, $component['weight']);
     // Test the Id map.
-    $this->assertEqual(array('node', 'article', 'default', 'tags'), entity_load('migration', 'd6_vocabulary_entity_form_display')->getIdMap()->lookupDestinationID(array(4, 'article')));
+    $this->assertIdentical(array('node', 'article', 'default', 'tags'), entity_load('migration', 'd6_vocabulary_entity_form_display')->getIdMap()->lookupDestinationID(array(4, 'article')));
   }
 
 }

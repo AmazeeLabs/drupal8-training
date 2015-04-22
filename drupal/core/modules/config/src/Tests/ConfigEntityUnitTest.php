@@ -8,14 +8,14 @@
 namespace Drupal\config\Tests;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Unit tests for configuration entity base methods.
  *
  * @group config
  */
-class ConfigEntityUnitTest extends DrupalUnitTestBase {
+class ConfigEntityUnitTest extends KernelTestBase {
 
   /**
    * Modules to enable.
@@ -70,7 +70,7 @@ class ConfigEntityUnitTest extends DrupalUnitTestBase {
     $entity->save();
 
     // Ensure that the configuration entity can be loaded by UUID.
-    $entity_loaded_by_uuid = entity_load_by_uuid($entity_type->id(), $entity->uuid());
+    $entity_loaded_by_uuid = \Drupal::entityManager()->loadEntityByUuid($entity_type->id(), $entity->uuid());
     if (!$entity_loaded_by_uuid) {
       $this->fail(sprintf("Failed to load '%s' entity ID '%s' by UUID '%s'.", $entity_type->id(), $entity->id(), $entity->uuid()));
     }

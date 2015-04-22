@@ -8,6 +8,7 @@
 namespace Drupal\system\Tests\System;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests page access denied functionality, including custom 403 pages.
@@ -29,10 +30,10 @@ class AccessDeniedTest extends WebTestBase {
     parent::setUp();
 
     // Create an administrative user.
-    $this->admin_user = $this->drupalCreateUser(array('access administration pages', 'administer site configuration', 'administer blocks'));
+    $this->admin_user = $this->drupalCreateUser(array('access administration pages', 'administer site configuration', 'link to any page', 'administer blocks'));
 
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access user profiles'));
-    user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access user profiles'));
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array('access user profiles'));
+    user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array('access user profiles'));
   }
 
   function testAccessDenied() {
@@ -70,9 +71,9 @@ class AccessDeniedTest extends WebTestBase {
     $this->assertResponse(403);
     $this->assertText(t('Username'), 'Blocks are shown on the default 403 page');
 
-    // Log back in, set the custom 403 page to /user and remove the block
+    // Log back in, set the custom 403 page to /user/login and remove the block
     $this->drupalLogin($this->admin_user);
-    \Drupal::config('system.site')->set('page.403', 'user')->save();
+    $this->config('system.site')->set('page.403', 'user/login')->save();
     $edit = array(
       'region' => -1,
     );

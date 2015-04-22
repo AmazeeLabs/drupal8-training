@@ -11,6 +11,8 @@ use Drupal\Core\Access\AccessibleInterface;
 
 /**
  * Defines a common interface for all entity objects.
+ *
+ * @ingroup entity_api
  */
 interface EntityInterface extends AccessibleInterface {
 
@@ -103,9 +105,9 @@ interface EntityInterface extends AccessibleInterface {
    * example:
    * @code
    * links = {
-   *   "canonical" = "entity.node.canonical",
-   *   "edit-form" = "entity.node.edit_form",
-   *   "version-history" = "entity.node.version_history"
+   *   "canonical" = "/node/{node}",
+   *   "edit-form" = "/node/{node}/edit",
+   *   "version-history" = "/node/{node}/revisions"
    * }
    * @endcode
    * or specified in a callback function set like:
@@ -119,10 +121,13 @@ interface EntityInterface extends AccessibleInterface {
    *
    * @param string $rel
    *   The link relationship type, for example: canonical or edit-form.
+   * @param array $options
+   *   See \Drupal\Core\Routing\UrlGeneratorInterface::generateFromRoute() for
+   *   the available options.
    *
    * @return \Drupal\Core\Url
    */
-  public function urlInfo($rel = 'canonical');
+  public function urlInfo($rel = 'canonical', array $options = array());
 
   /**
    * Returns the public URL for this entity.
@@ -139,6 +144,23 @@ interface EntityInterface extends AccessibleInterface {
   public function url($rel = 'canonical', $options = array());
 
   /**
+   * Generates the HTML for a link to this entity.
+   *
+   * @param string|null $text
+   *   (optional) The link text for the anchor tag as a translated string.
+   *   If NULL, it will use the entity's label. Defaults to NULL.
+   * @param string $rel
+   *   (optional) The link relationship type. Defaults to 'canonical'.
+   * @param array $options
+   *   See \Drupal\Core\Routing\UrlGeneratorInterface::generateFromRoute() for
+   *   the available options.
+   *
+   * @return string
+   *   An HTML string containing a link to the entity.
+   */
+  public function link($text = NULL, $rel = 'canonical', array $options = []);
+
+  /**
    * Returns the internal path for this entity.
    *
    * self::url() will return the full path including any prefixes, fragments, or
@@ -149,6 +171,9 @@ interface EntityInterface extends AccessibleInterface {
    *
    * @return string
    *   The internal path for this entity.
+   *
+   * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.0. Use
+   *    static::urlInfo() instead.
    */
   public function getSystemPath($rel = 'canonical');
 
@@ -359,22 +384,60 @@ interface EntityInterface extends AccessibleInterface {
   public function toArray();
 
   /**
-   * The unique cache tag associated with this entity.
+   * Returns a typed data object for this entity object.
    *
-   * @return array
-   *   An array of cache tags.
+   * The returned typed data object wraps this entity and allows dealing with
+   * entities based on the generic typed data API.
+   *
+   * @return \Drupal\Core\TypedData\ComplexDataInterface
+   *   The typed data object for this entity.
+   *
+   * @see \Drupal\Core\TypedData\TypedDataInterface
    */
-  public function getCacheTag();
+  public function getTypedData();
 
   /**
-   * The list cache tags associated with this entity.
+   * The unique cache tag associated with this entity.
    *
-   * Enables code listing entities of this type to ensure that newly created
-   * entities show up immediately.
-   *
-   * @return array
+   * @return string[]
    *   An array of cache tags.
    */
-  public function getListCacheTags();
+  public function getCacheTags();
+
+  /**
+   * Gets the key that is used to store configuration dependencies.
+   *
+   * @return string
+   *   The key to be used in configuration dependencies when storing
+   *   dependencies on entities of this type.
+   *
+   * @see \Drupal\Core\Entity\EntityTypeInterface::getConfigDependencyKey()
+   */
+  public function getConfigDependencyKey();
+
+  /**
+   * Gets the configuration dependency name.
+   *
+   * Configuration entities can depend on content and configuration entities.
+   * They store an array of content and config dependency names in their
+   * "dependencies" key.
+   *
+   * @return string
+   *   The configuration dependency name.
+   *
+   * @see \Drupal\Core\Config\Entity\ConfigDependencyManager
+   */
+  public function getConfigDependencyName();
+
+  /**
+   * Gets the configuration target identifier for the entity.
+   *
+   * Used to supply the correct format for storing a reference targeting this
+   * entity in configuration.
+   *
+   * @return string
+   *   The configuration target identifier.
+   */
+  public function getConfigTarget();
 
 }

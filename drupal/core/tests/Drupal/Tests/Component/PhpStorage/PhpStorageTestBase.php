@@ -8,7 +8,6 @@
 namespace Drupal\Tests\Component\PhpStorage;
 
 use Drupal\Tests\UnitTestCase;
-use Drupal\Core\PhpStorage\PhpStorageFactory;
 
 /**
  * Base test for PHP storages.
@@ -16,19 +15,18 @@ use Drupal\Core\PhpStorage\PhpStorageFactory;
 abstract class PhpStorageTestBase extends UnitTestCase {
 
   /**
-   * The storage factory object.
+   * A unique per test class directory path to test php storage.
    *
-   * @var \Drupal\Component\PhpStorage\PhpStorageFactory
+   * @var string
    */
-  protected $storageFactory;
+  protected $directory;
 
   /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
-
-    $this->storageFactory = new PhpStorageFactory();
+    $this->directory = sys_get_temp_dir() . '/php' . str_replace('\\','_', get_class($this));
   }
 
   /**

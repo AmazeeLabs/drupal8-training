@@ -7,10 +7,12 @@
 
 namespace Drupal\action\Plugin\Action;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Action\ConfigurableActionBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Routing\UrlGeneratorInterface;
+use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -99,7 +101,7 @@ class GotoAction extends ConfigurableActionBase implements ContainerFactoryPlugi
     $form['url'] = array(
       '#type' => 'textfield',
       '#title' => t('URL'),
-      '#description' => t('The URL to which the user should be redirected. This can be an internal URL like node/1234 or an external URL like @url.', array('@url' => 'http://drupal.org')),
+      '#description' => t('The URL to which the user should be redirected. This can be an internal URL like node/1234 or an external URL like @url.', array('@url' => 'http://example.com')),
       '#default_value' => $this->configuration['url'],
       '#required' => TRUE,
     );
@@ -111,6 +113,14 @@ class GotoAction extends ConfigurableActionBase implements ContainerFactoryPlugi
    */
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
     $this->configuration['url'] = $form_state->getValue('url');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function access($object, AccountInterface $account = NULL, $return_as_object = FALSE) {
+    $access = AccessResult::allowed();
+    return $return_as_object ? $access : $access->isAllowed();
   }
 
 }

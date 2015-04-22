@@ -111,27 +111,33 @@ class UserSearch extends SearchPluginBase implements AccessibleInterface {
     if (!$this->isSearchExecutable()) {
       return $results;
     }
+
+    // Process the keywords.
     $keys = $this->keywords;
+    // Escape for LIKE matching.
+    $keys = $this->database->escapeLike($keys);
     // Replace wildcards with MySQL/PostgreSQL wildcards.
     $keys = preg_replace('!\*+!', '%', $keys);
+
+    // Run the query to find matching users.
     $query = $this->database
       ->select('users_field_data', 'users')
       ->extend('Drupal\Core\Database\Query\PagerSelectExtender');
     $query->fields('users', array('uid'));
     $query->condition('default_langcode', 1);
     if ($this->currentUser->hasPermission('administer users')) {
-      // Administrators can also search in the otherwise private email field, and
-      // they don't need to be restricted to only active users.
+      // Administrators can also search in the otherwise private email field,
+      // and they don't need to be restricted to only active users.
       $query->fields('users', array('mail'));
       $query->condition($query->orConditionGroup()
-        ->condition('name', '%' . $this->database->escapeLike($keys) . '%', 'LIKE')
-        ->condition('mail', '%' . $this->database->escapeLike($keys) . '%', 'LIKE')
+        ->condition('name', '%' . $keys . '%', 'LIKE')
+        ->condition('mail', '%' . $keys . '%', 'LIKE')
       );
     }
     else {
       // Regular users can only search via usernames, and we do not show them
       // blocked accounts.
-      $query->condition('name', '%' . $this->database->escapeLike($keys) . '%', 'LIKE')
+      $query->condition('name', '%' . $keys . '%', 'LIKE')
         ->condition('status', 1);
     }
     $uids = $query
@@ -143,7 +149,7 @@ class UserSearch extends SearchPluginBase implements AccessibleInterface {
     foreach ($accounts as $account) {
       $result = array(
         'title' => $account->getUsername(),
-        'link' => url('user/' . $account->id(), array('absolute' => TRUE)),
+        'link' => $account->url('canonical', array('absolute' => TRUE)),
       );
       if ($this->currentUser->hasPermission('administer users')) {
         $result['title'] .= ' (' . $account->getEmail() . ')';
@@ -152,6 +158,21 @@ class UserSearch extends SearchPluginBase implements AccessibleInterface {
     }
 
     return $results;
+  }
+
+  /*
+   * {@inheritdoc}
+   */
+  public function getHelp() {
+    $help = array('list' => array(
+      '#theme' => 'item_list',
+      '#items' => array(
+        $this->t('User search looks for user names and partial user names. Example: mar would match usernames mar, delmar, and maryjane.'),
+        $this->t('You can use * as a wildcard within your keyword. Example: m*r would match user names mar, delmar, and elementary.'),
+      ),
+    ));
+
+    return $help;
   }
 
 }

@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\EventSubscriber;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
@@ -25,11 +24,11 @@ class SpecialAttributesRouteSubscriber extends RouteSubscriberBase {
     $special_variables = array(
       'system_path',
       '_legacy',
-      '_authentication_provider',
       '_raw_variables',
       RouteObjectInterface::ROUTE_OBJECT,
       RouteObjectInterface::ROUTE_NAME,
       '_content',
+      '_controller',
       '_form',
     );
     foreach ($collection->all() as $name => $route) {

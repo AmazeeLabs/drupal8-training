@@ -14,13 +14,13 @@ namespace Symfony\Component\Serializer\Encoder;
 use Symfony\Component\Serializer\Exception\UnexpectedValueException;
 
 /**
- * Encodes JSON data
+ * Encodes JSON data.
  *
  * @author Sander Coolen <sander@jibber.nl>
  */
 class JsonEncode implements EncoderInterface
 {
-    private $options ;
+    private $options;
     private $lastError = JSON_ERROR_NONE;
 
     public function __construct($bitmask = 0)
@@ -43,7 +43,7 @@ class JsonEncode implements EncoderInterface
     }
 
     /**
-     * Encodes PHP data to a JSON string
+     * Encodes PHP data to a JSON string.
      *
      * {@inheritdoc}
      */
@@ -72,6 +72,7 @@ class JsonEncode implements EncoderInterface
      * Merge default json encode options with context.
      *
      * @param array $context
+     *
      * @return array
      */
     private function resolveContext(array $context = array())

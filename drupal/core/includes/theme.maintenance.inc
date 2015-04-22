@@ -23,7 +23,6 @@ function _drupal_maintenance_theme() {
     return;
   }
 
-  require_once __DIR__ . '/path.inc';
   require_once __DIR__ . '/theme.inc';
   require_once __DIR__ . '/common.inc';
   require_once __DIR__ . '/unicode.inc';
@@ -63,38 +62,35 @@ function _drupal_maintenance_theme() {
     }
   }
 
-  // Ensure that system.module is loaded.
-  if (!function_exists('system_rebuild_theme_data')) {
-    $module_handler = \Drupal::moduleHandler();
-    $module_handler->addModule('system', 'core/modules/system');
-    $module_handler->load('system');
-  }
-
-  $themes = list_themes();
+  $themes = \Drupal::service('theme_handler')->listInfo();
 
   // If no themes are installed yet, or if the requested custom theme is not
   // installed, retrieve all available themes.
   /** @var \Drupal\Core\Theme\ThemeInitialization $theme_init */
   $theme_init = \Drupal::service('theme.initialization');
+  $theme_handler = \Drupal::service('theme_handler');
   if (empty($themes) || !isset($themes[$custom_theme])) {
-    $theme_handler = \Drupal::service('theme_handler');
     $themes = $theme_handler->rebuildThemeData();
     $theme_handler->addTheme($themes[$custom_theme]);
-    \Drupal::theme()->setActiveTheme($theme_init->getActiveTheme($themes[$custom_theme], array()));
   }
 
-  // list_themes() triggers a \Drupal\Core\Extension\ModuleHandler::alter() in
-  // maintenance mode, but we can't let themes alter the .info.yml data until
-  // we know a theme's base themes. So don't set active theme until after
-  // list_themes() builds its cache.
+  // \Drupal\Core\Extension\ThemeHandlerInterface::listInfo() triggers a
+  // \Drupal\Core\Extension\ModuleHandler::alter() in maintenance mode, but we
+  // can't let themes alter the .info.yml data until we know a theme's base
+  // themes. So don't set active theme until after
+  // \Drupal\Core\Extension\ThemeHandlerInterface::listInfo() builds its cache.
   $theme = $custom_theme;
 
   // Find all our ancestor themes and put them in an array.
   $base_theme = array();
   $ancestor = $theme;
   while ($ancestor && isset($themes[$ancestor]->base_theme)) {
-    $base_theme[] = $new_base_theme = $themes[$themes[$ancestor]->base_theme];
+    $base_theme[] = $themes[$themes[$ancestor]->base_theme];
     $ancestor = $themes[$ancestor]->base_theme;
+    if ($ancestor) {
+      // Ensure that the base theme is added.
+      $theme_handler->addTheme($themes[$ancestor]);
+    }
   }
   // @todo This is just a workaround. Find a better way how to handle themes
   //   on maintenance pages, see https://www.drupal.org/node/2322619.
@@ -116,7 +112,7 @@ function theme_authorize_report($variables) {
   $messages = $variables['messages'];
   $output = '';
   if (!empty($messages)) {
-    $output .= '<div id="authorize-results">';
+    $output .= '<div class="authorize-results">';
     foreach ($messages as $heading => $logs) {
       $items = array();
       foreach ($logs as $number => $log_message) {
@@ -158,10 +154,10 @@ function theme_authorize_message($variables) {
   $message = $variables['message'];
   $success = $variables['success'];
   if ($success) {
-    $item = array('data' => $message, 'class' => array('success'));
+    $item = array('data' => array('#markup' => $message), 'class' => array('authorize-results__success'));
   }
   else {
-    $item = array('data' => '<strong>' . $message . '</strong>', 'class' => array('failure'));
+    $item = array('data' => array('#markup' => $message), 'class' => array('authorize-results__failure'));
   }
   return $item;
 }

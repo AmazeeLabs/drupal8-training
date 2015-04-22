@@ -7,21 +7,22 @@
 
 namespace Drupal\node\Tests\Config;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\node\Entity\NodeType;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Change content types during config create method invocation.
  *
  * @group node
  */
-class NodeImportChangeTest extends DrupalUnitTestBase {
+class NodeImportChangeTest extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('node', 'entity', 'field', 'text', 'system', 'node_test_config', 'user');
+  public static $modules = array('node', 'field', 'text', 'system', 'node_test_config', 'user', 'entity_reference');
 
   /**
    * Set the default field storage backend for fields created during tests.
@@ -49,14 +50,14 @@ class NodeImportChangeTest extends DrupalUnitTestBase {
     $node_type = $active->read($node_type_config_name);
     $new_label = 'Test update import field';
     $node_type['name'] = $new_label;
-    // Save as files in the the staging directory.
+    // Save as files in the staging directory.
     $staging->write($node_type_config_name, $node_type);
 
     // Import the content of the staging directory.
     $this->configImporter()->import();
 
     // Check that the updated config was correctly imported.
-    $node_type = entity_load('node_type', $node_type_id);
+    $node_type = NodeType::load($node_type_id);
     $this->assertEqual($node_type->label(), $new_label, 'Node type name has been updated.');
   }
 

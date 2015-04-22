@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Tests\Handler;
 
+use Drupal\Component\Utility\Unicode;
+use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\views\Views;
 
@@ -25,7 +27,17 @@ class FieldWebTest extends HandlerTestBase {
    */
   public static $testViews = array('test_view', 'test_field_classes', 'test_field_output', 'test_click_sort');
 
-  protected $column_map = array(
+  /**
+   * {@inheritdoc}
+   */
+  public static $modules = ['node'];
+
+  /**
+   * Maps between the key in the expected result and the query result.
+   *
+   * @var array
+   */
+  protected $columnMap = array(
     'views_test_data_name' => 'name',
   );
 
@@ -51,13 +63,13 @@ class FieldWebTest extends HandlerTestBase {
     $this->drupalGet('test_click_sort');
     $this->assertResponse(200);
     // Only the id and name should be click sortable, but not the name.
-    $this->assertLinkByHref(url('test_click_sort', array('query' => array('order' => 'id', 'sort' => 'asc'))));
-    $this->assertLinkByHref(url('test_click_sort', array('query' => array('order' => 'name', 'sort' => 'desc'))));
-    $this->assertNoLinkByHref(url('test_click_sort', array('query' => array('order' => 'created'))));
+    $this->assertLinkByHref(\Drupal::url('view.test_click_sort.page_1', [], ['query' => ['order' => 'id', 'sort' => 'asc']]));
+    $this->assertLinkByHref(\Drupal::url('view.test_click_sort.page_1', [], ['query' => ['order' => 'name', 'sort' => 'desc']]));
+    $this->assertNoLinkByHref(\Drupal::url('view.test_click_sort.page_1', [], ['query' => ['order' => 'created']]));
 
     // Clicking a click sort should change the order.
     $this->clickLink(t('ID'));
-    $this->assertLinkByHref(url('test_click_sort', array('query' => array('order' => 'id', 'sort' => 'desc'))));
+    $this->assertLinkByHref(\Drupal::url('view.test_click_sort.page_1', [], ['query' => ['order' => 'id', 'sort' => 'desc']]));
     // Check that the output has the expected order (asc).
     $ids = $this->clickSortLoadIdsFromOutput();
     $this->assertEqual($ids, range(1, 5));
@@ -199,38 +211,37 @@ class FieldWebTest extends HandlerTestBase {
     global $base_url, $script_path;
 
     foreach (array(FALSE, TRUE) as $absolute) {
-      // Get the expected start of the path string.
-      $base = ($absolute ? $base_url . '/' : base_path()) . $script_path;
-      $absolute_string = $absolute ? 'absolute' : NULL;
       $alter = &$id_field->options['alter'];
       $alter['path'] = 'node/123';
 
-      $expected_result = url('node/123', array('absolute' => $absolute));
+      $expected_result = \Drupal::url('entity.node.canonical', ['node' => '123'], ['absolute' => $absolute]);
       $alter['absolute'] = $absolute;
       $result = $id_field->theme($row);
       $this->assertSubString($result, $expected_result);
 
-      $expected_result = url('node/123', array('fragment' => 'foo', 'absolute' => $absolute));
+      $expected_result = \Drupal::url('entity.node.canonical', ['node' => '123'], ['fragment' => 'foo', 'absolute' => $absolute]);
       $alter['path'] = 'node/123#foo';
       $result = $id_field->theme($row);
       $this->assertSubString($result, $expected_result);
 
-      $expected_result = url('node/123', array('query' => array('foo' => NULL), 'absolute' => $absolute));
+      $expected_result = \Drupal::url('entity.node.canonical', ['node' => '123'], ['query' => ['foo' => NULL], 'absolute' => $absolute]);
       $alter['path'] = 'node/123?foo';
       $result = $id_field->theme($row);
       $this->assertSubString($result, $expected_result);
 
-      $expected_result = url('node/123', array('query' => array('foo' => 'bar', 'bar' => 'baz'), 'absolute' => $absolute));
+      $expected_result = \Drupal::url('entity.node.canonical', ['node' => '123'], ['query' => ['foo' => 'bar', 'bar' => 'baz'], 'absolute' => $absolute]);
       $alter['path'] = 'node/123?foo=bar&bar=baz';
       $result = $id_field->theme($row);
-      $this->assertSubString(decode_entities($result), decode_entities($expected_result));
+      $this->assertSubString(String::decodeEntities($result), String::decodeEntities($expected_result));
 
-      $expected_result = url('node/123', array('query' => array('foo' => NULL), 'fragment' => 'bar', 'absolute' => $absolute));
+      // @todo The route-based URL generator strips out NULL attributes.
+      // $expected_result = \Drupal::url('entity.node.canonical', ['node' => '123'], ['query' => ['foo' => NULL], 'fragment' => 'bar', 'absolute' => $absolute]);
+      $expected_result = \Drupal::urlGenerator()->generateFromPath('node/123', array('query' => array('foo' => NULL), 'fragment' => 'bar', 'absolute' => $absolute));
       $alter['path'] = 'node/123?foo#bar';
       $result = $id_field->theme($row);
-      $this->assertSubString(decode_entities($result), decode_entities($expected_result));
+      $this->assertSubString(String::decodeEntities($result), String::decodeEntities($expected_result));
 
-      $expected_result = url('<front>', array('absolute' => $absolute));
+      $expected_result = \Drupal::url('<front>', [], ['absolute' => $absolute]);
       $alter['path'] = '<front>';
       $result = $id_field->theme($row);
       $this->assertSubString($result, $expected_result);
@@ -476,7 +487,7 @@ class FieldWebTest extends HandlerTestBase {
     // Tests for simple trimming by string length.
     $row->views_test_data_name = $this->randomMachineName(8);
     $name_field->options['alter']['max_length'] = 5;
-    $trimmed_name = drupal_substr($row->views_test_data_name, 0, 5);
+    $trimmed_name = Unicode::substr($row->views_test_data_name, 0, 5);
 
     $output = $name_field->advancedRender($row);
     $this->assertSubString($output, $trimmed_name, format_string('Make sure the trimmed output (!trimmed) appears in the rendered output (!output).', array('!trimmed' => $trimmed_name, '!output' => $output)));

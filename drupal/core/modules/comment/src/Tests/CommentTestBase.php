@@ -12,6 +12,7 @@ use Drupal\comment\Entity\Comment;
 use Drupal\comment\CommentInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
+use Drupal\node\Entity\NodeType;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -19,8 +20,10 @@ use Drupal\simpletest\WebTestBase;
  */
 abstract class CommentTestBase extends WebTestBase {
 
+  use CommentTestTrait;
+
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -31,14 +34,14 @@ abstract class CommentTestBase extends WebTestBase {
    *
    * @var \Drupal\user\UserInterface
    */
-  protected $admin_user;
+  protected $adminUser;
 
   /**
    * A normal user with permission to post comments.
    *
    * @var \Drupal\user\UserInterface
    */
-  protected $web_user;
+  protected $webUser;
 
   /**
    * A test node to which comments will be posted.
@@ -52,13 +55,13 @@ abstract class CommentTestBase extends WebTestBase {
 
     // Create an article content type only if it does not yet exist, so that
     // child classes may specify the standard profile.
-    $types = node_type_get_types();
+    $types = NodeType::loadMultiple();
     if (empty($types['article'])) {
       $this->drupalCreateContentType(array('type' => 'article', 'name' => t('Article')));
     }
 
     // Create two test users.
-    $this->admin_user = $this->drupalCreateUser(array(
+    $this->adminUser = $this->drupalCreateUser(array(
       'administer content types',
       'administer comments',
       'administer comment types',
@@ -69,7 +72,7 @@ abstract class CommentTestBase extends WebTestBase {
       'access comments',
       'access content',
      ));
-    $this->web_user = $this->drupalCreateUser(array(
+    $this->webUser = $this->drupalCreateUser(array(
       'access comments',
       'post comments',
       'create article content',
@@ -79,10 +82,10 @@ abstract class CommentTestBase extends WebTestBase {
     ));
 
     // Create comment field on article.
-    $this->container->get('comment.manager')->addDefaultField('node', 'article');
+    $this->addDefaultCommentField('node', 'article');
 
     // Create a test node authored by the web user.
-    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->web_user->id()));
+    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->webUser->id()));
   }
 
   /**
@@ -184,13 +187,14 @@ abstract class CommentTestBase extends WebTestBase {
    */
   function commentExists(CommentInterface $comment = NULL, $reply = FALSE) {
     if ($comment) {
-      $regex = '/' . ($reply ? '<div class="indented">(.*?)' : '');
+      $regex = '!' . ($reply ? '<div class="indented">(.*?)' : '');
       $regex .= '<a id="comment-' . $comment->id() . '"(.*?)';
       $regex .= $comment->getSubject() . '(.*?)';
       $regex .= $comment->comment_body->value . '(.*?)';
-      $regex .= '/s';
+      $regex .= ($reply ? '</article>\s</div>(.*?)' : '');
+      $regex .= '!s';
 
-      return (boolean) preg_match($regex, $this->drupalGetContent());
+      return (boolean) preg_match($regex, $this->getRawContent());
     }
     else {
       return FALSE;
@@ -323,7 +327,7 @@ abstract class CommentTestBase extends WebTestBase {
    *   Contact info is available.
    */
   function commentContactInfoAvailable() {
-    return preg_match('/(input).*?(name="name").*?(input).*?(name="mail").*?(input).*?(name="homepage")/s', $this->drupalGetContent());
+    return preg_match('/(input).*?(name="name").*?(input).*?(name="mail").*?(input).*?(name="homepage")/s', $this->getRawContent());
   }
 
   /**
@@ -344,7 +348,7 @@ abstract class CommentTestBase extends WebTestBase {
 
     if ($operation == 'delete') {
       $this->drupalPostForm(NULL, array(), t('Delete comments'));
-      $this->assertRaw(format_plural(1, 'Deleted 1 comment.', 'Deleted @count comments.'), format_string('Operation "@operation" was performed on comment.', array('@operation' => $operation)));
+      $this->assertRaw(\Drupal::translation()->formatPlural(1, 'Deleted 1 comment.', 'Deleted @count comments.'), format_string('Operation "@operation" was performed on comment.', array('@operation' => $operation)));
     }
     else {
       $this->assertText(t('The update has been performed.'), format_string('Operation "@operation" was performed on comment.', array('@operation' => $operation)));
@@ -362,7 +366,7 @@ abstract class CommentTestBase extends WebTestBase {
    */
   function getUnapprovedComment($subject) {
     $this->drupalGet('admin/content/comment/approval');
-    preg_match('/href="(.*?)#comment-([^"]+)"(.*?)>(' . $subject . ')/', $this->drupalGetContent(), $match);
+    preg_match('/href="(.*?)#comment-([^"]+)"(.*?)>(' . $subject . ')/', $this->getRawContent(), $match);
 
     return $match[2];
   }

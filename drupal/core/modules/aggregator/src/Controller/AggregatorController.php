@@ -11,6 +11,7 @@ use Drupal\Component\Utility\Xss;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Datetime\DateFormatter;
 use Drupal\aggregator\FeedInterface;
+use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -81,7 +82,7 @@ class AggregatorController extends ControllerBase {
     if ($items) {
       $build['items'] = $this->entityManager()->getViewBuilder('aggregator_item')
         ->viewMultiple($items, 'default');
-      $build['pager'] = array('#theme' => 'pager');
+      $build['pager'] = array('#type' => 'pager');
     }
     return $build;
   }
@@ -119,33 +120,30 @@ class AggregatorController extends ControllerBase {
 
     $header = array($this->t('Title'), $this->t('Items'), $this->t('Last update'), $this->t('Next update'), $this->t('Operations'));
     $rows = array();
+    /** @var \Drupal\aggregator\FeedInterface[] $feeds */
     foreach ($feeds as $feed) {
       $row = array();
-      $row[] = l($feed->label(), "aggregator/sources/" . $feed->id());
-      $row[] = $this->dateFormatter->formatInterval($entity_manager->getStorage('aggregator_item')->getItemCount($feed), '1 item', '@count items');
+      $row[] = $feed->link();
+      $row[] = $this->formatPlural($entity_manager->getStorage('aggregator_item')->getItemCount($feed), '1 item', '@count items');
       $last_checked = $feed->getLastCheckedTime();
       $refresh_rate = $feed->getRefreshRate();
       $row[] = ($last_checked ? $this->t('@time ago', array('@time' => $this->dateFormatter->formatInterval(REQUEST_TIME - $last_checked))) : $this->t('never'));
       $row[] = ($last_checked && $refresh_rate ? $this->t('%time left', array('%time' => $this->dateFormatter->formatInterval($last_checked + $refresh_rate - REQUEST_TIME))) : $this->t('never'));
-      $links['edit'] = array(
+      $links['edit'] = [
         'title' => $this->t('Edit'),
-        'route_name' => 'entity.aggregator_feed.edit_form',
-        'route_parameters' => array('aggregator_feed' => $feed->id()),
-      );
+        'url' => Url::fromRoute('entity.aggregator_feed.edit_form', ['aggregator_feed' => $feed->id()]),
+      ];
       $links['delete'] = array(
         'title' => $this->t('Delete'),
-        'route_name' => 'entity.aggregator_feed.delete_form',
-        'route_parameters' => array('aggregator_feed' => $feed->id()),
+        'url' => Url::fromRoute('entity.aggregator_feed.delete_form', ['aggregator_feed' => $feed->id()]),
       );
       $links['delete_items'] = array(
         'title' => $this->t('Delete items'),
-        'route_name' => 'aggregator.feed_items_delete',
-        'route_parameters' => array('aggregator_feed' => $feed->id()),
+        'url' => Url::fromRoute('aggregator.feed_items_delete', ['aggregator_feed' => $feed->id()]),
       );
       $links['update'] = array(
         'title' => $this->t('Update items'),
-        'route_name' => 'aggregator.feed_refresh',
-        'route_parameters' => array('aggregator_feed' => $feed->id()),
+        'url' => Url::fromRoute('aggregator.feed_refresh', ['aggregator_feed' => $feed->id()]),
       );
       $row[] = array(
         'data' => array(
@@ -175,54 +173,8 @@ class AggregatorController extends ControllerBase {
   public function pageLast() {
     $items = $this->entityManager()->getStorage('aggregator_item')->loadAll(20);
     $build = $this->buildPageList($items);
-    $build['#attached']['drupal_add_feed'][] = array('aggregator/rss', $this->config('system.site')->get('name') . ' ' . $this->t('aggregator'));
+    $build['#attached']['feed'][] = array('aggregator/rss', $this->config('system.site')->get('name') . ' ' . $this->t('aggregator'));
     return $build;
-  }
-
-  /**
-   * Displays all the feeds used by the Aggregator module.
-   *
-   * @return array
-   *   A render array as expected by drupal_render().
-   */
-  public function sources() {
-    $entity_manager = $this->entityManager();
-
-    $feeds = $entity_manager->getStorage('aggregator_feed')->loadMultiple();
-
-    $build = $entity_manager->getViewBuilder('aggregator_feed')
-      ->viewMultiple($feeds, 'summary');
-    $build['feed_icon'] = array(
-      '#theme' => 'feed_icon',
-      '#url' => 'aggregator/opml',
-      '#title' => $this->t('OPML feed'),
-    );
-    return $build;
-  }
-
-  /**
-   * Generates an OPML representation of all feeds.
-   *
-   * @return \Symfony\Component\HttpFoundation\Response
-   *   The response containing the OPML.
-   */
-  public function opmlPage() {
-     $feeds = $this->entityManager()
-      ->getStorage('aggregator_feed')
-      ->loadMultiple();
-
-    $feeds = $result->fetchAll();
-    $aggregator_page_opml = array(
-      '#theme' => 'aggregator_page_opml',
-      '#feeds' => $feeds,
-    );
-    $output = drupal_render($aggregator_page_opml);
-
-    $response = new Response();
-    $response->headers->set('Content-Type', 'text/xml; charset=utf-8');
-    $response->setContent($output);
-
-    return $response;
   }
 
   /**

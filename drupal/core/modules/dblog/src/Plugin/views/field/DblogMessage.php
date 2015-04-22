@@ -39,7 +39,7 @@ class DblogMessage extends FieldPluginBase {
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['replace_variables'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['replace_variables'] = array('default' => TRUE);
 
     return $options;
   }
@@ -51,7 +51,7 @@ class DblogMessage extends FieldPluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $form['replace_variables'] = array(
-      '#title' => t('Replace variables'),
+      '#title' => $this->t('Replace variables'),
       '#type' => 'checkbox',
       '#default_value' => $this->options['replace_variables'],
     );

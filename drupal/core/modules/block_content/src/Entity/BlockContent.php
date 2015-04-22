@@ -18,14 +18,15 @@ use Drupal\block_content\BlockContentInterface;
  *
  * @ContentEntityType(
  *   id = "block_content",
- *   label = @Translation("Custom Block"),
- *   bundle_label = @Translation("Custom Block type"),
+ *   label = @Translation("Custom block"),
+ *   bundle_label = @Translation("Custom block type"),
  *   handlers = {
  *     "storage" = "Drupal\Core\Entity\Sql\SqlContentEntityStorage",
  *     "storage_schema" = "Drupal\block_content\BlockContentStorageSchema",
  *     "access" = "Drupal\block_content\BlockContentAccessControlHandler",
  *     "list_builder" = "Drupal\block_content\BlockContentListBuilder",
  *     "view_builder" = "Drupal\block_content\BlockContentViewBuilder",
+ *     "views_data" = "Drupal\block_content\BlockContentViewsData",
  *     "form" = {
  *       "add" = "Drupal\block_content\BlockContentForm",
  *       "edit" = "Drupal\block_content\BlockContentForm",
@@ -39,22 +40,29 @@ use Drupal\block_content\BlockContentInterface;
  *   revision_table = "block_content_revision",
  *   data_table = "block_content_field_data",
  *   links = {
- *     "canonical" = "entity.block_content.canonical",
- *     "delete-form" = "entity.block_content.delete_form",
- *     "edit-form" = "entity.block_content.canonical",
+ *     "canonical" = "/block/{block_content}",
+ *     "delete-form" = "/block/{block_content}/delete",
+ *     "edit-form" = "/block/{block_content}",
+ *     "collection" = "/admin/structure/block/block-content",
  *   },
- *   fieldable = TRUE,
  *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "id",
  *     "revision" = "revision_id",
  *     "bundle" = "type",
  *     "label" = "info",
+ *     "langcode" = "langcode",
  *     "uuid" = "uuid"
  *   },
  *   bundle_entity_type = "block_content_type",
  *   field_ui_base_route = "entity.block_content_type.edit_form",
+ *   render_cache = FALSE,
  * )
+ *
+ * Note that render caching of block_content entities is disabled because they
+ * are always rendered as blocks, and blocks already have their own render
+ * caching.
+ * See https://www.drupal.org/node/2284917#comment-9132521 for more information.
  */
 class BlockContent extends ContentEntityBase implements BlockContentInterface {
 
@@ -157,9 +165,17 @@ class BlockContent extends ContentEntityBase implements BlockContentInterface {
       ->setSetting('unsigned', TRUE);
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
-      ->setLabel(t('Language code'))
+      ->setLabel(t('Language'))
       ->setDescription(t('The custom block language code.'))
-      ->setRevisionable(TRUE);
+      ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
+      ->setDisplayOptions('view', array(
+        'type' => 'hidden',
+      ))
+      ->setDisplayOptions('form', array(
+        'type' => 'language_select',
+        'weight' => 2,
+      ));
 
     $fields['info'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Block description'))

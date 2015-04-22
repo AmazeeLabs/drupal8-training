@@ -60,9 +60,10 @@ class UserBulkFormTest extends UnitTestCase {
       ->will($this->returnValue(array('table' => array('entity type' => 'user'))));
     $container = new ContainerBuilder();
     $container->set('views.views_data', $views_data);
+    $container->set('string_translation', $this->getStringTranslationStub());
     \Drupal::setContainer($container);
 
-    $storage = $this->getMock('Drupal\views\ViewStorageInterface');
+    $storage = $this->getMock('Drupal\views\ViewEntityInterface');
     $storage->expects($this->any())
       ->method('get')
       ->with('base_table')

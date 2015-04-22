@@ -7,6 +7,7 @@
 
 namespace Drupal\entity_reference\Tests;
 
+use Drupal\field_ui\Tests\FieldUiTestTrait;
 use Drupal\simpletest\WebTestBase;
 use Drupal\taxonomy\Entity\Vocabulary;
 
@@ -17,6 +18,8 @@ use Drupal\taxonomy\Entity\Vocabulary;
  */
 class EntityReferenceAdminTest extends WebTestBase {
 
+  use FieldUiTestTrait;
+
   /**
    * Modules to install.
    *
@@ -25,10 +28,22 @@ class EntityReferenceAdminTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('node', 'field_ui', 'entity_reference', 'path', 'taxonomy');
+  public static $modules = array('node', 'field_ui', 'entity_reference', 'path', 'taxonomy', 'block', 'views');
 
+
+  /**
+   * The name of the content type created for testing purposes.
+   *
+   * @var string
+   */
+  protected $type;
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
+    $this->drupalPlaceBlock('system_breadcrumb_block');
 
     // Create test user.
     $admin_user = $this->drupalCreateUser(array('access content', 'administer node fields', 'administer node display'));
@@ -37,7 +52,7 @@ class EntityReferenceAdminTest extends WebTestBase {
     // Create a content type, with underscores.
     $type_name = strtolower($this->randomMachineName(8)) . '_test';
     $type = $this->drupalCreateContentType(array('name' => $type_name, 'type' => $type_name));
-    $this->type = $type->type;
+    $this->type = $type->id();
   }
 
   /**
@@ -47,11 +62,17 @@ class EntityReferenceAdminTest extends WebTestBase {
     $bundle_path = 'admin/structure/types/manage/' . $this->type;
 
     // First step: 'Add new field' on the 'Manage fields' page.
-    $this->drupalPostForm($bundle_path . '/fields', array(
-      'fields[_add_new_field][label]' => 'Test label',
-      'fields[_add_new_field][field_name]' => 'test',
-      'fields[_add_new_field][type]' => 'entity_reference',
-    ), t('Save'));
+    $this->drupalGet($bundle_path . '/fields/add-field');
+
+    // Check if the commonly referenced entity types appear in the list.
+    $this->assertOption('edit-new-storage-type', 'field_ui:entity_reference:node');
+    $this->assertOption('edit-new-storage-type', 'field_ui:entity_reference:user');
+
+    $this->drupalPostForm(NULL, array(
+      'label' => 'Test label',
+      'field_name' => 'test',
+      'new_storage_type' => 'entity_reference',
+    ), t('Save and continue'));
 
     // Node should be selected by default.
     $this->assertFieldByName('field_storage[settings][target_type]', 'node');
@@ -63,7 +84,7 @@ class EntityReferenceAdminTest extends WebTestBase {
     $this->drupalPostForm(NULL, array(), t('Save field settings'));
 
     // The base handler should be selected by default.
-    $this->assertFieldByName('field[settings][handler]', 'default');
+    $this->assertFieldByName('field[settings][handler]', 'default:node');
 
     // The base handler settings should be displayed.
     $entity_type_id = 'node';
@@ -95,11 +116,46 @@ class EntityReferenceAdminTest extends WebTestBase {
 
     // Third step: confirm.
     $this->drupalPostForm(NULL, array(
+      'field[required]' => '1',
       'field[settings][handler_settings][target_bundles][' . key($bundles) . ']' => key($bundles),
     ), t('Save settings'));
 
     // Check that the field appears in the overview form.
     $this->assertFieldByXPath('//table[@id="field-overview"]//tr[@id="field-test"]/td[1]', 'Test label', 'Field was created and appears in the overview page.');
+
+    // Check that the field settings form can be submitted again, even when the
+    // field is required.
+    // The first 'Edit' link is for the Body field.
+    $this->clickLink(t('Edit'), 1);
+    $this->drupalPostForm(NULL, array(), t('Save settings'));
+
+    // Switch the target type to 'taxonomy_term' and check that the settings
+    // specific to its selection handler are displayed.
+    $field_name = 'node.' . $this->type . '.field_test';
+    $edit = array(
+      'field_storage[settings][target_type]' => 'taxonomy_term',
+    );
+    $this->drupalPostForm($bundle_path . '/fields/' . $field_name . '/storage', $edit, t('Save field settings'));
+    $this->drupalGet($bundle_path . '/fields/' . $field_name);
+    $this->assertFieldByName('field[settings][handler_settings][auto_create]');
+
+    // Switch the target type to 'user' and check that the settings specific to
+    // its selection handler are displayed.
+    $field_name = 'node.' . $this->type . '.field_test';
+    $edit = array(
+      'field_storage[settings][target_type]' => 'user',
+    );
+    $this->drupalPostForm($bundle_path . '/fields/' . $field_name . '/storage', $edit, t('Save field settings'));
+    $this->drupalGet($bundle_path . '/fields/' . $field_name);
+    $this->assertFieldByName('field[settings][handler_settings][filter][type]', '_none');
+
+    // Try to select the views handler.
+    $edit = array(
+      'field[settings][handler]' => 'views',
+    );
+    $this->drupalPostAjaxForm($bundle_path . '/fields/' . $field_name, $edit, 'field[settings][handler]');
+    $this->drupalPostForm(NULL, $edit, t('Save settings'));
+    $this->assertResponse(200);
   }
 
 
@@ -183,24 +239,13 @@ class EntityReferenceAdminTest extends WebTestBase {
     // Generate a random field name, must be only lowercase characters.
     $field_name = strtolower($this->randomMachineName());
 
-    // Create the initial entity reference.
-    $this->drupalPostForm($bundle_path . '/fields', array(
-      'fields[_add_new_field][label]' => $this->randomMachineName(),
-      'fields[_add_new_field][field_name]' => $field_name,
-      'fields[_add_new_field][type]' => 'entity_reference',
-    ), t('Save'));
-
-    // Select the correct target type given in the parameters and save field settings.
-    $this->drupalPostForm(NULL, array('field_storage[settings][target_type]' => $target_type), t('Save field settings'));
-
-    // Select required fields if there are any.
-    $edit = array();
-    if($bundle) {
-      $edit['field[settings][handler_settings][target_bundles][' . $bundle . ']'] = TRUE;
+    $storage_edit = $field_edit = array();
+    $storage_edit['field_storage[settings][target_type]'] = $target_type;
+    if ($bundle) {
+      $field_edit['field[settings][handler_settings][target_bundles][' . $bundle . ']'] = TRUE;
     }
 
-    // Save settings.
-    $this->drupalPostForm(NULL, $edit, t('Save settings'));
+    $this->fieldUIAddNewField($bundle_path, $field_name, NULL, 'entity_reference', $storage_edit, $field_edit);
 
     // Returns the generated field name.
     return $field_name;

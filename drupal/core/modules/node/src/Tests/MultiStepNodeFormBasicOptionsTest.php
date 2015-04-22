@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\node\Tests;
+use Drupal\Component\Utility\Unicode;
 
 /**
  * Tests the persistence of basic options through multiple steps.
@@ -30,9 +31,9 @@ class MultiStepNodeFormBasicOptionsTest extends NodeTestBase {
     $this->drupalLogin($web_user);
 
     // Create an unlimited cardinality field.
-    $this->field_name = drupal_strtolower($this->randomMachineName());
+    $this->field_name = Unicode::strtolower($this->randomMachineName());
     entity_create('field_storage_config', array(
-      'name' => $this->field_name,
+      'field_name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'text',
       'cardinality' => -1,

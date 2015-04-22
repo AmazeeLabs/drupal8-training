@@ -10,34 +10,13 @@ namespace Drupal\Core\Entity;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\BaseFormIdInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
 
 /**
  * Defines an interface for entity form classes.
  */
 interface EntityFormInterface extends BaseFormIdInterface {
-
-  /**
-   * Returns the code identifying the active form language.
-   *
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   *
-   * @return string
-   *   The form language code.
-   */
-  public function getFormLangcode(FormStateInterface $form_state);
-
-  /**
-   * Checks whether the current form language matches the entity one.
-   *
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   *
-   * @return boolean
-   *   Returns TRUE if the entity form language matches the entity one.
-   */
-  public function isDefaultFormLangcode(FormStateInterface $form_state);
 
   /**
    * Sets the operation for this form.
@@ -62,9 +41,6 @@ interface EntityFormInterface extends BaseFormIdInterface {
    *
    * The form entity which has been used for populating form element defaults.
    *
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   *
    * @return \Drupal\Core\Entity\EntityInterface
    *   The current form entity.
    */
@@ -85,6 +61,19 @@ interface EntityFormInterface extends BaseFormIdInterface {
    * @return $this
    */
   public function setEntity(EntityInterface $entity);
+
+  /**
+   * Determines which entity will be used by this form from a RouteMatch object.
+   *
+   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+   *   The route match.
+   * @param string $entity_type_id
+   *   The entity type identifier.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
+   *   The entity object as determined from the passed-in route match.
+   */
+  public function getEntityFromRouteMatch(RouteMatchInterface $route_match, $entity_type_id);
 
   /**
    * Builds an updated entity object based upon the submitted form values.
@@ -112,6 +101,9 @@ interface EntityFormInterface extends BaseFormIdInterface {
    *   A nested array form elements comprising the form.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The current state of the form.
+   *
+   * @return \Drupal\Core\Entity\ContentEntityTypeInterface
+   *   The built entity.
    */
   public function validate(array $form, FormStateInterface $form_state);
 
@@ -150,5 +142,15 @@ interface EntityFormInterface extends BaseFormIdInterface {
    * @return $this
    */
   public function setModuleHandler(ModuleHandlerInterface $module_handler);
+
+  /**
+   * Sets the entity manager for this form.
+   *
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
+   *
+   * @return $this
+   */
+  public function setEntityManager(EntityManagerInterface $entity_manager);
 
 }

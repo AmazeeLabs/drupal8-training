@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\Routing;
 
+use Drupal\Component\Utility\String;
 use Drupal\simpletest\KernelTestBase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,7 +48,7 @@ class ExceptionHandlingTest extends KernelTestBase {
 
     $this->assertEqual($response->getStatusCode(), Response::HTTP_FORBIDDEN);
     $this->assertEqual($response->headers->get('Content-type'), 'application/json');
-    $this->assertEqual('{}', $response->getContent());
+    $this->assertEqual('{"message":""}', $response->getContent());
   }
 
   /**
@@ -64,7 +65,7 @@ class ExceptionHandlingTest extends KernelTestBase {
 
     $this->assertEqual($response->getStatusCode(), Response::HTTP_NOT_FOUND);
     $this->assertEqual($response->headers->get('Content-type'), 'application/json');
-    $this->assertEqual('{}', $response->getContent());
+    $this->assertEqual('{"message":"No route found for \\u0022GET \\/not-found\\u0022"}', $response->getContent());
   }
 
   /**
@@ -77,14 +78,14 @@ class ExceptionHandlingTest extends KernelTestBase {
 
     /** @var \Symfony\Component\HttpKernel\HttpKernelInterface $kernel */
     $kernel = \Drupal::getContainer()->get('http_kernel');
-    $response = $kernel->handle($request);
+    $response = $kernel->handle($request)->prepare($request);
 
     $this->assertEqual($response->getStatusCode(), Response::HTTP_FORBIDDEN);
-    $this->assertEqual($response->headers->get('Content-type'), 'text/html');
+    $this->assertEqual($response->headers->get('Content-type'), 'text/html; charset=UTF-8');
   }
 
   /**
-   * Tests the exception handling for HTML and 403 status code.
+   * Tests the exception handling for HTML and 404 status code.
    */
   public function testHtml404() {
     $request = Request::create('/not-found');
@@ -93,28 +94,33 @@ class ExceptionHandlingTest extends KernelTestBase {
 
     /** @var \Symfony\Component\HttpKernel\HttpKernelInterface $kernel */
     $kernel = \Drupal::getContainer()->get('http_kernel');
-    $response = $kernel->handle($request);
+    $response = $kernel->handle($request)->prepare($request);
 
     $this->assertEqual($response->getStatusCode(), Response::HTTP_NOT_FOUND);
-    $this->assertEqual($response->headers->get('Content-type'), 'text/html');
+    $this->assertEqual($response->headers->get('Content-type'), 'text/html; charset=UTF-8');
   }
 
   /**
-   * Tests the exception handling for HTML and 405 status code.
+   * Tests if exception backtraces are properly escaped when output to HTML.
    */
-  public function testHtml405() {
-    $request = Request::create('/admin', 'NOT_EXISTING');
+  public function testBacktraceEscaping() {
+    // Enable verbose error logging.
+    $this->config('system.logging')->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE)->save();
+
+    $request = Request::create('/router_test/test17');
     $request->headers->set('Accept', 'text/html');
     $request->setFormat('html', ['text/html']);
 
     /** @var \Symfony\Component\HttpKernel\HttpKernelInterface $kernel */
     $kernel = \Drupal::getContainer()->get('http_kernel');
-    $response = $kernel->handle($request);
+    $response = $kernel->handle($request)->prepare($request);
+    $this->assertEqual($response->getStatusCode(), Response::HTTP_INTERNAL_SERVER_ERROR);
+    $this->assertEqual($response->headers->get('Content-type'), 'text/html; charset=UTF-8');
 
-    $this->assertEqual($response->getStatusCode(), Response::HTTP_METHOD_NOT_ALLOWED);
-    $this->assertEqual($response->headers->get('Content-type'), 'text/html');
-    $this->assertEqual($response->getContent(), 'Method Not Allowed');
+    // Test both that the backtrace is properly escaped, and that the unescaped
+    // string is not output at all.
+    $this->assertTrue(strpos($response->getContent(), String::checkPlain('<script>alert(\'xss\')</script>')) !== FALSE);
+    $this->assertTrue(strpos($response->getContent(), '<script>alert(\'xss\')</script>') === FALSE);
   }
 
 }
-

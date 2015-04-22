@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\Theme;
 
+use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\Core\Extension\ExtensionDiscovery;
 use Drupal\comment\CommentInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
@@ -19,6 +20,8 @@ use Drupal\simpletest\WebTestBase;
  * @group Theme
  */
 class EntityFilteringThemeTest extends WebTestBase {
+
+  use CommentTestTrait;
 
   /**
    * Use the standard profile.
@@ -79,7 +82,7 @@ class EntityFilteringThemeTest extends WebTestBase {
     parent::setUp();
 
     // Install all available non-testing themes.
-    $listing = new ExtensionDiscovery();
+    $listing = new ExtensionDiscovery(\Drupal::root());
     $this->themes = $listing->scan('theme', FALSE);
     \Drupal::service('theme_handler')->install(array_keys($this->themes));
 
@@ -97,7 +100,7 @@ class EntityFilteringThemeTest extends WebTestBase {
     $this->term->save();
 
     // Add a comment field.
-    $this->container->get('comment.manager')->addDefaultField('node', 'article', 'comment', CommentItemInterface::OPEN);
+    $this->addDefaultCommentField('node', 'article', 'comment', CommentItemInterface::OPEN);
     // Create a test node tagged with the test term.
     $this->node = $this->drupalCreateNode(array(
       'title' => $this->xss_label,
@@ -132,7 +135,7 @@ class EntityFilteringThemeTest extends WebTestBase {
 
     // Check each path in all available themes.
     foreach ($this->themes as $name => $theme) {
-      \Drupal::config('system.theme')
+      $this->config('system.theme')
         ->set('default', $name)
         ->save();
       foreach ($paths as $path) {

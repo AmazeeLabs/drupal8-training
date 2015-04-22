@@ -21,7 +21,7 @@ class LinkEdit extends Link {
 
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['destination'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['destination'] = array('default' => FALSE);
 
     return $options;
   }
@@ -31,8 +31,8 @@ class LinkEdit extends Link {
 
     $form['destination'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Use destination'),
-      '#description' => t('Add destination to the link'),
+      '#title' => $this->t('Use destination'),
+      '#description' => $this->t('Add destination to the link'),
       '#default_value' => $this->options['destination'],
     );
   }
@@ -56,14 +56,14 @@ class LinkEdit extends Link {
       return;
     }
 
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('Edit');
+    $text = !empty($this->options['text']) ? $this->options['text'] : $this->t('Edit');
     unset($this->options['alter']['fragment']);
 
     if (!empty($this->options['destination'])) {
       $this->options['alter']['query'] = drupal_get_destination();
     }
 
-    $this->options['alter']['path'] = "comment/" . $comment->id() . "/edit";
+    $this->options['alter']['url'] = $comment->urlInfo('edit-form');
 
     return $text;
   }

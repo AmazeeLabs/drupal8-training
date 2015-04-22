@@ -24,12 +24,9 @@ fieldset {
 }
 label {
   display: table;
-  margin: 0 0 0 0.2em; /* LTR */
+  margin: 0 0 0.1em;
   padding: 0;
   font-weight: bold;
-}
-[dir="rtl"] label {
-  margin: 0 0.2em 0 0;
 }
 label.error {
   color: #a51b00;
@@ -186,6 +183,13 @@ textarea.form-textarea {
   clear: both;
 }
 
+/**
+ * Limits extra long instances of select elements to the max width allowed
+ * to avoid breaking layouts.
+ */
+select {
+  max-width: 100%;
+}
 
 /**
  * Select elements - Webkit only
@@ -265,13 +269,6 @@ textarea.form-textarea {
   .form-actions input:first-child,
   .form-wrapper input[type="submit"]:first-child {
     margin-top: 0;
-  }
-  .exposed-filters .filters,
-  .exposed-filters .form-item label,
-  .exposed-filters .form-select {
-    float: none;
-    margin-bottom: 2px;
-    width: 100%;
   }
   details summary {
     overflow: hidden;

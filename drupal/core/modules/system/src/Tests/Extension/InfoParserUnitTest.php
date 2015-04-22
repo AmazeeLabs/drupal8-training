@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Tests\Extension;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 use Drupal\Core\Extension\InfoParser;
 use Drupal\Core\Extension\InfoParserException;
 
@@ -20,7 +20,7 @@ use Drupal\Core\Extension\InfoParserException;
  *
  * @group Extension
  */
-class InfoParserUnitTest extends DrupalUnitTestBase {
+class InfoParserUnitTest extends KernelTestBase {
 
   /**
    * The InfoParser object.
@@ -74,7 +74,7 @@ class InfoParserUnitTest extends DrupalUnitTestBase {
       $this->fail('Expected InfoParserException not thrown when reading missing_key.info.txt');
     }
     catch (InfoParserException $e) {
-      $expected_message = "Missing required key (type) in $filename.";
+      $expected_message = "Missing required keys (type) in $filename.";
       $this->assertEqual($e->getMessage(), $expected_message);
     }
 

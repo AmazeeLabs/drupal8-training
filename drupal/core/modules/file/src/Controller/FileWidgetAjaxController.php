@@ -38,19 +38,23 @@ class FileWidgetAjaxController extends FormAjaxController {
       // Invalid request.
       drupal_set_message(t('An unrecoverable error occurred. The uploaded file likely exceeded the maximum file size (@size) that this server supports.', array('@size' => format_size(file_upload_max_size()))), 'error');
       $response = new AjaxResponse();
-      $status_messages = array('#theme' => 'status_messages');
-      return $response->addCommand(new ReplaceCommand(NULL, drupal_render($status_messages)));
+      $status_messages = array('#type' => 'status_messages');
+      return $response->addCommand(new ReplaceCommand(NULL, $this->renderer->renderRoot($status_messages)));
     }
 
     try {
-      list($form, $form_state) = $this->getForm($request);
+      /** @var $ajaxForm \Drupal\system\FileAjaxForm */
+      $ajaxForm = $this->getForm($request);
+      $form = $ajaxForm->getForm();
+      $form_state = $ajaxForm->getFormState();
+      $commands = $ajaxForm->getCommands();
     }
     catch (HttpExceptionInterface $e) {
       // Invalid form_build_id.
       drupal_set_message(t('An unrecoverable error occurred. Use of this form has expired. Try reloading the page and submitting again.'), 'error');
       $response = new AjaxResponse();
-      $status_messages = array('#theme' => 'status_messages');
-      return $response->addCommand(new ReplaceCommand(NULL, drupal_render($status_messages)));
+      $status_messages = array('#type' => 'status_messages');
+      return $response->addCommand(new ReplaceCommand(NULL, $this->renderer->renderRoot($status_messages)));
     }
 
     // Get the current element and count the number of files.
@@ -58,7 +62,7 @@ class FileWidgetAjaxController extends FormAjaxController {
     $current_file_count = isset($current_element['#file_upload_delta']) ? $current_element['#file_upload_delta'] : 0;
 
     // Process user input. $form and $form_state are modified in the process.
-    drupal_process_form($form['#form_id'], $form, $form_state);
+    $this->formBuilder->processForm($form['#form_id'], $form, $form_state);
 
     // Retrieve the element to be rendered.
     $form = NestedArray::getValue($form, $form_parents);
@@ -72,15 +76,16 @@ class FileWidgetAjaxController extends FormAjaxController {
       $form['#suffix'] .= '<span class="ajax-new-content"></span>';
     }
 
-    $status_messages = array('#theme' => 'status_messages');
-    $form['#prefix'] .= drupal_render($status_messages);
-    $output = drupal_render($form);
-    drupal_process_attached($form);
-    $js = _drupal_add_js();
-    $settings = drupal_merge_js_settings($js['settings']['data']);
+    $status_messages = array('#type' => 'status_messages');
+    $form['#prefix'] .= $this->renderer->renderRoot($status_messages);
+    $output = $this->renderer->renderRoot($form);
 
     $response = new AjaxResponse();
-    return $response->addCommand(new ReplaceCommand(NULL, $output, $settings));
+    $response->setAttachments($form['#attached']);
+    foreach ($commands as $command) {
+      $response->addCommand($command, TRUE);
+    }
+    return $response->addCommand(new ReplaceCommand(NULL, $output));
   }
 
   /**

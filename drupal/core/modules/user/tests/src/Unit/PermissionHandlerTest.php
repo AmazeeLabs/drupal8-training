@@ -55,6 +55,8 @@ class PermissionHandlerTest extends UnitTestCase {
    * {@inheritdoc}
    */
   protected function setUp() {
+    parent::setUp();
+
     $this->stringTranslation = $this->getStringTranslationStub();
     $this->controllerResolver = $this->getMock('Drupal\Core\Controller\ControllerResolverInterface');
   }
@@ -71,7 +73,7 @@ class PermissionHandlerTest extends UnitTestCase {
    *   The extension object.
    */
   protected function mockModuleExtension($module, $name) {
-    $extension = new Extension($module, "modules/$module");
+    $extension = new Extension($this->root, $module, "modules/$module");
     $extension->info['name'] = $name;
     return $extension;
   }
@@ -81,7 +83,6 @@ class PermissionHandlerTest extends UnitTestCase {
    *
    * @covers ::__construct
    * @covers ::getPermissions
-   * @covers ::buildPermissions
    * @covers ::buildPermissionsYaml
    * @covers ::moduleProvidesPermissions
    */
@@ -154,7 +155,6 @@ class PermissionHandlerTest extends UnitTestCase {
    *
    * @covers ::__construct
    * @covers ::getPermissions
-   * @covers ::buildPermissions
    * @covers ::buildPermissionsYaml
    * @covers ::sortPermissions
    */
@@ -204,7 +204,6 @@ access_module_a1: single_description"
    *
    * @covers ::__construct
    * @covers ::getPermissions
-   * @covers ::buildPermissions
    * @covers ::buildPermissionsYaml
    */
   public function testBuildPermissionsYamlCallback() {

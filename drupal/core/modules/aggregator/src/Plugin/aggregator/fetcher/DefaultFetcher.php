@@ -90,13 +90,12 @@ class DefaultFetcher implements FetcherInterface, ContainerFactoryPluginInterfac
         return FALSE;
       }
 
-      $feed->source_string = $response->getBody(TRUE);
+      $feed->source_string = (string) $response->getBody();
       $feed->setEtag($response->getHeader('ETag'));
       $feed->setLastModified(strtotime($response->getHeader('Last-Modified')));
       $feed->http_headers = $response->getHeaders();
 
       // Update the feed URL in case of a 301 redirect.
-
       if ($response->getEffectiveUrl() != $feed->getUrl()) {
         $feed->setUrl($response->getEffectiveUrl());
       }
@@ -104,7 +103,7 @@ class DefaultFetcher implements FetcherInterface, ContainerFactoryPluginInterfac
     }
     catch (RequestException $e) {
       $this->logger->warning('The feed from %site seems to be broken because of error "%error".', array('%site' => $feed->label(), '%error' => $e->getMessage()));
-      drupal_set_message(t('The feed from %site seems to be broken because of error "%error".', array('%site' => $feed->label(), '%error' => $e->getMessage())) , 'warning');
+      drupal_set_message(t('The feed from %site seems to be broken because of error "%error".', array('%site' => $feed->label(), '%error' => $e->getMessage())), 'warning');
       return FALSE;
     }
   }

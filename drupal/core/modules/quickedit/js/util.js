@@ -82,7 +82,7 @@
      *    - Boolean nocssjs: (required) boolean indicating whether no CSS and JS
      *      should be returned (necessary when the form is invisible to the user).
      *    - Boolean reset: (required) boolean indicating whether the data stored
-     *      for this field's entity in TempStore should be used or reset.
+     *      for this field's entity in PrivateTempStore should be used or reset.
      * @param Function callback
      *   A callback function that will receive the form to be inserted, as well as
      *   the ajax object, necessary if the callback wants to perform other AJAX
@@ -100,13 +100,13 @@
           nocssjs: options.nocssjs,
           reset: options.reset
         },
-        progress: { type: null }, // No progress indicator.
+        progress: {type: null}, // No progress indicator.
         error: function (xhr, url) {
           $el.off('quickedit-internal.quickedit');
 
           // Show a modal to inform the user of the network error.
           var fieldLabel = Drupal.quickedit.metadata.get(fieldID, 'label');
-          var message = Drupal.t('Could not load the form for <q>@field-label</q>, either due to a website problem or a network connection problem.<br>Please try again.', { '@field-label': fieldLabel });
+          var message = Drupal.t('Could not load the form for <q>@field-label</q>, either due to a website problem or a network connection problem.<br>Please try again.', {'@field-label': fieldLabel});
           Drupal.quickedit.util.networkErrorModal(Drupal.t('Sorry!'), message);
 
           // Change the state back to "candidate", to allow the user to start
@@ -143,7 +143,7 @@
         url: $submit.closest('form').attr('action'),
         setClick: true,
         event: 'click.quickedit',
-        progress: { type: null },
+        progress: {type: null},
         submit: {
           nocssjs: options.nocssjs,
           other_view_modes: options.other_view_modes

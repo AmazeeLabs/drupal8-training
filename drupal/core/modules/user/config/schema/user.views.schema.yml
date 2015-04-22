@@ -16,14 +16,14 @@ views.access.role:
       type: sequence
       label: 'List of roles'
       sequence:
-        - type: string
-          label: 'Role'
+        type: string
+        label: 'Role'
 
 views.argument.user_uid:
   type: views.argument.numeric
   label: 'User ID'
 
-views.argument.users_roles_rid:
+views.argument.user__roles_rid:
   type: views.argument.many_to_one
   label: 'Role ID'
 
@@ -41,8 +41,8 @@ views.argument_validator.user:
       type: sequence
       label: 'Restrict to the selected roles'
       sequence:
-        - type: string
-          label: 'Role'
+        type: string
+        label: 'Role'
 
 views.argument_default.user:
   type: mapping
@@ -60,28 +60,12 @@ views.argument_default.node:
   type: boolean
   label: 'Content ID from URL'
 
-"views.row.entity:user":
-  type: views_entity_row
-  label: 'Entity options'
-
 views_field_user:
   type: views_field
   mapping:
     link_to_user:
       type: boolean
       label: 'Link this field to its user'
-
-views.field.user_language:
-  type: views_field
-  label: 'User language'
-  mapping:
-    link_to_node:
-      type: boolean
-      label: 'Link this field to its user'
-
-views.field.user_language:
-  type: views_field_user
-  label: 'User language'
 
 views.field.user_link:
   type: views_field
@@ -132,6 +116,17 @@ views.field.user:
 views.field.user_bulk_form:
   type: views_field_bulk_form
   label: 'User operations bulk form'
+
+views.field.user_data:
+  type: views_field
+  label: 'User data field'
+  mapping:
+    data_module:
+      type: string
+      label: 'Module name'
+    data_name:
+      type: string
+      label: 'Name'
 
 views.filter.user_current:
   type: views.filter.boolean

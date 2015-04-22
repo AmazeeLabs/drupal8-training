@@ -30,52 +30,48 @@ class RdfMapping extends ConfigEntityBase implements RdfMappingInterface {
    *
    * @var string
    */
-  public $id;
+  protected $id;
 
   /**
    * Entity type to be mapped.
    *
    * @var string
    */
-  public $targetEntityType;
+  protected $targetEntityType;
 
   /**
    * Bundle to be mapped.
    *
    * @var string
    */
-  public $bundle;
+  protected $bundle;
 
   /**
    * The RDF type mapping for this bundle.
    *
    * @var array
    */
-  protected $types;
+  protected $types = array();
 
   /**
    * The mappings for fields on this bundle.
    *
    * @var array
    */
-  protected $fieldMappings;
+  protected $fieldMappings = array();
 
   /**
    * {@inheritdoc}
    */
   public function getPreparedBundleMapping() {
-    $types = array();
-    if (isset($this->types)) {
-      $types = $this->types;
-    }
-    return array('types' => $types);
+    return array('types' => $this->types);
   }
 
   /**
    * {@inheritdoc}
    */
   public function getBundleMapping() {
-    if (isset($this->types)) {
+    if (!empty($this->types)) {
       return array('types' => $this->types);
     }
     return array();
@@ -145,7 +141,7 @@ class RdfMapping extends ConfigEntityBase implements RdfMappingInterface {
       // If the target entity type uses entities to manage its bundles then
       // depend on the bundle entity.
       $bundle_entity = \Drupal::entityManager()->getStorage($bundle_entity_type_id)->load($this->bundle);
-      $this->addDependency('entity', $bundle_entity->getConfigDependencyName());
+      $this->addDependency('config', $bundle_entity->getConfigDependencyName());
     }
     return $this->dependencies;
   }

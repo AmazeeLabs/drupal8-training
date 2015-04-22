@@ -2,26 +2,26 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Routing\RouteBuilder.
+ * Contains \Drupal\Core\Routing\RouteBuilder.
  */
 
 namespace Drupal\Core\Routing;
 
 use Drupal\Component\Discovery\YamlDiscovery;
+use Drupal\Core\Access\CheckProviderInterface;
 use Drupal\Core\Controller\ControllerResolverInterface;
-use Drupal\Core\State\StateInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Lock\LockBackendInterface;
+use Drupal\Core\DestructableInterface;
 use Symfony\Component\EventDispatcher\Event;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\Component\Routing\Route;
 
-use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Lock\LockBackendInterface;
-
 /**
  * Managing class for rebuilding the router table.
  */
-class RouteBuilder implements RouteBuilderInterface {
+class RouteBuilder implements RouteBuilderInterface, DestructableInterface {
 
   /**
    * The dumper to which we should send collected routes.
@@ -73,6 +73,27 @@ class RouteBuilder implements RouteBuilderInterface {
   protected $routeCollection;
 
   /**
+   * Flag that indicates if we are currently rebuilding the routes.
+   *
+   * @var bool
+   */
+  protected $building = FALSE;
+
+  /**
+   * Flag that indicates if we should rebuild at the end of the request.
+   *
+   * @var bool
+   */
+  protected $rebuildNeeded = FALSE;
+
+  /**
+   * The check provider.
+   *
+   * @var \Drupal\Core\Access\CheckProviderInterface
+   */
+  protected $checkProvider;
+
+  /**
    * Constructs the RouteBuilder using the passed MatcherDumperInterface.
    *
    * @param \Drupal\Core\Routing\MatcherDumperInterface $dumper
@@ -85,22 +106,33 @@ class RouteBuilder implements RouteBuilderInterface {
    *   The module handler.
    * @param \Drupal\Core\Controller\ControllerResolverInterface $controller_resolver
    *   The controller resolver.
-   * @param \Drupal\Core\KeyValueStore\StateInterface $state
-   *   The state.
+   * @param \Drupal\Core\Access\CheckProviderInterface $check_provider
+   *   The check provider.
    */
-  public function __construct(MatcherDumperInterface $dumper, LockBackendInterface $lock, EventDispatcherInterface $dispatcher, ModuleHandlerInterface $module_handler, ControllerResolverInterface $controller_resolver, StateInterface $state = NULL) {
+  public function __construct(MatcherDumperInterface $dumper, LockBackendInterface $lock, EventDispatcherInterface $dispatcher, ModuleHandlerInterface $module_handler, ControllerResolverInterface $controller_resolver, CheckProviderInterface $check_provider) {
     $this->dumper = $dumper;
     $this->lock = $lock;
     $this->dispatcher = $dispatcher;
     $this->moduleHandler = $module_handler;
     $this->controllerResolver = $controller_resolver;
-    $this->state = $state;
+    $this->checkProvider = $check_provider;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setRebuildNeeded() {
+    $this->rebuildNeeded = TRUE;
   }
 
   /**
    * {@inheritdoc}
    */
   public function rebuild() {
+    if ($this->building) {
+      throw new \RuntimeException('Recursive router rebuild detected.');
+    }
+
     if (!$this->lock->acquire('router_rebuild')) {
       // Wait for another request that is already doing this work.
       // We choose to block here since otherwise the routes might not be
@@ -109,8 +141,9 @@ class RouteBuilder implements RouteBuilderInterface {
       return FALSE;
     }
 
+    $this->building = TRUE;
+
     $collection = new RouteCollection();
-    $this->routeCollection = $collection;
     foreach ($this->getRouteDefinitions() as $routes) {
       // The top-level 'routes_callback' is a list of methods in controller
       // syntax, see \Drupal\Core\Controller\ControllerResolver. These methods
@@ -147,7 +180,6 @@ class RouteBuilder implements RouteBuilderInterface {
         $route = new Route($route_info['path'], $route_info['defaults'], $route_info['requirements'], $route_info['options']);
         $collection->add($name, $route);
       }
-
     }
 
     // DYNAMIC is supposed to be used to add new routes based upon all the
@@ -159,14 +191,16 @@ class RouteBuilder implements RouteBuilderInterface {
     // make it clear.
     $this->dispatcher->dispatch(RoutingEvents::ALTER, new RouteBuildEvent($collection));
 
+    $this->checkProvider->setChecks($collection);
+
     $this->dumper->addRoutes($collection);
     $this->dumper->dump();
 
-    $this->state->delete(static::REBUILD_NEEDED);
     $this->lock->release('router_rebuild');
     $this->dispatcher->dispatch(RoutingEvents::FINISHED, new Event());
+    $this->building = FALSE;
 
-    $this->routeCollection = NULL;
+    $this->rebuildNeeded = FALSE;
 
     return TRUE;
   }
@@ -174,15 +208,8 @@ class RouteBuilder implements RouteBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function getCollectionDuringRebuild() {
-    return $this->routeCollection ?: FALSE;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function rebuildIfNeeded() {
-    if ($this->state->get(static::REBUILD_NEEDED, FALSE)) {
+    if ($this->rebuildNeeded) {
       return $this->rebuild();
     }
     return FALSE;
@@ -191,8 +218,11 @@ class RouteBuilder implements RouteBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function setRebuildNeeded() {
-    $this->state->set(static::REBUILD_NEEDED, TRUE);
+  public function destruct() {
+    // Rebuild routes only once at the end of the request lifecycle to not
+    // trigger multiple rebuilds and also make the page more responsive for the
+    // user.
+    $this->rebuildIfNeeded();
   }
 
   /**

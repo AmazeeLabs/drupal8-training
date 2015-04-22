@@ -9,14 +9,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade image gd variables to system.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateSystemImageGdTest extends MigrateDrupalTestBase {
+class MigrateSystemImageGdTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -25,7 +25,7 @@ class MigrateSystemImageGdTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_system_image_gd');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6SystemImageGd.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -36,8 +36,8 @@ class MigrateSystemImageGdTest extends MigrateDrupalTestBase {
    * Tests migration of system (image GD) variables to system.image.gd.yml.
    */
   public function testSystemImageGd() {
-    $config = \Drupal::config('system.image.gd');
-    $this->assertIdentical($config->get('jpeg_quality'), 75);
+    $config = $this->config('system.image.gd');
+    $this->assertIdentical(75, $config->get('jpeg_quality'));
   }
 
 }

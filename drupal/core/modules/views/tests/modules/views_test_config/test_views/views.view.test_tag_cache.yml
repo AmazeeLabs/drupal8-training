@@ -1,8 +1,16 @@
-base_field: nid
-base_table: node
-core: 8
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - node
+id: test_tag_cache
+label: ''
+module: views
+description: ''
+tag: ''
+base_table: node_field_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -15,21 +23,22 @@ display:
       fields:
         nid:
           alter:
-            alter_text: '0'
-            ellipsis: '1'
-            html: '0'
-            make_link: '0'
-            strip_tags: '0'
-            trim: '0'
-            word_boundary: '1'
-          empty_zero: '0'
+            alter_text: false
+            ellipsis: true
+            html: false
+            make_link: false
+            strip_tags: false
+            trim: false
+            word_boundary: true
+          empty_zero: false
           field: nid
-          group_type: {  }
-          hide_empty: '0'
+          group_type: group
+          hide_empty: false
           id: nid
-          table: node
-          plugin_id: numeric
-          provider: views
+          table: node_field_data
+          plugin_id: field
+          entity_type: node
+          entity_field: nid
         title:
           id: title
           table: node_field_data
@@ -44,9 +53,13 @@ display:
           hide_empty: false
           empty_zero: false
           hide_alter_empty: true
-          link_to_node: true
-          plugin_id: node
-          provider: node
+          plugin_id: field
+          entity_type: node
+          entity_field: title
+          type: string
+          settings:
+            link_to_entity: true
+          plugin_id: field
       filters:
         type:
           id: type
@@ -58,10 +71,10 @@ display:
           operator: in
           value:
             page: page
-          group: '1'
+          group: 1
           exposed: false
           expose:
-            operator_id: false
+            operator_id: ''
             label: ''
             description: ''
             use_operator: false
@@ -81,13 +94,14 @@ display:
             optional: true
             widget: select
             multiple: false
-            remember: 0
+            remember: false
             default_group: All
             default_group_multiple: {  }
             group_items: {  }
           plugin_id: bundle
-          provider: views
-      group_by: '1'
+          entity_type: node
+          entity_field: type
+      group_by: true
       pager:
         type: some
       style:
@@ -98,6 +112,3 @@ display:
     display_title: Master
     id: default
     position: 0
-label: ''
-id: test_tag_cache
-tag: ''

@@ -11,8 +11,11 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Routing\RouteMatch;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\Core\Url;
 use Drupal\locale\LocaleConfigManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -74,9 +77,11 @@ class ConfigEntityMapper extends ConfigNamesMapper {
    *   The string translation manager.
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    */
-  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, TypedConfigManagerInterface $typed_config, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $translation_manager, EntityManagerInterface $entity_manager) {
-    parent::__construct($plugin_id, $plugin_definition, $config_factory, $typed_config, $locale_config_manager, $config_mapper_manager, $route_provider, $translation_manager);
+  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, TypedConfigManagerInterface $typed_config, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $translation_manager, EntityManagerInterface $entity_manager, LanguageManagerInterface $language_manager) {
+    parent::__construct($plugin_id, $plugin_definition, $config_factory, $typed_config, $locale_config_manager, $config_mapper_manager, $route_provider, $translation_manager, $language_manager);
     $this->setType($plugin_definition['entity_type']);
 
     $this->entityManager = $entity_manager;
@@ -97,7 +102,8 @@ class ConfigEntityMapper extends ConfigNamesMapper {
       $container->get('plugin.manager.config_translation.mapper'),
       $container->get('router.route_provider'),
       $container->get('string_translation'),
-      $container->get('entity.manager')
+      $container->get('entity.manager'),
+      $container->get('language_manager')
     );
   }
 
@@ -216,7 +222,9 @@ class ConfigEntityMapper extends ConfigNamesMapper {
     return array(
       'list' => array(
         'title' => $this->t('List'),
-        'href' => 'admin/config/regional/config-translation/' . $this->getPluginId(),
+        'url' => Url::fromRoute('config_translation.entity_list', [
+          'mapper_id' => $this->getPluginId(),
+        ]),
       ),
     );
   }
@@ -236,6 +244,13 @@ class ConfigEntityMapper extends ConfigNamesMapper {
       default:
         return NULL;
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getOverviewRouteName() {
+    return 'entity.' . $this->entityType . '.config_translation_overview';
   }
 
   /**

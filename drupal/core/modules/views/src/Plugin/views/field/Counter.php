@@ -26,25 +26,33 @@ class Counter extends FieldPluginBase {
     return FALSE;
   }
 
-
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
     $options['counter_start'] = array('default' => 1);
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['counter_start'] = array(
       '#type' => 'textfield',
-      '#title' => t('Starting value'),
+      '#title' => $this->t('Starting value'),
       '#default_value' => $this->options['counter_start'],
-      '#description' => t('Specify the number the counter should start at.'),
+      '#description' => $this->t('Specify the number the counter should start at.'),
       '#size' => 2,
     );
 
     parent::buildOptionsForm($form, $form_state);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {
     // do nothing -- to override the parent query.
   }

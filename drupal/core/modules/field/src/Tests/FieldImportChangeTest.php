@@ -7,6 +7,8 @@
 
 namespace Drupal\field\Tests;
 
+use Drupal\field\Entity\FieldConfig;
+
 /**
  * Update field storage and fields during config change method invocation.
  *
@@ -17,6 +19,10 @@ class FieldImportChangeTest extends FieldUnitTestBase {
   /**
    * Modules to enable.
    *
+   * The default configuration provided by field_test_config is imported by
+   * \Drupal\field\Tests\FieldUnitTestBase::setUp() when it installs field
+   * configuration.
+   *
    * @var array
    */
   public static $modules = array('field_test_config');
@@ -25,17 +31,16 @@ class FieldImportChangeTest extends FieldUnitTestBase {
    * Tests importing an updated field.
    */
   function testImportChange() {
+    $this->installConfig(['field_test_config']);
     $field_storage_id = 'field_test_import';
     $field_id = "entity_test.entity_test.$field_storage_id";
     $field_config_name = "field.field.$field_id";
 
-    // Import default config.
-    $this->installConfig(array('field_test_config'));
     $active = $this->container->get('config.storage');
     $staging = $this->container->get('config.storage.staging');
     $this->copyConfig($active, $staging);
 
-    // Save as files in the the staging directory.
+    // Save as files in the staging directory.
     $field = $active->read($field_config_name);
     $new_label = 'Test update import field';
     $field['label'] = $new_label;
@@ -45,7 +50,7 @@ class FieldImportChangeTest extends FieldUnitTestBase {
     $this->configImporter()->import();
 
     // Check that the updated config was correctly imported.
-    $field = entity_load('field_config', $field_id);
+    $field = FieldConfig::load($field_id);
     $this->assertEqual($field->getLabel(), $new_label, 'field label updated');
   }
 }

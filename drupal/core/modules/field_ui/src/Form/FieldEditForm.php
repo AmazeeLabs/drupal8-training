@@ -86,6 +86,7 @@ class FieldEditForm extends FormBase {
     $ids = (object) array('entity_type' => $this->field->entity_type, 'bundle' => $this->field->bundle, 'entity_id' => NULL);
     $form['#entity'] = _field_create_entity_from_ids($ids);
     $items = $form['#entity']->get($this->field->getName());
+    $item = $items->first() ?: $items->appendItem();
 
     if (!empty($field_storage->locked)) {
       $form['locked'] = array(
@@ -140,7 +141,7 @@ class FieldEditForm extends FormBase {
 
     // Add field settings for the field type and a container for third party
     // settings that modules can add to via hook_form_FORM_ID_alter().
-    $form['field']['settings'] = $items[0]->fieldSettingsForm($form, $form_state);
+    $form['field']['settings'] = $item->fieldSettingsForm($form, $form_state);
     $form['field']['settings']['#weight'] = 10;
     $form['field']['third_party_settings'] = array();
     $form['field']['third_party_settings']['#weight'] = 11;
@@ -160,7 +161,8 @@ class FieldEditForm extends FormBase {
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(
       '#type' => 'submit',
-      '#value' => $this->t('Save settings')
+      '#value' => $this->t('Save settings'),
+      '#button_type' => 'primary',
     );
     $form['actions']['delete'] = array(
       '#type' => 'submit',
@@ -222,7 +224,7 @@ class FieldEditForm extends FormBase {
     }
     $entity_type = $this->entityManager->getDefinition($this->field->entity_type);
     $form_state->setRedirect(
-      'field_ui.delete_' . $this->field->entity_type,
+      'entity.field_config.' . $this->field->entity_type . '_field_delete_form',
       array(
         $entity_type->getBundleEntityType() => $this->field->bundle,
         'field_config' => $this->field->id(),

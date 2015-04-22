@@ -23,23 +23,24 @@ use Drupal\entity_test\Entity\EntityTest;
  *       "default" = "Drupal\entity_test\EntityTestForm",
  *       "delete" = "Drupal\entity_test\EntityTestDeleteForm"
  *     },
+ *     "view_builder" = "Drupal\entity_test\EntityTestViewBuilder",
  *     "translation" = "Drupal\content_translation\ContentTranslationHandler",
  *     "views_data" = "Drupal\views\EntityViewsData"
  *   },
  *   base_table = "entity_test_rev",
  *   revision_table = "entity_test_rev_revision",
- *   fieldable = TRUE,
  *   entity_keys = {
  *     "id" = "id",
  *     "uuid" = "uuid",
  *     "revision" = "revision_id",
  *     "bundle" = "type",
  *     "label" = "name",
+ *     "langcode" = "langcode",
  *   },
  *   links = {
- *     "canonical" = "entity.entity_test_rev.edit_form",
- *     "delete-form" = "entity.entity_test_rev.delete_form",
- *     "edit-form" = "entity.entity_test_rev.edit_form"
+ *     "canonical" = "/entity_test_rev/manage/{entity_test_rev}",
+ *     "delete-form" = "/entity_test/delete/entity_test_rev/{entity_test_rev}",
+ *     "edit-form" = "/entity_test_rev/manage/{entity_test_rev}"
  *   }
  * )
  */

@@ -2,14 +2,12 @@
 
 body {
   color: #3b3b3b;
-}
-.comment .comment-arrow {
-  border-color: #ffffff;
+  background: #292929;
 }
 #page,
 #main-wrapper,
-#main-menu-links li a.active,
-#main-menu-links li.active-trail a {
+.region-primary-menu .menu-item a.active,
+.region-primary-menu .menu-item .menu-item--active-trail a {
   background: #ffffff;
 }
 .tabs ul.primary li a.active {
@@ -17,7 +15,7 @@ body {
 }
 .tabs ul.primary li.active a {
   background-color: #ffffff;
-  border-bottom: 1px solid #ffffff;
+  border-bottom-color: #ffffff;
 }
 #header {
   background-color: #1d84c3;
@@ -42,8 +40,7 @@ a:active,
   background-color: #f6f6f2;
   border-color: #f9f9f9;
 }
-#page-wrapper,
-#footer-wrapper {
+#site-footer__wrapper {
   background: #292929;
 }
 .region-header,
@@ -53,6 +50,20 @@ a:active,
 .site-branding-block,
 #name-and-slogan a,
 .site-branding-block a,
-#secondary-menu-links li a {
+.region-secondary-menu .menu-item a {
   color: #fffeff;
+}
+
+/* ---------- Color Form ----------- */
+
+[dir="rtl"] .color-form #palette {
+  margin-left: 0;
+  margin-right: 20px;
+}
+[dir="rtl"] .color-form .form-item label {
+  float: right;
+}
+[dir="rtl"] .color-form #palette .lock {
+  right: -20px;
+  left: 0;
 }

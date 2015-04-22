@@ -7,6 +7,7 @@
 
 namespace Drupal\contact\Controller;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Datetime\DateFormatter;
 use Drupal\Core\Flood\FloodInterface;
@@ -77,12 +78,13 @@ class ContactController extends ControllerBase {
     if (!$this->currentUser()->hasPermission('administer contact forms')) {
       $this->contactFloodControl();
     }
+    $config = $this->config('contact.settings');
 
     // Use the default form if no form has been passed.
     if (empty($contact_form)) {
       $contact_form = $this->entityManager()
         ->getStorage('contact_form')
-        ->load($this->config('contact.settings')->get('default_form'));
+        ->load($config->get('default_form'));
       // If there are no forms, do not display the form.
       if (empty($contact_form)) {
         if ($this->currentUser()->hasPermission('administer contact forms')) {
@@ -104,6 +106,7 @@ class ContactController extends ControllerBase {
 
     $form = $this->entityFormBuilder()->getForm($message);
     $form['#title'] = String::checkPlain($contact_form->label());
+    $form['#cache']['tags'] = Cache::mergeTags(isset($form['#cache']['tags']) ? $form['#cache']['tags'] : [],  $config->getCacheTags());
     return $form;
   }
 
@@ -115,8 +118,17 @@ class ContactController extends ControllerBase {
    *
    * @return array
    *   The personal contact form as render array as expected by drupal_render().
+   *
+   * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
+   *   Exception is thrown when user tries to access a contact form for a
+   *   user who does not have an e-mail address configured.
    */
   public function contactPersonalPage(UserInterface $user) {
+    // Do not continue if the user does not have an e-mail address configured.
+    if (!$user->getEmail()) {
+      throw new NotFoundHttpException();
+    }
+
     // Check if flood control has been activated for sending emails.
     if (!$this->currentUser()->hasPermission('administer contact forms') && !$this->currentUser()->hasPermission('administer users')) {
       $this->contactFloodControl();

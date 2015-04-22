@@ -74,13 +74,30 @@ class ExtensionDiscovery {
   protected $profileDirectories;
 
   /**
+   * The app root.
+   *
+   * @var string
+   */
+  protected $root;
+
+  /**
+   * Constructs a new ExtensionDiscovery object.
+   *
+   * @param string $root
+   *   The app root.
+   */
+  public function __construct($root) {
+    $this->root = $root;
+  }
+
+  /**
    * Discovers available extensions of a given type.
    *
    * Finds all extensions (modules, themes, etc) that exist on the site. It
    * searches in several locations. For instance, to discover all available
    * modules:
    * @code
-   * $listing = new ExtensionDiscovery();
+   * $listing = new ExtensionDiscovery(\Drupal::root());
    * $modules = $listing->scan('module');
    * @endcode
    *
@@ -158,54 +175,14 @@ class ExtensionDiscovery {
       }
     }
 
-    // Sort the discovered extensions by their originating directories and,
-    // if applicable, filter out extensions that do not belong to the current
+    // If applicable, filter out extensions that do not belong to the current
     // installation profiles.
+    $files = $this->filterByProfileDirectories($files);
+    // Sort the discovered extensions by their originating directories.
     $origin_weights = array_flip($searchdirs);
-    $origins = array();
-    $profiles = array();
-    foreach ($files as $key => $file) {
-      // If the extension does not belong to a profile, just apply the weight
-      // of the originating directory.
-      if (strpos($file->subpath, 'profiles') !== 0) {
-        $origins[$key] = $origin_weights[$file->origin];
-        $profiles[$key] = NULL;
-      }
-      // If the extension belongs to a profile but no profile directories are
-      // defined, then we are scanning for installation profiles themselves.
-      // In this case, profiles are sorted by origin only.
-      elseif (empty($this->profileDirectories)) {
-        $origins[$key] = static::ORIGIN_PROFILE;
-        $profiles[$key] = NULL;
-      }
-      else {
-        // Apply the weight of the originating profile directory.
-        foreach ($this->profileDirectories as $weight => $profile_path) {
-          if (strpos($file->getPath(), $profile_path) === 0) {
-            $origins[$key] = static::ORIGIN_PROFILE;
-            $profiles[$key] = $weight;
-            continue 2;
-          }
-        }
-        // If we end up here, then the extension does not belong to any of the
-        // current installation profile directories, so remove it.
-        unset($files[$key]);
-      }
-    }
-    // Now sort the extensions by origin and installation profile(s).
-    // The result of this multisort can be depicted like the following matrix,
-    // whereas the first integer is the weight of the originating directory and
-    // the second is the weight of the originating installation profile:
-    // 0   core/modules/node/node.module
-    // 1 0 profiles/parent_profile/modules/parent_module/parent_module.module
-    // 1 1 core/profiles/testing/modules/compatible_test/compatible_test.module
-    // 2   sites/all/modules/common/common.module
-    // 3   modules/devel/devel.module
-    // 4   sites/default/modules/custom/custom.module
-    array_multisort($origins, SORT_ASC, $profiles, SORT_ASC, $files);
+    $files = $this->sort($files, $origin_weights);
 
-    // Process and return the sorted and filtered list of extensions keyed by
-    // extension name.
+    // Process and return the list of extensions keyed by extension name.
     return $this->process($files);
   }
 
@@ -260,6 +237,93 @@ class ExtensionDiscovery {
   }
 
   /**
+   * Filters out extensions not belonging to the scanned installation profiles.
+   *
+   * @param \Drupal\Core\Extension\Extension[] $all_files.
+   *   The list of all extensions.
+   *
+   * @return \Drupal\Core\Extension\Extension[]
+   *   The filtered list of extensions.
+   */
+  protected function filterByProfileDirectories(array $all_files) {
+    if (empty($this->profileDirectories)) {
+      return $all_files;
+    }
+
+    $all_files = array_filter($all_files, function ($file) {
+      if (strpos($file->subpath, 'profiles') !== 0) {
+        // This extension doesn't belong to a profile, ignore it.
+        return TRUE;
+      }
+
+      foreach ($this->profileDirectories as $weight => $profile_path) {
+        if (strpos($file->getPath(), $profile_path) === 0) {
+          // Parent profile found.
+          return TRUE;
+        }
+      }
+
+      return FALSE;
+    });
+
+    return $all_files;
+  }
+
+  /**
+   * Sorts the discovered extensions.
+   *
+   * @param \Drupal\Core\Extension\Extension[] $all_files.
+   *   The list of all extensions.
+   * @param array $weights
+   *   An array of weights, keyed by originating directory.
+   *
+   * @return \Drupal\Core\Extension\Extension[]
+   *   The sorted list of extensions.
+   */
+  protected function sort(array $all_files, array $weights) {
+    $origins = array();
+    $profiles = array();
+    foreach ($all_files as $key => $file) {
+      // If the extension does not belong to a profile, just apply the weight
+      // of the originating directory.
+      if (strpos($file->subpath, 'profiles') !== 0) {
+        $origins[$key] = $weights[$file->origin];
+        $profiles[$key] = NULL;
+      }
+      // If the extension belongs to a profile but no profile directories are
+      // defined, then we are scanning for installation profiles themselves.
+      // In this case, profiles are sorted by origin only.
+      elseif (empty($this->profileDirectories)) {
+        $origins[$key] = static::ORIGIN_PROFILE;
+        $profiles[$key] = NULL;
+      }
+      else {
+        // Apply the weight of the originating profile directory.
+        foreach ($this->profileDirectories as $weight => $profile_path) {
+          if (strpos($file->getPath(), $profile_path) === 0) {
+            $origins[$key] = static::ORIGIN_PROFILE;
+            $profiles[$key] = $weight;
+            continue 2;
+          }
+        }
+      }
+    }
+    // Now sort the extensions by origin and installation profile(s).
+    // The result of this multisort can be depicted like the following matrix,
+    // whereas the first integer is the weight of the originating directory and
+    // the second is the weight of the originating installation profile:
+    // 0   core/modules/node/node.module
+    // 1 0 profiles/parent_profile/modules/parent_module/parent_module.module
+    // 1 1 core/profiles/testing/modules/compatible_test/compatible_test.module
+    // 2   sites/all/modules/common/common.module
+    // 3   modules/devel/devel.module
+    // 4   sites/default/modules/custom/custom.module
+    array_multisort($origins, SORT_ASC, $profiles, SORT_ASC, $all_files);
+
+    return $all_files;
+  }
+
+  /**
    * Processes the filtered and sorted list of extensions.
    *
    * Extensions discovered in later search paths override earlier, unless they
@@ -304,9 +368,9 @@ class ExtensionDiscovery {
     // be used (which also improves performance, since any configured PHP
     // include_paths will not be consulted). Retain the relative originating
     // directory being scanned, so relative paths can be reconstructed below
-    // (all paths are expected to be relative to DRUPAL_ROOT).
+    // (all paths are expected to be relative to $this->root).
     $dir_prefix = ($dir == '' ? '' : "$dir/");
-    $absolute_dir = ($dir == '' ? DRUPAL_ROOT : DRUPAL_ROOT . "/$dir");
+    $absolute_dir = ($dir == '' ? $this->root : $this->root . "/$dir");
 
     if (!is_dir($absolute_dir)) {
       return $files;
@@ -370,7 +434,7 @@ class ExtensionDiscovery {
         $filename = NULL;
       }
 
-      $extension = new Extension($type, $pathname, $filename);
+      $extension = new Extension($this->root, $type, $pathname, $filename);
 
       // Track the originating directory for sorting purposes.
       $extension->subpath = $fileinfo->getSubPath();

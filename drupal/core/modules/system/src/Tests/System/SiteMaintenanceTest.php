@@ -29,7 +29,7 @@ class SiteMaintenanceTest extends WebTestBase {
     parent::setUp();
 
     // Configure 'node' as front page.
-    \Drupal::config('system.site')->set('page.front', 'node')->save();
+    $this->config('system.site')->set('page.front', 'node')->save();
 
     // Create a user allowed to access site in maintenance mode.
     $this->user = $this->drupalCreateUser(array('access site in maintenance mode'));
@@ -39,18 +39,39 @@ class SiteMaintenanceTest extends WebTestBase {
   }
 
   /**
+   * Verify site maintenance mode functionality with page cache disabled.
+   */
+  function testSiteMaintenanceWithoutPageCache() {
+    $config = $this->config('system.performance');
+    $config->set('cache.page.use_internal', 0);
+    $config->save();
+    $this->doTestSiteMaintenance();
+  }
+
+  /**
+   * Verify site maintenance mode functionality with page cache enabled.
+   */
+  function testSiteMaintenanceWithPageCache() {
+    $config = $this->config('system.performance');
+    $config->set('cache.page.use_internal', 1);
+    $config->set('cache.page.max_age', 300);
+    $config->save();
+    $this->doTestSiteMaintenance();
+  }
+
+  /**
    * Verify site maintenance mode functionality.
    */
-  function testSiteMaintenance() {
+  protected function doTestSiteMaintenance() {
     // Turn on maintenance mode.
     $edit = array(
       'maintenance_mode' => 1,
     );
     $this->drupalPostForm('admin/config/development/maintenance', $edit, t('Save configuration'));
 
-    $admin_message = t('Operating in maintenance mode. <a href="@url">Go online.</a>', array('@url' => url('admin/config/development/maintenance')));
+    $admin_message = t('Operating in maintenance mode. <a href="@url">Go online.</a>', array('@url' => \Drupal::url('system.site_maintenance_mode')));
     $user_message = t('Operating in maintenance mode.');
-    $offline_message = t('@site is currently under maintenance. We should be back shortly. Thank you for your patience.', array('@site' => \Drupal::config('system.site')->get('name')));
+    $offline_message = t('@site is currently under maintenance. We should be back shortly. Thank you for your patience.', array('@site' => $this->config('system.site')->get('name')));
 
     $this->drupalGet('');
     $this->assertRaw($admin_message, 'Found the site maintenance mode message.');
@@ -104,7 +125,7 @@ class SiteMaintenanceTest extends WebTestBase {
     $edit = array(
       'name' => $this->user->getUsername(),
     );
-    $this->drupalPostForm('user/password', $edit, t('Email new password'));
+    $this->drupalPostForm('user/password', $edit, t('Submit'));
     $mails = $this->drupalGetMails();
     $start = strpos($mails[0]['body'], 'user/reset/'. $this->user->id());
     $path = substr($mails[0]['body'], $start, 66 + strlen($this->user->id()));

@@ -7,6 +7,8 @@
 
 namespace Drupal\comment\Tests;
 
+use Drupal\user\RoleInterface;
+
 /**
  * Tests anonymous commenting.
  *
@@ -18,12 +20,12 @@ class CommentAnonymousTest extends CommentTestBase {
     parent::setUp();
 
     // Enable anonymous and authenticated user comments.
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access comments',
       'post comments',
       'skip comment approval',
     ));
-    user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array(
+    user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array(
       'access comments',
       'post comments',
       'skip comment approval',
@@ -34,8 +36,8 @@ class CommentAnonymousTest extends CommentTestBase {
    * Tests anonymous comment functionality.
    */
   function testAnonymous() {
-    $this->drupalLogin($this->admin_user);
-    $this->setCommentAnonymous('0'); // Ensure that doesn't require contact info.
+    $this->drupalLogin($this->adminUser);
+    $this->setCommentAnonymous(COMMENT_ANONYMOUS_MAYNOT_CONTACT);
     $this->drupalLogout();
 
     // Post anonymous comment without contact info.
@@ -43,8 +45,8 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->assertTrue($this->commentExists($anonymous_comment1), 'Anonymous comment without contact info found.');
 
     // Allow contact info.
-    $this->drupalLogin($this->admin_user);
-    $this->setCommentAnonymous('1');
+    $this->drupalLogin($this->adminUser);
+    $this->setCommentAnonymous(COMMENT_ANONYMOUS_MAY_CONTACT);
 
     // Attempt to edit anonymous comment.
     $this->drupalGet('comment/' . $anonymous_comment1->id() . '/edit');
@@ -56,22 +58,28 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->drupalGet('comment/reply/node/' . $this->node->id() . '/comment');
     $this->assertTrue($this->commentContactInfoAvailable(), 'Contact information available.');
 
+    // Check the presence of expected cache tags.
+    $this->assertCacheTag('config:field.field.node.article.comment');
+    $this->assertCacheTag('config:user.settings');
+
     $anonymous_comment2 = $this->postComment($this->node, $this->randomMachineName(), $this->randomMachineName());
     $this->assertTrue($this->commentExists($anonymous_comment2), 'Anonymous comment with contact info (optional) found.');
 
     // Ensure anonymous users cannot post in the name of registered users.
     $edit = array(
-      'name' => $this->admin_user->getUsername(),
+      'name' => $this->adminUser->getUsername(),
       'mail' => $this->randomMachineName() . '@example.com',
       'subject[0][value]' => $this->randomMachineName(),
       'comment_body[0][value]' => $this->randomMachineName(),
     );
     $this->drupalPostForm('comment/reply/node/' . $this->node->id() . '/comment', $edit, t('Save'));
-    $this->assertText(t('The name you used belongs to a registered user.'));
+    $this->assertRaw(t('The name you used (%name) belongs to a registered user.', [
+      '%name' => $this->adminUser->getUsername(),
+    ]));
 
     // Require contact info.
-    $this->drupalLogin($this->admin_user);
-    $this->setCommentAnonymous('2');
+    $this->drupalLogin($this->adminUser);
+    $this->setCommentAnonymous(COMMENT_ANONYMOUS_MUST_CONTACT);
     $this->drupalLogout();
 
     // Try to post comment with contact info (required).
@@ -90,7 +98,7 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->assertTrue($this->commentExists($anonymous_comment3), 'Anonymous comment with contact info (required) found.');
 
     // Make sure the user data appears correctly when editing the comment.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->drupalGet('comment/' . $anonymous_comment3->id() . '/edit');
     $this->assertRaw($author_name, "The anonymous user's name is correct when editing the comment.");
     $this->assertRaw($author_mail, "The anonymous user's email address is correct when editing the comment.");
@@ -115,7 +123,7 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->drupalLogout();
 
     // Reset.
-    user_role_change_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_change_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access comments' => FALSE,
       'post comments' => FALSE,
       'skip comment approval' => FALSE,
@@ -134,7 +142,7 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->assertNoFieldByName('subject[0][value]', '', 'Subject field not found.');
     $this->assertNoFieldByName('comment_body[0][value]', '', 'Comment field not found.');
 
-    user_role_change_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_change_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access comments' => TRUE,
       'post comments' => FALSE,
       'skip comment approval' => FALSE,
@@ -144,7 +152,7 @@ class CommentAnonymousTest extends CommentTestBase {
     $this->assertLink('Log in', 1, 'Link to log in was found.');
     $this->assertLink('register', 1, 'Link to register was found.');
 
-    user_role_change_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_change_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access comments' => FALSE,
       'post comments' => TRUE,
       'skip comment approval' => TRUE,

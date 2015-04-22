@@ -105,13 +105,6 @@ class FakeDatabaseSchema extends Schema {
   /**
    * {@inheritdoc}
    */
-  public function copyTable($source, $destination) {
-    throw new \Exception(sprintf('Unsupported method "%s"', __METHOD__));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function createTable($name, $table) {
     #throw new \Exception(sprintf('Unsupported method "%s"', __METHOD__));
   }
@@ -232,17 +225,6 @@ class FakeDatabaseSchema extends Schema {
    */
   public function uniqueIdentifier() {
     return $this->uniqueIdentifier;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getInfo() {
-    return array(
-      'name' => 'Fake database schema',
-      'description' => 'Tests for fake database schema plugin.',
-      'group' => 'Migrate',
-    );
   }
 
 }

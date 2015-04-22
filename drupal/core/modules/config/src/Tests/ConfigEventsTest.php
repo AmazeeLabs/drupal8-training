@@ -9,14 +9,14 @@ namespace Drupal\config\Tests;
 
 use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigEvents;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests events fired on configuration objects.
  *
  * @group config
  */
-class ConfigEventsTest extends DrupalUnitTestBase {
+class ConfigEventsTest extends KernelTestBase {
 
   /**
    * Modules to enable.
@@ -67,11 +67,14 @@ class ConfigEventsTest extends DrupalUnitTestBase {
     $GLOBALS['config'][$name] = array('key' => 'overridden');
     $GLOBALS['config'][$new_name] = array('key' => 'new overridden');
 
-    $config = \Drupal::config($name);
+    $config = $this->config($name);
     $config->set('key', 'initial')->save();
     $event = \Drupal::state()->get('config_events_test.event', array());
     $this->assertIdentical($event['event_name'], ConfigEvents::SAVE);
-    $this->assertIdentical($event['current_config_data'], array('key' => 'overridden'));
+    $this->assertIdentical($event['current_config_data'], array('key' => 'initial'));
+
+    // Override applies when getting runtime config.
+    $this->assertEqual($GLOBALS['config'][$name], \Drupal::config($name)->get());
 
     \Drupal::configFactory()->rename($name, $new_name);
     $event = \Drupal::state()->get('config_events_test.event', array());

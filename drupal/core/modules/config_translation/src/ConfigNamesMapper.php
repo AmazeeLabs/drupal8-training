@@ -11,10 +11,12 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Url;
 use Drupal\locale\LocaleConfigManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -83,6 +85,13 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
   protected $langcode = NULL;
 
   /**
+   * The language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManagerInterface
+   */
+  protected $languageManager;
+
+  /**
    * Constructs a ConfigNamesMapper.
    *
    * @param $plugin_id
@@ -109,12 +118,14 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    *   The route provider.
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
    *   The string translation manager.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    *
    * @throws \Symfony\Component\Routing\Exception\RouteNotFoundException
    *   Throws an exception if the route specified by the 'base_route_name' in
    *   the plugin definition could not be found by the route provider.
    */
-  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, TypedConfigManagerInterface $typed_config, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $string_translation) {
+  public function __construct($plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, TypedConfigManagerInterface $typed_config, LocaleConfigManager $locale_config_manager, ConfigMapperManagerInterface $config_mapper_manager, RouteProviderInterface $route_provider, TranslationInterface $string_translation, LanguageManagerInterface $language_manager) {
     $this->pluginId = $plugin_id;
     $this->pluginDefinition = $plugin_definition;
     $this->routeProvider = $route_provider;
@@ -125,6 +136,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
     $this->configMapperManager = $config_mapper_manager;
 
     $this->stringTranslation = $string_translation;
+    $this->languageManager = $language_manager;
   }
 
   /**
@@ -141,7 +153,8 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
       $container->get('locale.config.typed'),
       $container->get('plugin.manager.config_translation.mapper'),
       $container->get('router.route_provider'),
-      $container->get('string_translation')
+      $container->get('string_translation'),
+      $container->get('language_manager')
     );
   }
 
@@ -200,7 +213,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    * {@inheritdoc}
    */
   public function getBasePath() {
-    return $this->getPathFromRoute($this->getBaseRoute(), $this->getBaseRouteParameters());
+    return Url::fromRoute($this->getBaseRouteName(), $this->getBaseRouteParameters())->getInternalPath();
   }
 
   /**
@@ -224,7 +237,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
     $route = new Route(
       $this->getBaseRoute()->getPath() . '/translate',
       array(
-        '_content' => '\Drupal\config_translation\Controller\ConfigTranslationController::itemPage',
+        '_controller' => '\Drupal\config_translation\Controller\ConfigTranslationController::itemPage',
         'plugin_id' => $this->getPluginId(),
       ),
       array('_config_translation_overview_access' => 'TRUE')
@@ -237,7 +250,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    * {@inheritdoc}
    */
   public function getOverviewPath() {
-    return $this->getPathFromRoute($this->getOverviewRoute(), $this->getOverviewRouteParameters());
+    return Url::fromRoute($this->getOverviewRouteName(), $this->getOverviewRouteParameters())->getInternalPath();
   }
 
   /**
@@ -335,25 +348,6 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
   }
 
   /**
-   * Gets the path for a certain route, given a set of route parameters.
-   *
-   * @param \Symfony\Component\Routing\Route $route
-   *   The route object.
-   * @param array $parameters
-   *   An array of route parameters.
-   *
-   * @return string
-   *   Processed path with placeholders replaced.
-   */
-  public function getPathFromRoute(Route $route, array $parameters) {
-    $path = $route->getPath();
-    foreach ($parameters as $key => $value) {
-      $path = str_replace('{' . $key . '}', $value, $path);
-    }
-    return $path;
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function getConfigNames() {
@@ -418,7 +412,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
    */
   public function getLanguageWithFallback() {
     $langcode = $this->getLangcode();
-    $language = language_load($langcode);
+    $language = $this->languageManager->getLanguage($langcode);
     // If the language of the file is English but English is not a configured
     // language on the site, create a mock language object to represent this
     // language run-time. In this case, the title of the language is
@@ -437,7 +431,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
   public function getConfigData() {
     $config_data = array();
     foreach ($this->getConfigNames() as $name) {
-      $config_data[$name] = $this->configFactory->get($name)->get();
+      $config_data[$name] = $this->configFactory->getEditable($name)->get();
     }
     return $config_data;
   }
@@ -492,7 +486,7 @@ class ConfigNamesMapper extends PluginBase implements ConfigMapperInterface, Con
     return array(
       'translate' => array(
         'title' => $this->t('Translate'),
-        'href' => $this->getOverviewPath(),
+        'url' => Url::fromRoute($this->getOverviewRouteName(), $this->getOverviewRouteParameters()),
       ),
     );
   }

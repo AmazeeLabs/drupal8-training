@@ -6,7 +6,6 @@ langcode: en
 region: sidebar_first
 plugin: 'system_menu_block:tools'
 settings:
-  visibility: {  }
   id: 'system_menu_block:tools'
   label: Tools
   provider: system
@@ -17,9 +16,10 @@ settings:
   level: 1
   depth: 0
 dependencies:
-  entity:
+  config:
     - system.menu.tools
   module:
     - system
   theme:
     - bartik
+visibility: {  }

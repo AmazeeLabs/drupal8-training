@@ -250,7 +250,6 @@ function rdf_theme() {
   return array(
     'rdf_metadata' => array(
       'variables' => array('metadata' => array()),
-      'template' => 'rdf-metadata',
     ),
   );
 }
@@ -367,13 +366,13 @@ function rdf_preprocess_user(&$variables) {
           'lang' => '',
         ),
       );
-      drupal_add_html_head($username_meta, 'rdf_user_username');
+      $variables['#attached']['html_head'][] = [$username_meta, 'rdf_user_username'];
     }
   }
 }
 
 /**
- * Implements hook_preprocess_HOOK() for theme_username().
+ * Implements hook_preprocess_HOOK() for username.html.twig.
  */
 function rdf_preprocess_username(&$variables) {
   // Because lang is set on the HTML element that wraps the page, the
@@ -393,7 +392,7 @@ function rdf_preprocess_username(&$variables) {
   // a user profile URI for it (only a homepage which cannot be used as user
   // profile in RDF.)
   if ($variables['uid'] > 0) {
-    $variables['attributes']['about'] = url('user/' . $variables['uid']);
+    $variables['attributes']['about'] = \Drupal::url('entity.user.canonical', ['user' => $variables['uid']]);
   }
 
   // Add RDF type of user.
@@ -499,14 +498,14 @@ function rdf_preprocess_comment(&$variables) {
   }
   // Adds RDF metadata markup above comment body.
   if (!empty($variables['rdf_metadata_attributes'])) {
-    if (!isset($variables['content']['comment_body']['#prefix'])) {
-      $variables['content']['comment_body']['#prefix'] = '';
-    }
     $rdf_metadata = array(
       '#theme' => 'rdf_metadata',
       '#metadata' => $variables['rdf_metadata_attributes'],
     );
-    $variables['content']['comment_body']['#prefix'] = drupal_render($rdf_metadata) . $variables['content']['comment_body']['#prefix'];
+    if (!empty($variables['content']['comment_body']['#prefix'])) {
+      $rdf_metadata['#suffix'] = $variables['content']['comment_body']['#prefix'];
+    }
+    $variables['content']['comment_body']['#prefix'] = drupal_render($rdf_metadata);
   }
 }
 
@@ -539,7 +538,7 @@ function rdf_preprocess_taxonomy_term(&$variables) {
 }
 
 /**
- * Implements hook_preprocess_HOOK() for theme_image().
+ * Implements hook_preprocess_HOOK() for image.html.twig.
  */
 function rdf_preprocess_image(&$variables) {
   // Adds the RDF type for image.  We cannot use the usual entity-based mapping

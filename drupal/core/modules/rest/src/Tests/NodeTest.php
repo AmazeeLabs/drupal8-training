@@ -7,6 +7,7 @@
 
 namespace Drupal\rest\Tests;
 
+use Drupal\Core\Url;
 use Drupal\rest\Tests\RESTTestBase;
 
 /**
@@ -17,7 +18,7 @@ use Drupal\rest\Tests\RESTTestBase;
 class NodeTest extends RESTTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * Ensure that the node resource works with comment module enabled.
    *
@@ -45,18 +46,19 @@ class NodeTest extends RESTTestBase {
    * Performs various tests on nodes and their REST API.
    */
   public function testNodes() {
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
     $this->enableNodeConfiguration('GET', 'view');
 
     $node = $this->entityCreate('node');
     $node->save();
-    $this->httpRequest('node/' . $node->id(), 'GET', NULL, $this->defaultMimeType);
+    $this->httpRequest($node->urlInfo(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse(200);
     $this->assertHeader('Content-type', $this->defaultMimeType);
 
     // Also check that JSON works and the routing system selects the correct
     // REST route.
     $this->enableService('entity:node', 'GET', 'json');
-    $this->httpRequest('node/' . $node->id(), 'GET', NULL, 'application/json');
+    $this->httpRequest($node->urlInfo(), 'GET', NULL, 'application/json');
     $this->assertResponse(200);
     $this->assertHeader('Content-type', 'application/json');
 
@@ -68,7 +70,7 @@ class NodeTest extends RESTTestBase {
     $data = array(
       '_links' => array(
         'type' => array(
-          'href' => url('rest/type/node/resttest', array('absolute' => TRUE)),
+          'href' => Url::fromUri('base:rest/type/node/resttest', array('absolute' => TRUE))->toString(),
         ),
       ),
       'title' => array(
@@ -78,11 +80,12 @@ class NodeTest extends RESTTestBase {
       ),
     );
     $serialized = $this->container->get('serializer')->serialize($data, $this->defaultFormat);
-    $this->httpRequest('node/' . $node->id(), 'PATCH', $serialized, $this->defaultMimeType);
+    $this->httpRequest($node->urlInfo(), 'PATCH', $serialized, $this->defaultMimeType);
     $this->assertResponse(204);
 
     // Reload the node from the DB and check if the title was correctly updated.
-    $updated_node = entity_load('node', $node->id(), TRUE);
+    $node_storage->resetCache(array($node->id()));
+    $updated_node = $node_storage->load($node->id());
     $this->assertEqual($updated_node->getTitle(), $new_title);
     // Make sure that the UUID of the node has not changed.
     $this->assertEqual($node->get('uuid')->getValue(), $updated_node->get('uuid')->getValue(), 'UUID was not changed.');

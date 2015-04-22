@@ -5,11 +5,14 @@
  * Hooks provided the Entity module.
  */
 
-use Drupal\Component\Utility\String;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\DynamicallyFieldableEntityStorageInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Render\Element;
+use Drupal\language\Entity\ContentLanguageSettings;
+use Drupal\node\Entity\NodeType;
 
 /**
  * @defgroup entity_crud Entity CRUD, editing, and view hooks
@@ -148,10 +151,6 @@ use Drupal\Core\Render\Element;
  * - hook_ENTITY_TYPE_prepare_form()
  * - hook_entity_form_display_alter() (for content entities only)
  *
- * Some specific entity types have additional hooks that are run during
- * various steps in the process:
- * - Node entities: hook_node_validate() and hook_submit().
- *
  * @section delete Delete operations
  * To delete one or more entities, load them and then delete them:
  * @code
@@ -185,7 +184,7 @@ use Drupal\Core\Render\Element;
  * To make a render array for a loaded entity:
  * @code
  * // You can omit the language ID if the default language is being used.
- * $build = $view_builder->view($entity, 'view_mode_name', $language->id);
+ * $build = $view_builder->view($entity, 'view_mode_name', $language->getId());
  * @endcode
  * You can also use the viewMultiple() method to view multiple entities.
  *
@@ -265,8 +264,8 @@ use Drupal\Core\Render\Element;
  * - Choose a unique machine name, or ID, for your entity type. This normally
  *   starts with (or is the same as) your module's machine name. It should be
  *   as short as possible, and may not exceed 32 characters.
- * - Define an interface for your entity's get/set methods, extending either
- *   \Drupal\Core\Config\Entity\ConfigEntityInterface or
+ * - Define an interface for your entity's get/set methods, usually extending
+ *   either \Drupal\Core\Config\Entity\ConfigEntityInterface or
  *   \Drupal\Core\Entity\ContentEntityInterface.
  * - Define a class for your entity, implementing your interface and extending
  *   either \Drupal\Core\Config\Entity\ConfigEntityBase or
@@ -325,11 +324,12 @@ use Drupal\Core\Render\Element;
  *   also need to add a corresponding route to your module's routing.yml file;
  *   see the entity.node.canonical route in node.routing.yml for an example, and see
  *   @ref sec_routes below for some notes.
- * - Define routing and links for the various URLs associated with the entity.
+ * - Define routes and links for the various URLs associated with the entity.
  *   These go into the 'links' annotation, with the link type as the key, and
- *   the route machine name (defined in your module's routing.yml file) as the
- *   value; see @ref sec_routes below for some routing notes. Typical link
- *   types are:
+ *   the path of this link template as the value. The corresponding route
+ *   requires the following route name:
+ *   "entity.$entity_type_id.$link_template_type". See @ref sec_routes below for
+ *   some routing notes. Typical link types are:
  *   - canonical: Default link, either to view (if entities are viewed on their
  *     own pages) or edit the entity.
  *   - delete-form: Confirmation form to delete the entity.
@@ -375,7 +375,7 @@ use Drupal\Core\Render\Element;
  *   the entity system will load the corresponding entity item and pass it in as
  *   an object to the controller for the route.
  * - defaults: For entity form routes, use _entity_form rather than the generic
- *   _content or _form. The value is composed of the entity type machine name
+ *   _controller or _form. The value is composed of the entity type machine name
  *   and a form controller type from the entity annotation (see @ref define
  *   above more more on controllers and annotation). So, in this example,
  *   block.default refers to the 'default' form controller on the block entity
@@ -468,7 +468,7 @@ use Drupal\Core\Render\Element;
  * Then, to build and render the entity:
  * @code
  * // You can omit the language ID if the default language is being used.
- * $build = $view_builder->view($entity, 'view_mode_name', $language->id);
+ * $build = $view_builder->view($entity, 'view_mode_name', $language->getId());
  * // $build is a render array.
  * $rendered = drupal_render($build);
  * @endcode
@@ -532,7 +532,7 @@ use Drupal\Core\Render\Element;
  */
 function hook_entity_access(\Drupal\Core\Entity\EntityInterface $entity, $operation, \Drupal\Core\Session\AccountInterface $account, $langcode) {
   // No opinion.
-  return AccessResult::create();
+  return AccessResult::neutral();
 }
 
 /**
@@ -558,7 +558,7 @@ function hook_entity_access(\Drupal\Core\Entity\EntityInterface $entity, $operat
  */
 function hook_ENTITY_TYPE_access(\Drupal\Core\Entity\EntityInterface $entity, $operation, \Drupal\Core\Session\AccountInterface $account, $langcode) {
   // No opinion.
-  return AccessResult::create();
+  return AccessResult::neutral();
 }
 
 /**
@@ -584,7 +584,7 @@ function hook_ENTITY_TYPE_access(\Drupal\Core\Entity\EntityInterface $entity, $o
  */
 function hook_entity_create_access(\Drupal\Core\Session\AccountInterface $account, array $context, $entity_bundle) {
   // No opinion.
-  return AccessResult::create();
+  return AccessResult::neutral();
 }
 
 /**
@@ -610,7 +610,7 @@ function hook_entity_create_access(\Drupal\Core\Session\AccountInterface $accoun
  */
 function hook_ENTITY_TYPE_create_access(\Drupal\Core\Session\AccountInterface $account, array $context, $entity_bundle) {
   // No opinion.
-  return AccessResult::create();
+  return AccessResult::neutral();
 }
 
 /**
@@ -785,7 +785,7 @@ function hook_entity_bundle_delete($entity_type_id, $bundle) {
  * @see hook_ENTITY_TYPE_create()
  */
 function hook_entity_create(\Drupal\Core\Entity\EntityInterface $entity) {
-  if ($entity instanceof ContentEntityInterface && !$entity->foo->value) {
+  if ($entity instanceof FieldableEntityInterface && !$entity->foo->value) {
     $entity->foo->value = 'some_initial_value';
   }
 }
@@ -891,8 +891,8 @@ function hook_ENTITY_TYPE_storage_load(array $entities) {
  */
 function hook_entity_presave(Drupal\Core\Entity\EntityInterface $entity) {
  if ($entity instanceof ContentEntityInterface && $entity->isTranslatable()) {
-   $attributes = \Drupal::request()->attributes;
-   \Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->id, $attributes->get('source_langcode'));
+   $route_match = \Drupal::routeMatch();
+   \Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->getId(), $route_match->getParameter('source_langcode'));
   }
 }
 
@@ -907,8 +907,8 @@ function hook_entity_presave(Drupal\Core\Entity\EntityInterface $entity) {
  */
 function hook_ENTITY_TYPE_presave(Drupal\Core\Entity\EntityInterface $entity) {
   if ($entity->isTranslatable()) {
-    $attributes = \Drupal::request()->attributes;
-    \Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->id, $attributes->get('source_langcode'));
+    $route_match = \Drupal::routeMatch();
+    \Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->getId(), $route_match->getParameter('source_langcode'));
   }
 }
 
@@ -1658,6 +1658,9 @@ function hook_entity_base_field_info(\Drupal\Core\Entity\EntityTypeInterface $en
  * @see hook_entity_base_field_info()
  * @see hook_entity_bundle_field_info()
  * @see hook_entity_bundle_field_info_alter()
+ *
+ * @todo WARNING: This hook will be changed in
+ *   https://www.drupal.org/node/2346329.
  */
 function hook_entity_base_field_info_alter(&$fields, \Drupal\Core\Entity\EntityTypeInterface $entity_type) {
   // Alter the mymodule_text field to use a custom class.
@@ -1690,6 +1693,9 @@ function hook_entity_base_field_info_alter(&$fields, \Drupal\Core\Entity\EntityT
  * @see hook_entity_bundle_field_info_alter()
  * @see \Drupal\Core\Field\FieldDefinitionInterface
  * @see \Drupal\Core\Entity\EntityManagerInterface::getFieldDefinitions()
+ *
+ * @todo WARNING: This hook will be changed in
+ *   https://www.drupal.org/node/2346347.
  */
 function hook_entity_bundle_field_info(\Drupal\Core\Entity\EntityTypeInterface $entity_type, $bundle, array $base_field_definitions) {
   // Add a property only to nodes of the 'article' bundle.
@@ -1716,6 +1722,9 @@ function hook_entity_bundle_field_info(\Drupal\Core\Entity\EntityTypeInterface $
  * @see hook_entity_base_field_info()
  * @see hook_entity_base_field_info_alter()
  * @see hook_entity_bundle_field_info()
+ *
+ * @todo WARNING: This hook will be changed in
+ *   https://www.drupal.org/node/2346347.
  */
 function hook_entity_bundle_field_info_alter(&$fields, \Drupal\Core\Entity\EntityTypeInterface $entity_type, $bundle) {
   if ($entity_type->id() == 'node' && $bundle == 'article' && !empty($fields['mymodule_text'])) {
@@ -1738,20 +1747,19 @@ function hook_entity_bundle_field_info_alter(&$fields, \Drupal\Core\Entity\Entit
  * @see \Drupal\Core\Entity\EntityManagerInterface::getFieldStorageDefinitions()
  */
 function hook_entity_field_storage_info(\Drupal\Core\Entity\EntityTypeInterface $entity_type) {
-  // Expose storage definitions for all exposed bundle fields.
-  if ($entity_type->isFieldable()) {
+  if (\Drupal::entityManager()->getStorage($entity_type->id()) instanceof DynamicallyFieldableEntityStorageInterface) {
     // Query by filtering on the ID as this is more efficient than filtering
     // on the entity_type property directly.
     $ids = \Drupal::entityQuery('field_storage_config')
       ->condition('id', $entity_type->id() . '.', 'STARTS_WITH')
       ->execute();
-
     // Fetch all fields and key them by field name.
-    $field_storages = entity_load_multiple('field_storage_config', $ids);
+    $field_storages = FieldStorageConfig::loadMultiple($ids);
     $result = array();
     foreach ($field_storages as $field_storage) {
       $result[$field_storage->getName()] = $field_storage;
     }
+
     return $result;
   }
 }
@@ -1868,7 +1876,7 @@ function hook_entity_field_access_alter(array &$grants, array $context) {
     // don't want to switch node module's grant to
     // AccessResultInterface::isAllowed() , because the grants of other modules
     // should still decide on their own if this field is accessible or not
-    $grants['node']->resetAccess();
+    $grants['node'] = AccessResult::neutral()->inheritCacheability($grants['node']);
   }
 }
 
@@ -1895,15 +1903,15 @@ function hook_entity_extra_field_info() {
   $module_language_enabled = \Drupal::moduleHandler()->moduleExists('language');
   $description = t('Node module element');
 
-  foreach (node_type_get_types() as $bundle) {
+  foreach (NodeType::loadMultiple() as $bundle) {
 
     // Add also the 'language' select if Language module is enabled and the
     // bundle has multilingual support.
     // Visibility of the ordering of the language selector is the same as on the
     // node/add form.
     if ($module_language_enabled) {
-      $configuration = language_get_default_configuration('node', $bundle->type);
-      if ($configuration['language_show']) {
+      $configuration = ContentLanguageSettings::loadByEntityTypeBundle('node', $bundle->type);
+      if ($configuration->isLanguageAlterable()) {
         $extra['node'][$bundle->type]['form']['language'] = array(
           'label' => t('Language'),
           'description' => $description,
@@ -1933,9 +1941,13 @@ function hook_entity_extra_field_info() {
  */
 function hook_entity_extra_field_info_alter(&$info) {
   // Force node title to always be at the top of the list by default.
-  foreach (node_type_get_types() as $bundle) {
+  foreach (NodeType::loadMultiple() as $bundle) {
     if (isset($info['node'][$bundle->type]['form']['title'])) {
       $info['node'][$bundle->type]['form']['title']['weight'] = -20;
     }
   }
 }
+
+/**
+ * @} End of "addtogroup hooks".
+ */

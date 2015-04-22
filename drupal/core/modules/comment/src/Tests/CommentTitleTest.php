@@ -18,8 +18,8 @@ class CommentTitleTest extends CommentTestBase {
    * Tests markup for comments with empty titles.
    */
   public function testCommentEmptyTitles() {
-    // Enables module that sets comments to an empty string.
-    \Drupal::moduleHandler()->install(array('comment_empty_title_test'));
+    // Installs module that sets comments to an empty string.
+    \Drupal::service('module_installer')->install(array('comment_empty_title_test'));
 
     // Set comments to have a subject with preview disabled.
     $this->setCommentPreview(DRUPAL_DISABLED);
@@ -27,8 +27,8 @@ class CommentTitleTest extends CommentTestBase {
     $this->setCommentSubject(TRUE);
 
     // Create a node.
-    $this->drupalLogin($this->web_user);
-    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->web_user->id()));
+    $this->drupalLogin($this->webUser);
+    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->webUser->id()));
 
     // Post comment #1 and verify that h3's are not rendered.
     $subject_text = $this->randomMachineName();
@@ -38,7 +38,7 @@ class CommentTitleTest extends CommentTestBase {
     $regex = '/<a id="comment-' . $comment->id() . '"(.*?)';
     $regex .= $comment->comment_body->value . '(.*?)';
     $regex .= '/s';
-    $this->assertPattern($regex, 'Comment is created succesfully');
+    $this->assertPattern($regex, 'Comment is created successfully');
     // Tests that markup is not generated for the comment without header.
     $this->assertNoPattern('|<h3[^>]*></h3>|', 'Comment title H3 element not found when title is an empty string.');
   }
@@ -53,8 +53,8 @@ class CommentTitleTest extends CommentTestBase {
     $this->setCommentSubject(TRUE);
 
     // Create a node.
-    $this->drupalLogin($this->web_user);
-    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->web_user->id()));
+    $this->drupalLogin($this->webUser);
+    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->webUser->id()));
 
     // Post comment #1 and verify that title is rendered in h3.
     $subject_text = $this->randomMachineName();

@@ -8,6 +8,7 @@
 namespace Drupal\Core\Language;
 
 use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\Core\Url;
 
 /**
  * Common interface for the language manager service.
@@ -90,9 +91,9 @@ interface LanguageManagerInterface {
    * @param int $flags
    *   (optional) Specifies the state of the languages that have to be returned.
    *   It can be: LanguageInterface::STATE_CONFIGURABLE,
-   *   LanguageInterface::STATE_LOCKED, LanguageInterface::STATE_ALL.
+   *   LanguageInterface::STATE_LOCKED, or LanguageInterface::STATE_ALL.
    *
-   * @return array
+   * @return \Drupal\Core\Language\LanguageInterface[]
    *   An associative array of languages, keyed by the language code.
    */
   public function getLanguages($flags = LanguageInterface::STATE_CONFIGURABLE);
@@ -135,7 +136,7 @@ interface LanguageManagerInterface {
    *   (optional) An integer value that is used as the start value for the
    *   weights of the locked languages.
    *
-   * @return array
+   * @return \Drupal\Core\Language\LanguageInterface[]
    *   An array of language objects.
    */
   public function getDefaultLockedLanguages($weight = 0);
@@ -181,13 +182,13 @@ interface LanguageManagerInterface {
    *
    * @param string $type
    *   The language type.
-   * @param string $path
-   *   The internal path the switch links will be relative to.
+   * @param \Drupal\Core\Url $url
+   *   The URL the switch links will be relative to.
    *
    * @return array
    *   A keyed array of links ready to be themed.
    */
-  public function getLanguageSwitchLinks($type, $path);
+  public function getLanguageSwitchLinks($type, Url $url);
 
   /**
    * Sets the configuration override language.

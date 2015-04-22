@@ -1,7 +1,16 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies:
+  module:
+    - user
+id: test_access_role
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -34,6 +43,3 @@ display:
     display_title: Page
     id: page_1
     position: 1
-label: ''
-id: test_access_role
-tag: ''

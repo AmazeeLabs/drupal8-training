@@ -18,6 +18,16 @@ use Drupal\Core\Template\Attribute;
 class HtmlTag extends RenderElement {
 
   /**
+   * Void elements do not contain values or closing tags.
+   * @see http://www.w3.org/TR/html5/syntax.html#syntax-start-tag
+   * @see http://www.w3.org/TR/html5/syntax.html#void-elements
+   */
+  static protected $voidElements = array(
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr',
+  );
+
+  /**
    * {@inheritdoc}
    */
   public function getInfo() {
@@ -59,13 +69,16 @@ class HtmlTag extends RenderElement {
    */
   public static function preRenderHtmlTag($element) {
     $attributes = isset($element['#attributes']) ? new Attribute($element['#attributes']) : '';
-    if (!isset($element['#value'])) {
+
+    // Construct a void element.
+    if (in_array($element['#tag'], self::$voidElements)) {
       // This function is intended for internal use, so we assume that no unsafe
       // values are passed in #tag. The attributes are already safe because
       // Attribute output is already automatically sanitized.
       // @todo Escape this properly instead? https://www.drupal.org/node/2296101
       $markup = SafeMarkup::set('<' . $element['#tag'] . $attributes . " />\n");
     }
+    // Construct all other elements.
     else {
       $markup = '<' . $element['#tag'] . $attributes . '>';
       if (isset($element['#value_prefix'])) {
@@ -139,27 +152,33 @@ class HtmlTag extends RenderElement {
       $expression = '!IE';
     }
     else {
-      $expression = $browsers['IE'];
+      // The IE expression might contain some user input data.
+      $expression = SafeMarkup::checkAdminXss($browsers['IE']);
     }
 
-    // Wrap the element's potentially existing #prefix and #suffix properties with
-    // conditional comment markup. The conditional comment expression is evaluated
-    // by Internet Explorer only. To control the rendering by other browsers,
-    // either the "downlevel-hidden" or "downlevel-revealed" technique must be
-    // used. See http://en.wikipedia.org/wiki/Conditional_comment for details.
-    $element += array(
-      '#prefix' => '',
-      '#suffix' => '',
-    );
+    // If the #prefix and #suffix properties are used, wrap them with
+    // conditional comment markup. The conditional comment expression is
+    // evaluated by Internet Explorer only. To control the rendering by other
+    // browsers, use either the "downlevel-hidden" or "downlevel-revealed"
+    // technique. See http://en.wikipedia.org/wiki/Conditional_comment
+    // for details.
+
+    // Ensure what we are dealing with is safe.
+    // This would be done later anyway in drupal_render().
+    $prefix = isset($elements['#prefix']) ? SafeMarkup::checkAdminXss($elements['#prefix']) : '';
+    $suffix = isset($elements['#suffix']) ? SafeMarkup::checkAdminXss($elements['#suffix']) : '';
+
+    // Now calling SafeMarkup::set is safe, because we ensured the
+    // data coming in was at least admin escaped.
     if (!$browsers['!IE']) {
       // "downlevel-hidden".
-      $element['#prefix'] = "\n<!--[if $expression]>\n" . $element['#prefix'];
-      $element['#suffix'] .= "<![endif]-->\n";
+      $element['#prefix'] = SafeMarkup::set("\n<!--[if $expression]>\n" . $prefix);
+      $element['#suffix'] = SafeMarkup::set($suffix . "<![endif]-->\n");
     }
     else {
       // "downlevel-revealed".
-      $element['#prefix'] = "\n<!--[if $expression]><!-->\n" . $element['#prefix'];
-      $element['#suffix'] .= "<!--<![endif]-->\n";
+      $element['#prefix'] = SafeMarkup::set("\n<!--[if $expression]><!-->\n" . $prefix);
+      $element['#suffix'] = SafeMarkup::set($suffix . "<!--<![endif]-->\n");
     }
 
     return $element;

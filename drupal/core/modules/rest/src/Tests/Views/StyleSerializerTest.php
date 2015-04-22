@@ -11,6 +11,7 @@ use Drupal\Component\Utility\String;
 use Drupal\views\Views;
 use Drupal\views\Tests\Plugin\PluginTestBase;
 use Drupal\views\Tests\ViewTestData;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests the serializer style plugin.
@@ -24,7 +25,7 @@ use Drupal\views\Tests\ViewTestData;
 class StyleSerializerTest extends PluginTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -91,7 +92,7 @@ class StyleSerializerTest extends PluginTestBase {
     // Mock the request content type by setting it on the display handler.
     $view->display_handler->setContentType('json');
     $output = $view->preview();
-    $this->assertIdentical($actual_json, drupal_render($output), 'The expected JSON preview output was found.');
+    $this->assertIdentical($actual_json, drupal_render_root($output), 'The expected JSON preview output was found.');
 
     // Test a 403 callback.
     $this->drupalGet('test/serialize/denied');
@@ -259,9 +260,17 @@ class StyleSerializerTest extends PluginTestBase {
   }
 
   /**
-   * Tests the preview output for json output.
+   * Tests the live preview output for json output.
    */
-  public function testPreview() {
+  public function testLivePreview() {
+    // We set up a request so it looks like an request in the live preview.
+    $request = new Request();
+    $request->setFormat('drupal_ajax', 'application/vnd.drupal-ajax');
+    $request->headers->set('Accept', 'application/vnd.drupal-ajax');
+      /** @var \Symfony\Component\HttpFoundation\RequestStack $request_stack */
+    $request_stack = \Drupal::service('request_stack');
+    $request_stack->push($request);
+
     $view = Views::getView('test_serializer_display_entity');
     $view->setDisplay('rest_export_1');
     $this->executeView($view);
@@ -276,12 +285,24 @@ class StyleSerializerTest extends PluginTestBase {
 
     $expected = String::checkPlain($serializer->serialize($entities, 'json'));
 
-    $view->display_handler->setContentType('json');
     $view->live_preview = TRUE;
 
     $build = $view->preview();
     $rendered_json = $build['#markup'];
     $this->assertEqual($rendered_json, $expected, 'Ensure the previewed json is escaped.');
+  }
+
+  /**
+   * Tests the views interface for rest export displays.
+   */
+  public function testSerializerViewsUI() {
+    $this->drupalLogin($this->adminUser);
+    // Click the "Update preview button".
+    $this->drupalPostForm('admin/structure/views/view/test_serializer_display_field/edit/rest_export_1', $edit = array(), t('Update preview'));
+    $this->assertResponse(200);
+    // Check if we receive the expected result.
+    $result = $this->xpath('//div[@id="views-live-preview"]/pre');
+    $this->assertIdentical($this->drupalGet('test/serialize/field'), (string) $result[0], 'The expected JSON preview output was found.');
   }
 
   /**

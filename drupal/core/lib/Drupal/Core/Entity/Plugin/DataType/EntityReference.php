@@ -56,13 +56,24 @@ class EntityReference extends DataReferenceBase {
   }
 
   /**
+   * Checks whether the target entity has not been saved yet.
+   *
+   * @return bool
+   *   TRUE if the entity is new, FALSE otherwise.
+   */
+  public function isTargetNew() {
+    // If only an ID is given, the reference cannot be a new entity.
+    return !isset($this->id) && isset($this->target) && $this->target->getValue()->isNew();
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function getTarget() {
     if (!isset($this->target) && isset($this->id)) {
-      // If we have a valid reference, return the entity object which is typed
-      // data itself.
-      $this->target = entity_load($this->getTargetDefinition()->getEntityTypeId(), $this->id);
+      // If we have a valid reference, return the entity's TypedData adapter.
+      $entity = entity_load($this->getTargetDefinition()->getEntityTypeId(), $this->id);
+      $this->target = isset($entity) ? $entity->getTypedData() : NULL;
     }
     return $this->target;
   }
@@ -82,22 +93,17 @@ class EntityReference extends DataReferenceBase {
   /**
    * {@inheritdoc}
    */
-  public function getValue() {
-    // Entities are already typed data, so just return that.
-    return $this->getTarget();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function setValue($value, $notify = TRUE) {
     unset($this->target);
     unset($this->id);
 
     // Both the entity ID and the entity object may be passed as value. The
     // reference may also be unset by passing NULL as value.
-    if (!isset($value) || $value instanceof EntityInterface) {
-      $this->target = $value;
+    if (!isset($value)) {
+      $this->target = NULL;
+    }
+    elseif ($value instanceof EntityInterface) {
+      $this->target = $value->getTypedData();
     }
     elseif (!is_scalar($value) || $this->getTargetDefinition()->getEntityTypeId() === NULL) {
       throw new \InvalidArgumentException('Value is not a valid entity.');

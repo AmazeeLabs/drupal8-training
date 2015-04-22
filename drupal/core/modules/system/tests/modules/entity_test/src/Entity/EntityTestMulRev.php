@@ -18,6 +18,7 @@ use Drupal\entity_test\Entity\EntityTestRev;
  *   id = "entity_test_mulrev",
  *   label = @Translation("Test entity - revisions and data table"),
  *   handlers = {
+ *     "view_builder" = "Drupal\entity_test\EntityTestViewBuilder",
  *     "access" = "Drupal\entity_test\EntityTestAccessControlHandler",
  *     "form" = {
  *       "default" = "Drupal\entity_test\EntityTestForm",
@@ -30,18 +31,19 @@ use Drupal\entity_test\Entity\EntityTestRev;
  *   data_table = "entity_test_mulrev_property_data",
  *   revision_table = "entity_test_mulrev_revision",
  *   revision_data_table = "entity_test_mulrev_property_revision",
- *   fieldable = TRUE,
  *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "id",
  *     "uuid" = "uuid",
+ *     "bundle" = "type",
  *     "revision" = "revision_id",
- *     "bundle" = "type"
+ *     "label" = "name",
+ *     "langcode" = "langcode",
  *   },
  *   links = {
- *     "canonical" = "entity.entity_test_mulrev.edit_form",
- *     "delete-form" = "entity.entity_test_mulrev.delete_form",
- *     "edit-form" = "entity.entity_test_mulrev.edit_form"
+ *     "canonical" = "/entity_test_mulrev/manage/{entity_test_mulrev}",
+ *     "delete-form" = "/entity_test/delete/entity_test_mulrev/{entity_test_mulrev}",
+ *     "edit-form" = "/entity_test_mulrev/manage/{entity_test_mulrev}",
  *   }
  * )
  */

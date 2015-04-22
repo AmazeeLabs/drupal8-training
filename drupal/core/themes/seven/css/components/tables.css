@@ -33,12 +33,23 @@ tr {
 thead > tr {
   border-bottom: 1px solid #000;
 }
-tbody tr:hover {
+tbody tr:hover,
+tbody tr:focus {
   background: #f7fcff;
+}
+
+/* See colors.css */
+tbody tr.color-warning:hover,
+tbody tr.color-warning:focus {
+  background: #fdf8ed;
+}
+tbody tr.color-error:hover,
+tbody tr.color-error:focus {
+  background: #fcf4f2;
 }
 td,
 th {
-  vertical-align: top;
+  vertical-align: middle;
 }
 td {
   padding: 10px 12px;
@@ -80,17 +91,17 @@ th.active img {
 th.active > a:after {
   border-bottom-color: #004875;
 }
-th > a:focus,
 th > a:hover,
-th.active > a:focus,
-th.active > a:hover {
+th > a:focus,
+th.active > a:hover,
+th.active > a:focus {
   color: #008ee6;
   text-decoration: none;
 }
-th > a:focus:after,
 th > a:hover:after,
-th.active > a:focus:after,
-th.active > a:hover:after {
+th > a:focus:after,
+th.active > a:hover:after,
+th.active > a:focus:after {
   border-bottom-color: #008ee6;
 }
 td .item-list ul {
@@ -117,8 +128,6 @@ th.select-all {
  */
 table.system-status-report tr {
   border-top: 1px solid #ccc;
-  border-left: 1px solid #bebfb9;
-  border-right: 1px solid #bebfb9;
   border-bottom: inherit;
 }
 table.system-status-report tr:first-child {
@@ -127,18 +136,11 @@ table.system-status-report tr:first-child {
 table.system-status-report tr:last-child {
   border-bottom: 1px solid #bebfb9;
 }
-
-table.system-status-report tr.ok {
-  color: #255b1e;
-  background-color: #e5ffe2;
+table.system-status-report td {
+  padding: 12px;
 }
-table.system-status-report tr.warning {
-  color: #840;
-  background-color: #fffce5;
-}
-table.system-status-report tr.error {
-  color: #8c2e0b;
-  background-color: #fef5f1;
+table.system-status-report td:nth-child(-n+2) {
+ background-color: transparent;
 }
 
 /**

@@ -6,7 +6,9 @@
  */
 
 namespace Drupal\node\Tests;
+
 use Drupal\field\Entity\FieldConfig;
+use Drupal\node\Entity\NodeType;
 
 /**
  * Ensures that node type functions work correctly.
@@ -28,17 +30,17 @@ class NodeTypeTest extends NodeTestBase {
    * Load available node types and validate the returned data.
    */
   function testNodeTypeGetFunctions() {
-    $node_types = node_type_get_types();
+    $node_types = NodeType::loadMultiple();
     $node_names = node_type_get_names();
 
     $this->assertTrue(isset($node_types['article']), 'Node type article is available.');
     $this->assertTrue(isset($node_types['page']), 'Node type basic page is available.');
 
-    $this->assertEqual($node_types['article']->name, $node_names['article'], 'Correct node type base has been returned.');
+    $this->assertEqual($node_types['article']->label(), $node_names['article'], 'Correct node type base has been returned.');
 
-    $article = entity_load('node_type', 'article');
+    $article = NodeType::load('article');
     $this->assertEqual($node_types['article'], $article, 'Correct node type has been returned.');
-    $this->assertEqual($node_types['article']->name, $article->label(), 'Correct node type name has been returned.');
+    $this->assertEqual($node_types['article']->label(), $article->label(), 'Correct node type name has been returned.');
   }
 
   /**
@@ -48,14 +50,14 @@ class NodeTypeTest extends NodeTestBase {
     // Create a content type programmaticaly.
     $type = $this->drupalCreateContentType();
 
-    $type_exists = (bool) entity_load('node_type', $type->type);
+    $type_exists = (bool) NodeType::load($type->id());
     $this->assertTrue($type_exists, 'The new content type has been created in the database.');
 
     // Login a test user.
-    $web_user = $this->drupalCreateUser(array('create ' . $type->name . ' content'));
+    $web_user = $this->drupalCreateUser(array('create ' . $type->label() . ' content'));
     $this->drupalLogin($web_user);
 
-    $this->drupalGet('node/add/' . $type->type);
+    $this->drupalGet('node/add/' . $type->id());
     $this->assertResponse(200, 'The new content type can be accessed at node/add.');
 
     // Create a content type via the user interface.
@@ -67,7 +69,7 @@ class NodeTypeTest extends NodeTestBase {
       'type' => 'foo',
     );
     $this->drupalPostForm('admin/structure/types/add', $edit, t('Save and manage fields'));
-    $type_exists = (bool) entity_load('node_type', 'foo');
+    $type_exists = (bool) NodeType::load('foo');
     $this->assertTrue($type_exists, 'The new content type has been created in the database.');
   }
 
@@ -108,7 +110,7 @@ class NodeTypeTest extends NodeTestBase {
     $this->assertRaw('Bar', 'New name was displayed.');
     $this->assertRaw('Lorem ipsum', 'New description was displayed.');
     $this->clickLink('Bar');
-    $this->assertEqual(url('node/add/bar', array('absolute' => TRUE)), $this->getUrl(), 'New machine name was used in URL.');
+    $this->assertUrl(\Drupal::url('node.add', ['node_type' => 'bar'], ['absolute' => TRUE]), [], 'New machine name was used in URL.');
     $this->assertRaw('Foo', 'Title field was found.');
     $this->assertRaw('Body', 'Body field was found.');
 
@@ -119,35 +121,6 @@ class NodeTypeTest extends NodeTestBase {
     // Check that the body field doesn't exist.
     $this->drupalGet('node/add/bar');
     $this->assertNoRaw('Body', 'Body field was not found.');
-  }
-
-  /**
-   * Tests that node types correctly handles their locking.
-   */
-  function testNodeTypeStatus() {
-    // Enable all core node modules, and all types should be active.
-    $this->container->get('module_handler')->install(array('book'), FALSE);
-    $types = node_type_get_types();
-    foreach (array('book', 'article', 'page') as $type) {
-      $this->assertTrue(isset($types[$type]), format_string('%type is found in node types.', array('%type' => $type)));
-      $this->assertFalse($types[$type]->isLocked(), format_string('%type type is not locked.', array('%type' => $type)));
-    }
-
-    // Disable book module and the respective type should still be active, since
-    // it is not provided by shipped configuration entity.
-    $this->container->get('module_handler')->uninstall(array('book'), FALSE);
-    $types = node_type_get_types();
-    $this->assertFalse($types['book']->isLocked(), "Book module's node type still active.");
-    $this->assertFalse($types['article']->isLocked(), 'Article node type still active.');
-    $this->assertFalse($types['page']->isLocked(), 'Basic page node type still active.');
-
-    // Re-install the modules and verify that the types are active again.
-    $this->container->get('module_handler')->install(array('book'), FALSE);
-    $types = node_type_get_types();
-    foreach (array('book', 'article', 'page') as $type) {
-      $this->assertTrue(isset($types[$type]), format_string('%type is found in node types.', array('%type' => $type)));
-      $this->assertFalse($types[$type]->isLocked(), format_string('%type type is not locked.', array('%type' => $type)));
-    }
   }
 
   /**
@@ -165,11 +138,11 @@ class NodeTypeTest extends NodeTestBase {
     $this->drupalLogin($web_user);
 
     // Add a new node of this type.
-    $node = $this->drupalCreateNode(array('type' => $type->type));
+    $node = $this->drupalCreateNode(array('type' => $type->id()));
     // Attempt to delete the content type, which should not be allowed.
-    $this->drupalGet('admin/structure/types/manage/' . $type->name . '/delete');
+    $this->drupalGet('admin/structure/types/manage/' . $type->label() . '/delete');
     $this->assertRaw(
-      t('%type is used by 1 piece of content on your site. You can not remove this content type until you have removed all of the %type content.', array('%type' => $type->name)),
+      t('%type is used by 1 piece of content on your site. You can not remove this content type until you have removed all of the %type content.', array('%type' => $type->label())),
       'The content type will not be deleted until all nodes of that type are removed.'
     );
     $this->assertNoText(t('This action cannot be undone.'), 'The node type deletion confirmation form is not available.');
@@ -177,26 +150,35 @@ class NodeTypeTest extends NodeTestBase {
     // Delete the node.
     $node->delete();
     // Attempt to delete the content type, which should now be allowed.
-    $this->drupalGet('admin/structure/types/manage/' . $type->name . '/delete');
+    $this->drupalGet('admin/structure/types/manage/' . $type->label() . '/delete');
     $this->assertRaw(
-      t('Are you sure you want to delete the content type %type?', array('%type' => $type->name)),
+      t('Are you sure you want to delete the content type %type?', array('%type' => $type->label())),
       'The content type is available for deletion.'
     );
     $this->assertText(t('This action cannot be undone.'), 'The node type deletion confirmation form is available.');
-    // Test that forum node type could not be deleted while forum active.
-    $this->container->get('module_handler')->install(array('forum'));
+
+    // Test that a locked node type could not be deleted.
+    $this->container->get('module_installer')->install(array('node_test_config'));
+    // Lock the default node type.
+    $locked = \Drupal::state()->get('node.type.locked');
+    $locked['default'] = 'default';
+    \Drupal::state()->set('node.type.locked', $locked);
     // Call to flush all caches after installing the forum module in the same
     // way installing a module through the UI does.
     $this->resetAll();
-    $this->drupalGet('admin/structure/types/manage/forum');
+    $this->drupalGet('admin/structure/types/manage/default');
     $this->assertNoLink(t('Delete'));
-    $this->drupalGet('admin/structure/types/manage/forum/delete');
+    $this->drupalGet('admin/structure/types/manage/default/delete');
     $this->assertResponse(403);
-    $this->container->get('module_handler')->uninstall(array('forum'));
-    $this->drupalGet('admin/structure/types/manage/forum');
-    $this->assertLink(t('Delete'));
-    $this->drupalGet('admin/structure/types/manage/forum/delete');
+    $this->container->get('module_installer')->uninstall(array('node_test_config'));
+    $this->container = \Drupal::getContainer();
+    unset($locked['default']);
+    \Drupal::state()->set('node.type.locked', $locked);
+    $this->drupalGet('admin/structure/types/manage/default');
+    $this->clickLink(t('Delete'));
     $this->assertResponse(200);
+    $this->drupalPostForm(NULL, array(), t('Delete'));
+    $this->assertFalse((bool) NodeType::load('default'), 'Node type with machine default deleted.');
   }
 
   /**

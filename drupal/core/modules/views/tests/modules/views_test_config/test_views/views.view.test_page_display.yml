@@ -1,15 +1,22 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_page_display
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
+      title: 'Test page display'
       defaults:
-        fields: '0'
-        pager: '0'
-        pager_options: '0'
-        sorts: '0'
+        fields: false
+        pager: false
+        sorts: false
       fields:
         age:
           field: age
@@ -17,7 +24,6 @@ display:
           relationship: none
           table: views_test_data
           plugin_id: numeric
-          provider: views_test_data
     display_plugin: default
     display_title: Master
     id: default
@@ -43,6 +49,3 @@ display:
     display_title: Page
     id: page_3
     position: 3
-label: ''
-id: test_page_display
-tag: ''

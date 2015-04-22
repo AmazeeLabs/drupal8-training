@@ -8,15 +8,16 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\field\Entity\FieldConfig;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Vocabulary field instance migration.
  *
  * @group migrate_drupal
  */
-class MigrateVocabularyFieldInstanceTest extends MigrateDrupalTestBase {
+class MigrateVocabularyFieldInstanceTest extends MigrateDrupal6TestBase {
 
   /**
    * The modules to be enabled during the test.
@@ -48,14 +49,14 @@ class MigrateVocabularyFieldInstanceTest extends MigrateDrupalTestBase {
 
     // Create the vocab.
     entity_create('taxonomy_vocabulary', array(
-      'name' => 'Test Vocabulary',
+      'field_name' => 'Test Vocabulary',
       'description' => 'Test Vocabulary',
       'vid' => 'tags',
     ))->save();
-    // Create the field itself.
+    // Create the field storage.
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-      'name' => 'tags',
+      'field_name' => 'tags',
       'type' => 'taxonomy_term_reference',
       'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
@@ -70,7 +71,8 @@ class MigrateVocabularyFieldInstanceTest extends MigrateDrupalTestBase {
 
     $migration = entity_load('migration', 'd6_vocabulary_field_instance');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6VocabularyField.php',
+      $this->getDumpDirectory() . '/Vocabulary.php',
+      $this->getDumpDirectory() . '/VocabularyNodeTypes.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -83,15 +85,15 @@ class MigrateVocabularyFieldInstanceTest extends MigrateDrupalTestBase {
   public function testVocabularyFieldInstance() {
     // Test that the field exists.
     $field_id = 'node.article.tags';
-    $field = entity_load('field_config', $field_id);
-    $this->assertEqual($field->id(), $field_id, 'Field instance exists on article bundle.');
+    $field = FieldConfig::load($field_id);
+    $this->assertIdentical($field_id, $field->id(), 'Field instance exists on article bundle.');
 
     // Test the page bundle as well.
     $field_id = 'node.page.tags';
-    $field = entity_load('field_config', $field_id);
-    $this->assertEqual($field->id(), $field_id, 'Field instance exists on page bundle.');
+    $field = FieldConfig::load($field_id);
+    $this->assertIdentical($field_id, $field->id(), 'Field instance exists on page bundle.');
 
-    $this->assertEqual(array('node', 'article', 'tags'), entity_load('migration', 'd6_vocabulary_field_instance')->getIdMap()->lookupDestinationID(array(4, 'article')));
+    $this->assertIdentical(array('node', 'article', 'tags'), entity_load('migration', 'd6_vocabulary_field_instance')->getIdMap()->lookupDestinationID(array(4, 'article')));
   }
 
 }

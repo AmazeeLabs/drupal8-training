@@ -1,31 +1,42 @@
 name: Bartik
 type: theme
+base theme: classy
 description: 'A flexible, recolorable theme with many regions and a responsive, mobile-first layout.'
 package: Core
-version: VERSION
-core: 8.x
+# version: VERSION
+# core: 8.x
 libraries:
-  - bartik/base
+  - bartik/global-styling
 ckeditor_stylesheets:
-  - css/ckeditor-iframe.css
+  - css/base/elements.css
+  - css/components/captions.css
+  - css/components/content.css
+  - css/components/table.css
 regions:
   header: Header
+  primary_menu: 'Primary menu'
+  secondary_menu: 'Secondary menu'
   help: Help
   page_top: 'Page top'
   page_bottom: 'Page bottom'
-  highlighted: Highlighted
-  featured: Featured
+  messages: Messages
+  featured_top: 'Featured top'
+  breadcrumb: Breadcrumb
   content: Content
   sidebar_first: 'Sidebar first'
   sidebar_second: 'Sidebar second'
-  triptych_first: 'Triptych first'
-  triptych_middle: 'Triptych middle'
-  triptych_last: 'Triptych last'
-  footer_firstcolumn: 'Footer first column'
-  footer_secondcolumn: 'Footer second column'
-  footer_thirdcolumn: 'Footer third column'
-  footer_fourthcolumn: 'Footer fourth column'
-  footer: Footer
+  featured_bottom_first: 'Featured bottom first'
+  featured_bottom_second: 'Featured bottom second'
+  featured_bottom_third: 'Featured bottom third'
+  footer_first: 'Footer first'
+  footer_second: 'Footer second'
+  footer_third: 'Footer third'
+  footer_fourth: 'Footer fourth'
+  footer_fifth: 'Footer fifth'
 
-settings:
-  shortcut_module_link: false
+
+# Information added by Drupal.org packaging script on 2015-03-25
+version: '8.0.0-beta9'
+core: '8.x'
+project: 'drupal'
+datestamp: 1427300653

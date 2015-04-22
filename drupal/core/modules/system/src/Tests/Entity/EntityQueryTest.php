@@ -7,8 +7,14 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\entity_test\Entity\EntityTestMulRev;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\Entity\Vocabulary;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -56,15 +62,14 @@ class EntityQueryTest extends EntityUnitTestBase {
 
     $this->installConfig(array('language'));
 
-    $figures = drupal_strtolower($this->randomMachineName());
-    $greetings = drupal_strtolower($this->randomMachineName());
+    $figures = Unicode::strtolower($this->randomMachineName());
+    $greetings = Unicode::strtolower($this->randomMachineName());
     foreach (array($figures => 'shape', $greetings => 'text') as $field_name => $field_type) {
       $field_storage = entity_create('field_storage_config', array(
-        'name' => $field_name,
+        'field_name' => $field_name,
         'entity_type' => 'entity_test_mulrev',
         'type' => $field_type,
         'cardinality' => 2,
-        'translatable' => TRUE,
       ));
       $field_storage->save();
       $field_storages[] = $field_storage;
@@ -413,7 +418,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     // Create a field with the same name in a different entity type.
     $field_name = $this->figures;
     $field_storage = entity_create('field_storage_config', array(
-      'name' => $field_name,
+      'field_name' => $field_name,
       'entity_type' => 'entity_test',
       'type' => 'shape',
       'cardinality' => 2,
@@ -489,7 +494,7 @@ class EntityQueryTest extends EntityUnitTestBase {
    *
    * The tags and metadata should propagate to the SQL query object.
    */
-  function testMetaData() {
+  public function testMetaData() {
     $query = \Drupal::entityQuery('entity_test_mulrev');
     $query
       ->addTag('efq_metadata_test')
@@ -499,4 +504,206 @@ class EntityQueryTest extends EntityUnitTestBase {
     global $efq_test_metadata;
     $this->assertEqual($efq_test_metadata, 'bar', 'Tag and metadata propagated to the SQL query object.');
   }
+
+  /**
+   * Test case sensitive and in-sensitive query conditions.
+   */
+  public function testCaseSensitivity() {
+    $bundle = $this->randomMachineName();
+
+    $field_storage = FieldStorageConfig::create(array(
+      'field_name' => 'field_ci',
+      'entity_type' => 'entity_test_mulrev',
+      'type' => 'string',
+      'cardinality' => 1,
+      'translatable' => FALSE,
+      'settings' => array(
+        'case_sensitive' => FALSE,
+      )
+    ));
+    $field_storage->save();
+
+    FieldConfig::create(array(
+      'field_storage' => $field_storage,
+      'bundle' => $bundle,
+    ))->save();
+
+    $field_storage = FieldStorageConfig::create(array(
+      'field_name' => 'field_cs',
+      'entity_type' => 'entity_test_mulrev',
+      'type' => 'string',
+      'cardinality' => 1,
+      'translatable' => FALSE,
+      'settings' => array(
+        'case_sensitive' => TRUE,
+      ),
+    ));
+    $field_storage->save();
+
+    FieldConfig::create(array(
+      'field_storage' => $field_storage,
+      'bundle' => $bundle,
+    ))->save();
+
+    $fixtures = array();
+
+    for ($i = 0; $i < 2; $i++) {
+      // If the last 4 of the string are all numbers, then there is no
+      // difference between upper and lowercase and the case sensitive CONTAINS
+      // test will fail. Ensure that can not happen by appending a non-numeric
+      // character. See https://www.drupal.org/node/2397297.
+      $string = $this->randomMachineName(7) . 'a';
+      $fixtures[] = array(
+        'original' => $string,
+        'uppercase' => Unicode::strtoupper($string),
+        'lowercase' => Unicode::strtolower($string),
+      );
+    }
+
+    EntityTestMulRev::create(array(
+      'type' => $bundle,
+      'name' => $this->randomMachineName(),
+      'langcode' => 'en',
+      'field_ci' => $fixtures[0]['uppercase'] . $fixtures[1]['lowercase'],
+      'field_cs' => $fixtures[0]['uppercase'] . $fixtures[1]['lowercase']
+    ))->save();
+
+    // Check the case insensitive field, = operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[0]['lowercase'] . $fixtures[1]['lowercase']
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case insensitive, lowercase');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[0]['uppercase'] . $fixtures[1]['uppercase']
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case insensitive, uppercase');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[0]['uppercase'] . $fixtures[1]['lowercase']
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case insensitive, mixed.');
+
+    // Check the case sensitive field, = operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[0]['lowercase'] . $fixtures[1]['lowercase']
+    )->execute();
+    $this->assertIdentical(count($result), 0, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[0]['uppercase'] . $fixtures[1]['uppercase']
+    )->execute();
+    $this->assertIdentical(count($result), 0, 'Case sensitive, uppercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[0]['uppercase'] . $fixtures[1]['lowercase']
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, exact match.');
+
+    // Check the case insensitive field, STARTS_WITH operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[0]['lowercase'], 'STARTS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[0]['uppercase'], 'STARTS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, exact match.');
+
+    // Check the case sensitive field, STARTS_WITH operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[0]['lowercase'], 'STARTS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 0, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[0]['uppercase'], 'STARTS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, exact match.');
+
+
+    // Check the case insensitive field, ENDS_WITH operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[1]['lowercase'], 'ENDS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', $fixtures[1]['uppercase'], 'ENDS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, exact match.');
+
+    // Check the case sensitive field, ENDS_WITH operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[1]['lowercase'], 'ENDS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', $fixtures[1]['uppercase'], 'ENDS_WITH'
+    )->execute();
+    $this->assertIdentical(count($result), 0, 'Case sensitive, exact match.');
+
+
+    // Check the case insensitive field, CONTAINS operator, use the inner 8
+    // characters of the uppercase and lowercase strings.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', Unicode::substr($fixtures[0]['uppercase'] . $fixtures[1]['lowercase'], 4, 8), 'CONTAINS'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_ci', Unicode::strtolower(Unicode::substr($fixtures[0]['uppercase'] . $fixtures[1]['lowercase'], 4, 8)), 'CONTAINS'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, exact match.');
+
+    // Check the case sensitive field, CONTAINS operator.
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', Unicode::substr($fixtures[0]['uppercase'] . $fixtures[1]['lowercase'], 4, 8), 'CONTAINS'
+    )->execute();
+    $this->assertIdentical(count($result), 1, 'Case sensitive, lowercase.');
+
+    $result = \Drupal::entityQuery('entity_test_mulrev')->condition(
+      'field_cs', Unicode::strtolower(Unicode::substr($fixtures[0]['uppercase'] . $fixtures[1]['lowercase'], 4, 8)), 'CONTAINS'
+    )->execute();
+    $this->assertIdentical(count($result), 0, 'Case sensitive, exact match.');
+
+  }
+
+  /**
+   * Test base fields with multiple columns.
+   */
+  public function testBaseFieldMultipleColumns() {
+    $this->enableModules(['taxonomy']);
+    $this->installEntitySchema('taxonomy_term');
+
+    Vocabulary::create(['vid' => 'tags']);
+
+    $term1 = Term::create([
+      'name' => $this->randomMachineName(),
+      'vid' => 'tags',
+      'description' => array(
+        'value' => $this->randomString(),
+        'format' => 'format1',
+      )]);
+    $term1->save();
+
+    $term2 = Term::create([
+      'name' => $this->randomMachineName(),
+      'vid' => 'tags',
+      'description' => array(
+        'value' => $this->randomString(),
+        'format' => 'format2',
+      )]);
+    $term2->save();
+
+    $ids = \Drupal::entityQuery('taxonomy_term')
+      ->condition('description.format', 'format1')
+      ->execute();
+
+    $this->assertEqual(count($ids), 1);
+    $this->assertEqual($term1->id(), reset($ids));
+  }
+
 }

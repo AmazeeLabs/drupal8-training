@@ -12,15 +12,23 @@
 namespace Symfony\Component\Validator\Mapping\Loader;
 
 use Doctrine\Common\Annotations\Reader;
+use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Constraints\Callback;
-use Symfony\Component\Validator\Exception\MappingException;
-use Symfony\Component\Validator\Mapping\ClassMetadata;
 use Symfony\Component\Validator\Constraints\GroupSequence;
 use Symfony\Component\Validator\Constraints\GroupSequenceProvider;
-use Symfony\Component\Validator\Constraint;
+use Symfony\Component\Validator\Exception\MappingException;
+use Symfony\Component\Validator\Mapping\ClassMetadata;
 
+/**
+ * Loads validation metadata using a Doctrine annotation {@link Reader}.
+ *
+ * @author Bernhard Schussek <bschussek@gmail.com>
+ */
 class AnnotationLoader implements LoaderInterface
 {
+    /**
+     * @var Reader
+     */
     protected $reader;
 
     public function __construct(Reader $reader)
@@ -29,13 +37,13 @@ class AnnotationLoader implements LoaderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function loadClassMetadata(ClassMetadata $metadata)
     {
         $reflClass = $metadata->getReflectionClass();
         $className = $reflClass->name;
-        $loaded = false;
+        $success = false;
 
         foreach ($this->reader->getClassAnnotations($reflClass) as $constraint) {
             if ($constraint instanceof GroupSequence) {
@@ -46,7 +54,7 @@ class AnnotationLoader implements LoaderInterface
                 $metadata->addConstraint($constraint);
             }
 
-            $loaded = true;
+            $success = true;
         }
 
         foreach ($reflClass->getProperties() as $property) {
@@ -56,7 +64,7 @@ class AnnotationLoader implements LoaderInterface
                         $metadata->addPropertyConstraint($property->name, $constraint);
                     }
 
-                    $loaded = true;
+                    $success = true;
                 }
             }
         }
@@ -70,18 +78,18 @@ class AnnotationLoader implements LoaderInterface
 
                         $metadata->addConstraint($constraint);
                     } elseif ($constraint instanceof Constraint) {
-                        if (preg_match('/^(get|is)(.+)$/i', $method->name, $matches)) {
+                        if (preg_match('/^(get|is|has)(.+)$/i', $method->name, $matches)) {
                             $metadata->addGetterConstraint(lcfirst($matches[2]), $constraint);
                         } else {
-                            throw new MappingException(sprintf('The constraint on "%s::%s" cannot be added. Constraints can only be added on methods beginning with "get" or "is".', $className, $method->name));
+                            throw new MappingException(sprintf('The constraint on "%s::%s" cannot be added. Constraints can only be added on methods beginning with "get", "is" or "has".', $className, $method->name));
                         }
                     }
 
-                    $loaded = true;
+                    $success = true;
                 }
             }
         }
 
-        return $loaded;
+        return $success;
     }
 }

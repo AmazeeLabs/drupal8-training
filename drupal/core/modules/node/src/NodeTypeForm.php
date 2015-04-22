@@ -12,6 +12,8 @@ use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
+use Drupal\language\Entity\ContentLanguageSettings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -71,8 +73,8 @@ class NodeTypeForm extends EntityForm {
     $form['name'] = array(
       '#title' => t('Name'),
       '#type' => 'textfield',
-      '#default_value' => $type->name,
-      '#description' => t('The human-readable name of this content type. This text will be displayed as part of the list on the <em>Add content</em> page. It is recommended that this name begin with a capital letter and contain only letters, numbers, and spaces. This name must be unique.'),
+      '#default_value' => $type->label(),
+      '#description' => t('The human-readable name of this content type. This text will be displayed as part of the list on the <em>Add content</em> page. This name must be unique.'),
       '#required' => TRUE,
       '#size' => 30,
     );
@@ -83,7 +85,7 @@ class NodeTypeForm extends EntityForm {
       '#maxlength' => EntityTypeInterface::BUNDLE_MAX_LENGTH,
       '#disabled' => $type->isLocked(),
       '#machine_name' => array(
-        'exists' => 'node_type_load',
+        'exists' => ['Drupal\node\Entity\NodeType', 'load'],
         'source' => array('name'),
       ),
       '#description' => t('A unique machine-readable name for this content type. It must only contain lowercase letters, numbers, and underscores. This name will be used for constructing the URL of the %node-add page, in which underscores will be converted into hyphens.', array(
@@ -94,7 +96,7 @@ class NodeTypeForm extends EntityForm {
     $form['description'] = array(
       '#title' => t('Description'),
       '#type' => 'textarea',
-      '#default_value' => $type->description,
+      '#default_value' => $type->getDescription(),
       '#description' => t('Describe this content type. The text will be displayed on the <em>Add content</em> page.'),
     );
 
@@ -130,7 +132,7 @@ class NodeTypeForm extends EntityForm {
     $form['submission']['help']  = array(
       '#type' => 'textarea',
       '#title' => t('Explanation or submission guidelines'),
-      '#default_value' => $type->help,
+      '#default_value' => $type->getHelp(),
       '#description' => t('This text will be displayed at the top of the page when creating or editing content of this type.'),
     );
     $form['workflow'] = array(
@@ -165,7 +167,7 @@ class NodeTypeForm extends EntityForm {
         '#group' => 'additional_settings',
       );
 
-      $language_configuration = language_get_default_configuration('node', $type->id());
+      $language_configuration = ContentLanguageSettings::loadByEntityTypeBundle('node', $type->id());
       $form['language']['language_configuration'] = array(
         '#type' => 'language_configuration',
         '#entity_information' => array(
@@ -218,8 +220,8 @@ class NodeTypeForm extends EntityForm {
   public function save(array $form, FormStateInterface $form_state) {
     $type = $this->entity;
     $type->setNewRevision($form_state->getValue(array('options', 'revision')));
-    $type->type = trim($type->id());
-    $type->name = trim($type->name);
+    $type->set('type', trim($type->id()));
+    $type->set('name', trim($type->label()));
 
     $status = $type->save();
 
@@ -229,8 +231,9 @@ class NodeTypeForm extends EntityForm {
       drupal_set_message(t('The content type %name has been updated.', $t_args));
     }
     elseif ($status == SAVED_NEW) {
+      node_add_body_field($type);
       drupal_set_message(t('The content type %name has been added.', $t_args));
-      $context = array_merge($t_args, array('link' => l(t('View'), 'admin/structure/types')));
+      $context = array_merge($t_args, array('link' => $type->link($this->t('View'), 'collection')));
       $this->logger('node')->notice('Added content type %name.', $context);
     }
 
@@ -253,7 +256,7 @@ class NodeTypeForm extends EntityForm {
     }
 
     $this->entityManager->clearCachedFieldDefinitions();
-    $form_state->setRedirect('node.overview_types');
+    $form_state->setRedirectUrl($type->urlInfo('collection'));
   }
 
 }

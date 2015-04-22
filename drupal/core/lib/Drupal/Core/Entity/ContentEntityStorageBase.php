@@ -12,7 +12,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
-abstract class ContentEntityStorageBase extends EntityStorageBase implements FieldableEntityStorageInterface {
+abstract class ContentEntityStorageBase extends EntityStorageBase implements DynamicallyFieldableEntityStorageInterface {
 
   /**
    * The entity bundle key.
@@ -40,6 +40,16 @@ abstract class ContentEntityStorageBase extends EntityStorageBase implements Fie
     return new static(
       $entity_type
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasData() {
+    return (bool) $this->getQuery()
+      ->accessCheck(FALSE)
+      ->range(0, 1)
+      ->execute();
   }
 
   /**
@@ -106,21 +116,6 @@ abstract class ContentEntityStorageBase extends EntityStorageBase implements Fie
   /**
    * {@inheritdoc}
    */
-  public function onBundleCreate($bundle) { }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function onBundleRename($bundle, $bundle_new) { }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function onBundleDelete($bundle) { }
-
-  /**
-   * {@inheritdoc}
-   */
   public function purgeFieldData(FieldDefinitionInterface $field_definition, $batch_size) {
     $items_by_entity = $this->readFieldItemsToPurge($field_definition, $batch_size);
 
@@ -135,7 +130,7 @@ abstract class ContentEntityStorageBase extends EntityStorageBase implements Fie
    * Reads values to be purged for a single field.
    *
    * This method is called during field data purge, on fields for which
-   * onFieldDelete() or onFieldDelete() has previously run.
+   * onFieldDefinitionDelete() has previously run.
    *
    * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
    *   The field definition.
@@ -185,6 +180,16 @@ abstract class ContentEntityStorageBase extends EntityStorageBase implements Fie
   }
 
   /**
+   * {@inheritdoc}
+   */
+  protected function invokeHook($hook, EntityInterface $entity) {
+    if ($hook == 'presave') {
+      $this->invokeFieldMethod('preSave', $entity);
+    }
+    parent::invokeHook($hook, $entity);
+  }
+
+  /**
    * Invokes a method on the Field objects within an entity.
    *
    * @param string $method
@@ -195,7 +200,7 @@ abstract class ContentEntityStorageBase extends EntityStorageBase implements Fie
   protected function invokeFieldMethod($method, ContentEntityInterface $entity) {
     foreach (array_keys($entity->getTranslationLanguages()) as $langcode) {
       $translation = $entity->getTranslation($langcode);
-      foreach ($translation->getProperties(TRUE) as $field) {
+      foreach ($translation->getFields() as $field) {
         $field->$method();
       }
     }

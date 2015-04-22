@@ -22,12 +22,11 @@
  * - submitted: Submission information created from author and created
  *   during template_preprocess_comment().
  * - user_picture: The comment author's profile picture.
- * - signature: The comment author's signature.
  * - status: Comment status. Possible values are:
  *   unpublished, published, or preview.
  * - title: Comment title, linked to the comment.
- * - attributes.class: List of classes that can be used to style contextually
- *   through CSS. The default values can be one or more of the following:
+ * - attributes: HTML attributes for the containing element.
+ *   The attributes.class may contain one or more of the following classes:
  *   - comment: The current template type; e.g., 'theming hook'.
  *   - by-anonymous: Comment by an unregistered user.
  *   - by-{entity-type}-author: Comment by the author of the parent entity,
@@ -40,6 +39,8 @@
  * - title_suffix: Additional output populated by modules, intended to be
  *   displayed after the main title tag that appears in the template.
  * - content_attributes: List of classes for the styling of the comment content.
+ * - title_attributes: Same as attributes, except applied to the main title
+ *   tag that appears in the template.
  *
  * These variables are provided to give context about the parent comment (if
  * any):
@@ -64,6 +65,7 @@
  * @ingroup themeable
  */
 #}
+
 <article{{ attributes }}>
   {% if title %}
     {{ title_prefix }}
@@ -74,7 +76,7 @@
   the server which comments are new for the user. Rendering the final
   "new" indicator here would break the render cache.
   #}
-  <mark class="hidden new" data-comment-timestamp="{{ new_indicator_timestamp }}"></mark>
+  <mark class="hidden" data-comment-timestamp="{{ new_indicator_timestamp }}"></mark>
 
   {% if title %}
     <h3{{ title_attributes }}>{{ title }}</h3>
@@ -84,7 +86,7 @@
 
   <footer>
     {{ user_picture }}
-    <p class="submitted">{{ submitted }}</p>
+    <p>{{ submitted }}</p>
 
     {#
       Indicate the semantic relationship between parent and child comments
@@ -92,7 +94,7 @@
       reader without this information.
     #}
     {% if parent %}
-      <p class="parent visually-hidden">{{ parent }}</p>
+      <p class="visually-hidden">{{ parent }}</p>
     {% endif %}
 
     {{ permalink }}
@@ -100,12 +102,6 @@
 
   <div{{ content_attributes }}>
     {{ content|without('links') }}
-
-    {% if signature %}
-      <div class="user-signature">
-        {{ signature }}
-      </div>
-    {% endif %}
   </div>
   {% if content.links %}
     {{ content.links }}

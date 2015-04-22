@@ -31,7 +31,7 @@ class ManyToOneHelper {
   }
 
   public static function defineOptions(&$options) {
-    $options['reduce_duplicates'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['reduce_duplicates'] = array('default' => FALSE);
   }
 
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
@@ -310,6 +310,7 @@ class ManyToOneHelper {
       else {
         $placeholder = $this->placeholder();
         if (count($this->handler->value) > 1) {
+          $placeholder .= '[]';
           $this->handler->query->addWhereExpression(0, "$field $operator($placeholder)", array($placeholder => $value));
         }
         else {

@@ -71,7 +71,7 @@ class Permissions extends PrerenderList {
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
 
-    $this->additional_fields['uid'] = array('table' => 'users', 'field' => 'uid');
+    $this->additional_fields['uid'] = array('table' => 'users_field_data', 'field' => 'uid');
   }
 
   public function query() {
@@ -119,8 +119,8 @@ class Permissions extends PrerenderList {
 
   /*
   protected function documentSelfTokens(&$tokens) {
-    $tokens['[' . $this->options['id'] . '-role' . ']'] = t('The name of the role.');
-    $tokens['[' . $this->options['id'] . '-rid' . ']'] = t('The role ID of the role.');
+    $tokens['[' . $this->options['id'] . '-role' . ']'] = $this->t('The name of the role.');
+    $tokens['[' . $this->options['id'] . '-rid' . ']'] = $this->t('The role ID of the role.');
   }
 
   protected function addSelfTokens(&$tokens, $item) {

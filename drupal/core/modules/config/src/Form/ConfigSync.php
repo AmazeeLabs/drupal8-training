@@ -13,6 +13,7 @@ use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Form\FormBase;
@@ -20,7 +21,7 @@ use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\Core\Config\StorageComparer;
-use Drupal\Core\Routing\UrlGeneratorInterface;
+use Drupal\Core\Url;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -72,13 +73,6 @@ class ConfigSync extends FormBase {
   protected $configManager;
 
   /**
-   * URL generator service.
-   *
-   * @var \Drupal\Core\Routing\UrlGeneratorInterface
-   */
-  protected $urlGenerator;
-
-  /**
    * The typed config manager.
    *
    * @var \Drupal\Core\Config\TypedConfigManagerInterface
@@ -100,6 +94,13 @@ class ConfigSync extends FormBase {
   protected $themeHandler;
 
   /**
+   * The module installer.
+   *
+   * @var \Drupal\Core\Extension\ModuleInstallerInterface
+   */
+  protected $moduleInstaller;
+
+  /**
    * Constructs the object.
    *
    * @param \Drupal\Core\Config\StorageInterface $staging_storage
@@ -114,25 +115,25 @@ class ConfigSync extends FormBase {
    *   Event dispatcher.
    * @param \Drupal\Core\Config\ConfigManagerInterface $config_manager
    *   Configuration manager.
-   * @param \Drupal\Core\Routing\UrlGeneratorInterface $url_generator
-   *   The url generator service.
    * @param \Drupal\Core\Config\TypedConfigManagerInterface $typed_config
    *   The typed configuration manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler
+   * @param \Drupal\Core\Extension\ModuleInstallerInterface $module_installer
+   *   The module installer.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $theme_handler
    *   The theme handler
    */
-  public function __construct(StorageInterface $staging_storage, StorageInterface $active_storage, StorageInterface $snapshot_storage, LockBackendInterface $lock, EventDispatcherInterface $event_dispatcher, ConfigManagerInterface $config_manager, UrlGeneratorInterface $url_generator, TypedConfigManagerInterface $typed_config, ModuleHandlerInterface $module_handler, ThemeHandlerInterface $theme_handler) {
+  public function __construct(StorageInterface $staging_storage, StorageInterface $active_storage, StorageInterface $snapshot_storage, LockBackendInterface $lock, EventDispatcherInterface $event_dispatcher, ConfigManagerInterface $config_manager, TypedConfigManagerInterface $typed_config, ModuleHandlerInterface $module_handler, ModuleInstallerInterface $module_installer, ThemeHandlerInterface $theme_handler) {
     $this->stagingStorage = $staging_storage;
     $this->activeStorage = $active_storage;
     $this->snapshotStorage = $snapshot_storage;
     $this->lock = $lock;
     $this->eventDispatcher = $event_dispatcher;
     $this->configManager = $config_manager;
-    $this->urlGenerator = $url_generator;
     $this->typedConfigManager = $typed_config;
     $this->moduleHandler = $module_handler;
+    $this->moduleInstaller = $module_installer;
     $this->themeHandler = $theme_handler;
   }
 
@@ -144,12 +145,12 @@ class ConfigSync extends FormBase {
       $container->get('config.storage.staging'),
       $container->get('config.storage'),
       $container->get('config.storage.snapshot'),
-      $container->get('lock'),
+      $container->get('lock.persistent'),
       $container->get('event_dispatcher'),
       $container->get('config.manager'),
-      $container->get('url_generator'),
       $container->get('config.typed'),
       $container->get('module_handler'),
+      $container->get('module_installer'),
       $container->get('theme_handler')
     );
   }
@@ -165,33 +166,34 @@ class ConfigSync extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $snapshot_comparer = new StorageComparer($this->activeStorage, $this->snapshotStorage, $this->configManager);
-    if (!$form_state->getUserInput() && $snapshot_comparer->createChangelist()->hasChanges()) {
-      $change_list = array();
-      foreach ($snapshot_comparer->getAllCollectionNames() as $collection) {
-        foreach ($snapshot_comparer->getChangelist(NULL, $collection) as $config_names) {
-          if (empty($config_names)) {
-            continue;
-          }
-          foreach ($config_names as $config_name) {
-            $change_list[] = $config_name;
+    if ($this->snapshotStorage->exists('core.extension')) {
+      $snapshot_comparer = new StorageComparer($this->activeStorage, $this->snapshotStorage, $this->configManager);
+      if (!$form_state->getUserInput() && $snapshot_comparer->createChangelist()->hasChanges()) {
+        $change_list = array();
+        foreach ($snapshot_comparer->getAllCollectionNames() as $collection) {
+          foreach ($snapshot_comparer->getChangelist(NULL, $collection) as $config_names) {
+            if (empty($config_names)) {
+              continue;
+            }
+            foreach ($config_names as $config_name) {
+              $change_list[] = $config_name;
+            }
           }
         }
+        sort($change_list);
+        $change_list_render = array(
+          '#theme' => 'item_list',
+          '#items' => $change_list,
+        );
+        $change_list_html = drupal_render($change_list_render);
+        drupal_set_message($this->t('Your current configuration has changed. Changes to these configuration items will be lost on the next synchronization: !changes', array('!changes' => $change_list_html)), 'warning');
       }
-      sort($change_list);
-      $change_list_render = array(
-        '#theme' => 'item_list',
-        '#items' => $change_list,
-      );
-      $change_list_html = drupal_render($change_list_render);
-      drupal_set_message($this->t('Your current configuration has changed. Changes to these configuration items will be lost on the next synchronization: !changes', array('!changes' => $change_list_html)), 'warning');
     }
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(
       '#type' => 'submit',
       '#value' => $this->t('Import all'),
     );
-
     $source_list = $this->stagingStorage->listAll();
     $storage_comparer = new StorageComparer($this->stagingStorage, $this->activeStorage, $this->configManager);
     if (empty($source_list) || !$storage_comparer->createChangelist()->hasChanges()) {
@@ -238,19 +240,19 @@ class ConfigSync extends FormBase {
         );
         switch ($config_change_type) {
           case 'create':
-            $form[$collection][$config_change_type]['heading']['#value'] = format_plural(count($config_names), '@count new', '@count new');
+            $form[$collection][$config_change_type]['heading']['#value'] = $this->formatPlural(count($config_names), '@count new', '@count new');
             break;
 
           case 'update':
-            $form[$collection][$config_change_type]['heading']['#value'] = format_plural(count($config_names), '@count changed', '@count changed');
+            $form[$collection][$config_change_type]['heading']['#value'] = $this->formatPlural(count($config_names), '@count changed', '@count changed');
             break;
 
           case 'delete':
-            $form[$collection][$config_change_type]['heading']['#value'] = format_plural(count($config_names), '@count removed', '@count removed');
+            $form[$collection][$config_change_type]['heading']['#value'] = $this->formatPlural(count($config_names), '@count removed', '@count removed');
             break;
 
           case 'rename':
-            $form[$collection][$config_change_type]['heading']['#value'] = format_plural(count($config_names), '@count renamed', '@count renamed');
+            $form[$collection][$config_change_type]['heading']['#value'] = $this->formatPlural(count($config_names), '@count renamed', '@count renamed');
             break;
         }
         $form[$collection][$config_change_type]['list'] = array(
@@ -268,15 +270,15 @@ class ConfigSync extends FormBase {
             $route_options = array('source_name' => $config_name);
           }
           if ($collection != StorageInterface::DEFAULT_COLLECTION) {
+            $route_name = 'config.diff_collection';
             $route_options['collection'] = $collection;
-            $href = $this->urlGenerator->getPathFromRoute('config.diff_collection', $route_options);
           }
           else {
-            $href = $this->urlGenerator->getPathFromRoute('config.diff', $route_options);
+            $route_name = 'config.diff';
           }
           $links['view_diff'] = array(
             'title' => $this->t('View differences'),
-            'href' => $href,
+            'url' => Url::fromRoute($route_name, $route_options),
             'attributes' => array(
               'class' => array('use-ajax'),
               'data-accepts' => 'application/vnd.drupal-modal',
@@ -311,6 +313,7 @@ class ConfigSync extends FormBase {
       $this->lock,
       $this->typedConfigManager,
       $this->moduleHandler,
+      $this->moduleInstaller,
       $this->themeHandler,
       $this->getStringTranslation()
     );
@@ -351,7 +354,7 @@ class ConfigSync extends FormBase {
    * @param \Drupal\Core\Config\ConfigImporter $config_importer
    *   The batch config importer object to persist.
    * @param string $sync_step
-   *   The synchronisation step to do.
+   *   The synchronization step to do.
    * @param $context
    *   The batch context.
    */
@@ -373,7 +376,7 @@ class ConfigSync extends FormBase {
   /**
    * Finish batch.
    *
-   * This function is a static function to avoid serialising the ConfigSync
+   * This function is a static function to avoid serializing the ConfigSync
    * object unnecessarily.
    */
   public static function finishBatch($success, $results, $operations) {
@@ -396,7 +399,6 @@ class ConfigSync extends FormBase {
       $message = \Drupal::translation()->translate('An error occurred while processing %error_operation with arguments: @arguments', array('%error_operation' => $error_operation[0], '@arguments' => print_r($error_operation[1], TRUE)));
       drupal_set_message($message, 'error');
     }
-    drupal_flush_all_caches();
   }
 
 

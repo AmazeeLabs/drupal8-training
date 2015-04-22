@@ -3,3 +3,4 @@ drupal/sites/default/settings.php
 drupal/sites/default/files/*
 drupal/themes/movies/.sass-cache
 Gemfile.lock
+.DS_Store

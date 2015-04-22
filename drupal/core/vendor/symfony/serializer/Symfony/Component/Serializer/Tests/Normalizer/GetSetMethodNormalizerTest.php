@@ -12,11 +12,19 @@
 namespace Symfony\Component\Serializer\Tests\Normalizer;
 
 use Symfony\Component\Serializer\Normalizer\GetSetMethodNormalizer;
+use Symfony\Component\Serializer\Serializer;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
+use Symfony\Component\Serializer\Tests\Fixtures\CircularReferenceDummy;
+use Symfony\Component\Serializer\Tests\Fixtures\SiblingHolder;
 
 class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
 {
+    /**
+     * @var GetSetMethodNormalizer
+     */
+    private $normalizer;
+
     protected function setUp()
     {
         $this->serializer = $this->getMock(__NAMESPACE__.'\SerializerNormalizer');
@@ -66,6 +74,17 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($obj->isBaz());
     }
 
+    public function testDenormalizeWithObject()
+    {
+        $data = new \stdClass();
+        $data->foo = 'foo';
+        $data->bar = 'bar';
+        $data->fooBar = 'foobar';
+        $obj = $this->normalizer->denormalize($data, __NAMESPACE__.'\GetSetDummy', 'any');
+        $this->assertEquals('foo', $obj->getFoo());
+        $this->assertEquals('bar', $obj->getBar());
+    }
+
     public function testDenormalizeOnCamelCaseFormat()
     {
         $this->normalizer->setCamelizedAttributes(array('camel_case'));
@@ -74,6 +93,11 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
             __NAMESPACE__.'\GetSetDummy'
         );
         $this->assertEquals('camelCase', $obj->getCamelCase());
+    }
+
+    public function testDenormalizeNull()
+    {
+        $this->assertEquals(new GetSetDummy(), $this->normalizer->denormalize(null, __NAMESPACE__.'\GetSetDummy'));
     }
 
     /**
@@ -117,6 +141,18 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('test', $obj->getFoo());
         $this->assertEquals(array(), $obj->getBar());
         $this->assertEquals(array(1, 2, 3), $obj->getBaz());
+    }
+
+    public function testConstructorWithObjectDenormalize()
+    {
+        $data = new \stdClass();
+        $data->foo = 'foo';
+        $data->bar = 'bar';
+        $data->baz = true;
+        $data->fooBar = 'foobar';
+        $obj = $this->normalizer->denormalize($data, __NAMESPACE__.'\GetConstructorDummy', 'any');
+        $this->assertEquals('foo', $obj->getFoo());
+        $this->assertEquals('bar', $obj->getBar());
     }
 
     /**
@@ -183,7 +219,7 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
                 ),
                 'baz',
                 array('foo' => '', 'bar' => null, 'baz' => true),
-                'Null an item'
+                'Null an item',
             ),
             array(
                 array(
@@ -224,7 +260,7 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @expectedException \LogicException
+     * @expectedException \Symfony\Component\Serializer\Exception\LogicException
      * @expectedExceptionMessage Cannot normalize attribute "object" because injected serializer is not a normalizer
      */
     public function testUnableToNormalizeObjectAttribute()
@@ -232,11 +268,54 @@ class GetSetMethodNormalizerTest extends \PHPUnit_Framework_TestCase
         $serializer = $this->getMock('Symfony\Component\Serializer\SerializerInterface');
         $this->normalizer->setSerializer($serializer);
 
-        $obj    = new GetSetDummy();
+        $obj = new GetSetDummy();
         $object = new \stdClass();
         $obj->setObject($object);
 
         $this->normalizer->normalize($obj, 'any');
+    }
+
+    /**
+     * @expectedException \Symfony\Component\Serializer\Exception\CircularReferenceException
+     */
+    public function testUnableToNormalizeCircularReference()
+    {
+        $serializer = new Serializer(array($this->normalizer));
+        $this->normalizer->setSerializer($serializer);
+        $this->normalizer->setCircularReferenceLimit(2);
+
+        $obj = new CircularReferenceDummy();
+
+        $this->normalizer->normalize($obj);
+    }
+
+    public function testSiblingReference()
+    {
+        $serializer = new Serializer(array($this->normalizer));
+        $this->normalizer->setSerializer($serializer);
+
+        $siblingHolder = new SiblingHolder();
+
+        $expected = array(
+            'sibling0' => array('coopTilleuls' => 'Les-Tilleuls.coop'),
+            'sibling1' => array('coopTilleuls' => 'Les-Tilleuls.coop'),
+            'sibling2' => array('coopTilleuls' => 'Les-Tilleuls.coop'),
+        );
+        $this->assertEquals($expected, $this->normalizer->normalize($siblingHolder));
+    }
+
+    public function testCircularReferenceHandler()
+    {
+        $serializer = new Serializer(array($this->normalizer));
+        $this->normalizer->setSerializer($serializer);
+        $this->normalizer->setCircularReferenceHandler(function ($obj) {
+            return get_class($obj);
+        });
+
+        $obj = new CircularReferenceDummy();
+
+        $expected = array('me' => 'Symfony\Component\Serializer\Tests\Fixtures\CircularReferenceDummy');
+        $this->assertEquals($expected, $this->normalizer->normalize($obj));
     }
 }
 

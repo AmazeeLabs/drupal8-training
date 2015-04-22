@@ -14,26 +14,36 @@ namespace Drupal\node\Tests;
  */
 class NodeFormButtonsTest extends NodeTestBase {
 
-  protected $web_user;
+  /**
+   * A normal logged in user.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $webUser;
 
-  protected $admin_user;
+  /**
+   * A user with permission to bypass access content.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $adminUser;
 
   protected function setUp() {
     parent::setUp();
 
     // Create a user that has no access to change the state of the node.
-    $this->web_user = $this->drupalCreateUser(array('create article content', 'edit own article content'));
+    $this->webUser = $this->drupalCreateUser(array('create article content', 'edit own article content'));
     // Create a user that has access to change the state of the node.
-    $this->admin_user = $this->drupalCreateUser(array('administer nodes', 'bypass node access'));
+    $this->adminUser = $this->drupalCreateUser(array('administer nodes', 'bypass node access'));
   }
 
   /**
    * Tests that the right buttons are displayed for saving nodes.
    */
   function testNodeFormButtons() {
-
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
     // Login as administrative user.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
 
     // Verify the buttons on a node add form.
     $this->drupalGet('node/add/article');
@@ -45,7 +55,7 @@ class NodeFormButtonsTest extends NodeTestBase {
     $this->drupalPostForm('node/add/article', $edit, t('Save and publish'));
 
     // Get the node.
-    $node_1 = node_load(1);
+    $node_1 = $node_storage->load(1);
     $this->assertTrue($node_1->isPublished(), 'Node is published');
 
     // Verify the buttons on a node edit form.
@@ -55,13 +65,15 @@ class NodeFormButtonsTest extends NodeTestBase {
     // Save the node and verify it's still published after clicking
     // 'Save and keep published'.
     $this->drupalPostForm(NULL, $edit, t('Save and keep published'));
-    $node_1 = node_load(1, TRUE);
+    $node_storage->resetCache(array(1));
+    $node_1 = $node_storage->load(1);
     $this->assertTrue($node_1->isPublished(), 'Node is published');
 
     // Save the node and verify it's unpublished after clicking
     // 'Save and unpublish'.
     $this->drupalPostForm('node/' . $node_1->id() . '/edit', $edit, t('Save and unpublish'));
-    $node_1 = node_load(1, TRUE);
+    $node_storage->resetCache(array(1));
+    $node_1 = $node_storage->load(1);
     $this->assertFalse($node_1->isPublished(), 'Node is unpublished');
 
     // Verify the buttons on an unpublished node edit screen.
@@ -70,7 +82,7 @@ class NodeFormButtonsTest extends NodeTestBase {
 
     // Create a node as a normal user.
     $this->drupalLogout();
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
 
     // Verify the buttons for a normal user.
     $this->drupalGet('node/add/article');
@@ -79,23 +91,25 @@ class NodeFormButtonsTest extends NodeTestBase {
     // Create the node.
     $edit = array('title[0][value]' => $this->randomString());
     $this->drupalPostForm('node/add/article', $edit, t('Save'));
-    $node_2 = node_load(2);
+    $node_2 = $node_storage->load(2);
     $this->assertTrue($node_2->isPublished(), 'Node is published');
 
     // Login as an administrator and unpublish the node that just
     // was created by the normal user.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->drupalPostForm('node/' . $node_2->id() . '/edit', array(), t('Save and unpublish'));
-    $node_2 = node_load(2, TRUE);
+    $node_storage->resetCache(array(2));
+    $node_2 = $node_storage->load(2);
     $this->assertFalse($node_2->isPublished(), 'Node is unpublished');
 
     // Login again as the normal user, save the node and verify
     // it's still unpublished.
     $this->drupalLogout();
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $this->drupalPostForm('node/' . $node_2->id() . '/edit', array(), t('Save'));
-    $node_2 = node_load(2, TRUE);
+    $node_storage->resetCache(array(2));
+    $node_2 = $node_storage->load(2);
     $this->assertFalse($node_2->isPublished(), 'Node is still unpublished');
     $this->drupalLogout();
 
@@ -108,16 +122,16 @@ class NodeFormButtonsTest extends NodeTestBase {
       ->save();
 
     // Verify the buttons on a node add form for an administrator.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->drupalGet('node/add/article');
     $this->assertButtons(array(t('Save as unpublished'), t('Save and publish')));
 
     // Verify the node is unpublished by default for a normal user.
     $this->drupalLogout();
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $edit = array('title[0][value]' => $this->randomString());
     $this->drupalPostForm('node/add/article', $edit, t('Save'));
-    $node_3 = node_load(3);
+    $node_3 = $node_storage->load(3);
     $this->assertFalse($node_3->isPublished(), 'Node is unpublished');
   }
 

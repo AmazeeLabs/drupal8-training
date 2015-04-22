@@ -34,6 +34,9 @@ use Drupal\user\UserInterface;
  *       "delete" = "Drupal\node\Form\NodeDeleteForm",
  *       "edit" = "Drupal\node\NodeForm"
  *     },
+ *     "route_provider" = {
+ *       "html" = "Drupal\node\Entity\NodeRouteProvider",
+ *     },
  *     "list_builder" = "Drupal\node\NodeListBuilder",
  *     "translation" = "Drupal\node\NodeTranslationHandler"
  *   },
@@ -41,23 +44,25 @@ use Drupal\user\UserInterface;
  *   data_table = "node_field_data",
  *   revision_table = "node_revision",
  *   revision_data_table = "node_field_revision",
- *   fieldable = TRUE,
  *   translatable = TRUE,
+ *   list_cache_contexts = { "user.node_grants:view" },
  *   entity_keys = {
  *     "id" = "nid",
  *     "revision" = "vid",
  *     "bundle" = "type",
  *     "label" = "title",
+ *     "langcode" = "langcode",
  *     "uuid" = "uuid"
  *   },
  *   bundle_entity_type = "node_type",
  *   field_ui_base_route = "entity.node_type.edit_form",
+ *   common_reference_target = TRUE,
  *   permission_granularity = "bundle",
  *   links = {
- *     "canonical" = "entity.node.canonical",
- *     "delete-form" = "entity.node.delete_form",
- *     "edit-form" = "entity.node.edit_form",
- *     "version-history" = "entity.node.version_history",
+ *     "canonical" = "/node/{node}",
+ *     "delete-form" = "/node/{node}/delete",
+ *     "edit-form" = "/node/{node}/edit",
+ *     "version-history" = "/node/{node}/revisions",
  *   }
  * )
  */
@@ -121,10 +126,10 @@ class Node extends ContentEntityBase implements NodeInterface {
   public static function preDelete(EntityStorageInterface $storage, array $entities) {
     parent::preDelete($storage, $entities);
 
-    // Assure that all nodes deleted are removed from the search index.
+    // Ensure that all nodes deleted are removed from the search index.
     if (\Drupal::moduleHandler()->moduleExists('search')) {
       foreach ($entities as $entity) {
-        search_reindex($entity->nid->value, 'node_search');
+        search_index_clear('node_search', $entity->nid->value);
       }
     }
   }
@@ -161,14 +166,14 @@ class Node extends ContentEntityBase implements NodeInterface {
    * {@inheritdoc}
    */
   public function prepareLangcode() {
-    $langcode = $this->language()->id;
+    $langcode = $this->language()->getId();
     // If the Language module is enabled, try to use the language from content
     // negotiation.
     if (\Drupal::moduleHandler()->moduleExists('language')) {
       // Load languages the node exists in.
       $node_translations = $this->getTranslationLanguages();
       // Load the language from content negotiation.
-      $content_negotiation_langcode = \Drupal::languageManager()->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->id;
+      $content_negotiation_langcode = \Drupal::languageManager()->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId();
       // If there is a translation available, use it.
       if (isset($node_translations[$content_negotiation_langcode])) {
         $langcode = $content_negotiation_langcode;
@@ -348,13 +353,20 @@ class Node extends ContentEntityBase implements NodeInterface {
       ->setReadOnly(TRUE);
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
-      ->setLabel(t('Language code'))
+      ->setLabel(t('Language'))
       ->setDescription(t('The node language code.'))
-      ->setRevisionable(TRUE);
+      ->setTranslatable(TRUE)
+      ->setRevisionable(TRUE)
+      ->setDisplayOptions('view', array(
+        'type' => 'hidden',
+      ))
+      ->setDisplayOptions('form', array(
+        'type' => 'language_select',
+        'weight' => 2,
+      ));
 
     $fields['title'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Title'))
-      ->setDescription(t('The title of this node, always treated as non-markup plain text.'))
       ->setRequired(TRUE)
       ->setTranslatable(TRUE)
       ->setRevisionable(TRUE)
@@ -373,11 +385,11 @@ class Node extends ContentEntityBase implements NodeInterface {
 
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Authored by'))
-      ->setDescription(t('The user ID of the node author.'))
+      ->setDescription(t('The username of the content author.'))
       ->setRevisionable(TRUE)
       ->setSetting('target_type', 'user')
       ->setSetting('handler', 'default')
-      ->setDefaultValueCallback(array('Drupal\node\Entity\Node', 'getCurrentUserId'))
+      ->setDefaultValueCallback('Drupal\node\Entity\Node::getCurrentUserId')
       ->setTranslatable(TRUE)
       ->setDisplayOptions('view', array(
         'label' => 'hidden',
@@ -390,7 +402,6 @@ class Node extends ContentEntityBase implements NodeInterface {
         'settings' => array(
           'match_operator' => 'CONTAINS',
           'size' => '60',
-          'autocomplete_type' => 'tags',
           'placeholder' => '',
         ),
       ))
@@ -426,8 +437,7 @@ class Node extends ContentEntityBase implements NodeInterface {
       ->setTranslatable(TRUE);
 
     $fields['promote'] = BaseFieldDefinition::create('boolean')
-      ->setLabel(t('Promote'))
-      ->setDescription(t('A boolean indicating whether the node should be displayed on the front page.'))
+      ->setLabel(t('Promoted to front page'))
       ->setRevisionable(TRUE)
       ->setTranslatable(TRUE)
       ->setDefaultValue(TRUE)
@@ -441,10 +451,10 @@ class Node extends ContentEntityBase implements NodeInterface {
       ->setDisplayConfigurable('form', TRUE);
 
     $fields['sticky'] = BaseFieldDefinition::create('boolean')
-      ->setLabel(t('Sticky'))
-      ->setDescription(t('A boolean indicating whether the node should be displayed at the top of lists in which it appears.'))
+      ->setLabel(t('Sticky at top of lists'))
       ->setRevisionable(TRUE)
       ->setTranslatable(TRUE)
+      ->setDefaultValue(FALSE)
       ->setDisplayOptions('form', array(
         'type' => 'boolean_checkbox',
         'settings' => array(

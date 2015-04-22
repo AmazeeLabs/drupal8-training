@@ -26,7 +26,7 @@ class BooleanItemTest extends FieldUnitTestBase {
 
     // Create a boolean field and storage for validation.
     entity_create('field_storage_config', array(
-      'name' => 'field_boolean',
+      'field_name' => 'field_boolean',
       'entity_type' => 'entity_test',
       'type' => 'boolean',
     ))->save();
@@ -39,7 +39,7 @@ class BooleanItemTest extends FieldUnitTestBase {
     // Create a form display for the default form mode.
     entity_get_form_display('entity_test', 'entity_test', 'default')
       ->setComponent('field_boolean', array(
-        'type' => 'boolean',
+        'type' => 'boolean_checkbox',
       ))
       ->save();
   }

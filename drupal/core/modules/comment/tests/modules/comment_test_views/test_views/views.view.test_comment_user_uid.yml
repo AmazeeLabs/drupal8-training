@@ -1,7 +1,19 @@
-base_table: node
-core: '8'
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - comment
+    - comment_test_views
+    - node
+    - user
+id: test_comment_user_uid
+label: test_comment_user_uid
+module: comment_test_views
+description: ''
+tag: default
+base_table: node_field_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
@@ -20,7 +32,7 @@ display:
             items_per_page: 25
           table: node_field_data
           plugin_id: argument_comment_user_uid
-          provider: comment
+          entity_type: node
       cache:
         type: none
       exposed_form:
@@ -29,14 +41,15 @@ display:
         nid:
           field: nid
           id: nid
-          table: node
+          table: node_field_data
           plugin_id: node
-          provider: node
+          entity_type: node
+          entity_field: nid
       pager:
         type: full
       query:
         options:
-          query_comment: false
+          query_comment: ''
         type: views_query
       style:
         type: default
@@ -46,9 +59,3 @@ display:
     display_title: Master
     id: default
     position: 0
-label: test_comment_user_uid
-id: test_comment_user_uid
-tag: default
-base_field: nid
-module: comment_test_views
-langcode: und

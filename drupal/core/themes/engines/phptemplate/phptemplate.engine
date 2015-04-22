@@ -31,6 +31,8 @@ function phptemplate_extension() {
 }
 
 /**
+ * Implements hook_render_template().
+ *
  * Renders a system default template, which is essentially a PHP template.
  *
  * @param $template_file
@@ -49,7 +51,7 @@ function phptemplate_render_template($template_file, $variables) {
   ob_start();
 
   // Include the template file
-  include DRUPAL_ROOT . '/' . $template_file;
+  include \Drupal::root() . '/' . $template_file;
 
   // End buffering and return its contents
   return ob_get_clean();

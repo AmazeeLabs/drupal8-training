@@ -7,10 +7,12 @@
 
 namespace Drupal\comment;
 
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\language\Entity\ContentLanguageSettings;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -34,12 +36,20 @@ class CommentTypeForm extends EntityForm {
   protected $logger;
 
   /**
+   * The comment manager.
+   *
+   * @var \Drupal\comment\CommentManagerInterface
+   */
+  protected $commentManager;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity.manager'),
-      $container->get('logger.factory')->get('comment')
+      $container->get('logger.factory')->get('comment'),
+      $container->get('comment.manager')
     );
   }
 
@@ -50,10 +60,13 @@ class CommentTypeForm extends EntityForm {
    *   The entity manager service.
    * @param \Psr\Log\LoggerInterface $logger
    *   A logger instance.
+   * @param \Drupal\comment\CommentManagerInterface $comment_manager
+   *   The comment manager.
    */
-  public function __construct(EntityManagerInterface $entity_manager, LoggerInterface $logger) {
+  public function __construct(EntityManagerInterface $entity_manager, LoggerInterface $logger, CommentManagerInterface $comment_manager) {
     $this->entityManager = $entity_manager;
     $this->logger = $logger;
+    $this->commentManager = $comment_manager;
   }
 
   /**
@@ -91,7 +104,9 @@ class CommentTypeForm extends EntityForm {
     if ($comment_type->isNew()) {
       $options = array();
       foreach ($this->entityManager->getDefinitions() as $entity_type) {
-        if ($entity_type->isFieldable()) {
+        // Only expose entities that have field UI enabled, only those can
+        // get comment fields added in the UI.
+        if ($entity_type->get('field_ui_base_route')) {
           $options[$entity_type->id()] = $entity_type->getLabel();
         }
       }
@@ -118,7 +133,7 @@ class CommentTypeForm extends EntityForm {
         '#group' => 'additional_settings',
       );
 
-      $language_configuration = language_get_default_configuration('comment', $comment_type->id());
+      $language_configuration = ContentLanguageSettings::loadByEntityTypeBundle('comment', $comment_type->id());
       $form['language']['language_configuration'] = array(
         '#type' => 'language_configuration',
         '#entity_information' => array(
@@ -147,17 +162,18 @@ class CommentTypeForm extends EntityForm {
     $comment_type = $this->entity;
     $status = $comment_type->save();
 
-    $edit_link = \Drupal::linkGenerator()->generateFromUrl($this->t('Edit'), $this->entity->urlInfo());
+    $edit_link = $this->entity->link($this->t('Edit'));
     if ($status == SAVED_UPDATED) {
       drupal_set_message(t('Comment type %label has been updated.', array('%label' => $comment_type->label())));
       $this->logger->notice('Comment type %label has been updated.', array('%label' => $comment_type->label(), 'link' => $edit_link));
     }
     else {
+      $this->commentManager->addBodyField($comment_type->id());
       drupal_set_message(t('Comment type %label has been added.', array('%label' => $comment_type->label())));
       $this->logger->notice('Comment type %label has been added.', array('%label' => $comment_type->label(), 'link' =>  $edit_link));
     }
 
-    $form_state->setRedirect('comment.type_list');
+    $form_state->setRedirectUrl($comment_type->urlInfo('collection'));
   }
 
 }

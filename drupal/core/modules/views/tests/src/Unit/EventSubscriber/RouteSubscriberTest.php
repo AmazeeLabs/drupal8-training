@@ -102,7 +102,7 @@ class RouteSubscriberTest extends UnitTestCase {
     $display_1->expects($this->once())
       ->method('collectRoutes')
       ->willReturnCallback(function() use ($collection) {
-        $collection->add('views.test_id.page_1', new Route('test_route', ['_content' => 'Drupal\views\Routing\ViewPageController']));
+        $collection->add('views.test_id.page_1', new Route('test_route', ['_controller' => 'Drupal\views\Routing\ViewPageController']));
         return ['test_id.page_1' => 'views.test_id.page_1'];
       });
     $display_1->expects($this->once())
@@ -112,7 +112,7 @@ class RouteSubscriberTest extends UnitTestCase {
     $display_2->expects($this->once())
       ->method('collectRoutes')
       ->willReturnCallback(function() use ($collection) {
-        $collection->add('views.test_id.page_2', new Route('test_route', ['_content' => 'Drupal\views\Routing\ViewPageController']));
+        $collection->add('views.test_id.page_2', new Route('test_route', ['_controller' => 'Drupal\views\Routing\ViewPageController']));
         return ['test_id.page_2' => 'views.test_id.page_2'];
       });
     $display_2->expects($this->once())
@@ -174,16 +174,16 @@ class RouteSubscriberTest extends UnitTestCase {
     $display_1 = $this->getMock('Drupal\views\Plugin\views\display\DisplayRouterInterface');
     $display_2 = $this->getMock('Drupal\views\Plugin\views\display\DisplayRouterInterface');
 
-    $display_bag = $this->getMockBuilder('Drupal\views\DisplayBag')
+    $display_collection = $this->getMockBuilder('Drupal\views\DisplayPluginCollection')
       ->disableOriginalConstructor()
       ->getMock();
-    $display_bag->expects($this->any())
+    $display_collection->expects($this->any())
       ->method('get')
       ->will($this->returnValueMap(array(
         array('page_1', $display_1),
         array('page_2', $display_2),
       )));
-    $executable->displayHandlers = $display_bag;
+    $executable->displayHandlers = $display_collection;
 
     $this->routeSubscriber->applicableViews = array();
     $this->routeSubscriber->applicableViews[] = array($executable, 'page_1');

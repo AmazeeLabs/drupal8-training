@@ -50,11 +50,10 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
     $this->cardinality = 3;
 
     entity_create('field_storage_config', array(
-      'name' => $this->fieldName,
+      'field_name' => $this->fieldName,
       'entity_type' => $this->entityTypeId,
       'type' => 'image',
       'cardinality' => $this->cardinality,
-      'translatable' => TRUE,
     ))->save();
 
     entity_create('field_config', array(
@@ -107,7 +106,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
       'settings[entity_test_mul][entity_test_mul][columns][field_test_et_ui_image][alt]' => TRUE,
       'settings[entity_test_mul][entity_test_mul][columns][field_test_et_ui_image][title]' => TRUE,
     );
-    $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save'));
+    $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save configuration'));
     $errors = $this->xpath('//div[contains(@class, "messages--error")]');
     $this->assertFalse($errors, 'Settings correctly stored.');
     $this->assertFieldChecked('edit-settings-entity-test-mul-entity-test-mul-columns-field-test-et-ui-image-alt');
@@ -116,10 +115,6 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
 
     $default_langcode = $this->langcodes[0];
     $langcode = $this->langcodes[1];
-
-    // Populate the required contextual values.
-    $attributes = \Drupal::request()->attributes;
-    $attributes->set('source_langcode', $default_langcode);
 
     // Populate the test entity with some random initial values.
     $values = array(
@@ -154,7 +149,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
         'alt' => $default_langcode . '_' . $fid . '_' . $this->randomMachineName(),
         'title' => $default_langcode . '_' . $fid . '_' . $this->randomMachineName(),
       );
-      $entity->{$this->fieldName}->get($delta)->setValue($item);
+      $entity->{$this->fieldName}[] = $item;
 
       // Store the generated values keying them by fid for easier lookup.
       $values[$default_langcode][$fid] = $item;
@@ -180,7 +175,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
         'alt' => $langcode . '_' . $fid . '_' . $this->randomMachineName(),
         'title' => $langcode . '_' . $fid . '_' . $this->randomMachineName(),
       );
-      $translation->{$this->fieldName}->get($delta)->setValue($item);
+      $translation->{$this->fieldName}[] = $item;
 
       // Again store the generated values keying them by fid for easier lookup.
       $values[$langcode][$fid] = $item;
@@ -188,6 +183,7 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
 
     // Perform synchronization: the translation language is used as source,
     // while the default language is used as target.
+    $this->manager->getTranslationMetadata($translation)->setSource($default_langcode);
     $entity = $this->saveEntity($translation);
     $translation = $entity->getTranslation($langcode);
 
@@ -217,8 +213,6 @@ class ContentTranslationSyncImageTest extends ContentTranslationTestBase {
       'title' => $langcode . '_' . $removed_fid . '_' . $this->randomMachineName(),
     );
     $translation->{$this->fieldName}->setValue(array_values($values[$langcode]));
-    // When updating an entity we do not have a source language defined.
-    $attributes->remove('source_langcode');
     $entity = $this->saveEntity($translation);
     $translation = $entity->getTranslation($langcode);
 

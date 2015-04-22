@@ -36,29 +36,11 @@ class ApcuBackend implements CacheBackendInterface {
   protected $binPrefix;
 
   /**
-   * Prefix for keys holding invalidation cache tags.
+   * The cache tags checksum provider.
    *
-   * Includes the site-specific prefix in $sitePrefix.
-   *
-   * @var string
+   * @var \Drupal\Core\Cache\CacheTagsChecksumInterface
    */
-  protected $invalidationsTagsPrefix;
-
-  /**
-   * Prefix for keys holding invalidation cache tags.
-   *
-   * Includes the site-specific prefix in $sitePrefix.
-   *
-   * @var string
-   */
-  protected $deletionsTagsPrefix;
-
-  /**
-   * A static cache of all tags checked during the request.
-   *
-   * @var array
-   */
-  protected static $tagCache = array('deletions' => array(), 'invalidations' => array());
+  protected $checksumProvider;
 
   /**
    * Constructs a new ApcuBackend instance.
@@ -67,13 +49,14 @@ class ApcuBackend implements CacheBackendInterface {
    *   The name of the cache bin.
    * @param string $site_prefix
    *   The prefix to use for all keys in the storage that belong to this site.
+   * @param \Drupal\Core\Cache\CacheTagsChecksumInterface $checksum_provider
+   *   The cache tags checksum provider.
    */
-  public function __construct($bin, $site_prefix) {
+  public function __construct($bin, $site_prefix, CacheTagsChecksumInterface $checksum_provider) {
     $this->bin = $bin;
     $this->sitePrefix = $site_prefix;
+    $this->checksumProvider = $checksum_provider;
     $this->binPrefix = $this->sitePrefix . '::' . $this->bin . '::';
-    $this->invalidationsTagsPrefix = $this->sitePrefix . '::itags::';
-    $this->deletionsTagsPrefix = $this->sitePrefix . '::dtags::';
   }
 
   /**
@@ -163,18 +146,12 @@ class ApcuBackend implements CacheBackendInterface {
     }
 
     $cache->tags = $cache->tags ? explode(' ', $cache->tags) : array();
-    $checksum = $this->checksumTags($cache->tags);
-
-    // Check if deleteTags() has been called with any of the entry's tags.
-    if ($cache->checksum_deletions != $checksum['deletions']) {
-      return FALSE;
-    }
 
     // Check expire time.
     $cache->valid = $cache->expire == Cache::PERMANENT || $cache->expire >= REQUEST_TIME;
 
     // Check if invalidateTags() has been called with any of the entry's tags.
-    if ($cache->checksum_invalidations != $checksum['invalidations']) {
+    if (!$this->checksumProvider->isValid($cache->checksum, $cache->tags)) {
       $cache->valid = FALSE;
     }
 
@@ -189,14 +166,14 @@ class ApcuBackend implements CacheBackendInterface {
    * {@inheritdoc}
    */
   public function set($cid, $data, $expire = CacheBackendInterface::CACHE_PERMANENT, array $tags = array()) {
+    Cache::validateTags($tags);
+    $tags = array_unique($tags);
     $cache = new \stdClass();
     $cache->cid = $cid;
     $cache->created = round(microtime(TRUE), 3);
     $cache->expire = $expire;
-    $cache->tags = implode(' ', $this->flattenTags($tags));
-    $checksum = $this->checksumTags($tags);
-    $cache->checksum_invalidations = $checksum['invalidations'];
-    $cache->checksum_deletions = $checksum['deletions'];
+    $cache->tags = implode(' ', $tags);
+    $cache->checksum = $this->checksumProvider->getCurrentChecksum($tags);
     // APC serializes/unserializes any structure itself.
     $cache->serialized = 0;
     $cache->data = $data;
@@ -279,95 +256,6 @@ class ApcuBackend implements CacheBackendInterface {
       $cid = str_replace($this->binPrefix, '', $data['key']);
       $this->set($cid, $data['value'], REQUEST_TIME - 1);
     }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function deleteTags(array $tags) {
-    foreach ($this->flattenTags($tags) as $tag) {
-      apc_inc($this->deletionsTagsPrefix . $tag, 1, $success);
-      if (!$success) {
-        apc_store($this->deletionsTagsPrefix . $tag, 1);
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function invalidateTags(array $tags) {
-    foreach ($this->flattenTags($tags) as $tag) {
-      apc_inc($this->invalidationsTagsPrefix . $tag, 1, $success);
-      if (!$success) {
-        apc_store($this->invalidationsTagsPrefix . $tag, 1);
-      }
-    }
-  }
-
-  /**
-   * Flattens a tags array into a numeric array suitable for string storage.
-   *
-   * @param array $tags
-   *   Associative array of tags to flatten.
-   *
-   * @return array
-   *   Indexed array of flattened tag identifiers.
-   */
-  protected function flattenTags(array $tags) {
-    if (isset($tags[0])) {
-      return $tags;
-    }
-
-    $flat_tags = array();
-    foreach ($tags as $namespace => $values) {
-      if (is_array($values)) {
-        foreach ($values as $value) {
-          $flat_tags[] = "$namespace:$value";
-        }
-      }
-      else {
-        $flat_tags[] = "$namespace:$values";
-      }
-    }
-    return $flat_tags;
-  }
-
-  /**
-   * Returns the sum total of validations for a given set of tags.
-   *
-   * @param array $tags
-   *   Associative array of tags.
-   *
-   * @return int
-   *   Sum of all invalidations.
-   */
-  protected function checksumTags(array $tags) {
-    $checksum = array('invalidations' => 0, 'deletions' => 0);
-    $query_tags = array('invalidations' => array(), 'deletions' => array());
-
-    foreach ($this->flattenTags($tags) as $tag) {
-      foreach (array('deletions', 'invalidations') as $type) {
-        if (isset(static::$tagCache[$type][$tag])) {
-          $checksum[$type] += static::$tagCache[$type][$tag];
-        }
-        else {
-          $query_tags[$type][] = $this->{$type . 'TagsPrefix'} . $tag;
-        }
-      }
-    }
-
-    foreach (array('deletions', 'invalidations') as $type) {
-      if ($query_tags[$type]) {
-        $result = apc_fetch($query_tags[$type]);
-        if ($result) {
-          static::$tagCache[$type] = array_merge(static::$tagCache[$type], $result);
-          $checksum[$type] += array_sum($result);
-        }
-      }
-    }
-
-    return $checksum;
   }
 
 }

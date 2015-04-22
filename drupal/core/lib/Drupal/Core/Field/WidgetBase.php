@@ -7,6 +7,7 @@
 
 namespace Drupal\Core\Field;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\SortArray;
 use Drupal\Component\Utility\String;
@@ -49,7 +50,7 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
    * @param array $settings
    *   The widget settings.
    * @param array $third_party_settings
-   *   Any third party settings settings.
+   *   Any third party settings.
    */
   public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, array $third_party_settings) {
     parent::__construct(array(), $plugin_id, $plugin_definition);
@@ -126,9 +127,9 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
       '#parents' => array_merge($parents, array($field_name . '_wrapper')),
       '#attributes' => array(
         'class' => array(
-          'field-type-' . drupal_html_class($this->fieldDefinition->getType()),
-          'field-name-' . drupal_html_class($field_name),
-          'field-widget-' . drupal_html_class($this->getPluginId()),
+          'field-type-' . Html::getClass($this->fieldDefinition->getType()),
+          'field-name-' . Html::getClass($field_name),
+          'field-widget-' . Html::getClass($this->getPluginId()),
         ),
       ),
       'widget' => $elements,
@@ -168,6 +169,11 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
     $elements = array();
 
     for ($delta = 0; $delta <= $max; $delta++) {
+      // Add a new empty item if it doesn't exist yet at this delta.
+      if (!isset($items[$delta])) {
+        $items->appendItem();
+      }
+
       // For multiple fields, title and description are handled by the wrapping
       // table.
       $element = array(
@@ -211,7 +217,7 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
       // Add 'add more' button, if not working with a programmed form.
       if ($cardinality == FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED && !$form_state->isProgrammed()) {
         $id_prefix = implode('-', array_merge($parents, array($field_name)));
-        $wrapper_id = drupal_html_id($id_prefix . '-add-more-wrapper');
+        $wrapper_id = Html::getUniqueId($id_prefix . '-add-more-wrapper');
         $elements['#prefix'] = '<div id="' . $wrapper_id . '">';
         $elements['#suffix'] = '</div>';
 
@@ -318,7 +324,7 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
         'widget' => $this,
         'items' => $items,
         'delta' => $delta,
-        'default' => !empty($entity->field_ui_default_value),
+        'default' => $this->isDefaultValueWidget($form_state),
       );
       \Drupal::moduleHandler()->alter(array('field_widget_form', 'field_widget_' . $this->getPluginId() . '_form'), $element, $form_state, $context);
     }
@@ -382,7 +388,7 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
     if ($violations->count()) {
       $form_builder = \Drupal::formBuilder();
 
-      // Locate the correct element in the the form.
+      // Locate the correct element in the form.
       $element = NestedArray::getValue($form_state->getCompleteForm(), $field_state['array_parents']);
 
       // Do not report entity-level validation errors if Form API errors have
@@ -537,6 +543,19 @@ abstract class WidgetBase extends PluginSettingsBase implements WidgetInterface 
   public static function isApplicable(FieldDefinitionInterface $field_definition) {
     // By default, widgets are available for all fields.
     return TRUE;
+  }
+
+  /**
+   * Returns whether the widget used for default value form.
+   *
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return bool
+   *   TRUE if a widget used to input default value, FALSE otherwise.
+   */
+  protected function isDefaultValueWidget(FormStateInterface $form_state) {
+    return (bool) $form_state->get('default_value_widget');
   }
 
 }

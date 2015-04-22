@@ -7,7 +7,6 @@
 
 namespace Drupal\node\Tests\Views;
 
-use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
@@ -47,12 +46,6 @@ class NodeFieldFilterTest extends NodeTestBase {
     // Add two new languages.
     ConfigurableLanguage::createFromLangcode('fr')->save();
     ConfigurableLanguage::createFromLangcode('es')->save();
-
-    // Make the body field translatable. The title is already translatable by
-    // definition.
-    $field = FieldStorageConfig::loadByName('node', 'body');
-    $field->translatable = TRUE;
-    $field->save();
 
     // Set up node titles.
     $this->node_titles = array(

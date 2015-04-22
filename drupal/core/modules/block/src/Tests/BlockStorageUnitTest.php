@@ -8,7 +8,7 @@
 namespace Drupal\block\Tests;
 
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 use Drupal\block_test\Plugin\Block\TestHtmlBlock;
 use Drupal\Component\Plugin\Exception\PluginException;
 use Drupal\block\Entity\Block;
@@ -19,14 +19,14 @@ use Drupal\block\BlockInterface;
  *
  * @group block
  */
-class BlockStorageUnitTest extends DrupalUnitTestBase {
+class BlockStorageUnitTest extends KernelTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
-  public static $modules = array('block', 'block_test', 'system');
+  public static $modules = array('block', 'block_test');
 
   /**
    * The block storage.
@@ -78,13 +78,13 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
     $this->assertTrue($entity instanceof Block, 'The newly created entity is a Block.');
 
     // Verify all of the block properties.
-    $actual_properties = \Drupal::config('block.block.test_block')->get();
+    $actual_properties = $this->config('block.block.test_block')->get();
     $this->assertTrue(!empty($actual_properties['uuid']), 'The block UUID is set.');
     unset($actual_properties['uuid']);
 
     // Ensure that default values are filled in.
     $expected_properties = array(
-      'langcode' => \Drupal::languageManager()->getDefaultLanguage()->id,
+      'langcode' => \Drupal::languageManager()->getDefaultLanguage()->getId(),
       'status' => TRUE,
       'dependencies' => array('module' => array('block_test'), 'theme' => array('stark')),
       'id' => 'test_block',
@@ -94,7 +94,6 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
       'provider' => NULL,
       'plugin' => 'test_html',
       'settings' => array(
-        'visibility' => array(),
         'id' => 'test_html',
         'label' => '',
         'provider' => 'block_test',
@@ -104,6 +103,7 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
           'contexts' => array(),
         ),
       ),
+      'visibility' => array(),
     );
 
     $this->assertIdentical($actual_properties, $expected_properties);
@@ -120,9 +120,9 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
     $this->assertTrue($entity instanceof Block, 'The loaded entity is a Block.');
 
     // Verify several properties of the block.
-    $this->assertEqual($entity->get('region'), '-1');
-    $this->assertTrue($entity->get('status'));
-    $this->assertEqual($entity->get('theme'), 'stark');
+    $this->assertEqual($entity->getRegion(), '-1');
+    $this->assertTrue($entity->status());
+    $this->assertEqual($entity->getTheme(), 'stark');
     $this->assertTrue($entity->uuid());
   }
 
@@ -149,6 +149,7 @@ class BlockStorageUnitTest extends DrupalUnitTestBase {
    * Tests the installation of default blocks.
    */
   public function testDefaultBlocks() {
+    \Drupal::service('theme_handler')->install(['classy']);
     $entities = $this->controller->loadMultiple();
     $this->assertTrue(empty($entities), 'There are no blocks initially.');
 

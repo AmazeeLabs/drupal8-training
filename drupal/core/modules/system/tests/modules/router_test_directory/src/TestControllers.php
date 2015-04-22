@@ -26,19 +26,19 @@ class TestControllers {
   }
 
   public function test2() {
-    return "test2";
+    return ['#markup' => "test2"];
   }
 
   public function test3($value) {
-    return $value;
+    return ['#markup' => $value];
   }
 
   public function test4($value) {
-    return $value;
+    return ['#markup' => $value];
   }
 
   public function test5() {
-    return "test5";
+    return ['#markup' => "test5"];
   }
 
   public function test6() {
@@ -64,6 +64,37 @@ class TestControllers {
     catch (ParamNotConvertedException $e) {
     }
     return new Response($text);
+  }
+
+  /**
+   * Test controller for ExceptionHandlingTest::testBacktraceEscaping().
+   *
+   * Passes unsafe HTML as an argument to a method which throws an exception.
+   * This can be used to test if the generated backtrace is properly escaped.
+   */
+  public function test10() {
+    // Remove the exception logger from the event dispatcher. We are going to
+    // throw an exception to check if it is properly escaped when rendered as a
+    // backtrace. The exception logger does a call to error_log() which is not
+    // handled by the Simpletest error handler and would cause a test failure.
+    $event_dispatcher = \Drupal::service('event_dispatcher');
+    $exception_logger = \Drupal::service('exception.logger');
+    $event_dispatcher->removeSubscriber($exception_logger);
+
+    $this->throwException('<script>alert(\'xss\')</script>');
+  }
+
+  /**
+   * Throws an exception.
+   *
+   * @param string $message
+   *   The message to use in the exception.
+   *
+   * @throws \Exception
+   *   Always thrown.
+   */
+  protected function throwException($message) {
+    throw new \Exception($message);
   }
 
 }

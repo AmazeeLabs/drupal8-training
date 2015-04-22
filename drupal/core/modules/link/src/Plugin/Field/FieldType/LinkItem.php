@@ -8,12 +8,14 @@
 namespace Drupal\link\Plugin\Field\FieldType;
 
 use Drupal\Component\Utility\Random;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\MapDataDefinition;
+use Drupal\Core\Url;
 use Drupal\link\LinkItemInterface;
 
 /**
@@ -25,7 +27,7 @@ use Drupal\link\LinkItemInterface;
  *   description = @Translation("Stores a URL string, optional varchar link text, and optional blob of attributes to assemble a link."),
  *   default_widget = "link_default",
  *   default_formatter = "link",
- *   constraints = {"LinkType" = {}}
+ *   constraints = {"LinkType" = {}, "LinkAccess" = {}, "LinkExternalProtocols" = {}, "LinkNotExistingInternal" = {}}
  * )
  */
 class LinkItem extends FieldItemBase implements LinkItemInterface {
@@ -44,17 +46,11 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
    * {@inheritdoc}
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
-    $properties['url'] = DataDefinition::create('string')
-      ->setLabel(t('URL'));
+    $properties['uri'] = DataDefinition::create('uri')
+      ->setLabel(t('URI'));
 
     $properties['title'] = DataDefinition::create('string')
       ->setLabel(t('Link text'));
-
-    $properties['route_name'] = DataDefinition::create('string')
-      ->setLabel(t('Route name'));
-
-    $properties['route_parameters'] = MapDataDefinition::create()
-      ->setLabel(t('Route parameters'));
 
     $properties['options'] = MapDataDefinition::create()
       ->setLabel(t('Options'));
@@ -68,38 +64,25 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
   public static function schema(FieldStorageDefinitionInterface $field_definition) {
     return array(
       'columns' => array(
-        'url' => array(
-          'description' => 'The URL of the link.',
+        'uri' => array(
+          'description' => 'The URI of the link.',
           'type' => 'varchar',
           'length' => 2048,
-          'not null' => FALSE,
         ),
         'title' => array(
           'description' => 'The link text.',
           'type' => 'varchar',
           'length' => 255,
-          'not null' => FALSE,
-        ),
-        'route_name' => array(
-          'description' => 'The machine name of a defined Route this link represents.',
-          'type' => 'varchar',
-          'length' => 255,
-          'not null' => FALSE,
-        ),
-        'route_parameters' => array(
-          'description' => 'Serialized array of route parameters of the link.',
-          'type' => 'blob',
-          'size' => 'big',
-          'not null' => FALSE,
-          'serialize' => TRUE,
         ),
         'options' => array(
           'description' => 'Serialized array of options for the link.',
           'type' => 'blob',
           'size' => 'big',
-          'not null' => FALSE,
           'serialize' => TRUE,
         ),
+      ),
+      'indexes' => array(
+        'uri' => array(array('uri', 30)),
       ),
     );
   }
@@ -157,7 +140,7 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
         $values['title'] = mt_rand(0,1) ? $random->sentences(4) : '';
         break;
     }
-    $values['url'] = 'http://www.' . $random->word($domain_length) . '.' . $tlds[mt_rand(0, (sizeof($tlds)-1))];
+    $values['uri'] = 'http://www.' . $random->word($domain_length) . '.' . $tlds[mt_rand(0, (sizeof($tlds)-1))];
     return $values;
   }
 
@@ -165,7 +148,7 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
    * {@inheritdoc}
    */
   public function isEmpty() {
-    $value = $this->get('url')->getValue();
+    $value = $this->get('uri')->getValue();
     return $value === NULL || $value === '';
   }
 
@@ -173,14 +156,35 @@ class LinkItem extends FieldItemBase implements LinkItemInterface {
    * {@inheritdoc}
    */
   public function isExternal() {
-    // External links don't have a route_name value.
-    return empty($this->route_name);
+    return $this->getUrl()->isExternal();
   }
 
   /**
    * {@inheritdoc}
    */
   public static function mainPropertyName() {
-    return 'url';
+    return 'uri';
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getUrl() {
+    return Url::fromUri($this->uri);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setValue($values, $notify = TRUE) {
+    // Unserialize the values.
+    // @todo The storage controller should take care of this, see
+    //   SqlContentEntityStorage::loadFieldItems, see
+    //   https://www.drupal.org/node/2414835
+    if (isset($values['options']) && is_string($values['options'])) {
+      $values['options'] = unserialize($values['options']);
+    }
+    parent::setValue($values, $notify);
+  }
+
 }

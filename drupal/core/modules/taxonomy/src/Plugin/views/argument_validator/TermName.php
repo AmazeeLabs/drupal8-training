@@ -46,7 +46,7 @@ class TermName extends Entity {
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    $options['transform'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['transform'] = array('default' => FALSE);
 
     return $options;
   }
@@ -59,7 +59,7 @@ class TermName extends Entity {
 
     $form['transform'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Transform dashes in URL to spaces in term name filter values'),
+      '#title' => $this->t('Transform dashes in URL to spaces in term name filter values'),
       '#default_value' => $this->options['transform'],
     );
   }

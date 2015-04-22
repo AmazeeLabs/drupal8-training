@@ -7,7 +7,10 @@
 
 namespace Drupal\config\Tests;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Archiver\ArchiveTar;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -29,6 +32,42 @@ class ConfigExportImportUITest extends WebTestBase {
   protected $tarball;
 
   /**
+   * Holds the original 'site slogan' before testing.
+   *
+   * @var string
+   */
+  protected $originalSlogan;
+
+  /**
+   * Holds a randomly generated new 'site slogan' for testing.
+   *
+   * @var string
+   */
+  protected $newSlogan;
+
+
+  /**
+   * Holds a content type.
+   *
+   * @var \Drupal\node\NodeInterface
+   */
+  protected $contentType;
+
+  /**
+   * Holds the randomly-generated name of a field.
+   *
+   * @var string
+   */
+  protected $fieldName;
+
+  /**
+   * Holds the field storage entity for $fieldName.
+   *
+   * @var \Drupal\field\FieldStorageConfigInterface
+   */
+  protected $fieldStorage;
+
+  /**
    * Modules to enable.
    *
    * @var array
@@ -44,89 +83,118 @@ class ConfigExportImportUITest extends WebTestBase {
     // roles are created then the role is lost after import. If the roles
     // created have the same name then the sync will fail because they will
     // have different UUIDs.
-    $this->drupalLogin($this->root_user);
+    $this->drupalLogin($this->rootUser);
   }
 
   /**
    * Tests a simple site export import case.
    */
   public function testExportImport() {
-    $this->originalSlogan = \Drupal::config('system.site')->get('slogan');
+    // After installation there is no snapshot and nothing to import.
+    $this->drupalGet('admin/config/development/configuration');
+    $this->assertNoText(t('Warning message'));
+    $this->assertText(t('There are no configuration changes to import.'));
+
+    $this->originalSlogan = $this->config('system.site')->get('slogan');
     $this->newSlogan = $this->randomString(16);
     $this->assertNotEqual($this->newSlogan, $this->originalSlogan);
-    \Drupal::config('system.site')
+    $this->config('system.site')
       ->set('slogan', $this->newSlogan)
       ->save();
-    $this->assertEqual(\Drupal::config('system.site')->get('slogan'), $this->newSlogan);
+    $this->assertEqual($this->config('system.site')->get('slogan'), $this->newSlogan);
 
     // Create a content type.
-    $this->content_type = $this->drupalCreateContentType();
+    $this->contentType = $this->drupalCreateContentType();
 
     // Create a field.
-    $this->fieldName = drupal_strtolower($this->randomMachineName());
+    $this->fieldName = Unicode::strtolower($this->randomMachineName());
     $this->fieldStorage = entity_create('field_storage_config', array(
-      'name' => $this->fieldName,
+      'field_name' => $this->fieldName,
       'entity_type' => 'node',
       'type' => 'text',
     ));
     $this->fieldStorage->save();
     entity_create('field_config', array(
       'field_storage' => $this->fieldStorage,
-      'bundle' => $this->content_type->type,
+      'bundle' => $this->contentType->id(),
     ))->save();
-    entity_get_form_display('node', $this->content_type->type, 'default')
+    // Update the displays so that configuration does not change unexpectedly on
+    // import.
+    entity_get_form_display('node', $this->contentType->id(), 'default')
       ->setComponent($this->fieldName, array(
         'type' => 'text_textfield',
       ))
       ->save();
-    entity_get_display('node', $this->content_type->type, 'full')
+    entity_get_display('node', $this->contentType->id(), 'full')
       ->setComponent($this->fieldName)
       ->save();
+    entity_get_display('node', $this->contentType->id(), 'default')
+      ->setComponent($this->fieldName)
+      ->save();
+    entity_get_display('node', $this->contentType->id(), 'teaser')
+      ->removeComponent($this->fieldName)
+      ->save();
 
-    $this->drupalGet('node/add/' . $this->content_type->type);
+    $this->drupalGet('node/add/' . $this->contentType->id());
     $this->assertFieldByName("{$this->fieldName}[0][value]", '', 'Widget is displayed');
 
     // Export the configuration.
     $this->drupalPostForm('admin/config/development/configuration/full/export', array(), 'Export');
-    $this->tarball = $this->drupalGetContent();
+    $this->tarball = $this->getRawContent();
 
-    \Drupal::config('system.site')
+    $this->config('system.site')
       ->set('slogan', $this->originalSlogan)
       ->save();
-    $this->assertEqual(\Drupal::config('system.site')->get('slogan'), $this->originalSlogan);
+    $this->assertEqual($this->config('system.site')->get('slogan'), $this->originalSlogan);
 
     // Delete the custom field.
-    $fields = entity_load_multiple('field_config');
+    $fields = FieldConfig::loadMultiple();
     foreach ($fields as $field) {
       if ($field->field_name == $this->fieldName) {
         $field->delete();
       }
     }
-    $field_storages = entity_load_multiple('field_storage_config');
+    $field_storages = FieldStorageConfig::loadMultiple();
     foreach ($field_storages as $field_storage) {
-      if ($field_storage->name == $this->fieldName) {
+      if ($field_storage->getName() == $this->fieldName) {
         $field_storage->delete();
       }
     }
-    $this->drupalGet('node/add/' . $this->content_type->type);
+    $this->drupalGet('node/add/' . $this->contentType->id());
     $this->assertNoFieldByName("{$this->fieldName}[0][value]", '', 'Widget is not displayed');
 
     // Import the configuration.
     $filename = 'temporary://' . $this->randomMachineName();
     file_put_contents($filename, $this->tarball);
     $this->drupalPostForm('admin/config/development/configuration/full/import', array('files[import_tarball]' => $filename), 'Upload');
-    $this->drupalPostForm(NULL, array(), 'Import all');
+    // There is no snapshot yet because an import has never run.
+    $this->assertNoText(t('Warning message'));
+    $this->assertNoText(t('There are no configuration changes to import.'));
+    $this->assertText($this->contentType->label());
 
-    $this->assertEqual(\Drupal::config('system.site')->get('slogan'), $this->newSlogan);
+    $this->drupalPostForm(NULL, array(), 'Import all');
+    // After importing the snapshot has been updated an there are no warnings.
+    $this->assertNoText(t('Warning message'));
+    $this->assertText(t('There are no configuration changes to import.'));
+
+    $this->assertEqual($this->config('system.site')->get('slogan'), $this->newSlogan);
 
     $this->drupalGet('node/add');
     $this->assertFieldByName("{$this->fieldName}[0][value]", '', 'Widget is displayed');
 
-    \Drupal::config('system.site')
+    $this->config('system.site')
       ->set('slogan', $this->originalSlogan)
       ->save();
     $this->drupalGet('admin/config/development/configuration');
+    $this->assertText(t('Warning message'));
     $this->assertText('Your current configuration has changed. Changes to these configuration items will be lost on the next synchronization: system.site');
+    // Remove everything from staging. The warning about differences between the
+    // active and snapshot should still exist.
+    \Drupal::service('config.storage.staging')->deleteAll();
+    $this->drupalGet('admin/config/development/configuration');
+    $this->assertText(t('Warning message'));
+    $this->assertText('Your current configuration has changed. Changes to these configuration items will be lost on the next synchronization: system.site');
+    $this->assertText(t('There are no configuration changes to import.'));
   }
 
   /**
@@ -145,7 +213,7 @@ class ConfigExportImportUITest extends WebTestBase {
 
     // Export the configuration.
     $this->drupalPostForm('admin/config/development/configuration/full/export', array(), 'Export');
-    $this->tarball = $this->drupalGetContent();
+    $this->tarball = $this->getRawContent();
     $filename = file_directory_temp() .'/' . $this->randomMachineName();
     file_put_contents($filename, $this->tarball);
 

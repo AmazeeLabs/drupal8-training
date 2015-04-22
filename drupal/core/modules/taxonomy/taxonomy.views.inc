@@ -11,13 +11,13 @@ use Drupal\field\FieldStorageConfigInterface;
  * Implements hook_views_data_alter().
  */
 function taxonomy_views_data_alter(&$data) {
-  $data['node']['term_node_tid'] = array(
+  $data['node_field_data']['term_node_tid'] = array(
     'title' => t('Taxonomy terms on node'),
     'help' => t('Relate nodes to taxonomy terms, specifying which vocabulary or vocabularies to use. This relationship will cause duplicated records if there are multiple terms.'),
     'relationship' => array(
       'id' => 'node_term_data',
       'label' => t('term'),
-      'base' => 'taxonomy_term_data',
+      'base' => 'taxonomy_term_field_data',
     ),
     'field' => array(
       'title' => t('All taxonomy terms'),
@@ -28,7 +28,7 @@ function taxonomy_views_data_alter(&$data) {
     ),
   );
 
-  $data['node']['term_node_tid_depth'] = array(
+  $data['node_field_data']['term_node_tid_depth'] = array(
     'help' => t('Display content if it has the selected taxonomy terms, or children of the selected terms. Due to additional complexity, this has fewer options than the versions without depth.'),
     'real field' => 'nid',
     'argument' => array(
@@ -42,7 +42,7 @@ function taxonomy_views_data_alter(&$data) {
     ),
   );
 
-  $data['node']['term_node_tid_depth_modifier'] = array(
+  $data['node_field_data']['term_node_tid_depth_modifier'] = array(
     'title' => t('Has taxonomy term ID depth modifier'),
     'help' => t('Allows the "depth" for Taxonomy: Term ID (with depth) to be modified via an additional contextual filter value.'),
     'argument' => array(
@@ -57,10 +57,10 @@ function taxonomy_views_data_alter(&$data) {
  * Views integration for taxonomy_term_reference fields. Adds a term relationship to the default
  * field data.
  *
- * @see field_views_field_default_views_data()
+ * @see views_field_default_views_data()
  */
 function taxonomy_field_views_data(FieldStorageConfigInterface $field_storage) {
-  $data = field_views_field_default_views_data($field_storage);
+  $data = views_field_default_views_data($field_storage);
   foreach ($data as $table_name => $table_data) {
     foreach ($table_data as $field_name => $field_data) {
       if (isset($field_data['filter']) && $field_name != 'delta') {
@@ -98,7 +98,7 @@ function taxonomy_field_views_data_views_data_alter(array &$data, FieldStorageCo
   /** @var \Drupal\Core\Entity\Sql\DefaultTableMapping $table_mapping */
   $table_mapping = $entity_manager->getStorage($entity_type_id)->getTableMapping();
 
-  list($label) = field_views_field_label($entity_type_id, $field_name);
+  list($label) = views_entity_field_label($entity_type_id, $field_name);
 
   $data['taxonomy_term_data'][$pseudo_field_name]['relationship'] = array(
     'title' => t('@entity using @field', array('@entity' => $entity_type->getLabel(), '@field' => $label)),

@@ -19,7 +19,7 @@ class CommentVariable extends DrupalSqlBase {
   /**
    * {@inheritdoc}
    */
-  protected function runQuery() {
+  protected function initializeIterator() {
     return new \ArrayIterator($this->getCommentVariables());
   }
 
@@ -45,7 +45,7 @@ class CommentVariable extends DrupalSqlBase {
       }
     }
     $return = array();
-    $values = $this->getDatabase()->query('SELECT name, value FROM {variable} WHERE name IN (:name)', array(':name' => $variables))->fetchAllKeyed();
+    $values = $this->getDatabase()->query('SELECT name, value FROM {variable} WHERE name IN ( :name[] )', array(':name[]' => $variables))->fetchAllKeyed();
     foreach ($node_types as $node_type) {
       foreach ($comment_prefixes as $prefix) {
         $name = $prefix . '_' . $node_type;

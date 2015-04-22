@@ -7,14 +7,53 @@
 
 namespace Drupal\contact;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Form\ConfigFormBaseTrait;
 use Drupal\Core\Form\FormStateInterface;
+use Egulias\EmailValidator\EmailValidator;
 
 /**
  * Base form for contact form edit forms.
  */
-class ContactFormEditForm extends EntityForm {
+class ContactFormEditForm extends EntityForm implements ContainerInjectionInterface {
+  use ConfigFormBaseTrait;
+
+  /**
+   * The email validator.
+   *
+   * @var \Egulias\EmailValidator\EmailValidator
+   */
+  protected $emailValidator;
+
+  /**
+   * Constructs a new ContactFormEditForm.
+   *
+   * @param \Egulias\EmailValidator\EmailValidator $email_validator
+   *   The email validator.
+   */
+  public function __construct(EmailValidator $email_validator) {
+   $this->emailValidator = $email_validator;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('email.validator')
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames() {
+    return ['contact.settings'];
+  }
 
   /**
    * {@inheritdoc}
@@ -81,7 +120,7 @@ class ContactFormEditForm extends EntityForm {
 
     foreach ($recipients as &$recipient) {
       $recipient = trim($recipient);
-      if (!valid_email_address($recipient)) {
+      if (!$this->emailValidator->isValid($recipient)) {
         $form_state->setErrorByName('recipients', $this->t('%recipient is an invalid email address.', array('%recipient' => $recipient)));
       }
     }
@@ -96,8 +135,7 @@ class ContactFormEditForm extends EntityForm {
     $status = $contact_form->save();
     $contact_settings = $this->config('contact.settings');
 
-    $edit_link = \Drupal::linkGenerator()->generateFromUrl($this->t('Edit'), $this->entity->urlInfo());
-
+    $edit_link = $this->entity->link($this->t('Edit'));
     if ($status == SAVED_UPDATED) {
       drupal_set_message($this->t('Contact form %label has been updated.', array('%label' => $contact_form->label())));
       $this->logger('contact')->notice('Contact form %label has been updated.', array('%label' => $contact_form->label(), 'link' => $edit_link));
@@ -120,7 +158,7 @@ class ContactFormEditForm extends EntityForm {
         ->save();
     }
 
-    $form_state->setRedirect('contact.form_list');
+    $form_state->setRedirectUrl($contact_form->urlInfo('collection'));
   }
 
 }

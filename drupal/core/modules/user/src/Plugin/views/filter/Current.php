@@ -26,7 +26,7 @@ class Current extends BooleanOperator {
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
 
-    $this->value_value = t('Is the logged in user');
+    $this->value_value = $this->t('Is the logged in user');
   }
 
   public function query() {
@@ -45,6 +45,18 @@ class Current extends BooleanOperator {
       $or->condition($field, '***CURRENT_USER***', '=');
     }
     $this->query->addWhere($this->options['group'], $or);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    $contexts = parent::getCacheContexts();
+
+    // This filter depends on the current user.
+    $contexts[] = 'cache.context.user';
+
+    return $contexts;
   }
 
 }

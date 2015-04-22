@@ -1,8 +1,16 @@
-base_table: node
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - user
 id: test_bulk_form
+label: form
+module: views
 description: ''
 tag: ''
-label: form
+base_table: node_field_data
+base_field: nid
 core: 8.x
 display:
   default:
@@ -69,9 +77,9 @@ display:
             html: false
           hide_empty: false
           empty_zero: false
-          link_to_node: true
-          plugin_id: node
-          provider: node
+          plugin_id: field
+          entity_type: node
+          entity_field: title
         node_bulk_form:
           id: node_bulk_form
           table: node
@@ -98,7 +106,7 @@ display:
             suffix: ''
             target: ''
             nl2br: false
-            max_length: ''
+            max_length: 0
             word_boundary: true
             ellipsis: true
             more_link: false
@@ -121,7 +129,7 @@ display:
           empty_zero: false
           hide_alter_empty: true
           plugin_id: node_bulk_form
-          provider: node
+          entity_type: node
       filters:
         status:
           value: true
@@ -132,7 +140,8 @@ display:
             operator: ''
           group: 1
           plugin_id: boolean
-          provider: views
+          entity_type: node
+          entity_field: status
       sorts:
         created:
           id: created
@@ -140,7 +149,8 @@ display:
           field: created
           order: DESC
           plugin_id: date
-          provider: views
+          entity_type: node
+          entity_field: created
       title: form
   page_1:
     display_plugin: page
@@ -165,12 +175,7 @@ display:
         area:
           id: area
           table: views
-          field: area
+          field: area_text_custom
           empty: true
           content: 'This view is empty.'
           plugin_id: text_custom
-          provider: views
-base_field: nid
-status: true
-module: views
-langcode: und

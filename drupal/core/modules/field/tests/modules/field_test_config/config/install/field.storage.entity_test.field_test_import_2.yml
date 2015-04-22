@@ -1,6 +1,6 @@
 id: entity_test.field_test_import_2
-langcode: und
-name: field_test_import_2
+langcode: en
+field_name: field_test_import_2
 entity_type: entity_test
 type: text
 settings:
@@ -16,3 +16,4 @@ dependencies:
   module:
     - entity_test
     - text
+persist_with_no_fields: false

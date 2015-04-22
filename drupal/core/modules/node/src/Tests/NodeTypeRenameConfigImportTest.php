@@ -11,9 +11,10 @@ use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
 use Drupal\simpletest\WebTestBase;
+use Drupal\node\Entity\NodeType;
 
 /**
- * Tests importing renamed node type via configuration synchronisation.
+ * Tests importing renamed node type via configuration synchronization.
  *
  * @group node
  */
@@ -27,24 +28,30 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
   public static $modules = array('node', 'text', 'config');
 
   /**
+   * A normal logged in user.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $webUser;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
-    $this->web_user = $this->drupalCreateUser(array('synchronize configuration'));
-    $this->drupalLogin($this->web_user);
+    $this->webUser = $this->drupalCreateUser(array('synchronize configuration'));
+    $this->drupalLogin($this->webUser);
   }
 
   /**
    * Tests configuration renaming.
    */
   public function testConfigurationRename() {
-    $content_type = entity_create('node_type', array(
+    $content_type = $this->drupalCreateContentType(array(
       'type' => Unicode::strtolower($this->randomMachineName(16)),
       'name' => $this->randomMachineName(),
     ));
-    $content_type->save();
-    $staged_type = $content_type->type;
+    $staged_type = $content_type->id();
 
     // Check the default status value for a node of this type.
     $node = entity_create('node', array('type' => $staged_type));
@@ -62,9 +69,9 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
     $this->copyConfig($active, $staging);
 
     // Change the machine name of the content type.
-    $content_type->type = Unicode::strtolower($this->randomMachineName(8));
+    $content_type->set('type', Unicode::strtolower($this->randomMachineName(8)));
     $content_type->save();
-    $active_type = $content_type->type;
+    $active_type = $content_type->id();
 
     // Ensure the base field override has been renamed and the value is correct.
     $node = entity_create('node', array('type' => $active_type));
@@ -126,9 +133,9 @@ class NodeTypeRenameConfigImportTest extends WebTestBase {
     $this->drupalPostForm('admin/config/development/configuration', array(), t('Import all'));
     $this->assertText(t('There are no configuration changes to import.'));
 
-    $this->assertFalse(entity_load('node_type', $active_type), 'The content no longer exists with the old name.');
-    $content_type = entity_load('node_type', $staged_type);
-    $this->assertIdentical($staged_type, $content_type->type);
+    $this->assertFalse(NodeType::load($active_type), 'The content no longer exists with the old name.');
+    $content_type = NodeType::load($staged_type);
+    $this->assertIdentical($staged_type, $content_type->id());
 
     // Ensure the base field override has been renamed and the value is correct.
     $node = entity_create('node', array('type' => $staged_type));

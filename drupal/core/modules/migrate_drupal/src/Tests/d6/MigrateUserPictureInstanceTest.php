@@ -7,15 +7,16 @@
 
 namespace Drupal\migrate_drupal\Tests\d6;
 
+use Drupal\field\Entity\FieldConfig;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * User picture field instance migration.
  *
  * @group migrate_drupal
  */
-class MigrateUserPictureInstanceTest extends MigrateDrupalTestBase {
+class MigrateUserPictureInstanceTest extends MigrateDrupal6TestBase {
 
   /**
    * Modules to enable.
@@ -38,7 +39,7 @@ class MigrateUserPictureInstanceTest extends MigrateDrupalTestBase {
     $this->prepareMigrations($id_mappings);
     entity_create('field_storage_config', array(
       'entity_type' => 'user',
-      'name' => 'user_picture',
+      'field_name' => 'user_picture',
       'type' => 'image',
       'translatable' => '0',
     ))->save();
@@ -52,14 +53,14 @@ class MigrateUserPictureInstanceTest extends MigrateDrupalTestBase {
    * Tests the Drupal 6 user picture to Drupal 8 picture field instance migration.
    */
   public function testUserPictureFieldInstance() {
-    $field = entity_load('field_config', 'user.user.user_picture');
+    $field = FieldConfig::load('user.user.user_picture');
     $settings = $field->getSettings();
-    $this->assertEqual($settings['file_extensions'], 'png gif jpg jpeg');
-    $this->assertEqual($settings['file_directory'], 'pictures');
-    $this->assertEqual($settings['max_filesize'], '30KB');
-    $this->assertEqual($settings['max_resolution'], '85x85');
+    $this->assertIdentical('png gif jpg jpeg', $settings['file_extensions']);
+    $this->assertIdentical('pictures', $settings['file_directory']);
+    $this->assertIdentical('30KB', $settings['max_filesize']);
+    $this->assertIdentical('85x85', $settings['max_resolution']);
 
-    $this->assertEqual(array('user', 'user', 'user_picture'), entity_load('migration', 'd6_user_picture_field_instance')->getIdMap()->lookupDestinationID(array('')));
+    $this->assertIdentical(array('user', 'user', 'user_picture'), entity_load('migration', 'd6_user_picture_field_instance')->getIdMap()->lookupDestinationID(array('')));
   }
 
 }

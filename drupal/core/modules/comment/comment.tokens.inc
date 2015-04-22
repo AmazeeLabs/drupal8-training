@@ -37,10 +37,6 @@ function comment_token_info() {
     'name' => t("IP Address"),
     'description' => t("The IP address of the computer the comment was posted from."),
   );
-  $comment['name'] = array(
-    'name' => t("Name"),
-    'description' => t("The name left by the comment author."),
-  );
   $comment['mail'] = array(
     'name' => t("Email address"),
     'description' => t("The email address left by the comment author."),
@@ -56,6 +52,10 @@ function comment_token_info() {
   $comment['body'] = array(
     'name' => t("Content"),
     'description' => t("The formatted content of the comment itself."),
+  );
+  $comment['langcode'] = array(
+    'name' => t('Language code'),
+    'description' => t('The language code of the language the comment is written in.'),
   );
   $comment['url'] = array(
     'name' => t("URL"),
@@ -87,16 +87,9 @@ function comment_token_info() {
     'description' => t("The entity the comment was posted to."),
     'type' => 'entity',
   );
-  // Support legacy comment node tokens, since tokens are embedded in user data
-  // and can't be upgraded directly.
-  $comment['node'] = array(
-    'name' => t("Node"),
-    'description' => t("DEPRECATED: The node the comment was posted to."),
-    'type' => 'node',
-  );
   $comment['author'] = array(
     'name' => t("Author"),
-    'description' => t("The author of the comment, if they were logged in."),
+    'description' => t("The author name of the comment."),
     'type' => 'user',
   );
 
@@ -105,8 +98,6 @@ function comment_token_info() {
     'tokens' => array(
       'entity' => $entity,
       'comment' => $comment,
-      // Support deprecated node tokens.
-      'node' => $entity,
     ),
   );
 }
@@ -119,7 +110,7 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
 
   $url_options = array('absolute' => TRUE);
   if (isset($options['langcode'])) {
-    $url_options['language'] = language_load($options['langcode']);
+    $url_options['language'] = \Drupal::languageManager()->getLanguage($options['langcode']);
     $langcode = $options['langcode'];
   }
   else {
@@ -162,20 +153,21 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
           $replacements[$original] = $sanitize ? $comment->comment_body->processed : $comment->comment_body->value;
           break;
 
+        case 'langcode':
+          $replacements[$original] = $sanitize ? String::checkPlain($comment->language()->getId()) : $comment->language()->getId();
+          break;
+
         // Comment related URLs.
         case 'url':
           $url_options['fragment']  = 'comment-' . $comment->id();
-          $replacements[$original] = url('comment/' . $comment->id(), $url_options);
+          $replacements[$original] = $comment->url('canonical', $url_options);
           break;
 
         case 'edit-url':
           $url_options['fragment'] = NULL;
-          $replacements[$original] = url('comment/' . $comment->id() . '/edit', $url_options);
+          $replacements[$original] = $comment->url('edit-form', $url_options);
           break;
 
-        // @todo Remove 'name' token in favour of 'author'. See
-        //   https://drupal.org/node/920056.
-        case 'name':
         case 'author':
           $name = $comment->getAuthorName();
           $replacements[$original] = $sanitize ? Xss::filter($name) : $name;
@@ -201,20 +193,6 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
           $title = $entity->label();
           $replacements[$original] = $sanitize ? Xss::filter($title) : $title;
           break;
-
-        case 'node':
-          // Support legacy comment node tokens, since tokens are embedded in
-          // user data and can't be upgraded directly.
-          // @todo Remove in Drupal 9, see https://drupal.org/node/2031901.
-          if ($comment->getCommentedEntityTypeId() == 'node') {
-            $entity = $comment->getCommentedEntity();
-            $title = $entity->label();
-            $replacements[$original] = $sanitize ? Xss::filter($title) : $title;
-          }
-          else {
-            $replacements[$original] = NULL;
-          }
-          break;
       }
     }
 
@@ -222,11 +200,6 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
     if ($entity_tokens = $token_service->findwithPrefix($tokens, 'entity')) {
       $entity = $comment->getCommentedEntity();
       $replacements += $token_service->generate($comment->getCommentedEntityTypeId(), $entity_tokens, array($comment->getCommentedEntityTypeId() => $entity), $options);
-    }
-
-    if (($node_tokens = $token_service->findwithPrefix($tokens, 'node')) && $comment->getCommentedEntityTypeId() == 'node') {
-      $node = $comment->getCommentedEntity();
-      $replacements += $token_service->generate('node', $node_tokens, array('node' => $node), $options);
     }
 
     if ($date_tokens = $token_service->findwithPrefix($tokens, 'created')) {
@@ -245,10 +218,9 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
       $replacements += $token_service->generate('user', $author_tokens, array('user' => $account), $options);
     }
   }
-  elseif (($type == 'entity' & !empty($data['entity'])) ||
-    ($type == 'node' & !empty($data['node']))) {
-    /** @var $entity \Drupal\Core\Entity\ContentEntityInterface */
-    $entity = !empty($data['entity']) ? $data['entity'] : $data['node'];
+  elseif ($type == 'entity' & !empty($data['entity'])) {
+    /** @var $entity \Drupal\Core\Entity\FieldableEntityInterface */
+    $entity = $data['entity'];
 
     foreach ($tokens as $name => $original) {
       switch ($name) {

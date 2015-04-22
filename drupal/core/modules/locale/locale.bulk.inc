@@ -5,9 +5,10 @@
  * Mass import-export and batch import functionality for Gettext .po files.
  */
 
-use Drupal\locale\Gettext;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\file\FileInterface;
+use Drupal\locale\Gettext;
+use Drupal\locale\Locale;
 
 /**
  * Prepare a batch to import all translations.
@@ -24,15 +25,18 @@ use Drupal\file\FileInterface;
  *     LOCALE_NOT_CUSTOMIZED.
  *   - 'finish_feedback': Whether or not to give feedback to the user when the
  *     batch is finished. Optional, defaults to TRUE.
- * @param $force
+ * @param bool $force
  *   (optional) Import all available files, even if they were imported before.
+ *
+ * @return array|bool
+ *   The batch structure, or FALSE if no files are used to build the batch.
  *
  * @todo
  *   Integrate with update status to identify projects needed and integrate
  *   l10n_update functionality to feed in translation files alike.
  *   See http://drupal.org/node/1191488.
  */
-function locale_translate_batch_import_files($options, $force = FALSE) {
+function locale_translate_batch_import_files(array $options, $force = FALSE) {
   $options += array(
     'overwrite_options' => array(),
     'customized' => LOCALE_NOT_CUSTOMIZED,
@@ -71,16 +75,16 @@ function locale_translate_batch_import_files($options, $force = FALSE) {
  * Get interface translation files present in the translations directory.
  *
  * @param array $projects
- *   Project names from which to get the translation files and history.
- *   Defaults to all projects.
+ *   (optional) Project names from which to get the translation files and
+ *   history. Defaults to all projects.
  * @param array $langcodes
- *   Language codes from which to get the translation files and history.
- *   Defaults to all languages.
+ *   (optional) Language codes from which to get the translation files and
+ *   history. Defaults to all languages.
  *
  * @return array
  *   An array of interface translation files keyed by their URI.
  */
-function locale_translate_get_interface_translation_files($projects = array(), $langcodes = array()) {
+function locale_translate_get_interface_translation_files(array $projects = array(), array $langcodes = array()) {
   module_load_include('compare.inc', 'locale');
   $files = array();
   $projects = $projects ? $projects : array_keys(locale_translation_get_projects());
@@ -109,7 +113,7 @@ function locale_translate_get_interface_translation_files($projects = array(), $
 /**
  * Build a locale batch from an array of files.
  *
- * @param $files
+ * @param array $files
  *   Array of file objects to import.
  * @param array $options
  *   An array with options that can have the following elements:
@@ -124,10 +128,10 @@ function locale_translate_get_interface_translation_files($projects = array(), $
  *   - 'finish_feedback': Whether or not to give feedback to the user when the
  *     batch is finished. Optional, defaults to TRUE.
  *
- * @return
+ * @return array|bool
  *   A batch structure or FALSE if $files was empty.
  */
-function locale_translate_batch_build($files, $options) {
+function locale_translate_batch_build(array $files, array $options) {
   $options += array(
     'overwrite_options' => array(),
     'customized' => LOCALE_NOT_CUSTOMIZED,
@@ -161,7 +165,9 @@ function locale_translate_batch_build($files, $options) {
 }
 
 /**
- * Perform interface translation import as a batch step.
+ * Implements callback_batch_operation().
+ *
+ * Perform interface translation import.
  *
  * @param object $file
  *   A file object of the gettext file to be imported. The file object must
@@ -179,10 +185,10 @@ function locale_translate_batch_build($files, $options) {
  *     LOCALE_NOT_CUSTOMIZED.
  *   - 'message': Alternative message to display during import. Note, this must
  *     be sanitized text.
- * @param $context
+ * @param array $context
  *   Contains a list of files imported.
  */
-function locale_translate_batch_import($file, $options, &$context) {
+function locale_translate_batch_import($file, array $options, array &$context) {
   // Merge the default values in the $options array.
   $options += array(
     'overwrite_options' => array(),
@@ -258,12 +264,14 @@ function locale_translate_batch_import($file, $options, &$context) {
 }
 
 /**
- * Batch callback: Save data of imported files.
+ * Implements callback_batch_operation().
  *
- * @param $context
+ * Save data of imported files.
+ *
+ * @param array $context
  *   Contains a list of imported files.
  */
-function locale_translate_batch_import_save($context) {
+function locale_translate_batch_import_save(array $context) {
   if (isset($context['results']['files'])) {
     foreach ($context['results']['files'] as $file) {
       // Update the file history if both project and version are known. This
@@ -281,6 +289,8 @@ function locale_translate_batch_import_save($context) {
 }
 
 /**
+ * Implements callback_batch_operation().
+ *
  * Refreshs translations after importing strings.
  *
  * @param array $context
@@ -342,18 +352,25 @@ function locale_translate_batch_refresh(array &$context) {
 }
 
 /**
+ * Implements callback_batch_finished().
+ *
  * Finished callback of system page locale import batch.
+ *
+ * @param bool $success
+ *   TRUE if batch successfully completed.
+ * @param array $results
+ *   Batch results.
  */
-function locale_translate_batch_finished($success, $results) {
+function locale_translate_batch_finished($success, array $results) {
   $logger = \Drupal::logger('locale');
   if ($success) {
     $additions = $updates = $deletes = $skips = $config = 0;
     if (isset($results['failed_files'])) {
       if (\Drupal::moduleHandler()->moduleExists('dblog') && \Drupal::currentUser()->hasPermission('access site reports')) {
-        $message = format_plural(count($results['failed_files']), 'One translation file could not be imported. <a href="@url">See the log</a> for details.', '@count translation files could not be imported. <a href="@url">See the log</a> for details.', array('@url' => url('admin/reports/dblog')));
+        $message = \Drupal::translation()->formatPlural(count($results['failed_files']), 'One translation file could not be imported. <a href="@url">See the log</a> for details.', '@count translation files could not be imported. <a href="@url">See the log</a> for details.', array('@url' => \Drupal::url('dblog.overview')));
       }
       else {
-        $message = format_plural(count($results['failed_files']), 'One translation file could not be imported. See the log for details.', '@count translation files could not be imported. See the log for details.');
+        $message = \Drupal::translation()->formatPlural(count($results['failed_files']), 'One translation file could not be imported. See the log for details.', '@count translation files could not be imported. See the log for details.');
       }
       drupal_set_message($message, 'error');
     }
@@ -372,7 +389,7 @@ function locale_translate_batch_finished($success, $results) {
           }
         }
       }
-      drupal_set_message(format_plural(count($results['files']),
+      drupal_set_message(\Drupal::translation()->formatPlural(count($results['files']),
         'One translation file imported. %number translations were added, %update translations were updated and %delete translations were removed.',
         '@count translation files imported. %number translations were added, %update translations were updated and %delete translations were removed.',
         array('%number' => $additions, '%update' => $updates, '%delete' => $deletes)
@@ -381,10 +398,10 @@ function locale_translate_batch_finished($success, $results) {
 
       if ($skips) {
         if (\Drupal::moduleHandler()->moduleExists('dblog') && \Drupal::currentUser()->hasPermission('access site reports')) {
-          $message = format_plural($skips, 'One translation string was skipped because of disallowed or malformed HTML. <a href="@url">See the log</a> for details.', '@count translation strings were skipped because of disallowed or malformed HTML. <a href="@url">See the log</a> for details.', array('@url' => url('admin/reports/dblog')));
+          $message = \Drupal::translation()->formatPlural($skips, 'One translation string was skipped because of disallowed or malformed HTML. <a href="@url">See the log</a> for details.', '@count translation strings were skipped because of disallowed or malformed HTML. <a href="@url">See the log</a> for details.', array('@url' => \Drupal::url('dblog.overview')));
         }
         else {
-          $message = format_plural($skips, 'One translation string was skipped because of disallowed or malformed HTML. See the log for details.', '@count translation strings were skipped because of disallowed or malformed HTML. See the log for details.');
+          $message = \Drupal::translation()->formatPlural($skips, 'One translation string was skipped because of disallowed or malformed HTML. See the log for details.', '@count translation strings were skipped because of disallowed or malformed HTML. See the log for details.');
         }
         drupal_set_message($message, 'warning');
         $logger->warning('@count disallowed HTML string(s) in files: @files.', array('@count' => $skips, '@files' => implode(',', $skipped_files)));
@@ -400,10 +417,10 @@ function locale_translate_batch_finished($success, $results) {
 /**
  * Creates a file object and populates the timestamp property.
  *
- * @param $filepath
+ * @param string $filepath
  *   The filepath of a file to import.
  *
- * @return
+ * @return object
  *   An object representing the file.
  */
 function locale_translate_file_create($filepath) {
@@ -431,7 +448,7 @@ function locale_translate_file_create($filepath) {
  * @return object
  *   Modified file object.
  */
-function locale_translate_file_attach_properties($file, $options = array()) {
+function locale_translate_file_attach_properties($file, array $options = array()) {
   // If $file is a file entity, convert it to a stdClass.
   if ($file instanceof FileInterface) {
     $file = (object) array(
@@ -472,17 +489,17 @@ function locale_translate_file_attach_properties($file, $options = array()) {
  * Deletes interface translation files and translation history records.
  *
  * @param array $projects
- *   Project names from which to delete the translation files and history.
- *   Defaults to all projects.
+ *   (optional) Project names from which to delete the translation files and
+ *   history. Defaults to all projects.
  * @param array $langcodes
- *   Language codes from which to delete the translation files and history.
- *   Defaults to all languages.
+ *   (optional) Language codes from which to delete the translation files and
+ *   history. Defaults to all languages.
  *
  * @return bool
  *   TRUE if files are removed successfully. FALSE if one or more files could
  *   not be deleted.
  */
-function locale_translate_delete_translation_files($projects = array(), $langcodes = array()) {
+function locale_translate_delete_translation_files(array $projects = array(), array $langcodes = array()) {
   $fail = FALSE;
   locale_translation_file_history_delete($projects, $langcodes);
 
@@ -514,7 +531,7 @@ function locale_translate_delete_translation_files($projects = array(), $langcod
  * @return array
  *   The batch definition.
  */
-function locale_config_batch_update_components(array $options, $langcodes = array(), $components = array()) {
+function locale_config_batch_update_components(array $options, array $langcodes = array(), array $components = array()) {
   $langcodes = $langcodes ? $langcodes : array_keys(locale_translatable_language_list());
   if ($langcodes && $names = \Drupal\locale\Locale::config()->getComponentNames($components)) {
     return locale_config_batch_build($names, $langcodes, $options);
@@ -538,10 +555,11 @@ function locale_config_batch_update_components(array $options, $langcodes = arra
  *
  * @see locale_config_batch_refresh_name()
  */
-function locale_config_batch_build(array $names, array $langcodes, $options = array()) {
+function locale_config_batch_build(array $names, array $langcodes, array $options = array()) {
   $options += array('finish_feedback' => TRUE);
   $i = 0;
   $batch_names = array();
+  $operations = array();
   foreach ($names as $name) {
     $batch_names[] = $name;
     $i++;
@@ -571,10 +589,12 @@ function locale_config_batch_build(array $names, array $langcodes, $options = ar
 }
 
 /**
- * Performs configuration translation refresh as a batch step.
+ * Implements callback_batch_operation().
  *
- * @param string $names
- *   Name of configuration object to update.
+ * Performs configuration translation refresh.
+ *
+ * @param array $names
+ *   An array of names of configuration objects to update.
  * @param array $langcodes
  *   (optional) Array of language codes to update. Defaults to all languages.
  * @param array $context
@@ -595,6 +615,8 @@ function locale_config_batch_refresh_name(array $names, array $langcodes, array 
 }
 
 /**
+ * Implements callback_batch_finished().
+ *
  * Finishes callback of system page locale import batch.
  *
  * @param bool $success
@@ -629,19 +651,27 @@ function locale_config_batch_finished($success, array $results) {
  * @return int
  *   Number of configuration objects retranslated.
  */
-function locale_config_update_multiple(array $names, $langcodes = array()) {
+function locale_config_update_multiple(array $names, array $langcodes = array()) {
+  /** @var \Drupal\language\ConfigurableLanguageManagerInterface $language_manager */
+  $language_manager = \Drupal::languageManager();
+  $locale_config_manager = Locale::config();
+
   $langcodes = $langcodes ? $langcodes : array_keys(locale_translatable_language_list());
   $count = 0;
   foreach ($names as $name) {
-    $wrapper = \Drupal\locale\Locale::config()->get($name);
+    $wrapper = $locale_config_manager->get($name);
     foreach ($langcodes as $langcode) {
       $translation = $wrapper->getValue() ? $wrapper->getTranslation($langcode)->getValue() : NULL;
       if ($translation) {
-        \Drupal\locale\Locale::config()->saveTranslationData($name, $langcode, $translation);
+        $locale_config_manager->saveTranslationData($name, $langcode, $translation);
         $count++;
       }
       else {
-        \Drupal\locale\Locale::config()->deleteTranslationData($name, $langcode);
+        // Do not bother deleting language overrides which do not exist in the
+        // first place.
+        if (!$language_manager->getLanguageConfigOverride($langcode, $name)->isNew()) {
+          $locale_config_manager->deleteTranslationData($name, $langcode);
+        }
       }
     }
   }

@@ -17,6 +17,7 @@ use Drupal\Core\Form\FormStateInterface;
  *   id = "text",
  *   label = @Translation("Text (formatted)"),
  *   description = @Translation("This field stores a text with a text format."),
+ *   category = @Translation("Text"),
  *   default_widget = "text_textfield",
  *   default_formatter = "text_default"
  * )
@@ -41,12 +42,10 @@ class TextItem extends TextItemBase {
         'value' => array(
           'type' => 'varchar',
           'length' => $field_definition->getSetting('max_length'),
-          'not null' => FALSE,
         ),
         'format' => array(
           'type' => 'varchar',
           'length' => 255,
-          'not null' => FALSE,
         ),
       ),
       'indexes' => array(
@@ -91,6 +90,7 @@ class TextItem extends TextItemBase {
       '#min' => 1,
       '#disabled' => $has_data,
     );
+    $element += parent::storageSettingsForm($form, $form_state, $has_data);
 
     return $element;
   }

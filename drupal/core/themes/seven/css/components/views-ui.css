@@ -50,12 +50,6 @@ details.fieldset-no-legend {
   margin-left: 0;
 }
 
-/* Override for a button on the edit display screen */
-#edit-displays-preview-controls .form-submit {
-  display: inline-block;
-  margin-right: 1em;
-}
-
 .form-radios > .form-item {
   margin-top: 3px;
 }
@@ -69,8 +63,15 @@ details.fieldset-no-legend {
 .form-item-options-expose-required,
 .form-item-options-expose-label,
 .form-item-options-expose-description {
-  margin-left: 1.5em;
+  margin-left: 1.5em; /* LTR */
 }
+[dir="rtl"] .form-item-options-expose-required,
+[dir="rtl"] .form-item-options-expose-label,
+[dir="rtl"] .form-item-options-expose-description {
+  margin-left: 0;
+  margin-right: 1.5em;
+}
+
 
 .views-admin-dependent .form-item .form-item,
 .views-admin-dependent .form-type-checkboxes,
@@ -130,7 +131,10 @@ details.fieldset-no-legend {
 
 .views-display-top ul.secondary {
   background-color: transparent;
-  float: left
+  float: left; /* LTR */
+}
+[dir="rtl"] .views-display-top ul.secondary {
+  float: right;
 }
 
 .views-display-top .secondary .action-list li {
@@ -181,13 +185,17 @@ details.fieldset-no-legend {
   border-radius: 7px 7px 0 0;
 }
 
-.views-displays .secondary .open > a:hover {
+.views-displays .secondary .open > a:hover,
+.views-displays .secondary .open > a:focus {
   background-color: #f1f1f1;
   color: #008BCB;
 }
 
 .views-displays .secondary .action-list  li:first-child {
-  border-radius: 0 7px 0 0;
+  border-radius: 0 7px 0 0; /* LTR */
+}
+[dir="rtl"] .views-displays .secondary .action-list  li:first-child {
+  border-radius: 7px 0 0 0;
 }
 
 .views-displays .secondary .action-list  li:last-child {
@@ -215,40 +223,44 @@ details.fieldset-no-legend {
 }
 
 .views-ui-display-tab-bucket .links li + li {
-  margin-left: 3px;
+  margin-left: 3px; /* LTR */
+}
+[dir="rtl"] .views-ui-display-tab-bucket .links li + li {
+  margin-left: 0;
+  margin-right: 3px;
 }
 
 /* @end */
 
 /* @group Rearrange filter criteria */
 
-#views-ui-rearrange-filter-form .action-links {
+.views-ui-rearrange-filter-form .action-links {
   margin: 0;
   padding: 0;
 }
 
-#views-ui-rearrange-filter-form table {
+.views-ui-rearrange-filter-form table {
   border: medium none;
 }
 
-#views-ui-rearrange-filter-form [id^="views-row"] {
+.views-ui-rearrange-filter-form [id^="views-row"] {
   border: medium none;
 }
 
-#views-ui-rearrange-filter-form tr td:last-child {
+.views-ui-rearrange-filter-form tr td:last-child {
   border-right: medium none;
 }
 
-#views-ui-rearrange-filter-form .filter-group-operator-row {
+.views-ui-rearrange-filter-form .filter-group-operator-row {
   border-left: 1px solid transparent !important;
   border-right: 1px solid transparent !important;
 }
 
-#views-ui-rearrange-filter-form tr.drag td {
+.views-ui-rearrange-filter-form tr.drag td {
   background-color: #FFEE77 !important;
 }
 
-#views-ui-rearrange-filter-form tr.drag-previous td {
+.views-ui-rearrange-filter-form tr.drag-previous td {
   background-color: #FFFFBB !important;
 }
 
@@ -295,8 +307,12 @@ details.fieldset-no-legend {
 .filterable-option .form-item.form-type-checkbox {
   /* This selector is aggressive because Seven's reset for .form-items is aggressive. */
   padding-bottom: 4px;
-  padding-left: 4px;
+  padding-left: 4px; /* LTR */
   padding-top: 4px;
+}
+[dir="rtl"] .filterable-option .form-item.form-type-checkbox {
+  padding-left: 8px;
+  padding-right: 4px;
 }
 
 /* @end */

@@ -5,41 +5,33 @@ node.multiple_delete_confirm:
   requirements:
     _permission: 'administer nodes'
 
-entity.node.edit_form:
-  path: '/node/{node}/edit'
-  defaults:
-    _entity_form: 'node.edit'
-  requirements:
-    _entity_access: 'node.update'
-  options:
-    _node_operation_route: TRUE
-
 node.add_page:
   path: '/node/add'
   defaults:
     _title: 'Add content'
-    _content: '\Drupal\node\Controller\NodeController::addPage'
+    _controller: '\Drupal\node\Controller\NodeController::addPage'
   options:
-    _access_mode: 'ANY'
     _node_operation_route: TRUE
   requirements:
-    _permission: 'administer content types'
     _node_add_access: 'node'
 
 node.add:
   path: '/node/add/{node_type}'
   defaults:
-    _content: '\Drupal\node\Controller\NodeController::add'
+    _controller: '\Drupal\node\Controller\NodeController::add'
     _title_callback: '\Drupal\node\Controller\NodeController::addPageTitle'
   requirements:
     _node_add_access: 'node:{node_type}'
   options:
     _node_operation_route: TRUE
+    parameters:
+      node_type:
+        with_config_overrides: TRUE
 
 entity.node.preview:
   path: '/node/preview/{node_preview}/{view_mode_id}'
   defaults:
-    _content: '\Drupal\node\Controller\NodePreviewController::view'
+    _controller: '\Drupal\node\Controller\NodePreviewController::view'
     _title_callback: '\Drupal\node\Controller\NodePreviewController::title'
   requirements:
     _node_preview_access: '{node_preview}'
@@ -48,29 +40,11 @@ entity.node.preview:
       node_preview:
         type: 'node_preview'
 
-entity.node.canonical:
-  path: '/node/{node}'
-  defaults:
-    _content: '\Drupal\node\Controller\NodeViewController::view'
-    _title_callback: '\Drupal\node\Controller\NodeViewController::title'
-  requirements:
-    _entity_access: 'node.view'
-
-entity.node.delete_form:
-  path: '/node/{node}/delete'
-  defaults:
-    _entity_form: 'node.delete'
-    _title: 'Delete'
-  requirements:
-    _entity_access: 'node.delete'
-  options:
-    _node_operation_route: TRUE
-
 entity.node.version_history:
   path: '/node/{node}/revisions'
   defaults:
     _title: 'Revisions'
-    _content: '\Drupal\node\Controller\NodeController::revisionOverview'
+    _controller: '\Drupal\node\Controller\NodeController::revisionOverview'
   requirements:
     _access_node_revision: 'view'
   options:
@@ -79,7 +53,7 @@ entity.node.version_history:
 node.revision_show:
   path: '/node/{node}/revisions/{node_revision}/view'
   defaults:
-    _content: '\Drupal\node\Controller\NodeController::revisionShow'
+    _controller: '\Drupal\node\Controller\NodeController::revisionShow'
     _title_callback: '\Drupal\node\Controller\NodeController::revisionPageTitle'
   requirements:
     _access_node_revision: 'view'
@@ -104,10 +78,10 @@ node.revision_delete_confirm:
   options:
     _node_operation_route: TRUE
 
-node.overview_types:
+entity.node_type.collection:
   path: '/admin/structure/types'
   defaults:
-    _content: '\Drupal\Core\Entity\Controller\EntityListController::listing'
+    _controller: '\Drupal\Core\Entity\Controller\EntityListController::listing'
     entity_type: 'node_type'
     _title: 'Content types'
   requirements:

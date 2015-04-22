@@ -9,8 +9,10 @@ namespace Drupal\node\Plugin\views\row;
 
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\String;
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\Plugin\views\row\RowPluginBase;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\views\Plugin\views\row\RssPluginBase;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\node\NodeStorageInterface;
 
 /**
  * Plugin which performs a node_view on the resulting object
@@ -22,50 +24,56 @@ use Drupal\views\Plugin\views\row\RowPluginBase;
  *   help = @Translation("Display the content with standard node view."),
  *   theme = "views_view_row_rss",
  *   register_theme = FALSE,
- *   base = {"node"},
+ *   base = {"node_field_data"},
  *   display_types = {"feed"}
  * )
  */
-class Rss extends RowPluginBase {
+class Rss extends RssPluginBase {
 
   // Basic properties that let the row style follow relationships.
-  var $base_table = 'node';
+  var $base_table = 'node_field_data';
 
   var $base_field = 'nid';
 
   // Stores the nodes loaded with preRender.
   var $nodes = array();
 
-  protected function defineOptions() {
-    $options = parent::defineOptions();
+  /**
+   * {@inheritdoc}
+   */
+  protected $entityTypeId = 'node';
 
-    $options['view_mode'] = array('default' => 'default');
+  /**
+   * The node storage
+   *
+   * @var \Drupal\node\NodeStorageInterface
+   */
+  protected $nodeStorage;
 
-    return $options;
-  }
-
-  public function buildOptionsForm(&$form, FormStateInterface $form_state) {
-    parent::buildOptionsForm($form, $form_state);
-
-    $form['view_mode'] = array(
-      '#type' => 'select',
-      '#title' => t('Display type'),
-      '#options' => $this->buildOptionsForm_summary_options(),
-      '#default_value' => $this->options['view_mode'],
-    );
+  /**
+   * Constructs the Rss object.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityManagerInterface $entity_manager) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_manager);
+    $this->nodeStorage = $entity_manager->getStorage('node');
   }
 
   /**
-   * Return the main options, which are shown in the summary title.
+   * {@inheritdoc}
    */
   public function buildOptionsForm_summary_options() {
-    $view_modes = \Drupal::entityManager()->getViewModes('node');
-    $options = array();
-    foreach ($view_modes as $mode => $settings) {
-      $options[$mode] = $settings['label'];
-    }
-    $options['title'] = t('Title only');
-    $options['default'] = t('Use site default RSS settings');
+    $options = parent::buildOptionsForm_summary_options();
+    $options['title'] = $this->t('Title only');
+    $options['default'] = $this->t('Use site default RSS settings');
     return $options;
   }
 
@@ -80,7 +88,7 @@ class Rss extends RowPluginBase {
       $nids[] = $row->{$this->field_alias};
     }
     if (!empty($nids)) {
-      $this->nodes = node_load_multiple($nids);
+      $this->nodes = $this->nodeStorage->loadMultiple($nids);
     }
   }
 
@@ -147,7 +155,7 @@ class Rss extends RowPluginBase {
 
     if ($display_mode != 'title') {
       // We render node contents.
-      $item_text .= drupal_render($build);
+      $item_text .= drupal_render_root($build);
     }
 
     $item = new \stdClass();
@@ -162,7 +170,7 @@ class Rss extends RowPluginBase {
       '#options' => $this->options,
       '#row' => $item,
     );
-    return drupal_render($theme_function);
+    return drupal_render_root($theme_function);
   }
 
 }

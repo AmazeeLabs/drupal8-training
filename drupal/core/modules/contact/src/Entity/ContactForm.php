@@ -9,8 +9,6 @@ namespace Drupal\contact\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
 use Drupal\contact\ContactFormInterface;
-use Drupal\Core\Entity\EntityStorageControllerInterface;
-use Drupal\contact\CategoryInterface;
 
 /**
  * Defines the contact form entity.
@@ -24,7 +22,7 @@ use Drupal\contact\CategoryInterface;
  *     "form" = {
  *       "add" = "Drupal\contact\ContactFormEditForm",
  *       "edit" = "Drupal\contact\ContactFormEditForm",
- *       "delete" = "Drupal\contact\Form\ContactFormDeleteForm"
+ *       "delete" = "Drupal\Core\Entity\EntityDeleteForm"
  *     }
  *   },
  *   config_prefix = "form",
@@ -35,8 +33,9 @@ use Drupal\contact\CategoryInterface;
  *     "label" = "label"
  *   },
  *   links = {
- *     "delete-form" = "entity.contact_form.delete_form",
- *     "edit-form" = "entity.contact_form.edit_form"
+ *     "delete-form" = "/admin/structure/contact/manage/{contact_form}/delete",
+ *     "edit-form" = "/admin/structure/contact/manage/{contact_form}",
+ *     "collection" = "/admin/structure/contact",
  *   }
  * )
  */
@@ -81,14 +80,14 @@ class ContactForm extends ConfigEntityBundleBase implements ContactFormInterface
    * {@inheritdoc}
    */
   public function getRecipients() {
-    return $this->get('recipients');
+    return $this->recipients;
   }
 
   /**
    * {@inheritdoc}
    */
   public function setRecipients($recipients) {
-    $this->set('recipients', $recipients);
+    $this->recipients = $recipients;
     return $this;
   }
 
@@ -96,14 +95,14 @@ class ContactForm extends ConfigEntityBundleBase implements ContactFormInterface
    * {@inheritdoc}
    */
   public function getReply() {
-    return $this->get('reply');
+    return $this->reply;
   }
 
   /**
    * {@inheritdoc}
    */
   public function setReply($reply) {
-    $this->set('reply', $reply);
+    $this->reply = $reply;
     return $this;
   }
 
@@ -111,14 +110,14 @@ class ContactForm extends ConfigEntityBundleBase implements ContactFormInterface
    * {@inheritdoc}
    */
   public function getWeight() {
-    return $this->get('weight');
+    return $this->weight;
   }
 
   /**
    * {@inheritdoc}
    */
   public function setWeight($weight) {
-    $this->set('weight', $weight);
+    $this->weight = $weight;
     return $this;
   }
 

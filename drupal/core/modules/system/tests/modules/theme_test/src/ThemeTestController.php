@@ -34,16 +34,10 @@ class ThemeTestController extends ControllerBase {
    *   A render array containing custom stylesheets.
    */
   public function testInfoStylesheets() {
-    $path = drupal_get_path('module', 'theme_test');
     return array(
       '#attached' => array(
-        'css' => array(
-          "$path/css/base-override.css",
-          "$path/css/base-override.sub-remove.css",
-          "$path/css/base-remove.css",
-          "$path/css/base-remove.sub-override.css",
-          "$path/css/sub-override.css",
-          "$path/css/sub-remove.css",
+        'library' => array(
+          'theme_test/theme_stylesheets_override_and_remove_test',
         ),
       ),
     );
@@ -56,7 +50,7 @@ class ThemeTestController extends ControllerBase {
    *   A render array containing a theme override.
    */
   public function testTemplate() {
-    return \Drupal::theme()->render('theme_test_template_test', array());
+    return ['#markup' => \Drupal::theme()->render('theme_test_template_test', array())];
   }
 
   /**
@@ -69,8 +63,8 @@ class ThemeTestController extends ControllerBase {
     $element = array();
     $element['test'] = array(
       '#type' => 'inline_template',
-      '#template' => 'test-with-context {{ lama }}',
-      '#context' => array('lama' => 'muuh'),
+      '#template' => 'test-with-context {{ llama }}',
+      '#context' => array('llama' => 'muuh'),
     );
     return $element;
   }
@@ -82,7 +76,7 @@ class ThemeTestController extends ControllerBase {
    *   An HTML string containing the themed output.
    */
   public function testSuggestion() {
-    return \Drupal::theme()->render(array('theme_test__suggestion', 'theme_test'), array());
+    return ['#markup' => \Drupal::theme()->render(array('theme_test__suggestion', 'theme_test'), array())];
   }
 
   /**
@@ -92,7 +86,7 @@ class ThemeTestController extends ControllerBase {
    *   Content in theme_test_output GLOBAL.
    */
   public function testRequestListener() {
-    return $GLOBALS['theme_test_output'];
+    return ['#markup' =>  $GLOBALS['theme_test_output']];
   }
 
   /**

@@ -4,7 +4,7 @@
  * @file
  * Enables users to comment on published content.
  *
- * When enabled, the Comment module creates a field that facilitates a
+ * When installed, the Comment module creates a field that facilitates a
  * discussion board for each Drupal entity to which a comment field is attached.
  * Users can post comments to discuss a forum topic, story, collaborative
  * book page, user etc.
@@ -14,9 +14,9 @@ use Drupal\comment\CommentInterface;
 use Drupal\comment\Entity\Comment;
 use Drupal\comment\CommentManagerInterface;
 use Drupal\comment\Entity\CommentType;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\Component\Utility\String;
-use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -31,6 +31,7 @@ use Drupal\field\FieldStorageConfigInterface;
 use Drupal\file\FileInterface;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\node\NodeInterface;
+use Drupal\user\RoleInterface;
 
 /**
  * Anonymous posters cannot enter their contact information.
@@ -69,7 +70,7 @@ function comment_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Enabling commenting and configuring defaults') . '</dt>';
-      $output .= '<dd>' . t('Comment functionality can be enabled for any <a href="!entity-help" title="Entity module help">entity sub-type</a> (for example, a <a href="!content-type">content type</a>). On the Manage fields page for each entity sub-type, you can enable commenting by adding a Comments field. The entity sub-types each have their own default comment settings configured as: <em>Open</em> to allow new comments, <em>Closed</em> to view existing comments, but prevent new comments, or <em>Hidden</em> to hide existing comments and prevent new comments.', array('!content-type' => \Drupal::url('node.overview_types'), '!entity-help' => \Drupal::url('help.page', array('name' => 'entity')))) . '</dd>';
+      $output .= '<dd>' . t('Comment functionality can be enabled for any entity sub-type (for example, a <a href="!content-type">content type</a>). On the Manage fields page for each entity sub-type, you can enable commenting by adding a Comments field. The entity sub-types each have their own default comment settings configured as: <em>Open</em> to allow new comments, <em>Closed</em> to view existing comments, but prevent new comments, or <em>Hidden</em> to hide existing comments and prevent new comments. For background information about entities, see the <a href="!field">Field module help page</a>.', array('!content-type' => \Drupal::url('entity.node_type.collection'), '!field' => \Drupal::url('help.page', array('name' => 'field')))) . '</dd>';
       $output .= '<dt>' . t('Overriding default settings') . '</dt>';
       $output .= '<dd>' . t('When you create an entity item, you can override the default comment settings. Changing the entity sub-type defaults will not affect existing entity items, whether they used the default settings or had overrides.') . '</dd>';
       $output .= '<dt>' . t('Approving and managing comments') . '</dt>';
@@ -77,7 +78,7 @@ function comment_help($route_name, RouteMatchInterface $route_match) {
       $output .= '</dl>';
       return $output;
 
-    case 'comment.type_list':
+    case 'entity.comment_type.collection':
       $output = '<p>' . t('This page provides a list of all comment types on the site and allows you to manage the fields, form and display settings for each.') . '</p>';
       return $output;
   }
@@ -129,11 +130,9 @@ function comment_theme() {
   return array(
     'comment' => array(
       'render element' => 'elements',
-      'template' => 'comment',
     ),
     'field__comment' => array(
       'base hook' => 'field',
-      'template' => 'field--comment',
     ),
   );
 }
@@ -195,25 +194,6 @@ function comment_field_config_delete(FieldConfigInterface $field) {
     $cids = $entity_query->execute();
     entity_delete_multiple('comment', $cids);
   }
-}
-
-/**
- * Implements hook_entity_build_defaults_alter().
- */
-function comment_entity_build_defaults_alter(array &$build, EntityInterface $entity, $view_mode = 'full', $langcode = NULL) {
-  // Get the corresponding display settings.
-  $display = EntityViewDisplay::collectRenderDisplay($entity, $view_mode);
-  // Add the comment page number to the cache key if render caching is enabled.
-  if (isset($build['#cache']) && isset($build['#cache']['keys']) && \Drupal::request()->query->has('page')) {
-    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
-      if ($definition->getType() === 'comment' && ($display_options = $display->getComponent($field_name))) {
-        $pager_id = $display_options['settings']['pager_id'];
-        $page = pager_find_page($pager_id);
-        $build['#cache']['keys'][] = $field_name . '-pager-' . $page;
-      }
-    }
-  }
-  return $build;
 }
 
 /**
@@ -313,17 +293,16 @@ function comment_view_multiple($comments, $view_mode = 'full', $langcode = NULL)
 }
 
 /**
- * Implements hook_form_FORM_ID_alter() for field_ui_field_overview_form.
+ * Implements hook_form_FORM_ID_alter() for field_ui_field_storage_add_form.
  */
-function comment_form_field_ui_field_overview_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form['#entity_type'] == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+function comment_form_field_ui_field_storage_add_form_alter(&$form, FormStateInterface $form_state) {
+  $route_match = \Drupal::routeMatch();
+  if ($form_state->get('entity_type_id') == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
-  $entity_type_id = $form['#entity_type'];
-  if (!_comment_entity_uses_integer_id($entity_type_id)) {
+  if (!_comment_entity_uses_integer_id($form_state->get('entity_type_id'))) {
     // You cannot use comment fields on entity types with non-integer IDs.
-    unset($form['fields']['_add_new_field']['type']['#options']['comment']);
+    unset($form['add']['new_storage_type']['#options'][t('General')]['comment']);
   }
 }
 
@@ -331,9 +310,9 @@ function comment_form_field_ui_field_overview_form_alter(&$form, FormStateInterf
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_form_field_ui_form_display_overview_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form['#entity_type'] == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+  $route_match = \Drupal::routeMatch();
+  if ($form['#entity_type'] == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
 }
 
@@ -341,9 +320,9 @@ function comment_form_field_ui_form_display_overview_form_alter(&$form, FormStat
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_form_field_ui_display_overview_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form['#entity_type'] == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+  $route_match = \Drupal::routeMatch();
+  if ($form['#entity_type'] == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
 }
 
@@ -354,8 +333,8 @@ function comment_form_field_ui_field_storage_edit_form_alter(&$form, FormStateIn
   if ($form['#field']->getType() == 'comment') {
     // We only support posting one comment at the time so it doesn't make sense
     // to let the site builder choose anything else.
-    $form['field']['cardinality_container']['cardinality']['#options'] = array(1 => 1);
-    $form['field']['cardinality_container']['#access'] = FALSE;
+    $form['field_storage']['cardinality_container']['cardinality']['#default_value'] = 1;
+    $form['field_storage']['cardinality_container']['#access'] = FALSE;
   }
 }
 
@@ -366,7 +345,7 @@ function comment_form_field_ui_field_storage_edit_form_alter(&$form, FormStateIn
  */
 function comment_entity_storage_load($entities, $entity_type) {
   // Comments can only be attached to content entities, so skip others.
-  if (!\Drupal::entityManager()->getDefinition($entity_type)->isSubclassOf('Drupal\Core\Entity\ContentEntityInterface')) {
+  if (!\Drupal::entityManager()->getDefinition($entity_type)->isSubclassOf('Drupal\Core\Entity\FieldableEntityInterface')) {
     return;
   }
   if (!\Drupal::service('comment.manager')->getFields($entity_type)) {
@@ -412,7 +391,7 @@ function comment_entity_predelete(EntityInterface $entity) {
   // mismatched types. So, we need to verify that the ID is numeric (even for an
   // entity type that has an integer ID, $entity->id() might be a string
   // containing a number), and then cast it to an integer when querying.
-  if ($entity->getEntityType()->isFieldable() && is_numeric($entity->id())) {
+  if ($entity instanceof FieldableEntityInterface && is_numeric($entity->id())) {
     $entity_query = \Drupal::entityQuery('comment');
     $entity_query->condition('entity_id', (int) $entity->id());
     $entity_query->condition('entity_type', $entity->getEntityTypeId());
@@ -461,10 +440,10 @@ function comment_node_update_index(EntityInterface $node, $langcode) {
     // comments.
     $index_comments = TRUE;
     $roles = \Drupal::entityManager()->getStorage('user_role')->loadMultiple();
-    $authenticated_can_access = $roles[DRUPAL_AUTHENTICATED_RID]->hasPermission('access comments');
+    $authenticated_can_access = $roles[RoleInterface::AUTHENTICATED_ID]->hasPermission('access comments');
     foreach ($roles as $rid => $role) {
       if ($role->hasPermission('search content') && !$role->hasPermission('access comments')) {
-        if ($rid == DRUPAL_AUTHENTICATED_RID || $rid == DRUPAL_ANONYMOUS_RID || !$authenticated_can_access) {
+        if ($rid == RoleInterface::AUTHENTICATED_ID || $rid == RoleInterface::ANONYMOUS_ID || !$authenticated_can_access) {
           $index_comments = FALSE;
           break;
         }
@@ -533,7 +512,7 @@ function comment_node_search_result(EntityInterface $node) {
   // Do not make a string if there are no comment fields, or no comments exist
   // or all comment fields are hidden.
   if ($comments > 0 || $open) {
-    return array('comment' => format_plural($comments, '1 comment', '@count comments'));
+    return array('comment' => \Drupal::translation()->formatPlural($comments, '1 comment', '@count comments'));
   }
 }
 
@@ -700,6 +679,7 @@ function template_preprocess_comment(&$variables) {
     '#account' => $account,
   );
   $variables['author'] = drupal_render($username);
+  $variables['author_id'] = $comment->getOwnerId();
   $variables['new_indicator_timestamp'] = $comment->getChangedTime();
   $variables['created'] = format_date($comment->getCreatedTime());
   // Avoid calling format_date() twice on the same timestamp.
@@ -719,28 +699,21 @@ function template_preprocess_comment(&$variables) {
     $variables['user_picture'] = array();
   }
 
-  if (isset($variables['elements']['signature'])) {
-    $variables['signature'] = $variables['elements']['signature'];
-    unset($variables['elements']['signature']);
-  }
-  else {
-    $variables['signature'] = '';
-  }
   if (isset($comment->in_preview)) {
-    $variables['title'] = l($comment->getSubject(), '');
-    $variables['permalink'] = l(t('Permalink'), '');
+    $variables['title'] = \Drupal::l($comment->getSubject(), new Url('<front>'));
+    $variables['permalink'] = \Drupal::l(t('Permalink'), new Url('<front>'));
   }
   else {
     $uri = $comment->urlInfo();
     $attributes = $uri->getOption('attributes') ?: array();
     $attributes += array('class' => array('permalink'), 'rel' => 'bookmark');
     $uri->setOption('attributes', $attributes);
-    $variables['title'] = \Drupal::linkGenerator()->generateFromUrl($comment->getSubject(), $uri);
+    $variables['title'] = \Drupal::l($comment->getSubject(), $uri);
 
-    $variables['permalink'] = \Drupal::linkGenerator()->generateFromUrl(t('Permalink'), $comment->permalink());
+    $variables['permalink'] = \Drupal::l(t('Permalink'), $comment->permalink());
   }
 
-  $variables['submitted'] = t('Submitted by !username on !datetime', array('!username' => $variables['author'], '!datetime' => $variables['created']));
+  $variables['submitted'] = t('Submitted by @username on @datetime', array('@username' => $variables['author'], '@datetime' => $variables['created']));
 
   if ($comment->hasParentComment()) {
     // Fetch and store the parent comment information for use in templates.
@@ -764,8 +737,8 @@ function template_preprocess_comment(&$variables) {
     $attributes = $permalink_uri_parent->getOption('attributes') ?: array();
     $attributes += array('class' => array('permalink'), 'rel' => 'bookmark');
     $permalink_uri_parent->setOption('attributes', $attributes);
-    $variables['parent_title'] = \Drupal::linkGenerator()->generateFromUrl($comment_parent->getSubject(), $permalink_uri_parent);
-    $variables['parent_permalink'] = \Drupal::linkGenerator()->generateFromUrl(t('Parent permalink'), $permalink_uri_parent);
+    $variables['parent_title'] = \Drupal::l($comment_parent->getSubject(), $permalink_uri_parent);
+    $variables['parent_permalink'] = \Drupal::l(t('Parent permalink'), $permalink_uri_parent);
     $variables['parent'] = t('In reply to !parent_title by !parent_username',
         array('!parent_username' => $variables['parent_author'], '!parent_title' => $variables['parent_title']));
   }
@@ -792,28 +765,8 @@ function template_preprocess_comment(&$variables) {
     $variables['status'] = $comment->isPublished() ? 'published' : 'unpublished';
   }
 
-  // Gather comment classes.
-  $variables['attributes']['class'][] = 'comment';
-  // 'published' class is not needed, it is either 'preview' or 'unpublished'.
-  if ($variables['status'] != 'published') {
-    $variables['attributes']['class'][] = $variables['status'];
-  }
-  if (!$comment->getOwnerId()) {
-    $variables['attributes']['class'][] = 'by-anonymous';
-  }
-  else {
-    // @todo Use $entity->getAuthorId() after https://drupal.org/node/2078387
-    if ($commented_entity instanceof EntityOwnerInterface && $comment->getOwnerId() == $commented_entity->getOwnerId()) {
-      $variables['attributes']['class'][] = 'by-' . $commented_entity->getEntityTypeId() . '-author';
-    }
-  }
-  // Add clearfix class.
-  $variables['attributes']['class'][] = 'clearfix';
-
   // Add comment author user ID. Necessary for the comment-by-viewer library.
   $variables['attributes']['data-comment-user-id'] = $comment->getOwnerId();
-
-  $variables['content_attributes']['class'][] = 'content';
 }
 
 /**
@@ -836,17 +789,12 @@ function comment_preprocess_field(&$variables) {
     $variables['comment_display_mode'] = $element[0]['#comment_display_mode'];
     $variables['comment_type'] = $element[0]['#comment_type'];
 
-    // Adjust a comment field's attributes.
-    $variables['attributes']['class'][] = 'comment-wrapper';
-    $variables['title_attributes']['class'][] = 'title';
-
     // Append additional attributes (eg. RDFa) from the first field item.
-    $variables['attributes'] += $variables['item_attributes'][0]->storage();
+    $variables['attributes'] += $variables['items'][0]['attributes']->storage();
 
     // Create separate variables for the comments and comment form.
     $variables['comments'] = $element[0]['comments'];
     $variables['comment_form'] = $element[0]['comment_form'];
-    $variables['content_attributes']['class'] = array('title', 'comment-form__title');
   }
 }
 

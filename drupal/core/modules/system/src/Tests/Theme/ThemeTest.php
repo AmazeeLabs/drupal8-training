@@ -10,6 +10,9 @@ namespace Drupal\system\Tests\Theme;
 use Drupal\Component\Serialization\Json;
 use Drupal\simpletest\WebTestBase;
 use Drupal\test_theme\ThemeClass;
+use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Route;
 
 /**
  * Tests low-level theme functions.
@@ -76,7 +79,7 @@ class ThemeTest extends WebTestBase {
   function testThemeSuggestions() {
     // Set the front page as something random otherwise the CLI
     // test runner fails.
-    \Drupal::config('system.site')->set('page.front', 'nobody-home')->save();
+    $this->config('system.site')->set('page.front', 'nobody-home')->save();
     $args = array('node', '1', 'edit');
     $suggestions = theme_get_suggestions($args, 'page');
     $this->assertEqual($suggestions, array('page__node', 'page__node__%', 'page__node__1', 'page__node__edit'), 'Found expected node edit page suggestions');
@@ -137,14 +140,16 @@ class ThemeTest extends WebTestBase {
    * Ensure page-front template suggestion is added when on front page.
    */
   function testFrontPageThemeSuggestion() {
-    $original_path = _current_path();
-    // Set the current path to node because theme_get_suggestions() will query
-    // it to see if we are on the front page.
-    \Drupal::config('system.site')->set('page.front', 'node')->save();
-    _current_path('node');
-    $suggestions = theme_get_suggestions(array('node'), 'page');
+    // Set the current route to user.login because theme_get_suggestions() will
+    // query it to see if we are on the front page.
+    $request = Request::create('/user/login');
+    $request->attributes->set(RouteObjectInterface::ROUTE_NAME, 'user.login');
+    $request->attributes->set(RouteObjectInterface::ROUTE_OBJECT, new Route('/user/login'));
+    \Drupal::requestStack()->push($request);
+    $this->config('system.site')->set('page.front', 'user/login')->save();
+    $suggestions = theme_get_suggestions(array('user', 'login'), 'page');
     // Set it back to not annoy the batch runner.
-    _current_path($original_path);
+    \Drupal::requestStack()->pop();
     $this->assertTrue(in_array('page__front', $suggestions), 'Front page template was suggested.');
   }
 
@@ -158,7 +163,7 @@ class ThemeTest extends WebTestBase {
     // what is output to the HTML HEAD based on what is in a theme's .info.yml
     // file, so it doesn't matter what page we get, as long as it is themed with
     // the test theme. First we test with CSS aggregation disabled.
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('css.preprocess', 0);
     $config->save();
     $this->drupalGet('theme-test/suggestion');
@@ -179,7 +184,7 @@ class ThemeTest extends WebTestBase {
    * Ensures a themes template is overrideable based on the 'template' filename.
    */
   function testTemplateOverride() {
-    \Drupal::config('system.theme')
+    $this->config('system.theme')
       ->set('default', 'test_theme')
       ->save();
     $this->drupalGet('theme-test/template-test');
@@ -195,20 +200,21 @@ class ThemeTest extends WebTestBase {
   }
 
   /**
-   * Test the list_themes() function.
+   * Test the listInfo() function.
    */
   function testListThemes() {
     $theme_handler = $this->container->get('theme_handler');
     $theme_handler->install(array('test_subtheme'));
     $themes = $theme_handler->listInfo();
 
-    // Check if drupal_theme_access() retrieves installed themes properly from
-    // list_themes().
-    $this->assertTrue(drupal_theme_access('test_theme'), 'Installed theme detected');
+    // Check if ThemeHandlerInterface::listInfo() retrieves enabled themes.
+    $this->assertIdentical(1, $themes['test_theme']->status, 'Installed theme detected');
 
+    // Check if ThemeHandlerInterface::listInfo() returns disabled themes.
     // Check for base theme and subtheme lists.
     $base_theme_list = array('test_basetheme' => 'Theme test base theme');
-    $sub_theme_list = array('test_subtheme' => 'Theme test subtheme');
+    $sub_theme_list = array('test_subsubtheme' => 'Theme test subsubtheme', 'test_subtheme' => 'Theme test subtheme');
+
     $this->assertIdentical($themes['test_basetheme']->sub_themes, $sub_theme_list, 'Base theme\'s object includes list of subthemes.');
     $this->assertIdentical($themes['test_subtheme']->base_themes, $base_theme_list, 'Subtheme\'s object includes list of base themes.');
     // Check for theme engine in subtheme.
@@ -216,17 +222,6 @@ class ThemeTest extends WebTestBase {
     // Check for theme engine prefix.
     $this->assertIdentical($themes['test_basetheme']->prefix, 'twig', 'Base theme\'s object includes the theme engine prefix.');
     $this->assertIdentical($themes['test_subtheme']->prefix, 'twig', 'Subtheme\'s object includes the theme engine prefix.');
-  }
-
-  /**
-   * Test the theme_get_setting() function.
-   */
-  function testThemeGetSetting() {
-    $this->container->get('theme_handler')->install(array('test_subtheme'));
-    \Drupal::theme()->setActiveTheme(\Drupal::service('theme.initialization')->initTheme('test_theme'));
-    $this->assertIdentical(theme_get_setting('theme_test_setting'), 'default value', 'theme_get_setting() uses the default theme automatically.');
-    $this->assertNotEqual(theme_get_setting('subtheme_override', 'test_basetheme'), theme_get_setting('subtheme_override', 'test_subtheme'), 'Base theme\'s default settings values can be overridden by subtheme.');
-    $this->assertIdentical(theme_get_setting('basetheme_only', 'test_subtheme'), 'base theme value', 'Base theme\'s default settings values are inherited by subtheme.');
   }
 
   /**
@@ -283,7 +278,7 @@ class ThemeTest extends WebTestBase {
    * Tests that region attributes can be manipulated via preprocess functions.
    */
   function testRegionClass() {
-    \Drupal::moduleHandler()->install(array('block', 'theme_region_test'));
+    \Drupal::service('module_installer')->install(array('block', 'theme_region_test'));
 
     // Place a block.
     $this->drupalPlaceBlock('system_main_block');

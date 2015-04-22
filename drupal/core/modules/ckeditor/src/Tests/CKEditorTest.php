@@ -7,16 +7,16 @@
 
 namespace Drupal\ckeditor\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
-use Drupal\editor\Plugin\EditorManager;
-use Drupal\ckeditor\Plugin\Editor\CKEditor;
+use Drupal\simpletest\KernelTestBase;
+use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\editor\Entity\Editor;
 
 /**
  * Tests for the 'CKEditor' text editor plugin.
  *
  * @group ckeditor
  */
-class CKEditorTest extends DrupalUnitTestBase {
+class CKEditorTest extends KernelTestBase {
 
   /**
    * Modules to enable.
@@ -44,6 +44,7 @@ class CKEditorTest extends DrupalUnitTestBase {
 
     // Install the Filter module.
     $this->installSchema('system', 'url_alias');
+    $this->installSchema('system', 'router');
 
     // Create text format, associate CKEditor.
     $filtered_html_format = entity_create('filter_format', array(
@@ -103,6 +104,9 @@ class CKEditorTest extends DrupalUnitTestBase {
     $this->container->get('plugin.manager.editor')->clearCachedDefinitions();
     $this->ckeditor = $this->container->get('plugin.manager.editor')->createInstance('ckeditor');
     $this->container->get('plugin.manager.ckeditor.plugin')->clearCachedDefinitions();
+    // KernelTestBase::enableModules() unfortunately doesn't invoke
+    // hook_rebuild() just like a "real" Drupal site would. Do it manually.
+    \Drupal::moduleHandler()->invoke('ckeditor', 'rebuild');
     $settings = $editor->getSettings();
     $settings['toolbar']['rows'][0][0]['items'][] = 'Strike';
     $settings['toolbar']['rows'][0][0]['items'][] = 'Format';
@@ -206,6 +210,11 @@ class CKEditorTest extends DrupalUnitTestBase {
     $expected_config['format_tags'] = 'p';
     ksort($expected_config);
     $this->assertIdentical($expected_config, $this->ckeditor->getJSSettings($editor), 'Generated JS settings are correct for customized configuration.');
+
+    // Assert that we're robust enough to withstand people messing with State
+    // manually.
+    \Drupal::state()->delete('ckeditor_internal_format_tags:' . $format->id());
+    $this->assertIdentical($expected_config, $this->ckeditor->getJSSettings($editor), 'Even when somebody manually deleted the key-value pair in State with the pre-calculated format_tags setting, it returns "p" — because the <p> tag is always allowed.');
   }
 
   /**
@@ -254,7 +263,14 @@ class CKEditorTest extends DrupalUnitTestBase {
     $expected[] = file_create_url('core/modules/ckeditor/tests/modules/ckeditor_test.css');
     $this->assertIdentical($expected, $this->ckeditor->buildContentsCssJSSetting($editor), '"contentsCss" configuration part of JS settings built correctly while a hook_ckeditor_css_alter() implementation exists.');
 
-    // @todo test coverage for _ckeditor_theme_css(), by including a custom theme in this test with a "ckeditor_stylesheets" entry in its .info file.
+    // Enable the Bartik theme, which specifies a CKEditor stylesheet.
+    \Drupal::service('theme_handler')->install(['bartik']);
+    $this->config('system.theme')->set('default', 'bartik')->save();
+    $expected[] = file_create_url('core/themes/bartik/css/base/elements.css');
+    $expected[] = file_create_url('core/themes/bartik/css/components/captions.css');
+    $expected[] = file_create_url('core/themes/bartik/css/components/content.css');
+    $expected[] = file_create_url('core/themes/bartik/css/components/table.css');
+    $this->assertIdentical($expected, $this->ckeditor->buildContentsCssJSSetting($editor), '"contentsCss" configuration part of JS settings built correctly while a theme providing a CKEditor stylesheet exists.');
   }
 
   /**
@@ -356,6 +372,10 @@ class CKEditorTest extends DrupalUnitTestBase {
     // Language codes only in CKEditor.
     $this->assertTrue($langcodes['en-au'] == 'en-au', '"en-au" properly resolved');
     $this->assertTrue($langcodes['sr-latn'] == 'sr-latn', '"sr-latn" properly resolved');
+
+    // No locale module, so even though languages are enabled, CKEditor should
+    // still be in English.
+    $this->assertCKEditorLanguage('en');
   }
 
   /**
@@ -365,11 +385,38 @@ class CKEditorTest extends DrupalUnitTestBase {
     $this->enableModules(array('language', 'locale'));
     $this->installSchema('locale', 'locales_source');
     $this->installSchema('locale', 'locales_location');
-    $editor = entity_load('editor', 'filtered_html');
+    $this->installSchema('locale', 'locales_target');
+    $editor = Editor::load('filtered_html');
     $this->ckeditor->getJSSettings($editor);
     $localeStorage = $this->container->get('locale.storage');
-    $string = $localeStorage->findString(array('source' => 'Image Properties', 'context' => ''));
+    $string = $localeStorage->findString(array('source' => 'Edit Link', 'context' => ''));
     $this->assertTrue(!empty($string), 'String from JavaScript file saved.');
+
+    // With locale module, CKEditor should not adhere to the language selected.
+    $this->assertCKEditorLanguage();
+  }
+
+  /**
+   * Assert that CKEditor picks the expected language when French is default.
+   *
+   * @param string $langcode
+   *   Language code to assert for. Defaults to French. That is the default
+   *   language set in this assertion.
+   */
+  protected function assertCKEditorLanguage($langcode = 'fr') {
+    // Set French as the site default language.
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('system.site')->set('langcode', 'fr')->save();
+
+    // Reset the language manager so new negotiations attempts will fall back on
+    // French. Reinject the language manager CKEditor to use the current one.
+    $this->container->get('language_manager')->reset();
+    $this->ckeditor = $this->container->get('plugin.manager.editor')->createInstance('ckeditor');
+
+    // Test that we now get the expected language.
+    $editor = Editor::load('filtered_html');
+    $settings = $this->ckeditor->getJSSettings($editor);
+    $this->assertEqual($settings['language'], $langcode);
   }
 
   protected function getDefaultInternalConfig() {
@@ -378,6 +425,7 @@ class CKEditorTest extends DrupalUnitTestBase {
       'pasteFromWordPromptCleanup' => TRUE,
       'resize_dir' => 'vertical',
       'justifyClasses' => array('text-align-left', 'text-align-center', 'text-align-right', 'text-align-justify'),
+      'entities' => FALSE,
     );
   }
 

@@ -7,6 +7,8 @@
 
 namespace Drupal\comment\Tests\Views;
 
+use Drupal\comment\Entity\Comment;
+use Drupal\user\Entity\User;
 use Drupal\views\Views;
 
 /**
@@ -30,6 +32,19 @@ class FilterUserUIDTest extends CommentTestBase {
     $view->setDisplay();
     $view->removeHandler('default', 'argument', 'uid_touch');
 
+    // Add an additional comment which is not created by the user.
+    $new_user = User::create(['name' => 'new user']);
+    $new_user->save();
+
+    $comment = Comment::create([
+      'uid' => $new_user->uid->value,
+      'entity_id' => $this->nodeUserCommented->id(),
+      'entity_type' => 'node',
+      'field_name' => 'comment',
+      'subject' => 'if a woodchuck could chuck wood.',
+    ]);
+    $comment->save();
+
     $options = array(
       'id' => 'uid_touch',
       'table' => 'node_field_data',
@@ -40,14 +55,14 @@ class FilterUserUIDTest extends CommentTestBase {
     $this->executeView($view, array($this->account->id()));
     $result_set = array(
       array(
-        'nid' => $this->node_user_posted->id(),
+        'nid' => $this->nodeUserPosted->id(),
       ),
       array(
-        'nid' => $this->node_user_commented->id(),
+        'nid' => $this->nodeUserCommented->id(),
       ),
     );
-    $this->column_map = array('nid' => 'nid');
-    $this->assertIdenticalResultset($view, $result_set, $this->column_map);
+    $column_map = array('nid' => 'nid');
+    $this->assertIdenticalResultset($view, $result_set, $column_map);
   }
 
 }

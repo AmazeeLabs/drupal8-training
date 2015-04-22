@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Tests\Plugin;
 
+use Drupal\views\Views;
+
 /**
  * Tests the views page display plugin as webtest.
  *
@@ -19,7 +21,7 @@ class DisplayPageWebTest extends PluginTestBase {
    *
    * @var array
    */
-  public static $testViews = array('test_page_display_arguments', 'test_page_display_menu');
+  public static $testViews = array('test_page_display', 'test_page_display_arguments', 'test_page_display_menu');
 
   /**
    * Modules to enable.
@@ -108,7 +110,7 @@ class DisplayPageWebTest extends PluginTestBase {
     $this->drupalPlaceBlock('system_menu_block:tools');
     $this->drupalGet('<front>');
 
-    $menu_link = $this->cssSelect('div.block-menu ul.menu a');
+    $menu_link = $this->cssSelect('nav.block-menu ul.menu a');
     $this->assertEqual((string) $menu_link[0], 'Test menu link');
 
     // Update the menu link.
@@ -117,8 +119,19 @@ class DisplayPageWebTest extends PluginTestBase {
     ], t('Save'));
 
     $this->drupalGet('<front>');
-    $menu_link = $this->cssSelect('div.block-menu ul.menu a');
+    $menu_link = $this->cssSelect('nav.block-menu ul.menu a');
     $this->assertEqual((string) $menu_link[0], 'New title');
+  }
+
+  /**
+   * Tests the title is not displayed in the output.
+   */
+  public function testTitleOutput() {
+    $this->drupalGet('test_page_display_200');
+
+    $view = Views::getView('test_page_display');
+    $xpath = $this->cssSelect('div.view:contains("' . $view->getTitle() . '")');
+    $this->assertFalse($xpath, 'The view title was not displayed in the view markup.');
   }
 
 }

@@ -68,7 +68,7 @@ function drupal_phpunit_register_extension_dirs(Composer\Autoload\ClassLoader $l
 }
 
 // Start with classes in known locations.
-$loader = require __DIR__ . '/../vendor/autoload.php';
+$loader = require __DIR__ . '/../../autoload.php';
 $loader->add('Drupal\\Tests', __DIR__);
 
 // Scan for arbitrary extension namespaces from core and contrib.
@@ -83,7 +83,6 @@ drupal_phpunit_register_extension_dirs($loader, $dirs);
 
 // Look into removing these later.
 define('REQUEST_TIME', (int) $_SERVER['REQUEST_TIME']);
-define('DRUPAL_ROOT', realpath(__DIR__ . '/../../'));
 
 // Set sane locale settings, to ensure consistent string, dates, times and
 // numbers handling.

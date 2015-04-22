@@ -7,33 +7,13 @@
 
 namespace Drupal\user;
 
+use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
  * Defines an interface for user entity storage classes.
  */
-interface UserStorageInterface {
-
-  /**
-   * Add any roles from the storage to the user.
-   *
-   * @param array $users
-   */
-  public function addRoles(array $users);
-
-  /**
-   * Save the user's roles.
-   *
-   * @param \Drupal\user\UserInterface $account
-   */
-  public function saveRoles(UserInterface $account);
-
-  /**
-   * Remove the roles of a user.
-   *
-   * @param array $uids
-   */
-  public function deleteUserRoles(array $uids);
+interface UserStorageInterface extends EntityStorageInterface{
 
   /**
    * Update the last login timestamp of the user.
@@ -51,5 +31,14 @@ interface UserStorageInterface {
    *   The last access timestamp.
    */
   public function updateLastAccessTimestamp(AccountInterface $account, $timestamp);
+
+  /**
+   * Delete role references.
+   *
+   * @param array $rids
+   *   The list of role IDs being deleted. The storage should
+   *   remove permission and user references to this role.
+   */
+  public function deleteRoleReferences(array $rids);
 
 }

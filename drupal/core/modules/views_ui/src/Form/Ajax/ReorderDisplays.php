@@ -7,7 +7,9 @@
 
 namespace Drupal\views_ui\Form\Ajax;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\views_ui\ViewUI;
 
 /**
@@ -33,13 +35,17 @@ class ReorderDisplays extends ViewsFormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    /** @var $view \Drupal\views\ViewStorageInterface */
+    /** @var $view \Drupal\views\ViewEntityInterface */
     $view = $form_state->get('view');
     $display_id = $form_state->get('display_id');
 
     $form['#title'] = $this->t('Reorder displays');
     $form['#section'] = 'reorder';
-    $form['#action'] = url('admin/structure/views/nojs/reorder-displays/' . $view->id() . '/' . $display_id);
+    $form['#action'] = $this->url('views_ui.form_reorder_displays', [
+      'js' => 'nojs',
+      'view' => $view->id(),
+      'display_id' => $display_id,
+    ]);
     $form['view'] = array(
       '#type' => 'value',
       '#value' => $view
@@ -115,11 +121,8 @@ class ReorderDisplays extends ViewsFormBase {
         ),
         'link' => array(
           '#type' => 'link',
-          '#title' => '<span>' . $this->t('Remove') . '</span>',
-          '#href' => 'javascript:void()',
-          '#options' => array(
-            'html' => TRUE,
-          ),
+          '#title' => String::format('<span>@text</span>', array('@text' => $this->t('Remove'))),
+          '#url' => Url::fromRoute('<none>'),
           '#attributes' => array(
             'id' => 'display-remove-link-' . $id,
             'class' => array('views-button-remove', 'display-remove-link'),

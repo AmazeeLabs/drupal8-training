@@ -8,10 +8,10 @@
 namespace Drupal\views\Plugin\views\row;
 
 use Drupal\Component\Utility\String;
-use Drupal\Core\DependencyInjection\Container;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\views\Entity\Render\EntityTranslationRenderTrait;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -25,6 +25,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * )
  */
 class EntityRow extends RowPluginBase {
+  use EntityTranslationRenderTrait;
 
   /**
    * The table the entity is using for storage.
@@ -53,13 +54,6 @@ class EntityRow extends RowPluginBase {
    * @var \Drupal\Core\Entity\EntityTypeInterface
    */
   protected $entityType;
-
-  /**
-   * The renderer to be used to render the entity row.
-   *
-   * @var \Drupal\views\Entity\Rendering\RendererBase
-   */
-  protected $renderer;
 
   /**
    * The entity manager.
@@ -98,7 +92,7 @@ class EntityRow extends RowPluginBase {
 
     $this->entityTypeId = $this->definition['entity_type'];
     $this->entityType = $this->entityManager->getDefinition($this->entityTypeId);
-    $this->base_table = $this->entityType->getBaseTable();
+    $this->base_table = $this->entityType->getDataTable() ?: $this->entityType->getBaseTable();
     $this->base_field = $this->entityType->getKey('id');
   }
 
@@ -110,16 +104,39 @@ class EntityRow extends RowPluginBase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function getEntityTypeId() {
+    return $this->entityType->id();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEntityManager() {
+    return $this->entityManager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getLanguageManager() {
+    return $this->languageManager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getView() {
+    return $this->view;
+  }
+
+  /**
    * Overrides Drupal\views\Plugin\views\row\RowPluginBase::defineOptions().
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
-
     $options['view_mode'] = array('default' => 'default');
-    // @todo Make the current language renderer the default as soon as we have a
-    //   translation language filter. See https://drupal.org/node/2161845.
-    $options['rendering_language'] = array('default' => 'translation_language_renderer');
-
     return $options;
   }
 
@@ -132,32 +149,8 @@ class EntityRow extends RowPluginBase {
     $form['view_mode'] = array(
       '#type' => 'select',
       '#options' => \Drupal::entityManager()->getViewModeOptions($this->entityTypeId),
-      '#title' => t('View mode'),
+      '#title' => $this->t('View mode'),
       '#default_value' => $this->options['view_mode'],
-    );
-
-    $options = $this->buildRenderingLanguageOptions();
-    $form['rendering_language'] = array(
-      '#type' => 'select',
-      '#options' => $options,
-      '#title' => t('Rendering language'),
-      '#default_value' => $this->options['rendering_language'],
-      '#access' => $this->languageManager->isMultilingual(),
-    );
-  }
-
-  /**
-   * Returns the available rendering strategies for language-aware entities.
-   *
-   * @return array
-   *   An array of available entity row renderers keyed by renderer identifiers.
-   */
-  protected function buildRenderingLanguageOptions() {
-    // @todo Consider making these plugins. See https://drupal.org/node/2173811.
-    return array(
-      'current_language_renderer' => $this->t('Current language'),
-      'default_language_renderer' => $this->t('Default language'),
-      'translation_language_renderer' => $this->t('Translation language'),
     );
   }
 
@@ -170,22 +163,8 @@ class EntityRow extends RowPluginBase {
       return String::checkPlain($options[$this->options['view_mode']]);
     }
     else {
-      return t('No view mode selected');
+      return $this->t('No view mode selected');
     }
-  }
-
-  /**
-   * Returns the current renderer.
-   *
-   * @return \Drupal\views\Entity\Render\RendererBase
-   *   The configured renderer.
-   */
-  protected function getRenderer() {
-    if (!isset($this->renderer)) {
-      $class = '\Drupal\views\Entity\Render\\' . Container::camelize($this->options['rendering_language']);
-      $this->renderer = new $class($this->view, $this->entityType);
-    }
-    return $this->renderer;
   }
 
   /**
@@ -193,7 +172,7 @@ class EntityRow extends RowPluginBase {
    */
   public function query() {
     parent::query();
-    $this->getRenderer()->query($this->view->getQuery());
+    $this->getEntityTranslationRenderer()->query($this->view->getQuery());
   }
 
   /**
@@ -202,7 +181,7 @@ class EntityRow extends RowPluginBase {
   public function preRender($result) {
     parent::preRender($result);
     if ($result) {
-      $this->getRenderer()->preRender($result);
+      $this->getEntityTranslationRenderer()->preRender($result);
     }
   }
 
@@ -210,7 +189,23 @@ class EntityRow extends RowPluginBase {
    * Overrides Drupal\views\Plugin\views\row\RowPluginBase::render().
    */
   public function render($row) {
-    return $this->getRenderer()->render($row);
+    return $this->getEntityTranslationRenderer()->render($row);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    $dependencies = parent::calculateDependencies();
+
+    $view_mode = $this->entityManager
+      ->getStorage('entity_view_mode')
+      ->load($this->entityTypeId . '.' . $this->options['view_mode']);
+    if ($view_mode) {
+      $dependencies[$view_mode->getConfigDependencyKey()][] = $view_mode->getConfigDependencyName();
+    }
+
+    return $dependencies;
   }
 
 }

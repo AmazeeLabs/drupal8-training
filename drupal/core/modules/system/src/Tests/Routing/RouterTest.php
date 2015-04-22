@@ -8,6 +8,7 @@
 namespace Drupal\system\Tests\Routing;
 
 use Drupal\simpletest\WebTestBase;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 /**
  * Functional class for the full integrated routing system.
@@ -24,17 +25,19 @@ class RouterTest extends WebTestBase {
   public static $modules = array('block', 'router_test');
 
   /**
-   * Confirms that the router can get to a controller.
-   */
-  public function testCanRoute() {
-    $this->drupalGet('router_test/test1');
-    $this->assertRaw('test1', 'The correct string was returned because the route was successful.');
-  }
-
-  /**
    * Confirms that our default controller logic works properly.
    */
   public function testDefaultController() {
+    // Confirm that the router can get to a controller.
+    $this->drupalGet('router_test/test1');
+    $this->assertRaw('test1', 'The correct string was returned because the route was successful.');
+
+    // Check expected headers from FinishResponseSubscriber.
+    $headers = $this->drupalGetHeaders();
+    $this->assertEqual($headers['x-ua-compatible'], 'IE=edge');
+    $this->assertEqual($headers['content-language'], 'en');
+    $this->assertEqual($headers['x-content-type-options'], 'nosniff');
+
     $this->drupalGet('router_test/test2');
     $this->assertRaw('test2', 'The correct string was returned because the route was successful.');
 
@@ -189,9 +192,18 @@ class RouterTest extends WebTestBase {
   /**
    * Tests that routes no longer exist for a module that has been uninstalled.
    */
-  public function testRouterUninstall() {
-    \Drupal::moduleHandler()->uninstall(array('router_test'));
-    $route_count = \Drupal::database()->query('SELECT COUNT(*) FROM {router} WHERE name = :route_name', array(':route_name' => 'router_test.1'))->fetchField();
-    $this->assertEqual(0, $route_count, 'All router_test routes have been removed on uninstall.');
+  public function testRouterUninstallInstall() {
+    \Drupal::service('module_installer')->uninstall(array('router_test'));
+    try {
+      \Drupal::service('router.route_provider')->getRouteByName('router_test.1');
+      $this->fail('Route was delete on uninstall.');
+    }
+    catch (RouteNotFoundException $e) {
+      $this->pass('Route was delete on uninstall.');
+    }
+    // Install the module again.
+    \Drupal::service('module_installer')->install(array('router_test'));
+    $route = \Drupal::service('router.route_provider')->getRouteByName('router_test.1');
+    $this->assertNotNull($route, 'Route exists after module installation');
   }
 }

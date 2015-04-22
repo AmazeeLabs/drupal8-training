@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\views\wizard;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\UrlGeneratorTrait;
 use Drupal\views\Entity\View;
 use Drupal\views\Views;
 use Drupal\views_ui\ViewUI;
@@ -37,6 +38,8 @@ use Drupal\views\Plugin\views\wizard\WizardInterface;
  * base table.
  */
 abstract class WizardPluginBase extends PluginBase implements WizardInterface {
+
+  use UrlGeneratorTrait;
 
   /**
    * The base table connected with the wizard.
@@ -75,20 +78,6 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    * @var string
    */
   protected $createdColumn;
-
-  /**
-   * A views item configuration array used for a jump-menu field.
-   *
-   * @var array
-   */
-  protected $pathField = array();
-
-  /**
-   * Additional fields required to generate the pathField.
-   *
-   * @var array
-   */
-  protected $pathFieldsSupplemental = array();
 
   /**
    * Views items configuration arrays for filters added by the wizard.
@@ -135,7 +124,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $entity_types = \Drupal::entityManager()->getDefinitions();
     foreach ($entity_types as $entity_type_id => $entity_type) {
-      if ($this->base_table == $entity_type->getBaseTable()) {
+      if ($this->base_table == $entity_type->getBaseTable() || $this->base_table == $entity_type->getDataTable()) {
         $this->entityType = $entity_type;
         $this->entityTypeId = $entity_type_id;
       }
@@ -150,30 +139,6 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    */
   public function getCreatedColumn() {
     return $this->createdColumn;
-  }
-
-  /**
-   * Gets the pathField property.
-   *
-   * @return array
-   *   The pathField array.
-   *
-   * @todo Rename this to be something about jump menus, and/or resolve this
-   *   dependency.
-   */
-  public function getPathField() {
-    return $this->pathField;
-  }
-
-  /**
-   * Gets the pathFieldsSupplemental property.
-   *
-   * @return array()
-   *
-   * @todo Rename this to be something about jump menus, and/or remove this.
-   */
-  public function getPathFieldsSupplemental() {
-    return $this->pathFieldsSupplemental;
   }
 
   /**
@@ -218,7 +183,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
   public function buildForm(array $form, FormStateInterface $form_state) {
     $style_options = Views::fetchPluginNames('style', 'normal', array($this->base_table));
     $feed_row_options = Views::fetchPluginNames('row', 'feed', array($this->base_table));
-    $path_prefix = url(NULL, array('absolute' => TRUE));
+    $path_prefix = $this->url('<none>', [], ['absolute' => TRUE]);
 
     // Add filters and sorts which apply to the view as a whole.
     $this->buildFilters($form, $form_state);
@@ -226,12 +191,12 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $form['displays']['page'] = array(
       '#type' => 'fieldset',
-      '#title' => t('Page settings'),
+      '#title' => $this->t('Page settings'),
       '#attributes' => array('class' => array('views-attachment', 'fieldset-no-legend')),
       '#tree' => TRUE,
     );
     $form['displays']['page']['create'] = array(
-      '#title' => t('Create a page'),
+      '#title' => $this->t('Create a page'),
       '#type' => 'checkbox',
       '#attributes' => array('class' => array('strong')),
       '#default_value' => FALSE,
@@ -254,12 +219,12 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     );
 
     $form['displays']['page']['options']['title'] = array(
-      '#title' => t('Page title'),
+      '#title' => $this->t('Page title'),
       '#type' => 'textfield',
       '#maxlength' => 255,
     );
     $form['displays']['page']['options']['path'] = array(
-      '#title' => t('Path'),
+      '#title' => $this->t('Path'),
       '#type' => 'textfield',
       '#field_prefix' => $path_prefix,
       // Account for the leading backslash.
@@ -267,13 +232,13 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     );
     $form['displays']['page']['options']['style'] = array(
       '#type' => 'fieldset',
-      '#title' => t('Page display settings'),
+      '#title' => $this->t('Page display settings'),
       '#attributes' => array('class' => array('container-inline', 'fieldset-no-legend')),
     );
 
     // Create the dropdown for choosing the display format.
     $form['displays']['page']['options']['style']['style_plugin'] = array(
-      '#title' => t('Display format'),
+      '#title' => $this->t('Display format'),
       '#type' => 'select',
       '#options' => $style_options,
     );
@@ -285,18 +250,18 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $this->buildFormStyle($form, $form_state, 'page');
     $form['displays']['page']['options']['items_per_page'] = array(
-      '#title' => t('Items to display'),
+      '#title' => $this->t('Items to display'),
       '#type' => 'number',
       '#default_value' => 10,
       '#min' => 0,
     );
     $form['displays']['page']['options']['pager'] = array(
-      '#title' => t('Use a pager'),
+      '#title' => $this->t('Use a pager'),
       '#type' => 'checkbox',
       '#default_value' => TRUE,
     );
     $form['displays']['page']['options']['link'] = array(
-      '#title' => t('Create a menu link'),
+      '#title' => $this->t('Create a menu link'),
       '#type' => 'checkbox',
       '#id' => 'edit-page-link',
     );
@@ -317,22 +282,22 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       // These are not yet translated.
       $menu_options = menu_list_system_menus();
       foreach ($menu_options as $name => $title) {
-        $menu_options[$name] = t($title);
+        $menu_options[$name] = $this->t($title);
       }
     }
     $form['displays']['page']['options']['link_properties']['menu_name'] = array(
-      '#title' => t('Menu'),
+      '#title' => $this->t('Menu'),
       '#type' => 'select',
       '#options' => $menu_options,
     );
     $form['displays']['page']['options']['link_properties']['title'] = array(
-      '#title' => t('Link text'),
+      '#title' => $this->t('Link text'),
       '#type' => 'textfield',
     );
     // Only offer a feed if we have at least one available feed row style.
     if ($feed_row_options) {
       $form['displays']['page']['options']['feed'] = array(
-        '#title' => t('Include an RSS feed'),
+        '#title' => $this->t('Include an RSS feed'),
         '#type' => 'checkbox',
         '#id' => 'edit-page-feed',
       );
@@ -347,7 +312,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
         '#suffix' => '</div>',
       );
       $form['displays']['page']['options']['feed_properties']['path'] = array(
-        '#title' => t('Feed path'),
+        '#title' => $this->t('Feed path'),
         '#type' => 'textfield',
         '#field_prefix' => $path_prefix,
         // Account for the leading backslash.
@@ -355,7 +320,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       );
       // This will almost never be visible.
       $form['displays']['page']['options']['feed_properties']['row_plugin'] = array(
-        '#title' => t('Feed row style'),
+        '#title' => $this->t('Feed row style'),
         '#type' => 'select',
         '#options' => $feed_row_options,
         '#default_value' => key($feed_row_options),
@@ -374,12 +339,12 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     if (\Drupal::moduleHandler()->moduleExists('block')) {
       $form['displays']['block'] = array(
         '#type' => 'fieldset',
-        '#title' => t('Block settings'),
+        '#title' => $this->t('Block settings'),
         '#attributes' => array('class' => array('views-attachment', 'fieldset-no-legend')),
         '#tree' => TRUE,
       );
       $form['displays']['block']['create'] = array(
-        '#title' => t('Create a block'),
+        '#title' => $this->t('Create a block'),
         '#type' => 'checkbox',
         '#attributes' => array('class' => array('strong')),
         '#id' => 'edit-block-create',
@@ -402,19 +367,19 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       );
 
       $form['displays']['block']['options']['title'] = array(
-        '#title' => t('Block title'),
+        '#title' => $this->t('Block title'),
         '#type' => 'textfield',
         '#maxlength' => 255,
       );
       $form['displays']['block']['options']['style'] = array(
         '#type' => 'fieldset',
-        '#title' => t('Block display settings'),
+        '#title' => $this->t('Block display settings'),
         '#attributes' => array('class' => array('container-inline', 'fieldset-no-legend')),
       );
 
       // Create the dropdown for choosing the display format.
       $form['displays']['block']['options']['style']['style_plugin'] = array(
-        '#title' => t('Display format'),
+        '#title' => $this->t('Display format'),
         '#type' => 'select',
         '#options' => $style_options,
       );
@@ -426,13 +391,13 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
       $this->buildFormStyle($form, $form_state, 'block');
       $form['displays']['block']['options']['items_per_page'] = array(
-        '#title' => t('Items per block'),
+        '#title' => $this->t('Items per block'),
         '#type' => 'number',
         '#default_value' => 5,
         '#min' => 0,
       );
       $form['displays']['block']['options']['pager'] = array(
-        '#title' => t('Use a pager'),
+        '#title' => $this->t('Use a pager'),
         '#type' => 'checkbox',
         '#default_value' => FALSE,
       );
@@ -442,12 +407,12 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     if (\Drupal::moduleHandler()->moduleExists('rest')) {
       $form['displays']['rest_export'] = array(
         '#type' => 'fieldset',
-        '#title' => t('REST export settings'),
+        '#title' => $this->t('REST export settings'),
         '#attributes' => array('class' => array('views-attachment', 'fieldset-no-legend')),
         '#tree' => TRUE,
       );
       $form['displays']['rest_export']['create'] = array(
-        '#title' => t('Provide a REST export'),
+        '#title' => $this->t('Provide a REST export'),
         '#type' => 'checkbox',
         '#attributes' => array('class' => array('strong')),
         '#id' => 'edit-rest-export-create',
@@ -470,7 +435,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       );
 
       $form['displays']['rest_export']['options']['path'] = array(
-        '#title' => t('REST export path'),
+        '#title' => $this->t('REST export path'),
         '#type' => 'textfield',
         '#field_prefix' => $path_prefix,
         // Account for the leading backslash.
@@ -579,7 +544,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       $options = $this->rowStyleOptions();
       $style_form['row_plugin'] = array(
         '#type' => 'select',
-        '#title' => t('of'),
+        '#title' => $this->t('of'),
         '#options' => $options,
         '#access' => count($options) > 1,
       );
@@ -598,7 +563,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       );
     }
     elseif ($style_plugin->usesFields()) {
-      $style_form['row_plugin'] = array('#markup' => '<span>' . t('of fields') . '</span>');
+      $style_form['row_plugin'] = array('#markup' => '<span>' . $this->t('of fields') . '</span>');
     }
   }
 
@@ -627,13 +592,13 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     // If the current base table support bundles and has more than one (like user).
     if (!empty($bundles) && $this->entityType && $this->entityType->hasKey('bundle')) {
       // Get all bundles and their human readable names.
-      $options = array('all' => t('All'));
+      $options = array('all' => $this->t('All'));
       foreach ($bundles as $type => $bundle) {
         $options[$type] = $bundle['label'];
       }
       $form['displays']['show']['type'] = array(
         '#type' => 'select',
-        '#title' => t('of type'),
+        '#title' => $this->t('of type'),
         '#options' => $options,
       );
       $selected_bundle = static::getSelected($form_state, array('show', 'type'), 'all', $form['displays']['show']['type']);
@@ -652,14 +617,14 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    */
   protected function buildSorts(&$form, FormStateInterface $form_state) {
     $sorts = array(
-      'none' => t('Unsorted'),
+      'none' => $this->t('Unsorted'),
     );
     // Check if we are allowed to sort by creation date.
     $created_column = $this->getCreatedColumn();
     if ($created_column) {
       $sorts += array(
-        $created_column . ':DESC' => t('Newest first'),
-        $created_column . ':ASC' => t('Oldest first'),
+        $created_column . ':DESC' => $this->t('Newest first'),
+        $created_column . ':ASC' => $this->t('Oldest first'),
       );
     }
     if ($available_sorts = $this->getAvailableSorts()) {
@@ -670,7 +635,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     if (!empty($sorts)) {
       $form['displays']['show']['sort'] = array(
         '#type' => 'select',
-        '#title' => t('sorted by'),
+        '#title' => $this->t('sorted by'),
         '#options' => $sorts,
         '#default_value' => isset($created_column) ? $created_column . ':DESC' : 'none',
       );
@@ -690,7 +655,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       'label' => $form_state->getValue('label'),
       'description' => $form_state->getValue('description'),
       'base_table' => $this->base_table,
-      'langcode' => language_default()->id,
+      'langcode' => \Drupal::languageManager()->getDefaultLanguage()->getId(),
     );
 
     $view = entity_create('view', $values);
@@ -840,16 +805,21 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     // Add default options array to each plugin type.
     foreach ($display_options as &$options) {
       $options['options'] = array();
-      $options['provider'] = 'views';
-      $options['dependencies'] = array();
     }
 
     // Add a least one field so the view validates and the user has a preview.
     // The base field can provide a default in its base settings; otherwise,
     // choose the first field with a field handler.
-    $data = Views::viewsData()->get($this->base_table);
+    $default_table = $this->base_table;
+    $data = Views::viewsData()->get($default_table);
     if (isset($data['table']['base']['defaults']['field'])) {
       $default_field = $data['table']['base']['defaults']['field'];
+      // If the table for the default field is different to the base table,
+      // load the view table data for this table.
+      if (isset($data['table']['base']['defaults']['table']) && $data['table']['base']['defaults']['table'] != $default_table) {
+        $default_table = $data['table']['base']['defaults']['table'];
+        $data = Views::viewsData()->get($default_table);
+      }
     }
     else {
       foreach ($data as $default_field => $field_data) {
@@ -858,18 +828,16 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
         }
       }
     }
+    // @todo refactor the code to use ViewExecutable::addHandler, see
+    //   https://drupal.org/node/2383157
     $display_options['fields'][$default_field] = array(
-      'table' => $this->base_table,
+      'table' => $default_table,
       'field' => $default_field,
       'id' => $default_field,
+      'entity_type' => isset($data[$default_field]['entity type']) ? $data[$default_field]['entity type'] : NULL,
+      'entity_field' => isset($data[$default_field]['entity field']) ? $data[$default_field]['entity field'] : NULL,
+      'plugin_id' => $data[$default_field]['field']['id'],
     );
-
-    // Load the plugin ID and module.
-    $base_field = $data['table']['base']['field'];
-    $display_options['fields'][$base_field]['plugin_id'] = $data[$base_field]['field']['id'];
-    if ($definition = Views::pluginManager('field')->getDefinition($display_options['fields'][$base_field]['plugin_id'], FALSE)) {
-      $display_options['fields'][$base_field]['provider'] = isset($definition['provider']) ? $definition['provider'] : 'views';
-    }
 
     return $display_options;
   }
@@ -953,6 +921,9 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
         'table' => $table,
         'field' => $bundle_key,
         'value' => $value,
+        'entity_type' => isset($table_data['table']['entity type']) ? $table_data['table']['entity type'] : NULL,
+        'entity_field' => isset($table_data[$bundle_key]['entity field']) ? $table_data[$bundle_key]['entity field'] : NULL,
+        'plugin_id' => $handler,
       );
     }
 
@@ -1029,6 +1000,9 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
           'table' => $table,
           'field' => $column,
           'order' => $sort,
+          'entity_type' => isset($data['table']['entity type']) ? $data['table']['entity type'] : NULL,
+          'entity_field' => isset($data[$column]['entity field']) ? $data[$column]['entity field'] : NULL,
+          'plugin_id' => $data[$column]['sort']['id'],
        );
       }
     }
@@ -1160,11 +1134,11 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    * @param array $options
    *   An array whose keys are the name of each option and whose values are the
    *   desired values to set.
-   * @param \Drupal\views\View\plugin\display\DisplayPluginBase $display
+   * @param \Drupal\views\Plugin\views\display\DisplayPluginBase $display
    *   The display handler which the options will be applied to. The default
    *   display will actually be assigned the options (and this display will
    *   inherit them) when possible.
-   * @param \Drupal\views\View\plugin\display\DisplayPluginBase $default_display
+   * @param \Drupal\views\Plugin\views\display\DisplayPluginBase $default_display
    *   The default display handler, which will store the options when possible.
    */
   protected function setDefaultOptions($options, DisplayPluginBase $display, DisplayPluginBase $default_display) {
@@ -1196,11 +1170,11 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    * @param array $options
    *   An array whose keys are the name of each option and whose values are the
    *   desired values to set.
-   * @param \Drupal\views\View\plugin\display\DisplayPluginBase $display
+   * @param \Drupal\views\Plugin\views\display\DisplayPluginBase $display
    *   The display handler which the options will be applied to. The default
    *   display will actually be assigned the options (and this display will
    *   inherit them) when possible.
-   * @param \Drupal\views\View\plugin\display\DisplayPluginBase $default_display
+   * @param \Drupal\views\Plugin\views\display\DisplayPluginBase $default_display
    *   The default display handler, which will store the options when possible.
    */
   protected function setOverrideOptions(array $options, DisplayPluginBase $display, DisplayPluginBase $default_display) {

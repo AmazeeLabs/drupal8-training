@@ -7,6 +7,7 @@
 
 namespace Drupal\node\Plugin\views\field;
 
+use Drupal\Core\Url;
 use Drupal\node\Plugin\views\field\Link;
 use Drupal\views\ResultRow;
 
@@ -37,10 +38,10 @@ class LinkEdit extends Link {
     }
 
     $this->options['alter']['make_link'] = TRUE;
-    $this->options['alter']['path'] = "node/" . $node->id() . "/edit";
+    $this->options['alter']['url'] = $node->urlInfo('edit-form');
     $this->options['alter']['query'] = drupal_get_destination();
 
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('Edit');
+    $text = !empty($this->options['text']) ? $this->options['text'] : $this->t('Edit');
     return $text;
   }
 

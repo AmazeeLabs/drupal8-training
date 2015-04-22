@@ -5,6 +5,8 @@
 
 namespace Drupal\rest\Tests;
 
+use Drupal\Core\Url;
+
 /**
  * Tests the CSRF protection.
  *
@@ -13,7 +15,7 @@ namespace Drupal\rest\Tests;
 class CsrfTest extends RESTTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -59,9 +61,6 @@ class CsrfTest extends RESTTestBase {
    * Tests that CSRF check is not triggered for Basic Auth requests.
    */
   public function testBasicAuth() {
-    // Login so the session cookie is sent in addition to the basic auth header.
-    $this->drupalLogin($this->account);
-
     $curl_options = $this->getCurlOptions();
     $curl_options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
     $curl_options[CURLOPT_USERPWD] = $this->account->getUsername() . ':' . $this->account->pass_raw;
@@ -107,7 +106,7 @@ class CsrfTest extends RESTTestBase {
       CURLOPT_HTTPGET => FALSE,
       CURLOPT_POST => TRUE,
       CURLOPT_POSTFIELDS => $this->serialized,
-      CURLOPT_URL => url('entity/' . $this->testEntityType, array('absolute' => TRUE)),
+      CURLOPT_URL => Url::fromRoute('rest.entity.' . $this->testEntityType . '.POST')->setAbsolute()->toString(),
       CURLOPT_NOBODY => FALSE,
       CURLOPT_HTTPHEADER => array(
         "Content-Type: {$this->defaultMimeType}",

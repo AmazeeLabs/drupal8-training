@@ -20,7 +20,7 @@ class FieldInstancePerViewMode extends ViewModeBase {
   /**
    * {@inheritdoc}
    */
-  protected function runQuery() {
+  protected function initializeIterator() {
     $rows = array();
     $result = $this->prepareQuery()->execute();
     while ($field_row = $result->fetchAssoc()) {
@@ -31,7 +31,7 @@ class FieldInstancePerViewMode extends ViewModeBase {
       $field_name = $field_row['field_name'];
 
       foreach ($this->getViewModes() as $view_mode) {
-        if (isset($field_row['display_settings'][$view_mode]) && !$field_row['display_settings'][$view_mode]['exclude']) {
+        if (isset($field_row['display_settings'][$view_mode]) && empty($field_row['display_settings'][$view_mode]['exclude'])) {
           $index = $view_mode . "." . $bundle . "." . $field_name;
           $rows[$index]['entity_type'] = 'node';
           $rows[$index]['view_mode'] = $view_mode;
@@ -39,7 +39,7 @@ class FieldInstancePerViewMode extends ViewModeBase {
           $rows[$index]['field_name'] = $field_name;
           $rows[$index]['type'] = $field_row['type'];
           $rows[$index]['module'] = $field_row['module'];
-          $rows[$index]['weight'] = $field_row['display_settings']['weight'];
+          $rows[$index]['weight'] = $field_row['weight'];
           $rows[$index]['label'] = $field_row['display_settings']['label']['format'];
           $rows[$index]['display_settings'] = $field_row['display_settings'][$view_mode];
           $rows[$index]['widget_settings'] = $field_row['widget_settings'];
@@ -68,7 +68,7 @@ class FieldInstancePerViewMode extends ViewModeBase {
         'module',
     ));
     $query->join('content_node_field', 'cnf', 'cnfi.field_name = cnf.field_name');
-    $query->orderBy('type_name');
+    $query->orderBy('weight');
 
     return $query;
   }

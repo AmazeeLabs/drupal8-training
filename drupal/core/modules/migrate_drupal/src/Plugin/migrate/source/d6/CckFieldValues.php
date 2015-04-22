@@ -10,6 +10,7 @@ namespace Drupal\migrate_drupal\Plugin\migrate\source\d6;
 use Drupal\migrate\Plugin\SourceEntityInterface;
 use Drupal\migrate\Row;
 use Drupal\migrate_drupal\Plugin\migrate\source\DrupalSqlBase;
+use Drupal\migrate_drupal\Plugin\CckFieldMigrateSourceInterface;
 
 
 /**
@@ -19,7 +20,7 @@ use Drupal\migrate_drupal\Plugin\migrate\source\DrupalSqlBase;
  *   id = "d6_cck_field_values"
  * )
  */
-class CckFieldValues extends DrupalSqlBase implements SourceEntityInterface {
+class CckFieldValues extends DrupalSqlBase implements SourceEntityInterface, CckFieldMigrateSourceInterface {
 
   /**
    * The join options between the node and the node_revisions table.
@@ -105,12 +106,20 @@ class CckFieldValues extends DrupalSqlBase implements SourceEntityInterface {
           }
         }
       }
-      if ($results = $query->execute()->fetchAssoc()) {
-        $source = $row->getSource();
-        // We diff the results because the extra will be all the field columns.
-        $new_fields = array_diff($results, $source);
-        foreach ($new_fields as $key => $value) {
-          $row->setSourceProperty($key, $value);
+
+      // The $query only contains single value CCK fields and so when the only
+      // CCK field attached to a content type is a multi-valued CCK field then
+      // this query would be invalid. Checking the count tells us if any single
+      // fields have been added the query.
+      if (count($query->getFields())) {
+        if ($results = $query->execute()->fetchAssoc()) {
+          $source = $row->getSource();
+          // We diff the results with the source to find any field columns
+          // in the content type's main table.
+          $new_fields = array_diff_key($results, $source);
+          foreach ($new_fields as $key => $value) {
+            $row->setSourceProperty($key, $value);
+          }
         }
       }
     }
@@ -251,6 +260,16 @@ class CckFieldValues extends DrupalSqlBase implements SourceEntityInterface {
       $fields[$field_name] = $field_data['label'];
     }
     return $fields;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function fieldData() {
+    $field_info = $this->getSourceFieldInfo($this->configuration['bundle']);
+    $field_info['nid'] = ['type' => 'number'];
+    $field_info['type'] = ['type' => 'varchar'];
+    return $field_info;
   }
 
   /**

@@ -32,6 +32,8 @@ class UpdateScriptTest extends WebTestBase {
     parent::setUp();
     $this->update_url = $GLOBALS['base_url'] . '/update.php';
     $this->update_user = $this->drupalCreateUser(array('administer software updates', 'access site in maintenance mode'));
+    // Make sure updates for new entity type definitions are processed.
+    \Drupal::service('entity.definition_update_manager')->applyUpdates();
   }
 
   /**
@@ -55,7 +57,7 @@ class UpdateScriptTest extends WebTestBase {
     $this->assertResponse(200);
 
     // Access the update page as user 1.
-    $this->drupalLogin($this->root_user);
+    $this->drupalLogin($this->rootUser);
     $this->drupalGet($this->update_url, array('external' => TRUE));
     $this->assertResponse(200);
   }
@@ -64,7 +66,7 @@ class UpdateScriptTest extends WebTestBase {
    * Tests that requirements warnings and errors are correctly displayed.
    */
   function testRequirements() {
-    $update_script_test_config = \Drupal::config('update_script_test.settings');
+    $update_script_test_config = $this->config('update_script_test.settings');
     $this->drupalLogin($this->update_user);
 
     // If there are no requirements warnings or errors, we expect to be able to
@@ -120,10 +122,10 @@ class UpdateScriptTest extends WebTestBase {
     // Since visiting update.php triggers a rebuild of the theme system from an
     // unusual maintenance mode environment, we check that this rebuild did not
     // put any incorrect information about the themes into the database.
-    $original_theme_data = \Drupal::config('core.extension')->get('theme');
+    $original_theme_data = $this->config('core.extension')->get('theme');
     $this->drupalLogin($this->update_user);
     $this->drupalGet($this->update_url, array('external' => TRUE));
-    $final_theme_data = \Drupal::config('core.extension')->get('theme');
+    $final_theme_data = $this->config('core.extension')->get('theme');
     $this->assertEqual($original_theme_data, $final_theme_data, 'Visiting update.php does not alter the information about themes stored in the database.');
   }
 

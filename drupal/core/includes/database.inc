@@ -246,7 +246,9 @@ use Drupal\Core\Site\Settings;
  * @param $query
  *   The prepared statement query to run. Although it will accept both named and
  *   unnamed placeholders, named placeholders are strongly preferred as they are
- *   more self-documenting.
+ *   more self-documenting. If the argument corresponding to a placeholder is
+ *   an array of values to be expanded, e.g. for an IN query, the placeholder
+ *   should be named with a trailing bracket like :example[]
  * @param $args
  *   An array of values to substitute into the query. If the query uses named
  *   placeholders, this is an associative array in any order. If the query uses
@@ -427,9 +429,9 @@ function db_truncate($table, array $options = array()) {
  *   The base table for this query. May be a string or another SelectQuery
  *   object. If a query object is passed, it will be used as a subselect.
  * @param $alias
- *   The alias for the base table of this query.
+ *   (optional) The alias for the base table of this query.
  * @param $options
- *   An array of options to control how the query operates.
+ *   (optional) An array of options to control how the query operates.
  *
  * @return \Drupal\Core\Database\Query\Select
  *   A new Select object for this connection.
@@ -735,23 +737,6 @@ function _db_create_keys_sql($spec) {
  */
 function db_rename_table($table, $new_name) {
   return Database::getConnection()->schema()->renameTable($table, $new_name);
-}
-
-/**
- * Copies the structure of a table.
- *
- * @param string $source
- *   The name of the table to be copied.
- * @param string $destination
- *   The name for the new table.
- *
- * @return \Drupal\Core\Database\StatementInterface
- *   The result of the executed query.
- *
- * @see \Drupal\Core\Database\Schema::copyTable()
- */
-function db_copy_table_schema($source, $destination) {
-  return Database::getConnection()->schema()->copyTable($source, $destination);
 }
 
 /**

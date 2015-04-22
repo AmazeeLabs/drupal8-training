@@ -9,8 +9,9 @@ namespace Drupal\Core\Entity\Controller;
 
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Render\RendererInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -26,13 +27,23 @@ class EntityViewController implements ContainerInjectionInterface {
   protected $entityManager;
 
   /**
+   * The renderer service.
+   *
+   * @var \Drupal\Core\Render\RendererInterface
+   */
+  protected $renderer;
+
+  /**
    * Creates an EntityViewController object.
    *
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The renderer service.
    */
-  public function __construct(EntityManagerInterface $entity_manager) {
+  public function __construct(EntityManagerInterface $entity_manager, RendererInterface $renderer) {
     $this->entityManager = $entity_manager;
+    $this->renderer = $renderer;
   }
 
   /**
@@ -40,7 +51,8 @@ class EntityViewController implements ContainerInjectionInterface {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity.manager')
+      $container->get('entity.manager'),
+      $container->get('renderer')
     );
   }
 
@@ -70,7 +82,7 @@ class EntityViewController implements ContainerInjectionInterface {
     // rendered title field formatter as the page title instead of the default
     // plain text title. This allows attributes set on the field to propagate
     // correctly (e.g. RDFa, in-place editing).
-    if ($_entity instanceof ContentEntityInterface) {
+    if ($_entity instanceof FieldableEntityInterface) {
       $label_field = $_entity->getEntityType()->getKey('label');
       if ($label_field && $_entity->getFieldDefinition($label_field)->getDisplayOptions('view')) {
         // We must render the label field, because rendering the entity may be
@@ -79,7 +91,7 @@ class EntityViewController implements ContainerInjectionInterface {
         $build = $this->entityManager->getTranslationFromContext($_entity)
           ->get($label_field)
           ->view($view_mode);
-        $page['#title'] = drupal_render($build, TRUE);
+        $page['#title'] = $this->renderer->render($build);
       }
     }
 

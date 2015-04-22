@@ -22,7 +22,7 @@ class StatisticsReportsTest extends StatisticsTestBase {
     $this->container->get('plugin.manager.block')->clearCachedDefinitions();
 
     // Visit a node to have something show up in the block.
-    $node = $this->drupalCreateNode(array('type' => 'page', 'uid' => $this->blocking_user->id()));
+    $node = $this->drupalCreateNode(array('type' => 'page', 'uid' => $this->blockingUser->id()));
     $this->drupalGet('node/' . $node->id());
     // Manually calling statistics.php, simulating ajax behavior.
     $nid = $node->id();
@@ -49,7 +49,7 @@ class StatisticsReportsTest extends StatisticsTestBase {
     $this->assertText('All time', 'Found the all time popular content.');
     $this->assertText('Last viewed', 'Found the last viewed popular content.');
 
-    $this->assertRaw(l($node->label(), 'node/' . $node->id()), 'Found link to visited node.');
+    $this->assertRaw(\Drupal::l($node->label(), $node->urlInfo()), 'Found link to visited node.');
   }
 
 }

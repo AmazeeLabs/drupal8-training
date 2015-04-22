@@ -9,12 +9,13 @@ namespace Drupal\comment;
 
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Database\Connection;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -45,9 +46,11 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
    *   Cache backend instance to use.
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current user.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    */
-  public function __construct(EntityTypeInterface $entity_info, Connection $database, EntityManagerInterface $entity_manager, AccountInterface $current_user, CacheBackendInterface $cache) {
-    parent::__construct($entity_info, $database, $entity_manager, $cache);
+  public function __construct(EntityTypeInterface $entity_info, Connection $database, EntityManagerInterface $entity_manager, AccountInterface $current_user, CacheBackendInterface $cache, LanguageManagerInterface $language_manager) {
+    parent::__construct($entity_info, $database, $entity_manager, $cache, $language_manager);
     $this->currentUser = $current_user;
   }
 
@@ -60,7 +63,8 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
       $container->get('database'),
       $container->get('entity.manager'),
       $container->get('current_user'),
-      $container->get('cache.entity')
+      $container->get('cache.entity'),
+      $container->get('language_manager')
     );
   }
 
@@ -131,7 +135,7 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
   /**
    * {@inheritdoc}
    */
-  public function getNewCommentPageNumber($total_comments, $new_comments, ContentEntityInterface $entity, $field_name = 'comment') {
+  public function getNewCommentPageNumber($total_comments, $new_comments, FieldableEntityInterface $entity, $field_name = 'comment') {
     $field = $entity->getFieldDefinition($field_name);
     $comments_per_page = $field->getSetting('per_page');
 
@@ -195,7 +199,7 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
   public function getChildCids(array $comments) {
     return $this->database->select('comment_field_data', 'c')
       ->fields('c', array('cid'))
-      ->condition('pid', array_keys($comments))
+      ->condition('pid', array_keys($comments), 'IN')
       ->condition('default_langcode', 1)
       ->execute()
       ->fetchCol();
@@ -260,13 +264,6 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
    */
   public function loadThread(EntityInterface $entity, $field_name, $mode, $comments_per_page = 0, $pager_id = 0) {
     $query = $this->database->select('comment_field_data', 'c');
-    if ($comments_per_page) {
-      $query = $query->extend('Drupal\Core\Database\Query\PagerSelectExtender')
-        ->limit($comments_per_page);
-      if ($pager_id) {
-        $query->element($pager_id);
-      }
-    }
     $query->addField('c', 'cid');
     $query
       ->condition('c.entity_id', $entity->id())
@@ -279,22 +276,33 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
       ->addMetaData('entity', $entity)
       ->addMetaData('field_name', $field_name);
 
-    $count_query = $this->database->select('comment_field_data', 'c');
-    $count_query->addExpression('COUNT(*)');
-    $count_query
-      ->condition('c.entity_id', $entity->id())
-      ->condition('c.entity_type', $entity->getEntityTypeId())
-      ->condition('c.field_name', $field_name)
-      ->condition('c.default_langcode', 1)
-      ->addTag('entity_access')
-      ->addTag('comment_filter')
-      ->addMetaData('base_table', 'comment')
-      ->addMetaData('entity', $entity)
-      ->addMetaData('field_name', $field_name);
+    if ($comments_per_page) {
+      $query = $query->extend('Drupal\Core\Database\Query\PagerSelectExtender')
+        ->limit($comments_per_page);
+      if ($pager_id) {
+        $query->element($pager_id);
+      }
+
+      $count_query = $this->database->select('comment_field_data', 'c');
+      $count_query->addExpression('COUNT(*)');
+      $count_query
+        ->condition('c.entity_id', $entity->id())
+        ->condition('c.entity_type', $entity->getEntityTypeId())
+        ->condition('c.field_name', $field_name)
+        ->condition('c.default_langcode', 1)
+        ->addTag('entity_access')
+        ->addTag('comment_filter')
+        ->addMetaData('base_table', 'comment')
+        ->addMetaData('entity', $entity)
+        ->addMetaData('field_name', $field_name);
+      $query->setCountQuery($count_query);
+    }
 
     if (!$this->currentUser->hasPermission('administer comments')) {
       $query->condition('c.status', CommentInterface::PUBLISHED);
-      $count_query->condition('c.status', CommentInterface::PUBLISHED);
+      if ($comments_per_page) {
+        $count_query->condition('c.status', CommentInterface::PUBLISHED);
+      }
     }
     if ($mode == CommentManagerInterface::COMMENT_MODE_FLAT) {
       $query->orderBy('c.cid', 'ASC');
@@ -307,7 +315,6 @@ class CommentStorage extends SqlContentEntityStorage implements CommentStorageIn
       $query->orderBy('torder', 'ASC');
     }
 
-    $query->setCountQuery($count_query);
     $cids = $query->execute()->fetchCol();
 
     $comments = array();

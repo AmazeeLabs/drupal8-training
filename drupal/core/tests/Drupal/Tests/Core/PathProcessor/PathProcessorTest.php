@@ -7,12 +7,12 @@
 
 namespace Drupal\Tests\Core\PathProcessor;
 
+use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\PathProcessor\PathProcessorAlias;
 use Drupal\Core\PathProcessor\PathProcessorDecode;
 use Drupal\Core\PathProcessor\PathProcessorFront;
 use Drupal\Core\PathProcessor\PathProcessorManager;
-use Drupal\Core\Site\Settings;
 use Drupal\language\HttpKernel\PathProcessorLanguage;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,17 +26,26 @@ use Drupal\Tests\UnitTestCase;
  */
 class PathProcessorTest extends UnitTestCase {
 
+  /**
+   * Configuration for the languageManager stub.
+   *
+   * @var \Drupal\Core\Language\LanguageInterface[]
+   */
   protected $languages;
+
+  /**
+   *  The language manager stub used to construct a PathProcessorLanguage object.
+   *
+   * @var \Drupal\language\ConfigurableLanguageManagerInterface|\PHPUnit_Framework_MockObject_MockBuilder
+   */
   protected $languageManager;
 
   protected function setUp() {
 
     // Set up some languages to be used by the language-based path processor.
     $languages = array();
-    foreach (array('en' => 'English', 'fr' => 'French') as $langcode => $language_name) {
-      $language = new \stdClass();
-      $language->id = $langcode;
-      $language->name = $language_name;
+    foreach (array('en', 'fr') as $langcode) {
+      $language = new Language(array('id' => $langcode));
       $languages[$langcode] = $language;
     }
     $this->languages = $languages;
@@ -98,7 +107,7 @@ class PathProcessorTest extends UnitTestCase {
       // Passing in anything else should return the same string.
       array('fr/foo', NULL, 'fr/foo'),
       array('fr', NULL, 'fr'),
-      array('user', NULL, 'user'),
+      array('user/login', NULL, 'user/login'),
     );
 
     $alias_manager->expects($this->any())
@@ -110,7 +119,7 @@ class PathProcessorTest extends UnitTestCase {
     $config_factory_stub = $this->getConfigFactoryStub(
       array(
         'system.site' => array(
-          'page.front' => 'user'
+          'page.front' => 'user/login'
         ),
         'language.negotiation' => array(
           'url' => array(
@@ -141,7 +150,7 @@ class PathProcessorTest extends UnitTestCase {
     $alias_processor = new PathProcessorAlias($alias_manager);
     $decode_processor = new PathProcessorDecode();
     $front_processor = new PathProcessorFront($config_factory_stub);
-    $language_processor = new PathProcessorLanguage($config_factory_stub, new Settings(array()), $this->languageManager, $negotiator, $current_user);
+    $language_processor = new PathProcessorLanguage($config_factory_stub, $this->languageManager, $negotiator, $current_user);
 
     // First, test the processor manager with the processors in the incorrect
     // order. The alias processor will run before the language processor, meaning
@@ -188,7 +197,7 @@ class PathProcessorTest extends UnitTestCase {
     $test_path = 'fr';
     $request = Request::create($test_path);
     $processed = $processor_manager->processInbound($test_path, $request);
-    $this->assertEquals('user', $processed, 'Processing in the correct order resolves the system path from the empty path.');
+    $this->assertEquals('user/login', $processed, 'Processing in the correct order resolves the system path from the empty path.');
 
     // Test resolving an existing alias using the correct processor order.
     $test_path = 'fr/foo';

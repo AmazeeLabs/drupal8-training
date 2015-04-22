@@ -13,6 +13,7 @@ use Drupal\Core\Database\Query\Condition;
 use Drupal\Core\Database\SchemaObjectExistsException;
 use Drupal\Core\Database\SchemaObjectDoesNotExistException;
 use Drupal\Core\Database\Schema as DatabaseSchema;
+use Drupal\Component\Utility\Unicode;
 
 /**
  * @addtogroup schemaapi
@@ -168,13 +169,7 @@ class Schema extends DatabaseSchema {
 
     // $spec['default'] can be NULL, so we explicitly check for the key here.
     if (array_key_exists('default', $spec)) {
-      if (is_string($spec['default'])) {
-        $spec['default'] = $this->connection->quote($spec['default']);
-      }
-      elseif (!isset($spec['default'])) {
-        $spec['default'] = 'NULL';
-      }
-      $sql .= ' DEFAULT ' . $spec['default'];
+      $sql .= ' DEFAULT ' . $this->escapeDefaultValue($spec['default']);
     }
 
     if (empty($spec['not null']) && !isset($spec['default'])) {
@@ -204,7 +199,7 @@ class Schema extends DatabaseSchema {
     // Set the correct database-engine specific datatype.
     // In case one is already provided, force it to uppercase.
     if (isset($field['mysql_type'])) {
-      $field['mysql_type'] = drupal_strtoupper($field['mysql_type']);
+      $field['mysql_type'] = Unicode::strtoupper($field['mysql_type']);
     }
     else {
       $map = $this->getFieldTypeMap();
@@ -263,16 +258,16 @@ class Schema extends DatabaseSchema {
     $keys = array();
 
     if (!empty($spec['primary key'])) {
-      $keys[] = 'PRIMARY KEY (' . $this->createKeysSqlHelper($spec['primary key']) . ')';
+      $keys[] = 'PRIMARY KEY (' . $this->createKeySql($spec['primary key']) . ')';
     }
     if (!empty($spec['unique keys'])) {
       foreach ($spec['unique keys'] as $key => $fields) {
-        $keys[] = 'UNIQUE KEY `' . $key . '` (' . $this->createKeysSqlHelper($fields) . ')';
+        $keys[] = 'UNIQUE KEY `' . $key . '` (' . $this->createKeySql($fields) . ')';
       }
     }
     if (!empty($spec['indexes'])) {
       foreach ($spec['indexes'] as $index => $fields) {
-        $keys[] = 'INDEX `' . $index . '` (' . $this->createKeysSqlHelper($fields) . ')';
+        $keys[] = 'INDEX `' . $index . '` (' . $this->createKeySql($fields) . ')';
       }
     }
 
@@ -280,19 +275,6 @@ class Schema extends DatabaseSchema {
   }
 
   protected function createKeySql($fields) {
-    $return = array();
-    foreach ($fields as $field) {
-      if (is_array($field)) {
-        $return[] = '`' . $field[0] . '`(' . $field[1] . ')';
-      }
-      else {
-        $return[] = '`' . $field . '`';
-      }
-    }
-    return implode(', ', $return);
-  }
-
-  protected function createKeysSqlHelper($fields) {
     $return = array();
     foreach ($fields as $field) {
       if (is_array($field)) {
@@ -324,21 +306,6 @@ class Schema extends DatabaseSchema {
 
     $this->connection->query('DROP TABLE {' . $table . '}');
     return TRUE;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function copyTable($source, $destination) {
-    if (!$this->tableExists($source)) {
-      throw new SchemaObjectDoesNotExistException(String::format("Cannot copy @source to @destination: table @source doesn't exist.", array('@source' => $source, '@destination' => $destination)));
-    }
-    if ($this->tableExists($destination)) {
-      throw new SchemaObjectExistsException(String::format("Cannot copy @source to @destination: table @destination already exists.", array('@source' => $source, '@destination' => $destination)));
-    }
-
-    $info = $this->getPrefixInfo($destination);
-    return $this->connection->query('CREATE TABLE `' . $info['table'] . '` LIKE {' . $source . '}');
   }
 
   public function addField($table, $field, $spec, $keys_new = array()) {
@@ -385,14 +352,7 @@ class Schema extends DatabaseSchema {
       throw new SchemaObjectDoesNotExistException(t("Cannot set default value of field @table.@field: field doesn't exist.", array('@table' => $table, '@field' => $field)));
     }
 
-    if (!isset($default)) {
-      $default = 'NULL';
-    }
-    else {
-      $default = is_string($default) ? "'$default'" : $default;
-    }
-
-    $this->connection->query('ALTER TABLE {' . $table . '} ALTER COLUMN `' . $field . '` SET DEFAULT ' . $default);
+    $this->connection->query('ALTER TABLE {' . $table . '} ALTER COLUMN `' . $field . '` SET DEFAULT ' . $this->escapeDefaultValue($default));
   }
 
   public function fieldSetNoDefault($table, $field) {
@@ -486,13 +446,10 @@ class Schema extends DatabaseSchema {
   }
 
   public function prepareComment($comment, $length = NULL) {
-    // Work around a bug in some versions of PDO, see http://bugs.php.net/bug.php?id=41125
-    $comment = str_replace("'", '’', $comment);
-
     // Truncate comment to maximum comment length.
     if (isset($length)) {
       // Add table prefixes before truncating.
-      $comment = substr($this->connection->prefixTables($comment), 0, $length);
+      $comment = Unicode::truncate($this->connection->prefixTables($comment), $length, TRUE, TRUE);
     }
 
     return $this->connection->quote($comment);

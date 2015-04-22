@@ -14,6 +14,12 @@ use Drupal\migrate\Plugin\MigrateIdMapInterface;
 
 /**
  * Sources whose data may be fetched via DBTNG.
+ *
+ * By default, an existing database connection with key 'migrate' and target
+ * 'default' is used. These may be overridden with explicit 'key' and/or
+ * 'target' configuration keys. In addition, if the configuration key 'database'
+ * is present, it is used as a database connection information array to define
+ * the connection.
  */
 abstract class SqlBase extends SourcePluginBase {
 
@@ -57,7 +63,22 @@ abstract class SqlBase extends SourcePluginBase {
    */
   public function getDatabase() {
     if (!isset($this->database)) {
-      $this->database = Database::getConnection('default', 'migrate');
+      if (isset($this->configuration['target'])) {
+        $target = $this->configuration['target'];
+      }
+      else {
+        $target = 'default';
+      }
+      if (isset($this->configuration['key'])) {
+        $key = $this->configuration['key'];
+      }
+      else {
+        $key = 'migrate';
+      }
+      if (isset($this->configuration['database'])) {
+        Database::addConnectionInfo($key, $target, $this->configuration['database']);
+      }
+      $this->database = Database::getConnection($target, $key);
     }
     return $this->database;
   }
@@ -91,7 +112,7 @@ abstract class SqlBase extends SourcePluginBase {
    * We could simply execute the query and be functionally correct, but
    * we will take advantage of the PDO-based API to optimize the query up-front.
    */
-  protected function runQuery() {
+  protected function initializeIterator() {
     $this->prepareQuery();
     $high_water_property = $this->migration->get('highWaterProperty');
 
@@ -142,10 +163,11 @@ abstract class SqlBase extends SourcePluginBase {
           $map_key = 'sourceid' . $count;
           $this->query->addField($alias, $map_key, "migrate_map_$map_key");
         }
-        $n = count($this->migration->get('destinationIds'));
-        for ($count = 1; $count <= $n; $count++) {
-          $map_key = 'destid' . $count++;
-          $this->query->addField($alias, $map_key, "migrate_map_$map_key");
+        if ($n = count($this->migration->get('destinationIds'))) {
+          for ($count = 1; $count <= $n; $count++) {
+            $map_key = 'destid' . $count++;
+            $this->query->addField($alias, $map_key, "migrate_map_$map_key");
+          }
         }
         $this->query->addField($alias, 'source_row_status', 'migrate_map_source_row_status');
       }
@@ -182,17 +204,14 @@ abstract class SqlBase extends SourcePluginBase {
   }
 
   /**
-   * Returns the iterator that will yield the row arrays to be processed.
+   * Check if we can join against the map table.
    *
-   * @return \Iterator
+   * This function specifically catches issues when we're migrating with
+   * unique sets of credentials for the source and destination database.
+   *
+   * @return bool
+   *   TRUE if we can join against the map table otherwise FALSE.
    */
-  public function getIterator() {
-    if (!isset($this->iterator)) {
-      $this->iterator = $this->runQuery();
-    }
-    return $this->iterator;
-  }
-
   protected function mapJoinable() {
     if (!$this->getIds()) {
       return FALSE;
@@ -204,10 +223,13 @@ abstract class SqlBase extends SourcePluginBase {
     $id_map_database_options = $id_map->getDatabase()->getConnectionOptions();
     $source_database_options = $this->getDatabase()->getConnectionOptions();
     foreach (array('username', 'password', 'host', 'port', 'namespace', 'driver') as $key) {
-      if ($id_map_database_options[$key] != $source_database_options[$key]) {
-        return FALSE;
+      if (isset($source_database_options[$key])) {
+        if ($id_map_database_options[$key] != $source_database_options[$key]) {
+          return FALSE;
+        }
       }
     }
     return TRUE;
   }
+
 }

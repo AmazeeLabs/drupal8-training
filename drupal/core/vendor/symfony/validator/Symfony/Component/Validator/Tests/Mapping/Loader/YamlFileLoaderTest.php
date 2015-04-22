@@ -13,10 +13,11 @@ namespace Symfony\Component\Validator\Tests\Mapping\Loader;
 
 use Symfony\Component\Validator\Constraints\All;
 use Symfony\Component\Validator\Constraints\Callback;
+use Symfony\Component\Validator\Constraints\Choice;
 use Symfony\Component\Validator\Constraints\Collection;
 use Symfony\Component\Validator\Constraints\NotNull;
 use Symfony\Component\Validator\Constraints\Range;
-use Symfony\Component\Validator\Constraints\Choice;
+use Symfony\Component\Validator\Constraints\True;
 use Symfony\Component\Validator\Mapping\ClassMetadata;
 use Symfony\Component\Validator\Mapping\Loader\YamlFileLoader;
 use Symfony\Component\Validator\Tests\Fixtures\ConstraintA;
@@ -32,14 +33,29 @@ class YamlFileLoaderTest extends \PHPUnit_Framework_TestCase
         $this->assertFalse($loader->loadClassMetadata($metadata));
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     */
     public function testLoadClassMetadataThrowsExceptionIfNotAnArray()
     {
         $loader = new YamlFileLoader(__DIR__.'/nonvalid-mapping.yml');
         $metadata = new ClassMetadata('Symfony\Component\Validator\Tests\Fixtures\Entity');
+
+        $this->setExpectedException('\InvalidArgumentException');
         $loader->loadClassMetadata($metadata);
+    }
+
+    /**
+     * @see https://github.com/symfony/symfony/pull/12158
+     */
+    public function testDoNotModifyStateIfExceptionIsThrown()
+    {
+        $loader = new YamlFileLoader(__DIR__.'/nonvalid-mapping.yml');
+        $metadata = new ClassMetadata('Symfony\Component\Validator\Tests\Fixtures\Entity');
+        try {
+            $loader->loadClassMetadata($metadata);
+        } catch (\InvalidArgumentException $e) {
+            // Call again. Again an exception should be thrown
+            $this->setExpectedException('\InvalidArgumentException');
+            $loader->loadClassMetadata($metadata);
+        }
     }
 
     public function testLoadClassMetadataReturnsTrueIfSuccessful()
@@ -86,6 +102,8 @@ class YamlFileLoaderTest extends \PHPUnit_Framework_TestCase
             'choices' => array('A', 'B'),
         )));
         $expected->addGetterConstraint('lastName', new NotNull());
+        $expected->addGetterConstraint('valid', new True());
+        $expected->addGetterConstraint('permissions', new True());
 
         $this->assertEquals($expected, $metadata);
     }

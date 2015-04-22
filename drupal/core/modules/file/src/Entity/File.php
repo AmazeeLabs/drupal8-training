@@ -25,29 +25,18 @@ use Drupal\user\UserInterface;
  *     "storage" = "Drupal\file\FileStorage",
  *     "storage_schema" = "Drupal\file\FileStorageSchema",
  *     "access" = "Drupal\file\FileAccessControlHandler",
- *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
  *     "views_data" = "Drupal\file\FileViewsData",
  *   },
  *   base_table = "file_managed",
  *   entity_keys = {
  *     "id" = "fid",
  *     "label" = "filename",
+ *     "langcode" = "langcode",
  *     "uuid" = "uuid"
  *   }
  * )
  */
 class File extends ContentEntityBase implements FileInterface {
-
-  /**
-   * The plain data values of the contained properties.
-   *
-   * Define default values.
-   *
-   * @var array
-   */
-  protected $values = array(
-    'langcode' => array(LanguageInterface::LANGCODE_DEFAULT => array(0 => array('value' => LanguageInterface::LANGCODE_NOT_SPECIFIED))),
-  );
 
   /**
    * {@inheritdoc}
@@ -195,7 +184,7 @@ class File extends ContentEntityBase implements FileInterface {
 
     // Automatically detect filemime if not set.
     if (!isset($values['filemime']) && isset($values['uri'])) {
-      $values['filemime'] = file_get_mimetype($values['uri']);
+      $values['filemime'] = \Drupal::service('file.mime_type.guesser')->guess($values['uri']);
     }
   }
 
@@ -260,7 +249,8 @@ class File extends ContentEntityBase implements FileInterface {
     $fields['uri'] = BaseFieldDefinition::create('uri')
       ->setLabel(t('URI'))
       ->setDescription(t('The URI to access the file (either local or remote).'))
-      ->setSetting('max_length', 255);
+      ->setSetting('max_length', 255)
+      ->setSetting('case_sensitive', TRUE);
 
     $fields['filemime'] = BaseFieldDefinition::create('string')
       ->setLabel(t('File MIME type'))
@@ -274,7 +264,8 @@ class File extends ContentEntityBase implements FileInterface {
 
     $fields['status'] = BaseFieldDefinition::create('boolean')
       ->setLabel(t('Status'))
-      ->setDescription(t('The status of the file, temporary (FALSE) and permanent (TRUE).'));
+      ->setDescription(t('The status of the file, temporary (FALSE) and permanent (TRUE).'))
+      ->setDefaultValue(FALSE);
 
     $fields['created'] = BaseFieldDefinition::create('created')
       ->setLabel(t('Created'))

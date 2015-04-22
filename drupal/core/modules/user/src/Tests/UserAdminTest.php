@@ -8,6 +8,7 @@
 namespace Drupal\user\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests user administration page functionality.
@@ -52,7 +53,7 @@ class UserAdminTest extends WebTestBase {
     $this->assertText($admin_user->getUsername(), 'Found Admin user on admin users page');
 
     // Test for existence of edit link in table.
-    $link = l(t('Edit'), "user/" . $user_a->id() . "/edit", array('query' => array('destination' => 'admin/people')));
+    $link = $user_a->link(t('Edit'), 'edit-form', array('query' => array('destination' => $user_a->url('collection'))));
     $this->assertRaw($link, 'Found user A edit link on admin users page');
 
     // Test exposed filter elements.
@@ -84,7 +85,7 @@ class UserAdminTest extends WebTestBase {
 
     // Filter the users by role. Grab the system-generated role name for User C.
     $roles = $user_c->getRoles();
-    unset($roles[array_search(DRUPAL_AUTHENTICATED_RID, $roles)]);
+    unset($roles[array_search(RoleInterface::AUTHENTICATED_ID, $roles)]);
     $this->drupalGet('admin/people', array('query' => array('role' => reset($roles))));
 
     // Check if the correct users show up when filtered by role.
@@ -149,14 +150,14 @@ class UserAdminTest extends WebTestBase {
     $this->drupalLogout();
 
     // Test custom user registration approval email address(es).
-    $config = \Drupal::config('user.settings');
+    $config = $this->config('user.settings');
     // Allow users to register with admin approval.
     $config
       ->set('verify_mail', TRUE)
       ->set('register', USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL)
       ->save();
     // Set the site and notification email addresses.
-    $system = \Drupal::config('system.site');
+    $system = $this->config('system.site');
     $server_address = $this->randomMachineName() . '@example.com';
     $notify_address = $this->randomMachineName() . '@example.com';
     $system

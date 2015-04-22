@@ -90,12 +90,6 @@ abstract class FilterFormatFormBase extends EntityForm {
       // If editing an existing text format, pre-select its current permissions.
       $form['roles']['#default_value'] = array_keys(filter_get_roles_by_format($format));
     }
-    elseif ($admin_role = $this->config('user.settings')->get('admin_role')) {
-      // If adding a new text format and the site has an administrative role,
-      // pre-select that role so as to grant administrators access to the new
-      // text format permission by default.
-      $form['roles']['#default_value'] = array($admin_role);
-    }
 
     // Create filter plugin instances for all available filters, including both
     // enabled/configured ones as well as new and not yet unconfigured ones.
@@ -218,8 +212,8 @@ abstract class FilterFormatFormBase extends EntityForm {
     $format_name = trim($form_state->getValue('name'));
 
     // Ensure that the values to be saved later are exactly the ones validated.
-    form_set_value($form['format'], $format_format, $form_state);
-    form_set_value($form['name'], $format_name, $form_state);
+    $form_state->setValueForElement($form['format'], $format_format);
+    $form_state->setValueForElement($form['name'], $format_name);
 
     $format_exists = $this->queryFactory
       ->get('filter_format')

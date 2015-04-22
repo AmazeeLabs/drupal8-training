@@ -54,7 +54,9 @@ class FileFieldDisplayTest extends FileFieldTestBase {
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
 
     // Check that the default formatter is displaying with the file name.
-    $node = node_load($nid, TRUE);
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
+    $node_storage->resetCache(array($nid));
+    $node = $node_storage->load($nid);
     $node_file = file_load($node->{$field_name}->target_id);
     $file_link = array(
       '#theme' => 'file_link',
@@ -90,5 +92,32 @@ class FileFieldDisplayTest extends FileFieldTestBase {
     $this->clickLink(t('Back to content editing'));
     $this->assertRaw($field_name . '[0][display]', 'First file appears as expected.');
     $this->assertRaw($field_name . '[1][display]', 'Second file appears as expected.');
+  }
+
+  /**
+   * Tests default display of File Field.
+   */
+  function testDefaultFileFieldDisplay() {
+    $field_name = strtolower($this->randomMachineName());
+    $type_name = 'article';
+    $field_storage_settings = array(
+      'display_field' => '1',
+      'display_default' => '0',
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+    );
+    $field_settings = array(
+      'description_field' => '1',
+    );
+    $widget_settings = array();
+    $this->createFileField($field_name, 'node', $type_name, $field_storage_settings, $field_settings, $widget_settings);
+
+    $test_file = $this->getTestFile('text');
+
+    // Create a new node with the uploaded file.
+    $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
+
+    $this->drupalGet('node/' . $nid . '/edit');
+    $this->assertFieldByXPath('//input[@type="checkbox" and @name="' . $field_name . '[0][display]"]', NULL, 'Default file display checkbox field exists.');
+    $this->assertFieldByXPath('//input[@type="checkbox" and @name="' . $field_name . '[0][display]" and not(@checked)]', NULL, 'Default file display is off.');
   }
 }

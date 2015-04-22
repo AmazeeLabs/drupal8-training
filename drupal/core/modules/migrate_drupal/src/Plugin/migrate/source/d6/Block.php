@@ -45,10 +45,10 @@ class Block extends DrupalSqlBase {
   /**
    * {@inheritdoc}
    */
-  protected function runQuery() {
+  protected function initializeIterator() {
     $this->defaultTheme = $this->variableGet('theme_default', 'Garland');
     $this->adminTheme = $this->variableGet('admin_theme', null);
-    return parent::runQuery();
+    return parent::initializeIterator();
   }
 
   /**
@@ -85,7 +85,7 @@ class Block extends DrupalSqlBase {
       ->condition('delta', $delta)
       ->execute()
       ->fetchCol();
-    $row->setSourceProperty('permissions', $roles);
+    $row->setSourceProperty('roles', $roles);
     $settings = array();
     // Contrib can use hook_migration_d6_block_prepare_row() to add similar
     // variables via $migration->getSource()->variableGet().

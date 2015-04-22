@@ -28,9 +28,11 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
 
         $context = array(
             'string'          => 'foo',
+            'empty_array'     => array(),
             'array'           => array('foo' => 'foo'),
             'array_access'    => new Twig_TemplateArrayAccessObject(),
             'magic_exception' => new Twig_TemplateMagicPropertyObjectWithException(),
+            'object'          => new stdClass(),
         );
 
         try {
@@ -45,15 +47,18 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
     {
         $tests = array(
             array('{{ string["a"] }}', 'Impossible to access a key ("a") on a string variable ("foo") in "%s" at line 1', false),
+            array('{{ empty_array["a"] }}', 'Key "a" does not exist as the array is empty in "%s" at line 1', false),
             array('{{ array["a"] }}', 'Key "a" for array with keys "foo" does not exist in "%s" at line 1', false),
-            array('{{ array_access["a"] }}', 'Key "a" in object (with ArrayAccess) of type "Twig_TemplateArrayAccessObject" does not exist in "%s" at line 1', false),
+            array('{{ array_access["a"] }}', 'Key "a" in object with ArrayAccess of class "Twig_TemplateArrayAccessObject" does not exist in "%s" at line 1', false),
             array('{{ string.a }}', 'Impossible to access an attribute ("a") on a string variable ("foo") in "%s" at line 1', false),
             array('{{ string.a() }}', 'Impossible to invoke a method ("a") on a string variable ("foo") in "%s" at line 1', false),
+            array('{{ empty_array.a }}', 'Key "a" does not exist as the array is empty in "%s" at line 1', false),
             array('{{ array.a }}', 'Key "a" for array with keys "foo" does not exist in "%s" at line 1', false),
             array('{{ attribute(array, -10) }}', 'Key "-10" for array with keys "foo" does not exist in "%s" at line 1', false),
             array('{{ array_access.a }}', 'Method "a" for object "Twig_TemplateArrayAccessObject" does not exist in "%s" at line 1', false),
             array('{% macro foo(obj) %}{{ obj.missing_method() }}{% endmacro %}{{ _self.foo(array_access) }}', 'Method "missing_method" for object "Twig_TemplateArrayAccessObject" does not exist in "%s" at line 1', false),
             array('{{ magic_exception.test }}', 'An exception has been thrown during the rendering of a template ("Hey! Don\'t try to isset me!") in "%s" at line 1.', false),
+            array('{{ object["a"] }}', 'Impossible to access a key "a" on an object of class "stdClass" that does not implement ArrayAccess interface in "%s" at line 1', false),
         );
 
         if (function_exists('twig_template_get_attributes')) {
@@ -245,7 +250,7 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
 
         $object = new Twig_TemplateMagicMethodExceptionObject();
 
-        $this->assertEquals(null, $template->getAttribute($object, 'foo'));
+        $this->assertNull($template->getAttribute($object, 'foo'));
     }
 
     public function getGetAttributeTests()
@@ -266,6 +271,7 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
         $propertyObject      = new Twig_TemplatePropertyObject();
         $propertyObject1     = new Twig_TemplatePropertyObjectAndIterator();
         $propertyObject2     = new Twig_TemplatePropertyObjectAndArrayAccess();
+        $propertyObject3     = new Twig_TemplatePropertyObjectDefinedWithUndefinedValue();
         $methodObject        = new Twig_TemplateMethodObject();
         $magicMethodObject   = new Twig_TemplateMagicMethodObject();
 
@@ -315,6 +321,11 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
             }
         }
 
+        // additional properties tests
+        $tests = array_merge($tests, array(
+            array(true, null, $propertyObject3, 'foo', array(), $anyType),
+        ));
+
         // additional method tests
         $tests = array_merge($tests, array(
             array(true, 'defined', $methodObject, 'defined',    array(), $methodType),
@@ -360,7 +371,7 @@ class Twig_Tests_TemplateTest extends PHPUnit_Framework_TestCase
         $tests = array_merge($tests, array(
             array(false, null, 42, 'a', array(), $anyType, false, 'Impossible to access an attribute ("a") on a integer variable ("42")'),
             array(false, null, "string", 'a', array(), $anyType, false, 'Impossible to access an attribute ("a") on a string variable ("string")'),
-            array(false, null, array(), 'a', array(), $anyType, false, 'Key "a" for array with keys "" does not exist'),
+            array(false, null, array(), 'a', array(), $anyType, false, 'Key "a" does not exist as the array is empty'),
         ));
 
         // add twig_template_get_attributes tests
@@ -543,6 +554,16 @@ class Twig_TemplatePropertyObjectAndArrayAccess extends Twig_TemplatePropertyObj
     }
 }
 
+class Twig_TemplatePropertyObjectDefinedWithUndefinedValue
+{
+    public $foo;
+
+    public function __construct()
+    {
+        $this->foo = @$notExist;
+    }
+}
+
 class Twig_TemplateMethodObject
 {
     public function getDefined()
@@ -567,7 +588,6 @@ class Twig_TemplateMethodObject
 
     public function getNull()
     {
-        return null;
     }
 
     public function isBar()

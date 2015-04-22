@@ -8,6 +8,8 @@
 namespace Drupal\language\Tests;
 
 use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Url;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Drupal\simpletest\WebTestBase;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,12 +28,19 @@ class LanguageUrlRewritingTest extends WebTestBase {
    */
   public static $modules = array('language', 'language_test');
 
+  /**
+   * An user with permissions to administer languages.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $webUser;
+
   protected function setUp() {
     parent::setUp();
 
     // Create and login user.
-    $this->web_user = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
-    $this->drupalLogin($this->web_user);
+    $this->webUser = $this->drupalCreateUser(array('administer languages', 'access administration pages'));
+    $this->drupalLogin($this->webUser);
 
     // Install French language.
     $edit = array();
@@ -57,7 +66,7 @@ class LanguageUrlRewritingTest extends WebTestBase {
 
     // Check that URL rewriting is not applied to subrequests.
     $this->drupalGet('language_test/subrequest');
-    $this->assertText($this->web_user->getUsername(), 'Page correctly retrieved');
+    $this->assertText($this->webUser->getUsername(), 'Page correctly retrieved');
   }
 
   /**
@@ -74,10 +83,10 @@ class LanguageUrlRewritingTest extends WebTestBase {
    * @param string $message2
    *   The message to display confirming prefixed URL is not working.
    */
-  private function checkUrl($language, $message1, $message2) {
+  private function checkUrl(LanguageInterface $language, $message1, $message2) {
     $options = array('language' => $language, 'script' => '');
     $base_path = trim(base_path(), '/');
-    $rewritten_path = trim(str_replace($base_path, '', url('node', $options)), '/');
+    $rewritten_path = trim(str_replace($base_path, '', \Drupal::url('<front>', array(), $options)), '/');
     $segments = explode('/', $rewritten_path, 2);
     $prefix = $segments[0];
     $path = isset($segments[1]) ? $segments[1] : $prefix;
@@ -85,7 +94,7 @@ class LanguageUrlRewritingTest extends WebTestBase {
     // If the rewritten URL has not a language prefix we pick a random prefix so
     // we can always check the prefixed URL.
     $prefixes = language_negotiation_url_prefixes();
-    $stored_prefix = isset($prefixes[$language->id]) ? $prefixes[$language->id] : $this->randomMachineName();
+    $stored_prefix = isset($prefixes[$language->getId()]) ? $prefixes[$language->getId()] : $this->randomMachineName();
     if ($this->assertNotEqual($stored_prefix, $prefix, $message1)) {
       $prefix = $stored_prefix;
     }
@@ -98,9 +107,13 @@ class LanguageUrlRewritingTest extends WebTestBase {
    * Check URL rewriting when using a domain name and a non-standard port.
    */
   function testDomainNameNegotiationPort() {
+    global $base_url;
     $language_domain = 'example.fr';
+    // Get the current host URI we're running on.
+    $base_url_host = parse_url($base_url, PHP_URL_HOST);
     $edit = array(
       'language_negotiation_url_part' => LanguageNegotiationUrl::CONFIG_DOMAIN,
+      'domain[en]' => $base_url_host,
       'domain[fr]' => $language_domain
     );
     $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
@@ -109,7 +122,7 @@ class LanguageUrlRewritingTest extends WebTestBase {
     $this->rebuildContainer();
 
     // Enable domain configuration.
-    \Drupal::config('language.negotiation')
+    $this->config('language.negotiation')
       ->set('url.source', LanguageNegotiationUrl::CONFIG_DOMAIN)
       ->save();
 
@@ -118,7 +131,7 @@ class LanguageUrlRewritingTest extends WebTestBase {
 
     // In case index.php is part of the URLs, we need to adapt the asserted
     // URLs as well.
-    $index_php = strpos(url('', array('absolute' => TRUE)), 'index.php') !== FALSE;
+    $index_php = strpos(\Drupal::url('<front>', array(), array('absolute' => TRUE)), 'index.php') !== FALSE;
 
     $request = Request::createFromGlobals();
     $server = $request->server->all();
@@ -126,21 +139,21 @@ class LanguageUrlRewritingTest extends WebTestBase {
 
     // Create an absolute French link.
     $language = \Drupal::languageManager()->getLanguage('fr');
-    $url = url('', array(
+    $url = Url::fromRoute('<none>', [], [
       'absolute' => TRUE,
       'language' => $language,
-    ));
+    ])->toString();
 
     $expected = ($index_php ? 'http://example.fr:88/index.php' : 'http://example.fr:88') . rtrim(base_path(), '/') . '/';
 
     $this->assertEqual($url, $expected, 'The right port is used.');
 
-    // If we set the port explicitly in url(), it should not be overriden.
-    $url = url('', array(
+    // If we set the port explicitly, it should not be overriden.
+    $url = Url::fromRoute('<none>', [], [
       'absolute' => TRUE,
       'language' => $language,
       'base_url' => $request->getBaseUrl() . ':90',
-    ));
+    ])->toString();
 
     $expected = $index_php ? 'http://example.fr:90/index.php' : 'http://example.fr:90' . rtrim(base_path(), '/') . '/';
 

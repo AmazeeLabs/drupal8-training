@@ -14,19 +14,21 @@ namespace Symfony\Component\HttpFoundation\Tests;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\Tests\File\FakeFile;
 
 class BinaryFileResponseTest extends ResponseTestCase
 {
     public function testConstruction()
     {
-        $response = new BinaryFileResponse('README.md', 404, array('X-Header' => 'Foo'), true, null, true, true);
+        $file = __DIR__.'/../README.md';
+        $response = new BinaryFileResponse($file, 404, array('X-Header' => 'Foo'), true, null, true, true);
         $this->assertEquals(404, $response->getStatusCode());
         $this->assertEquals('Foo', $response->headers->get('X-Header'));
         $this->assertTrue($response->headers->has('ETag'));
         $this->assertTrue($response->headers->has('Last-Modified'));
         $this->assertFalse($response->headers->has('Content-Disposition'));
 
-        $response = BinaryFileResponse::create('README.md', 404, array(), true, ResponseHeaderBag::DISPOSITION_INLINE);
+        $response = BinaryFileResponse::create($file, 404, array(), true, ResponseHeaderBag::DISPOSITION_INLINE);
         $this->assertEquals(404, $response->getStatusCode());
         $this->assertFalse($response->headers->has('ETag'));
         $this->assertEquals('inline; filename="README.md"', $response->headers->get('Content-Disposition'));
@@ -37,13 +39,13 @@ class BinaryFileResponseTest extends ResponseTestCase
      */
     public function testSetContent()
     {
-        $response = new BinaryFileResponse('README.md');
+        $response = new BinaryFileResponse(__FILE__);
         $response->setContent('foo');
     }
 
     public function testGetContent()
     {
-        $response = new BinaryFileResponse('README.md');
+        $response = new BinaryFileResponse(__FILE__);
         $this->assertFalse($response->getContent());
     }
 
@@ -75,7 +77,6 @@ class BinaryFileResponseTest extends ResponseTestCase
         $response->sendContent();
 
         $this->assertEquals(206, $response->getStatusCode());
-        $this->assertEquals('binary', $response->headers->get('Content-Transfer-Encoding'));
         $this->assertEquals($responseRange, $response->headers->get('Content-Range'));
     }
 
@@ -111,7 +112,6 @@ class BinaryFileResponseTest extends ResponseTestCase
         $response->sendContent();
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('binary', $response->headers->get('Content-Transfer-Encoding'));
     }
 
     public function provideFullFileRanges()
@@ -142,7 +142,6 @@ class BinaryFileResponseTest extends ResponseTestCase
         $response->sendContent();
 
         $this->assertEquals(416, $response->getStatusCode());
-        $this->assertEquals('binary', $response->headers->get('Content-Transfer-Encoding'));
         #$this->assertEquals('', $response->headers->get('Content-Range'));
     }
 
@@ -150,7 +149,7 @@ class BinaryFileResponseTest extends ResponseTestCase
     {
         return array(
             array('bytes=-40'),
-            array('bytes=30-40')
+            array('bytes=30-40'),
         );
     }
 
@@ -160,7 +159,7 @@ class BinaryFileResponseTest extends ResponseTestCase
         $request->headers->set('X-Sendfile-Type', 'X-Sendfile');
 
         BinaryFileResponse::trustXSendfileTypeHeader();
-        $response = BinaryFileResponse::create('README.md');
+        $response = BinaryFileResponse::create(__DIR__.'/../README.md');
         $response->prepare($request);
 
         $this->expectOutputString('');
@@ -178,18 +177,10 @@ class BinaryFileResponseTest extends ResponseTestCase
         $request->headers->set('X-Sendfile-Type', 'X-Accel-Redirect');
         $request->headers->set('X-Accel-Mapping', $mapping);
 
-        $file = $this->getMockBuilder('Symfony\Component\HttpFoundation\File\File')
-                     ->disableOriginalConstructor()
-                     ->getMock();
-        $file->expects($this->any())
-             ->method('getRealPath')
-             ->will($this->returnValue($realpath));
-        $file->expects($this->any())
-             ->method('isReadable')
-             ->will($this->returnValue(true));
+        $file = new FakeFile($realpath, __DIR__.'/File/Fixtures/test');
 
         BinaryFileResponse::trustXSendFileTypeHeader();
-        $response = new BinaryFileResponse('README.md');
+        $response = new BinaryFileResponse($file);
         $reflection = new \ReflectionObject($response);
         $property = $reflection->getProperty('file');
         $property->setAccessible(true);
@@ -199,16 +190,61 @@ class BinaryFileResponseTest extends ResponseTestCase
         $this->assertEquals($virtual, $response->headers->get('X-Accel-Redirect'));
     }
 
+    public function testDeleteFileAfterSend()
+    {
+        $request = Request::create('/');
+
+        $path = __DIR__.'/File/Fixtures/to_delete';
+        touch($path);
+        $realPath = realpath($path);
+        $this->assertFileExists($realPath);
+
+        $response = new BinaryFileResponse($realPath);
+        $response->deleteFileAfterSend(true);
+
+        $response->prepare($request);
+        $response->sendContent();
+
+        $this->assertFileNotExists($path);
+    }
+
+    public function testAcceptRangeOnUnsafeMethods()
+    {
+        $request = Request::create('/', 'POST');
+        $response = BinaryFileResponse::create(__DIR__.'/File/Fixtures/test.gif');
+        $response->prepare($request);
+
+        $this->assertEquals('none', $response->headers->get('Accept-Ranges'));
+    }
+
+    public function testAcceptRangeNotOverriden()
+    {
+        $request = Request::create('/', 'POST');
+        $response = BinaryFileResponse::create(__DIR__.'/File/Fixtures/test.gif');
+        $response->headers->set('Accept-Ranges', 'foo');
+        $response->prepare($request);
+
+        $this->assertEquals('foo', $response->headers->get('Accept-Ranges'));
+    }
+
     public function getSampleXAccelMappings()
     {
         return array(
-            array('/var/www/var/www/files/foo.txt', '/files/=/var/www/', '/files/var/www/files/foo.txt'),
-            array('/home/foo/bar.txt', '/files/=/var/www/,/baz/=/home/foo/', '/baz/bar.txt'),
+            array('/var/www/var/www/files/foo.txt', '/var/www/=/files/', '/files/var/www/files/foo.txt'),
+            array('/home/foo/bar.txt', '/var/www/=/files/,/home/foo/=/baz/', '/baz/bar.txt'),
         );
     }
 
     protected function provideResponse()
     {
-        return new BinaryFileResponse('README.md');
+        return new BinaryFileResponse(__DIR__.'/../README.md');
+    }
+
+    public static function tearDownAfterClass()
+    {
+        $path = __DIR__.'/../Fixtures/to_delete';
+        if (file_exists($path)) {
+            @unlink($path);
+        }
     }
 }

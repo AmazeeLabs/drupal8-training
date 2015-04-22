@@ -7,46 +7,77 @@
 
 namespace Drupal\search\Tests;
 
+use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Unicode;
+
 /**
- * Tests the bike shed text on no results page, and text on the search page.
+ * Tests the search help text and search page text.
  *
  * @group search
  */
 class SearchPageTextTest extends SearchTestBase {
-  protected $searching_user;
+  /**
+   * A user with permission to use advanced search.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $searchingUser;
 
   protected function setUp() {
     parent::setUp();
 
     // Create user.
-    $this->searching_user = $this->drupalCreateUser(array('search content', 'access user profiles', 'use advanced search'));
+    $this->searchingUser = $this->drupalCreateUser(array('search content', 'access user profiles', 'use advanced search'));
   }
 
   /**
    * Tests the failed search text, and various other text on the search page.
    */
   function testSearchText() {
-    $this->drupalLogin($this->searching_user);
+    $this->drupalLogin($this->searchingUser);
     $this->drupalGet('search/node');
     $this->assertText(t('Enter your keywords'));
     $this->assertText(t('Search'));
-    $title = t('Search') . ' | Drupal';
-    $this->assertTitle($title, 'Search page title is correct');
+    $this->assertTitle(t('Search') . ' | Drupal', 'Search page title is correct');
 
     $edit = array();
-    $edit['keys'] = 'bike shed ' . $this->randomMachineName();
+    $search_terms = 'bike shed ' . $this->randomMachineName();
+    $edit['keys'] = $search_terms;
     $this->drupalPostForm('search/node', $edit, t('Search'));
-    $this->assertText(t('Consider loosening your query with OR. bike OR shed will often show more results than bike shed.'), 'Help text is displayed when search returns no results.');
+    $this->assertText('search yielded no results');
     $this->assertText(t('Search'));
-    $this->assertTitle($title, 'Search page title is correct');
+    $title_source = 'Search for @keywords | Drupal';
+    $this->assertTitle(t($title_source, array('@keywords' => Unicode::truncate($search_terms, 60, TRUE, TRUE))), 'Search page title is correct');
     $this->assertNoText('Node', 'Erroneous tab and breadcrumb text is not present');
     $this->assertNoText(t('Node'), 'Erroneous translated tab and breadcrumb text is not present');
     $this->assertText(t('Content'), 'Tab and breadcrumb text is present');
 
-    $edit['keys'] = $this->searching_user->getUsername();
+    $this->clickLink('Search help');
+    $this->assertText('Search help', 'Correct title is on search help page');
+    $this->assertText('Use upper-case OR to get more results', 'Correct text is on content search help page');
+
+    // Search for a longer text, and see that it is in the title, truncated.
+    $edit = array();
+    $search_terms = 'Every word is like an unnecessary stain on silence and nothingness.';
+    $edit['keys'] = $search_terms;
+    $this->drupalPostForm('search/node', $edit, t('Search'));
+    $this->assertTitle(t($title_source, array('@keywords' => 'Every word is like an unnecessary stain on silence and…')), 'Search page title is correct');
+
+    // Search for a string with a lot of special characters.
+    $search_terms = 'Hear nothing > "see nothing" `feel' . " '1982.";
+    $edit['keys'] = $search_terms;
+    $this->drupalPostForm('search/node', $edit, t('Search'));
+    $actual_title = (string) current($this->xpath('//title'));
+    $this->assertEqual($actual_title, String::decodeEntities(t($title_source, array('@keywords' => Unicode::truncate($search_terms, 60, TRUE, TRUE)))), 'Search page title is correct');
+
+    $edit['keys'] = $this->searchingUser->getUsername();
     $this->drupalPostForm('search/user', $edit, t('Search'));
     $this->assertText(t('Search'));
-    $this->assertTitle($title, 'Search page title is correct');
+    $this->assertTitle(t($title_source, array('@keywords' => Unicode::truncate($this->searchingUser->getUsername(), 60, TRUE, TRUE))));
+
+    $this->clickLink('Search help');
+    $this->assertText('Search help', 'Correct title is on search help page');
+    $this->assertText('user names and partial user names', 'Correct text is on user search help page');
 
     // Test that search keywords containing slashes are correctly loaded
     // from the GET params and displayed in the search form.
@@ -57,7 +88,7 @@ class SearchPageTextTest extends SearchTestBase {
 
     // Test a search input exceeding the limit of AND/OR combinations to test
     // the Denial-of-Service protection.
-    $limit = \Drupal::config('search.settings')->get('and_or_limit');
+    $limit = $this->config('search.settings')->get('and_or_limit');
     $keys = array();
     for ($i = 0; $i < $limit + 1; $i++) {
       // Use a key of 4 characters to ensure we never generate 'AND' or 'OR'.

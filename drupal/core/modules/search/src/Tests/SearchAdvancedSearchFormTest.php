@@ -13,6 +13,12 @@ namespace Drupal\search\Tests;
  * @group search
  */
 class SearchAdvancedSearchFormTest extends SearchTestBase {
+
+  /**
+   * A node to use for testing.
+   *
+   * @var \Drupal\node\NodeInterface
+   */
   protected $node;
 
   protected function setUp() {
@@ -62,6 +68,6 @@ class SearchAdvancedSearchFormTest extends SearchTestBase {
     $this->assertText($this->node->label(), 'Basic page node is found with POST query and type:page.');
 
     $this->drupalPostForm('search/node', array_merge($edit, array('type[article]' => 'article')), t('Advanced search'));
-    $this->assertText('bike shed', 'Article node is not found with POST query and type:article.');
+    $this->assertText('search yielded no results', 'Article node is not found with POST query and type:article.');
   }
 }

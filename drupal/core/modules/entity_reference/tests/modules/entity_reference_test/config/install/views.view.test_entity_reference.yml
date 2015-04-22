@@ -1,26 +1,20 @@
-base_field: nid
-base_table: node
-core: '8'
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - entity_reference
+    - entity_reference_test
+    - node
+    - user
+id: test_entity_reference
+label: 'Entity reference'
+module: entity_reference_test
+description: ''
+tag: ''
+base_table: node_field_data
+base_field: nid
+core: '8'
 display:
-  entity_reference_1:
-    display_plugin: entity_reference
-    id: entity_reference_1
-    display_title: EntityReference
-    position: null
-    provider: entity_reference
-    display_options:
-      style:
-        type: entity_reference
-        options:
-          grouping: {  }
-          search_fields:
-            title: title
-      pager:
-        type: none
-        options:
-          offset: 0
   default:
     display_plugin: default
     id: default
@@ -68,7 +62,7 @@ display:
             suffix: ''
             target: ''
             nl2br: false
-            max_length: ''
+            max_length: 0
             word_boundary: false
             ellipsis: false
             more_link: false
@@ -90,9 +84,9 @@ display:
           hide_empty: false
           empty_zero: false
           hide_alter_empty: true
-          link_to_node: true
-          plugin_id: node
-          provider: node
+          plugin_id: field
+          entity_type: node
+          entity_field: title
       filters:
         status:
           value: true
@@ -103,7 +97,8 @@ display:
             operator: ''
           group: 1
           plugin_id: boolean
-          provider: views
+          entity_type: node
+          entity_field: status
       sorts:
         created:
           id: created
@@ -111,12 +106,21 @@ display:
           field: created
           order: DESC
           plugin_id: date
-          provider: views
-label: 'Entity reference'
-module: entity_reference_test
-id: test_entity_reference
-tag: ''
-langcode: en
-dependencies:
-  module:
-    - entity_reference
+          entity_type: node
+          entity_field: created
+  entity_reference_1:
+    display_plugin: entity_reference
+    id: entity_reference_1
+    display_title: EntityReference
+    position: null
+    display_options:
+      style:
+        type: entity_reference
+        options:
+          grouping: {  }
+          search_fields:
+            title: title
+      pager:
+        type: none
+        options:
+          offset: 0

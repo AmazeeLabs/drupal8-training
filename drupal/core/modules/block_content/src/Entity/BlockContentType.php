@@ -35,8 +35,9 @@ use Drupal\block_content\BlockContentTypeInterface;
  *     "label" = "label"
  *   },
  *   links = {
- *     "delete-form" = "entity.block_content_type.delete_form",
- *     "edit-form" = "entity.block_content_type.edit_form"
+ *     "delete-form" = "/admin/structure/block/block-content/manage/{block_content_type}/delete",
+ *     "edit-form" = "/admin/structure/block/block-content/manage/{block_content_type}",
+ *     "collection" = "/admin/structure/block/block-content/types",
  *   }
  * )
  */
@@ -47,38 +48,41 @@ class BlockContentType extends ConfigEntityBundleBase implements BlockContentTyp
    *
    * @var string
    */
-  public $id;
+  protected $id;
 
   /**
    * The custom block type label.
    *
    * @var string
    */
-  public $label;
+  protected $label;
 
   /**
    * The default revision setting for custom blocks of this type.
    *
    * @var bool
    */
-  public $revision;
+  protected $revision;
 
   /**
    * The description of the block type.
    *
    * @var string
    */
-  public $description;
+  protected $description;
 
   /**
    * {@inheritdoc}
    */
-  public function postSave(EntityStorageInterface $storage, $update = TRUE) {
-    parent::postSave($storage, $update);
+  public function getDescription() {
+    return $this->description;
+  }
 
-    if (!$update && !$this->isSyncing()) {
-      block_content_add_body_field($this->id);
-    }
+  /**
+   * {@inheritdoc}
+   */
+  public function shouldCreateNewRevision() {
+    return $this->revision;
   }
 
 }

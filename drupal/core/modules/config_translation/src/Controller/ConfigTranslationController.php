@@ -15,6 +15,7 @@ use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Matcher\RequestMatcherInterface;
@@ -152,7 +153,7 @@ class ConfigTranslationController extends ControllerBase {
       '#header' => array($this->t('Language'), $this->t('Operations')),
     );
     foreach ($languages as $language) {
-      $langcode = $language->id;
+      $langcode = $language->getId();
 
       // This is needed because
       // ConfigMapperInterface::getAddRouteParameters(), for example,
@@ -163,7 +164,7 @@ class ConfigTranslationController extends ControllerBase {
       // Prepare the language name and the operations depending on whether this
       // is the original language or not.
       if ($langcode == $original_langcode) {
-        $language_name = '<strong>' . $this->t('@language (original)', array('@language' => $language->name)) . '</strong>';
+        $language_name = '<strong>' . $this->t('@language (original)', array('@language' => $language->getName())) . '</strong>';
 
         // Check access for the path/route for editing, so we can decide to
         // include a link to edit or not.
@@ -174,36 +175,31 @@ class ConfigTranslationController extends ControllerBase {
         if ($edit_access) {
           $operations['edit'] = array(
             'title' => $this->t('Edit'),
-            'route_name' => $mapper->getBaseRouteName(),
-            'route_parameters' => $mapper->getBaseRouteParameters(),
-            'query' => array('destination' => $mapper->getOverviewPath()),
+            'url' => Url::fromRoute($mapper->getBaseRouteName(), $mapper->getBaseRouteParameters(), ['query' => ['destination' => $mapper->getOverviewPath()]]),
           );
         }
       }
       else {
-        $language_name = $language->name;
+        $language_name = $language->getName();
 
         $operations = array();
         // If no translation exists for this language, link to add one.
         if (!$mapper->hasTranslation($language)) {
           $operations['add'] = array(
             'title' => $this->t('Add'),
-            'route_name' => $mapper->getAddRouteName(),
-            'route_parameters' => $mapper->getAddRouteParameters(),
+            'url' => Url::fromRoute($mapper->getAddRouteName(), $mapper->getAddRouteParameters()),
           );
         }
         else {
           // Otherwise, link to edit the existing translation.
           $operations['edit'] = array(
             'title' => $this->t('Edit'),
-            'route_name' => $mapper->getEditRouteName(),
-            'route_parameters' => $mapper->getEditRouteParameters(),
+            'url' => Url::fromRoute($mapper->getEditRouteName(), $mapper->getEditRouteParameters()),
           );
 
           $operations['delete'] = array(
             'title' => $this->t('Delete'),
-            'route_name' => $mapper->getDeleteRouteName(),
-            'route_parameters' => $mapper->getDeleteRouteParameters(),
+            'url' => Url::fromRoute($mapper->getDeleteRouteName(), $mapper->getDeleteRouteParameters()),
           );
         }
       }

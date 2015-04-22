@@ -1,8 +1,16 @@
-base_table: node
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - user
 id: test_status_extra
+label: test_status_extra
+module: views
 description: ''
 tag: ''
-label: test_status_extra
+base_table: node_field_data
+base_field: nid
 core: 8.x
 display:
   default:
@@ -52,7 +60,7 @@ display:
             suffix: ''
             target: ''
             nl2br: false
-            max_length: ''
+            max_length: 0
             word_boundary: true
             ellipsis: true
             more_link: false
@@ -74,9 +82,9 @@ display:
           hide_empty: false
           empty_zero: false
           hide_alter_empty: true
-          link_to_node: false
-          plugin_id: node
-          provider: node
+          plugin_id: field
+          entity_type: node
+          entity_field: title
       filters:
         status_extra:
           id: status_extra
@@ -86,11 +94,11 @@ display:
           group_type: group
           admin_label: ''
           operator: '='
-          value: ''
+          value: false
           group: 1
           exposed: false
           expose:
-            operator_id: 0
+            operator_id: '0'
             label: ''
             description: ''
             use_operator: false
@@ -114,7 +122,7 @@ display:
             default_group_multiple: {  }
             group_items: {  }
           plugin_id: node_status
-          provider: node
+          entity_type: node
       sorts:
         nid:
           id: nid
@@ -122,7 +130,8 @@ display:
           field: nid
           order: ASC
           plugin_id: standard
-          provider: views
+          entity_type: node
+          entity_field: nid
       filter_groups:
         operator: AND
         groups:
@@ -134,7 +143,3 @@ display:
     display_title: Page
     id: page_1
     position: 0
-base_field: nid
-status: true
-module: views
-langcode: und

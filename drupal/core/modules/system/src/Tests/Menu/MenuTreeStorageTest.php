@@ -40,7 +40,7 @@ class MenuTreeStorageTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('system', 'menu_link_content');
+  public static $modules = array('system');
 
   /**
    * {@inheritdoc}
@@ -48,9 +48,8 @@ class MenuTreeStorageTest extends KernelTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->treeStorage = new MenuTreeStorage($this->container->get('database'), $this->container->get('cache.menu'), 'menu_tree');
+    $this->treeStorage = new MenuTreeStorage($this->container->get('database'), $this->container->get('cache.menu'), $this->container->get('cache_tags.invalidator'), 'menu_tree');
     $this->connection = $this->container->get('database');
-    $this->installEntitySchema('menu_link_content');
   }
 
   /**
@@ -74,7 +73,7 @@ class MenuTreeStorageTest extends KernelTestBase {
   protected function doTestTable() {
     // Test that we can create a tree storage with an arbitrary table name and
     // that selecting from the storage creates the table.
-    $tree_storage = new MenuTreeStorage($this->container->get('database'), $this->container->get('cache.menu'), 'test_menu_tree');
+    $tree_storage = new MenuTreeStorage($this->container->get('database'), $this->container->get('cache.menu'), $this->container->get('cache_tags.invalidator'), 'test_menu_tree');
     $this->assertFalse($this->connection->schema()->tableExists('test_menu_tree'), 'Test table is not yet created');
     $tree_storage->countMenuLinks();
     $this->assertTrue($this->connection->schema()->tableExists('test_menu_tree'), 'Test table was created');
@@ -267,36 +266,57 @@ class MenuTreeStorageTest extends KernelTestBase {
     $this->assertTrue($tree['test4']['in_active_trail']);
     $this->assertEqual(count($tree['test4']['subtree']['test5']['subtree']), 0);
     $this->assertTrue($tree['test4']['subtree']['test5']['in_active_trail']);
+
+    // Add some conditions to ensure that conditions work as expected.
+    $parameters = new MenuTreeParameters();
+    $parameters->addCondition('parent', 'test1');
+    $data = $this->treeStorage->loadTreeData('tools', $parameters);
+    $this->assertEqual(count($data['tree']), 1);
+    $this->assertEqual($data['tree']['test2']['definition']['id'], 'test2');
+    $this->assertEqual($data['tree']['test2']['subtree'], []);
+
+    // Test for only enabled links.
+    $link = $this->treeStorage->load('test3');
+    $link['enabled'] = FALSE;
+    $this->treeStorage->save($link);
+    $link = $this->treeStorage->load('test4');
+    $link['enabled'] = FALSE;
+    $this->treeStorage->save($link);
+    $link = $this->treeStorage->load('test5');
+    $link['enabled'] = FALSE;
+    $this->treeStorage->save($link);
+
+    $parameters = new MenuTreeParameters();
+    $parameters->onlyEnabledLinks();
+    $data = $this->treeStorage->loadTreeData('tools', $parameters);
+    $this->assertEqual(count($data['tree']), 1);
+    $this->assertEqual($data['tree']['test1']['definition']['id'], 'test1');
+    $this->assertEqual(count($data['tree']['test1']['subtree']), 1);
+    $this->assertEqual($data['tree']['test1']['subtree']['test2']['definition']['id'], 'test2');
+    $this->assertEqual($data['tree']['test1']['subtree']['test2']['subtree'], []);
+
   }
 
   /**
    * Tests finding the subtree height with content menu links.
    */
   public function testSubtreeHeight() {
-
-    $storage = \Drupal::entityManager()->getStorage('menu_link_content');
-
     // root
     // - child1
     // -- child2
     // --- child3
     // ---- child4
-    $root = $storage->create(array('route_name' => 'menu_test.menu_name_test', 'menu_name' => 'menu1', 'bundle' => 'menu_link_content'));
-    $root->save();
-    $child1 = $storage->create(array('route_name' => 'menu_test.menu_name_test', 'menu_name' => 'menu1', 'bundle' => 'menu_link_content', 'parent' => $root->getPluginId()));
-    $child1->save();
-    $child2 = $storage->create(array('route_name' => 'menu_test.menu_name_test', 'menu_name' => 'menu1', 'bundle' => 'menu_link_content', 'parent' => $child1->getPluginId()));
-    $child2->save();
-    $child3 = $storage->create(array('route_name' => 'menu_test.menu_name_test', 'menu_name' => 'menu1', 'bundle' => 'menu_link_content', 'parent' => $child2->getPluginId()));
-    $child3->save();
-    $child4 = $storage->create(array('route_name' => 'menu_test.menu_name_test', 'menu_name' => 'menu1', 'bundle' => 'menu_link_content', 'parent' => $child3->getPluginId()));
-    $child4->save();
+    $this->addMenuLink('root');
+    $this->addMenuLink('child1', 'root');
+    $this->addMenuLink('child2', 'child1');
+    $this->addMenuLink('child3', 'child2');
+    $this->addMenuLink('child4', 'child3');
 
-    $this->assertEqual($this->treeStorage->getSubtreeHeight($root->getPluginId()), 5);
-    $this->assertEqual($this->treeStorage->getSubtreeHeight($child1->getPluginId()), 4);
-    $this->assertEqual($this->treeStorage->getSubtreeHeight($child2->getPluginId()), 3);
-    $this->assertEqual($this->treeStorage->getSubtreeHeight($child3->getPluginId()), 2);
-    $this->assertEqual($this->treeStorage->getSubtreeHeight($child4->getPluginId()), 1);
+    $this->assertEqual($this->treeStorage->getSubtreeHeight('root'), 5);
+    $this->assertEqual($this->treeStorage->getSubtreeHeight('child1'), 4);
+    $this->assertEqual($this->treeStorage->getSubtreeHeight('child2'), 3);
+    $this->assertEqual($this->treeStorage->getSubtreeHeight('child3'), 2);
+    $this->assertEqual($this->treeStorage->getSubtreeHeight('child4'), 1);
   }
 
   /**
@@ -307,15 +327,15 @@ class MenuTreeStorageTest extends KernelTestBase {
       array('foo' => 'bar'),
       array(0 => 'wrong'),
     );
-    $msg = 'An invalid property name throws an exception.';
+    $message = 'An invalid property name throws an exception.';
     foreach ($tests as $properties) {
       try {
         $this->treeStorage->loadByProperties($properties);
-        $this->fail($msg);
+        $this->fail($message);
       }
       catch (\InvalidArgumentException $e) {
         $this->assertTrue(preg_match('/^An invalid property name, .+ was specified. Allowed property names are:/', $e->getMessage()), 'Found expected exception message.');
-        $this->pass($msg);
+        $this->pass($message);
       }
     }
     $this->addMenuLink('test_link.1', '', 'test', array(), 'menu1');

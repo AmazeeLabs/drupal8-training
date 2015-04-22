@@ -7,23 +7,27 @@
 
 namespace Drupal\system\Tests\DrupalKernel;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\Core\Site\Settings;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests site-specific service overrides.
  *
  * @group DrupalKernel
  */
-class DrupalKernelSiteTest extends DrupalUnitTestBase {
+class DrupalKernelSiteTest extends KernelTestBase {
 
   /**
    * Tests services.yml in site directory.
    */
   public function testServicesYml() {
+    $container_yamls = Settings::get('container_yamls');
+    $container_yamls[] = $this->siteDirectory . '/services.yml';
+    $this->settingsSet('container_yamls', $container_yamls);
     $this->assertFalse($this->container->has('site.service.yml'));
     // A service provider class always has precedence over services.yml files.
-    // DrupalUnitTestBase::buildContainer() swaps out many services with
-    // in-memory implementations already, so those cannot be tested.
+    // KernelTestBase::buildContainer() swaps out many services with in-memory
+    // implementations already, so those cannot be tested.
     $this->assertIdentical(get_class($this->container->get('cache.backend.database')), 'Drupal\Core\Cache\DatabaseBackendFactory');
 
     $class = __CLASS__;

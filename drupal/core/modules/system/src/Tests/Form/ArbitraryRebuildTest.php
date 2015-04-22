@@ -28,8 +28,8 @@ class ArbitraryRebuildTest extends WebTestBase {
 
     // Auto-create a field for testing.
     entity_create('field_storage_config', array(
-      'name' => 'test_multiple',
       'entity_type' => 'user',
+      'field_name' => 'test_multiple',
       'type' => 'text',
       'cardinality' => -1,
       'translatable' => FALSE,
@@ -58,7 +58,7 @@ class ArbitraryRebuildTest extends WebTestBase {
     );
     $this->drupalPostForm('user/register', $edit, 'Rebuild');
     $this->assertText('Form rebuilt.');
-    $this->assertFieldByName('name', 'foo', 'Entered user name has been kept.');
+    $this->assertFieldByName('name', 'foo', 'Entered username has been kept.');
     $this->assertFieldByName('mail', 'bar@example.com', 'Entered mail address has been kept.');
   }
 
@@ -72,7 +72,7 @@ class ArbitraryRebuildTest extends WebTestBase {
     );
     $this->drupalPostForm('user/register', $edit, t('Add another item'));
     $this->assertText('Test a multiple valued field', 'Form has been rebuilt.');
-    $this->assertFieldByName('name', 'foo', 'Entered user name has been kept.');
+    $this->assertFieldByName('name', 'foo', 'Entered username has been kept.');
     $this->assertFieldByName('mail', 'bar@example.com', 'Entered mail address has been kept.');
   }
 }

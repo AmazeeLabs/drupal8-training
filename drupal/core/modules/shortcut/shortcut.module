@@ -5,11 +5,10 @@
  * Allows users to manage customizable lists of shortcut links.
  */
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Access\AccessResult;
-use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Routing\UrlMatcher;
 use Drupal\Core\Url;
 use Drupal\shortcut\Entity\ShortcutSet;
 use Drupal\shortcut\ShortcutSetInterface;
@@ -24,7 +23,7 @@ function shortcut_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<p>' . t('The Shortcut module allows users to create sets of <em>shortcut</em> links to commonly-visited pages of the site. Shortcuts are contained within <em>sets</em>. Each user with <em>Select any shortcut set</em> permission can select a shortcut set created by anyone at the site. For more information, see the online handbook entry for <a href="!shortcut">Shortcut module</a>.', array('!shortcut' => 'http://drupal.org/documentation/modules/shortcut')) . '</p>';
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl><dt>' . t('Administering shortcuts') . '</dt>';
-      $output .= '<dd>' . t('Users with the <em>Administer shortcuts</em> permission can manage shortcut sets and edit the shortcuts within sets from the <a href="!shortcuts">Shortcuts administration page</a>.', array('!shortcuts' => \Drupal::url('shortcut.set_admin'))) . '</dd>';
+      $output .= '<dd>' . t('Users with the <em>Administer shortcuts</em> permission can manage shortcut sets and edit the shortcuts within sets from the <a href="!shortcuts">Shortcuts administration page</a>.', array('!shortcuts' => \Drupal::url('entity.shortcut_set.collection'))) . '</dd>';
       $output .= '<dt>' . t('Choosing shortcut sets') . '</dt>';
       $output .= '<dd>' . t('Users with permission to switch shortcut sets can choose a shortcut set to use from the Shortcuts tab of their user account page.') . '</dd>';
       $output .= '<dt>' . t('Adding and removing shortcuts') . '</dt>';
@@ -34,12 +33,12 @@ function shortcut_help($route_name, RouteMatchInterface $route_match) {
       $output .= '</dl>';
       return $output;
 
-    case 'shortcut.set_admin':
+    case 'entity.shortcut_set.collection':
     case 'shortcut.set_add':
     case 'entity.shortcut_set.edit_form':
       $user = \Drupal::currentUser();
       if ($user->hasPermission('access shortcuts') && $user->hasPermission('switch shortcut sets')) {
-        $output = '<p>' . t('Define which shortcut set you are using on the <a href="@shortcut-link">Shortcuts tab</a> of your account page.', array('@shortcut-link' => url("user/{$user->id()}/shortcuts"))) . '</p>';
+        $output = '<p>' . t('Define which shortcut set you are using on the <a href="@shortcut-link">Shortcuts tab</a> of your account page.', array('@shortcut-link' => \Drupal::url('shortcut.set_switch', array('user' => $user->id())))) . '</p>';
         return $output;
       }
   }
@@ -90,12 +89,12 @@ function shortcut_set_switch_access($account = NULL) {
 
   if (!$user->hasPermission('access shortcuts')) {
     // The user has no permission to use shortcuts.
-    return AccessResult::create()->cachePerRole();
+    return AccessResult::neutral()->cachePerRole();
   }
 
   if (!$user->hasPermission('switch shortcut sets')) {
     // The user has no permission to switch anyone's shortcut set.
-    return AccessResult::create()->cachePerRole();
+    return AccessResult::neutral()->cachePerRole();
   }
 
   // Users with the 'switch shortcut sets' permission can switch their own
@@ -108,7 +107,7 @@ function shortcut_set_switch_access($account = NULL) {
   }
 
   // No opinion.
-  return AccessResult::create()->cachePerRole();
+  return AccessResult::neutral()->cachePerRole();
 }
 
 /**
@@ -118,6 +117,9 @@ function shortcut_set_switch_access($account = NULL) {
  *   An object representing the shortcut set.
  * @param $account
  *   A user account that will be assigned to use the set.
+ *
+ * @deprecated in Drupal 8.x, will be removed before Drupal 9.0.
+ *   Use \Drupal::entityManager()->getStorage('shortcut_set')->assignUser().
  */
 function shortcut_set_assign_user($shortcut_set, $account) {
   \Drupal::entityManager()
@@ -137,6 +139,9 @@ function shortcut_set_assign_user($shortcut_set, $account) {
  *   TRUE if the user was previously assigned to a shortcut set and has been
  *   successfully removed from it. FALSE if the user was already not assigned
  *   to any set.
+ *
+ * @deprecated in Drupal 8.x, will be removed before Drupal 9.0.
+ *   Use \Drupal::entityManager()->getStorage('shortcut_set')->unassignUser().
  */
 function shortcut_set_unassign_user($account) {
   return (bool) \Drupal::entityManager()
@@ -223,11 +228,13 @@ function shortcut_default_set($account = NULL) {
  *
  * @return
  *   TRUE if a shortcut set with that title exists; FALSE otherwise.
+ *
+ * @deprecated in Drupal 8.x, will be removed before Drupal 9.0.
  */
 function shortcut_set_title_exists($title) {
   $sets = ShortcutSet::loadMultiple();
   foreach ($sets as $set) {
-    if ($set->label == $title) {
+    if ($set->label() == $title) {
       return TRUE;
     }
   }
@@ -251,16 +258,18 @@ function shortcut_renderable_links($shortcut_set = NULL) {
     $shortcut_set = shortcut_current_displayed_set();
   }
 
-  /** @var \Drupal\shortcut\ShortcutInterface[] $shortcuts  */
-  $shortcuts = \Drupal::entityManager()->getStorage('shortcut')->loadByProperties(array('shortcut_set' => $shortcut_set->id()));
-  $all_cache_tags = array();
-  foreach ($shortcuts as $shortcut) {
+  $cache_tags = array();
+  foreach ($shortcut_set->getShortcuts() as $shortcut) {
     $shortcut = \Drupal::entityManager()->getTranslationFromContext($shortcut);
-    $links[] = array(
-      'title' => $shortcut->label(),
-      'href' => $shortcut->path->value,
-    );
-    $all_cache_tags[] = $shortcut->getCacheTag();
+    $url = $shortcut->getUrl();
+    if ($url->access()) {
+      $links[$shortcut->id()] = array(
+        'type' => 'link',
+        'title' => $shortcut->label(),
+        'url' => $shortcut->getUrl(),
+      );
+      $cache_tags = Cache::mergeTags($cache_tags, $shortcut->getCacheTags());
+    }
   }
 
   if (!empty($links)) {
@@ -271,7 +280,7 @@ function shortcut_renderable_links($shortcut_set = NULL) {
         'class' => array('menu'),
       ),
       '#cache' => array(
-        'tags' => NestedArray::mergeDeepArray($all_cache_tags),
+        'tags' => $cache_tags,
       ),
     );
   }
@@ -297,11 +306,8 @@ function shortcut_preprocess_page(&$variables) {
   // we do not want to display it on "access denied" or "page not found"
   // pages).
   if (shortcut_set_edit_access()->isAllowed() && !\Drupal::request()->attributes->has('exception')) {
-    $link = current_path();
-    if (!($url = \Drupal::pathValidator()->getUrlIfValid($link))) {
-      // Bail out early if we couldn't find a matching route.
-      return;
-    }
+    $link = Url::fromRouteMatch(\Drupal::routeMatch())->getInternalPath();
+    $route_match = \Drupal::routeMatch();
 
     $query = array(
       'link' => $link,
@@ -313,8 +319,9 @@ function shortcut_preprocess_page(&$variables) {
 
     // Check if $link is already a shortcut and set $link_mode accordingly.
     $shortcuts = \Drupal::entityManager()->getStorage('shortcut')->loadByProperties(array('shortcut_set' => $shortcut_set->id()));
+    /** @var \Drupal\shortcut\ShortcutInterface $shortcut */
     foreach ($shortcuts as $shortcut) {
-      if ($shortcut->getRouteName() == $url->getRouteName() && $shortcut->getRouteParams() == $url->getRouteParameters()) {
+      if (($shortcut_url = $shortcut->getUrl()) && $shortcut_url->isRouted() && $shortcut_url->getRouteName() == $route_match->getRouteName() && $shortcut_url->getRouteParameters() == $route_match->getParameters()->all()) {
         $shortcut_id = $shortcut->id();
         break;
       }
@@ -333,7 +340,7 @@ function shortcut_preprocess_page(&$variables) {
       $route_parameters = array('shortcut' => $shortcut_id);
     }
 
-    if (theme_get_setting('shortcut_module_link')) {
+    if (theme_get_setting('third_party_settings.shortcut.module_link')) {
       $variables['title_suffix']['add_or_remove_shortcut'] = array(
         '#attached' => array(
           'library' => array(
@@ -342,10 +349,9 @@ function shortcut_preprocess_page(&$variables) {
         ),
         '#prefix' => '<div class="add-or-remove-shortcuts ' . $link_mode . '-shortcut">',
         '#type' => 'link',
-        '#title' => '<span class="icon"></span><span class="text">'. $link_text .'</span>',
-        '#route_name' => $route_name,
-        '#route_parameters' => $route_parameters,
-        '#options' => array('query' => $query, 'html' => TRUE),
+        '#title' => String::format('<span class="icon"></span><span class="text">@text</span>', array('@text' => $link_text)),
+        '#url' => Url::fromRoute($route_name, $route_parameters),
+        '#options' => array('query' => $query),
         '#suffix' => '</div>',
       );
     }
@@ -367,8 +373,7 @@ function shortcut_toolbar() {
       $configure_link = array(
         '#type' => 'link',
         '#title' => t('Edit shortcuts'),
-        '#route_name' => 'entity.shortcut_set.customize_form',
-        '#route_parameters' => array('shortcut_set' => $shortcut_set->id()),
+        '#url' => Url::fromRoute('entity.shortcut_set.customize_form', ['shortcut_set' => $shortcut_set->id()]),
         '#options' => array('attributes' => array('class' => array('edit-shortcuts'))),
       );
     }
@@ -378,7 +383,7 @@ function shortcut_toolbar() {
         'tab' => array(
           '#type' => 'link',
           '#title' => t('Shortcuts'),
-          '#href' => 'admin/config/user-interface/shortcut',
+          '#url' => $shortcut_set->urlInfo('collection'),
           '#attributes' => array(
             'title' => t('Shortcuts'),
             'class' => array('toolbar-icon', 'toolbar-icon-shortcut'),
@@ -400,4 +405,17 @@ function shortcut_toolbar() {
   }
 
   return $items;
+}
+
+/**
+ * Implements hook_themes_installed().
+ */
+function shortcut_themes_installed($theme_list) {
+  if (in_array('seven', $theme_list)) {
+    // Theme settings are not configuration entities and cannot depend on modules
+    // so to set a module-specific setting, we need to set it with logic.
+    if (\Drupal::moduleHandler()->moduleExists('shortcut')) {
+      \Drupal::configFactory()->getEditable('seven.settings')->set('third_party_settings.shortcut.module_link', TRUE)->save();
+    }
+  }
 }

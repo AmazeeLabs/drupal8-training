@@ -1,8 +1,16 @@
-base_field: nid
-base_table: node
-core: 8.x
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+id: test_node_bulk_form
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: node_field_data
+base_field: nid
+core: 8.x
 display:
   default:
     display_plugin: default
@@ -20,13 +28,14 @@ display:
           table: node
           field: node_bulk_form
           plugin_id: node_bulk_form
-          provider: node
+          entity_type: node
         title:
           id: title
           table: node_field_data
           field: title
-          plugin_id: node
-          provider: node
+          plugin_id: field
+          entity_type: node
+          entity_field: title
       sorts:
         nid:
           id: nid
@@ -34,7 +43,8 @@ display:
           field: nid
           order: ASC
           plugin_id: standard
-          provider: views
+          entity_type: node
+          entity_field: nid
   page_1:
     display_plugin: page
     id: page_1
@@ -42,7 +52,3 @@ display:
     position: null
     display_options:
       path: test-node-bulk-form
-label: ''
-module: views
-id: test_node_bulk_form
-tag: ''

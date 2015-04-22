@@ -6,9 +6,10 @@
  */
 
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Render\Element;
-use Drupal\Core\Template\Attribute;
+use Drupal\Core\Url;
 
 /**
  * Prepares variables for Views UI display tab setting templates.
@@ -27,21 +28,10 @@ use Drupal\Core\Template\Attribute;
  *     appended to the setting's description.
  */
 function template_preprocess_views_ui_display_tab_setting(&$variables) {
-
-  // Add default class attributes.
-  $variables['attributes']['class'][] = 'views-display-setting';
-  $variables['attributes']['class'][] = 'clearfix';
-
   // Put the primary link to the left side.
   array_unshift($variables['settings_links'], $variables['link']);
 
-  $variables['attributes']['class'][] = 'views-ui-display-tab-setting';
-
-  if (!empty($variables['defaulted'])) {
-    $variables['attributes']['class'][] = 'defaulted';
-  }
   if (!empty($variables['overridden'])) {
-    $variables['attributes']['class'][] = 'overridden';
     $variables['attributes']['title'][] = t('Overridden');
   }
 
@@ -64,16 +54,12 @@ function template_preprocess_views_ui_display_tab_setting(&$variables) {
 function template_preprocess_views_ui_display_tab_bucket(&$variables) {
   $element = $variables['element'];
 
-  $variables['attributes']['class'][] = 'views-ui-display-tab-bucket';
-
-  if (!empty($element['#name'])) {
-    $variables['attributes']['class'][] = drupal_html_class($element['#name']);
-  }
   if (!empty($element['#overridden'])) {
-    $variables['attributes']['class'][] = 'overridden';
     $variables['attributes']['title'][] = t('Overridden');
   }
 
+  $variables['name'] = isset($element['#name']) ? $element['#name'] : NULL;
+  $variables['overridden'] = isset($element['#overridden']) ? $element['#overridden'] : NULL;
   $variables['content'] = $element['#children'];
   $variables['title'] = $element['#title'];
   $variables['actions'] = !empty($element['#actions']) ? $element['#actions'] : array();
@@ -94,7 +80,7 @@ function template_preprocess_views_ui_view_info(&$variables) {
     $displays = t('None');
   }
   else {
-    $displays = format_plural(count($variables['displays']), 'Display', 'Displays') . ': <em>';
+    $displays = \Drupal::translation()->formatPlural(count($variables['displays']), 'Display', 'Displays') . ': <em>';
     $separator = '';
     foreach ($variables['displays'] as $displays_item) {
       $displays .= $separator . SafeMarkup::escape($displays_item);
@@ -161,12 +147,20 @@ function theme_views_ui_build_group_filter_form($variables) {
   foreach (Element::children($form['group_items']) as $group_id) {
     $form['group_items'][$group_id]['value']['#title'] = '';
     $data = array(
-      'default' => drupal_render($form['default_group'][$group_id]) . drupal_render($form['default_group_multiple'][$group_id]),
+      'default' => array(
+        'data' => array(
+          '#markup' => drupal_render($form['default_group'][$group_id]) . drupal_render($form['default_group_multiple'][$group_id]),
+        ),
+      ),
       'weight' => drupal_render($form['group_items'][$group_id]['weight']),
       'title' => drupal_render($form['group_items'][$group_id]['title']),
       'operator' => drupal_render($form['group_items'][$group_id]['operator']),
       'value' => drupal_render($form['group_items'][$group_id]['value']),
-      'remove' => drupal_render($form['group_items'][$group_id]['remove']) . l('<span>' . t('Remove') . '</span>', 'javascript:void()', array('attributes' => array('id' => 'views-remove-link-' . $group_id, 'class' => array('views-hidden', 'views-button-remove', 'views-groups-remove-link', 'views-remove-link'), 'alt' => t('Remove this item'), 'title' => t('Remove this item')), 'html' => true)),
+      'remove' => array(
+        'data' => array(
+          '#markup' => drupal_render($form['group_items'][$group_id]['remove']) . \Drupal::l(String::format('<span>@text</span>', array('@text' => t('Remove'))), Url::fromRoute('<none>', [], array('attributes' => array('id' => 'views-remove-link-' . $group_id, 'class' => array('views-hidden', 'views-button-remove', 'views-groups-remove-link', 'views-remove-link'), 'alt' => t('Remove this item'), 'title' => t('Remove this item'))))),
+        ),
+      ),
     );
     $rows[] = array('data' => $data, 'id' => 'views-row-' . $group_id, 'class' => array('draggable'));
   }
@@ -186,8 +180,12 @@ function theme_views_ui_build_group_filter_form($variables) {
       )
     ),
   );
+
+  // Render the "Add another item" button below the table.
+  $add_another = drupal_render($form['add_group']);
   $render_form = drupal_render_children($form);
-  return $output . $render_form . drupal_render($table) . drupal_render($form['add_group']) . $more;
+
+  return $output . $render_form . drupal_render($table) . $add_another . $more;
 }
 
 /**
@@ -283,8 +281,8 @@ function template_preprocess_views_ui_rearrange_filter_form(&$variables) {
 
         $remove_link = array(
           '#type' => 'link',
-          '#href' => '',
-          '#title' => '<span>' . t('Remove') . '</span>',
+          '#url' => Url::fromRoute('<none>'),
+          '#title' => String::format('<span>@text</span>', array('@text' => t('Remove'))),
           '#weight' => '1',
           '#options' => array(
             'attributes' => array(
@@ -298,7 +296,6 @@ function template_preprocess_views_ui_rearrange_filter_form(&$variables) {
               'alt' => t('Remove this item'),
               'title' => t('Remove this item'),
             ),
-            'html' => TRUE,
           ),
         );
         $row[]['data'] = array(

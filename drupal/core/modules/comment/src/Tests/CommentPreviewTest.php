@@ -32,21 +32,18 @@ class CommentPreviewTest extends CommentTestBase {
    */
   function testCommentPreview() {
     // As admin user, configure comment settings.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentPreview(DRUPAL_OPTIONAL);
     $this->setCommentForm(TRUE);
     $this->setCommentSubject(TRUE);
     $this->setCommentSettings('default_mode', CommentManagerInterface::COMMENT_MODE_THREADED, 'Comment paging changed.');
     $this->drupalLogout();
 
-    // Login as web user and add a signature and a user picture.
-    $this->drupalLogin($this->web_user);
-    \Drupal::config('user.settings')->set('signatures', 1)->save();
-    $test_signature = $this->randomMachineName();
-    $edit['signature[value]'] = '<a href="http://example.com/">' . $test_signature. '</a>';
+    // Login as web user and add a user picture.
+    $this->drupalLogin($this->webUser);
     $image = current($this->drupalGetTestFiles('image'));
     $edit['files[user_picture_0]'] = drupal_realpath($image->uri);
-    $this->drupalPostForm('user/' . $this->web_user->id() . '/edit', $edit, t('Save'));
+    $this->drupalPostForm('user/' . $this->webUser->id() . '/edit', $edit, t('Save'));
 
     // As the web user, fill in the comment form and preview the comment.
     $edit = array();
@@ -63,9 +60,6 @@ class CommentPreviewTest extends CommentTestBase {
     $this->assertFieldByName('subject[0][value]', $edit['subject[0][value]'], 'Subject field displayed.');
     $this->assertFieldByName('comment_body[0][value]', $edit['comment_body[0][value]'], 'Comment field displayed.');
 
-    // Check that the signature is displaying with the correct text format.
-    $this->assertLink($test_signature);
-
     // Check that the user picture is displayed.
     $this->assertFieldByXPath("//article[contains(@class, 'preview')]//div[contains(@class, 'user-picture')]//img", NULL, 'User picture displayed.');
   }
@@ -75,7 +69,7 @@ class CommentPreviewTest extends CommentTestBase {
    */
   function testCommentEditPreviewSave() {
     $web_user = $this->drupalCreateUser(array('access comments', 'post comments', 'skip comment approval',  'edit own comments'));
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->setCommentPreview(DRUPAL_OPTIONAL);
     $this->setCommentForm(TRUE);
     $this->setCommentSubject(TRUE);

@@ -10,7 +10,7 @@ namespace Drupal\comment\Plugin\views\field;
 use Drupal\Core\Database\Connection;
 use Drupal\comment\CommentInterface;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\Plugin\views\field\Numeric;
+use Drupal\views\Plugin\views\field\NumericField;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
@@ -23,7 +23,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsField("node_new_comments")
  */
-class NodeNewComments extends Numeric {
+class NodeNewComments extends NumericField {
 
   /**
    * {@inheritdoc}
@@ -65,7 +65,7 @@ class NodeNewComments extends Numeric {
   }
 
   /**
-   * Overrides Drupal\views\Plugin\views\field\FieldPluginBase::init().
+   * {@inheritdoc}
    */
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
@@ -75,18 +75,24 @@ class NodeNewComments extends Numeric {
     $this->additional_fields['comment_count'] = array('table' => 'comment_entity_statistics', 'field' => 'comment_count');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['link_to_comment'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['link_to_comment'] = array('default' => TRUE);
 
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['link_to_comment'] = array(
-      '#title' => t('Link this field to new comments'),
-      '#description' => t("Enable to override this field's links."),
+      '#title' => $this->t('Link this field to new comments'),
+      '#description' => $this->t("Enable to override this field's links."),
       '#type' => 'checkbox',
       '#default_value' => $this->options['link_to_comment'],
     );
@@ -94,12 +100,18 @@ class NodeNewComments extends Numeric {
     parent::buildOptionsForm($form, $form_state);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {
     $this->ensureMyTable();
     $this->addAdditionalFields();
     $this->field_alias = $this->table . '_' . $this->field;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function preRender(&$values) {
     $user = \Drupal::currentUser();
     if ($user->isAnonymous() || empty($values)) {
@@ -120,12 +132,13 @@ class NodeNewComments extends Numeric {
 
     if ($nids) {
       $result = $this->database->query("SELECT n.nid, COUNT(c.cid) as num_comments FROM {node} n INNER JOIN {comment_field_data} c ON n.nid = c.entity_id AND c.entity_type = 'node' AND c.default_langcode = 1
-        LEFT JOIN {history} h ON h.nid = n.nid AND h.uid = :h_uid WHERE n.nid IN (:nids)
-        AND c.changed > GREATEST(COALESCE(h.timestamp, :timestamp), :timestamp) AND c.status = :status GROUP BY n.nid", array(
+        LEFT JOIN {history} h ON h.nid = n.nid AND h.uid = :h_uid WHERE n.nid IN ( :nids[] )
+        AND c.changed > GREATEST(COALESCE(h.timestamp, :timestamp1), :timestamp2) AND c.status = :status GROUP BY n.nid", array(
         ':status' => CommentInterface::PUBLISHED,
         ':h_uid' => $user->id(),
-        ':nids' => $nids,
-        ':timestamp' => HISTORY_READ_LIMIT,
+        ':nids[]' => $nids,
+        ':timestamp1' => HISTORY_READ_LIMIT,
+        ':timestamp2' => HISTORY_READ_LIMIT,
       ));
       foreach ($result as $node) {
         foreach ($ids[$node->id()] as $id) {
@@ -155,7 +168,7 @@ class NodeNewComments extends Numeric {
       $page_number = \Drupal::entityManager()->getStorage('comment')
         ->getNewCommentPageNumber($this->getValue($values, 'comment_count'), $this->getValue($values), $node);
       $this->options['alter']['make_link'] = TRUE;
-      $this->options['alter']['path'] = 'node/' . $node->id();
+      $this->options['alter']['url'] = $node->urlInfo();
       $this->options['alter']['query'] = $page_number ? array('page' => $page_number) : NULL;
       $this->options['alter']['fragment'] = 'new';
     }

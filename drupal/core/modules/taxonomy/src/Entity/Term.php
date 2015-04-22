@@ -35,20 +35,20 @@ use Drupal\taxonomy\TermInterface;
  *   base_table = "taxonomy_term_data",
  *   data_table = "taxonomy_term_field_data",
  *   uri_callback = "taxonomy_term_uri",
- *   fieldable = TRUE,
  *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "tid",
  *     "bundle" = "vid",
  *     "label" = "name",
+ *     "langcode" = "langcode",
  *     "uuid" = "uuid"
  *   },
  *   bundle_entity_type = "taxonomy_vocabulary",
  *   field_ui_base_route = "entity.taxonomy_vocabulary.overview_form",
  *   links = {
- *     "canonical" = "entity.taxonomy_term.canonical",
- *     "delete-form" = "entity.taxonomy_term.delete_form",
- *     "edit-form" = "entity.taxonomy_term.edit_form",
+ *     "canonical" = "/taxonomy/term/{taxonomy_term}",
+ *     "delete-form" = "/taxonomy/term/{taxonomy_term}/delete",
+ *     "edit-form" = "/taxonomy/term/{taxonomy_term}/edit",
  *   },
  *   permission_granularity = "bundle"
  * )
@@ -119,8 +119,16 @@ class Term extends ContentEntityBase implements TermInterface {
       ->setSetting('target_type', 'taxonomy_vocabulary');
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
-      ->setLabel(t('Language code'))
-      ->setDescription(t('The term language code.'));
+      ->setLabel(t('Language'))
+      ->setDescription(t('The term language code.'))
+      ->setTranslatable(TRUE)
+      ->setDisplayOptions('view', array(
+        'type' => 'hidden',
+      ))
+      ->setDisplayOptions('form', array(
+        'type' => 'language_select',
+        'weight' => 2,
+      ));
 
     $fields['name'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Name'))

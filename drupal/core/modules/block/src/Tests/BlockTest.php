@@ -7,10 +7,12 @@
 
 namespace Drupal\block\Tests;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Cache\Cache;
 use Drupal\simpletest\WebTestBase;
 use Drupal\Component\Utility\String;
 use Drupal\block\Entity\Block;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests basic block functionality.
@@ -27,7 +29,7 @@ class BlockTest extends BlockTestBase {
     // Create a random title for the block.
     $title = $this->randomMachineName(8);
     // Enable a standard block.
-    $default_theme = \Drupal::config('system.theme')->get('default');
+    $default_theme = $this->config('system.theme')->get('default');
     $edit = array(
       'id' => strtolower($this->randomMachineName(8)),
       'region' => 'sidebar_first',
@@ -35,20 +37,23 @@ class BlockTest extends BlockTestBase {
     );
     // Set the block to be hidden on any user path, and to be shown only to
     // authenticated users.
-    $edit['settings[visibility][request_path][pages]'] = 'user*';
-    $edit['settings[visibility][request_path][negate]'] = TRUE;
-    $edit['settings[visibility][user_role][roles][' . DRUPAL_AUTHENTICATED_RID . ']'] = TRUE;
-    $this->drupalPostForm('admin/structure/block/add/' . $block_name . '/' . $default_theme, $edit, t('Save block'));
+    $edit['visibility[request_path][pages]'] = 'user*';
+    $edit['visibility[request_path][negate]'] = TRUE;
+    $edit['visibility[user_role][roles][' . RoleInterface::AUTHENTICATED_ID . ']'] = TRUE;
+    $this->drupalGet('admin/structure/block/add/' . $block_name . '/' . $default_theme);
+    $this->assertFieldChecked('edit-visibility-request-path-negate-0');
+
+    $this->drupalPostForm(NULL, $edit, t('Save block'));
     $this->assertText('The block configuration has been saved.', 'Block was saved');
+
+    $this->clickLink('Configure');
+    $this->assertFieldChecked('edit-visibility-request-path-negate-1');
 
     $this->drupalGet('');
     $this->assertText($title, 'Block was displayed on the front page.');
 
     $this->drupalGet('user');
     $this->assertNoText($title, 'Block was not displayed according to block visibility rules.');
-
-    $this->drupalGet('USER/' . $this->adminUser->id());
-    $this->assertNoText($title, 'Block was not displayed according to block visibility rules regardless of path case.');
 
     // Confirm that the block is not displayed to anonymous users.
     $this->drupalLogout();
@@ -61,6 +66,42 @@ class BlockTest extends BlockTestBase {
   }
 
   /**
+   * Tests that visibility can be properly toggled.
+   */
+  public function testBlockToggleVisibility() {
+    $block_name = 'system_powered_by_block';
+    // Create a random title for the block.
+    $title = $this->randomMachineName(8);
+    // Enable a standard block.
+    $default_theme = $this->config('system.theme')->get('default');
+    $edit = array(
+      'id' => strtolower($this->randomMachineName(8)),
+      'region' => 'sidebar_first',
+      'settings[label]' => $title,
+    );
+    $block_id = $edit['id'];
+    // Set the block to be shown only to authenticated users.
+    $edit['visibility[user_role][roles][' . RoleInterface::AUTHENTICATED_ID . ']'] = TRUE;
+    $this->drupalPostForm('admin/structure/block/add/' . $block_name . '/' . $default_theme, $edit, t('Save block'));
+    $this->clickLink('Configure');
+    $this->assertFieldChecked('edit-visibility-user-role-roles-authenticated');
+
+    $edit = [
+      'visibility[user_role][roles][' . RoleInterface::AUTHENTICATED_ID . ']' => FALSE,
+    ];
+    $this->drupalPostForm(NULL, $edit, 'Save block');
+    $this->clickLink('Configure');
+    $this->assertNoFieldChecked('edit-visibility-user-role-roles-authenticated');
+
+    // Ensure that no visibility is configured.
+    /** @var \Drupal\block\BlockInterface $block */
+    $block = Block::load($block_id);
+    $visibility_config = $block->getVisibilityConditions()->getConfiguration();
+    $this->assertIdentical([], $visibility_config);
+    $this->assertIdentical([], $block->get('visibility'));
+  }
+
+  /**
    * Test block visibility when leaving "pages" textarea empty.
    */
   function testBlockVisibilityListedEmpty() {
@@ -68,12 +109,12 @@ class BlockTest extends BlockTestBase {
     // Create a random title for the block.
     $title = $this->randomMachineName(8);
     // Enable a standard block.
-    $default_theme = \Drupal::config('system.theme')->get('default');
+    $default_theme = $this->config('system.theme')->get('default');
     $edit = array(
       'id' => strtolower($this->randomMachineName(8)),
       'region' => 'sidebar_first',
       'settings[label]' => $title,
-      'settings[visibility][request_path][negate]' => TRUE,
+      'visibility[request_path][negate]' => TRUE,
     );
     // Set the block to be hidden on any user path, and to be shown only to
     // authenticated users.
@@ -100,7 +141,7 @@ class BlockTest extends BlockTestBase {
     $block = array();
     $block['id'] = 'system_powered_by_block';
     $block['settings[label]'] = $this->randomMachineName(8);
-    $block['theme'] = \Drupal::config('system.theme')->get('default');
+    $block['theme'] = $this->config('system.theme')->get('default');
     $block['region'] = 'header';
 
     // Set block title to confirm that interface works and override any custom titles.
@@ -137,7 +178,7 @@ class BlockTest extends BlockTestBase {
     $this->clickLink(t('Delete'));
     $this->assertRaw(t('Are you sure you want to delete the block %name?', array('%name' => $block['settings[label]'])));
     $this->drupalPostForm(NULL, array(), t('Delete'));
-    $this->assertRaw(t('The block %name has been removed.', array('%name' => $block['settings[label]'])));
+    $this->assertRaw(t('The block %name has been deleted.', array('%name' => $block['settings[label]'])));
 
     // Test deleting a block via "Configure block" link.
     $block = $this->drupalPlaceBlock('system_powered_by_block');
@@ -145,7 +186,7 @@ class BlockTest extends BlockTestBase {
     $this->clickLink(t('Delete'));
     $this->assertRaw(t('Are you sure you want to delete the block %name?', array('%name' => $block->label())));
     $this->drupalPostForm(NULL, array(), t('Delete'));
-    $this->assertRaw(t('The block %name has been removed.', array('%name' => $block->label())));
+    $this->assertRaw(t('The block %name has been deleted.', array('%name' => $block->label())));
     $this->assertUrl('admin');
     $this->assertNoRaw($block->id());
   }
@@ -156,8 +197,8 @@ class BlockTest extends BlockTestBase {
   public function testBlockThemeSelector() {
     // Install all themes.
     \Drupal::service('theme_handler')->install(array('bartik', 'seven'));
-    $theme_settings = $this->container->get('config.factory')->get('system.theme');
-    foreach (array('bartik', 'stark', 'seven') as $theme) {
+    $theme_settings = $this->config('system.theme');
+    foreach (array('bartik', 'classy', 'seven') as $theme) {
       $this->drupalGet('admin/structure/block/list/' . $theme);
       $this->assertTitle(t('Block layout') . ' | Drupal');
       // Select the 'Powered by Drupal' block to be placed.
@@ -167,12 +208,12 @@ class BlockTest extends BlockTestBase {
       $block['region'] = 'content';
       $this->drupalPostForm('admin/structure/block/add/system_powered_by_block', $block, t('Save block'));
       $this->assertText(t('The block configuration has been saved.'));
-      $this->assertUrl('admin/structure/block/list/' . $theme . '?block-placement=' . drupal_html_class($block['id']));
+      $this->assertUrl('admin/structure/block/list/' . $theme . '?block-placement=' . Html::getClass($block['id']));
 
       // Set the default theme and ensure the block is placed.
       $theme_settings->set('default', $theme)->save();
       $this->drupalGet('');
-      $elements = $this->xpath('//div[@id = :id]', array(':id' => drupal_html_id('block-' . $block['id'])));
+      $elements = $this->xpath('//div[@id = :id]', array(':id' => Html::getUniqueId('block-' . $block['id'])));
       $this->assertTrue(!empty($elements), 'The block was found.');
     }
   }
@@ -182,15 +223,15 @@ class BlockTest extends BlockTestBase {
    */
   function testThemeName() {
     // Enable the help block.
-    $this->drupalPlaceBlock('system_help_block', array('region' => 'help'));
+    $this->drupalPlaceBlock('help_block', array('region' => 'help'));
     // Explicitly set the default and admin themes.
     $theme = 'block_test_specialchars_theme';
     \Drupal::service('theme_handler')->install(array($theme));
     \Drupal::service('router.builder')->rebuild();
     $this->drupalGet('admin/structure/block');
-    $this->assertRaw(String::checkPlain('<"Cat" & \'Mouse\'>'));
+    $this->assertEscaped('<"Cat" & \'Mouse\'>');
     $this->drupalGet('admin/structure/block/list/block_test_specialchars_theme');
-    $this->assertRaw(String::checkPlain('Demonstrate block regions (<"Cat" & \'Mouse\'>)'));
+    $this->assertEscaped('Demonstrate block regions (<"Cat" & \'Mouse\'>)');
   }
 
   /**
@@ -202,7 +243,7 @@ class BlockTest extends BlockTestBase {
     $title = $this->randomMachineName(8);
     $id = strtolower($this->randomMachineName(8));
     // Enable a standard block.
-    $default_theme = \Drupal::config('system.theme')->get('default');
+    $default_theme = $this->config('system.theme')->get('default');
     $edit = array(
       'id' => $id,
       'region' => 'sidebar_first',
@@ -241,7 +282,7 @@ class BlockTest extends BlockTestBase {
    */
   function moveBlockToRegion(array $block, $region) {
     // Set the created block to a specific region.
-    $block += array('theme' => \Drupal::config('system.theme')->get('default'));
+    $block += array('theme' => $this->config('system.theme')->get('default'));
     $edit = array();
     $edit['blocks[' . $block['id'] . '][region]'] = $region;
     $this->drupalPostForm('admin/structure/block', $edit, t('Save blocks'));
@@ -255,10 +296,10 @@ class BlockTest extends BlockTestBase {
 
     // Confirm that the custom block was found at the proper region.
     $xpath = $this->buildXPathQuery('//div[@class=:region-class]//div[@id=:block-id]/*', array(
-      ':region-class' => 'region region-' . drupal_html_class($region),
+      ':region-class' => 'region region-' . Html::getClass($region),
       ':block-id' => 'block-' . str_replace('_', '-', strtolower($block['id'])),
     ));
-    $this->assertFieldByXPath($xpath, NULL, t('Block found in %region_name region.', array('%region_name' => drupal_html_class($region))));
+    $this->assertFieldByXPath($xpath, NULL, t('Block found in %region_name region.', array('%region_name' => Html::getClass($region))));
   }
 
   /**
@@ -273,7 +314,7 @@ class BlockTest extends BlockTestBase {
     $this->drupalLogout();
 
     // Enable page caching.
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -289,30 +330,28 @@ class BlockTest extends BlockTestBase {
     // both the page and block caches.
     $this->drupalGet('<front>');
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
-    $cid_parts = array(url('<front>', array('absolute' => TRUE)), 'html');
-    $cid = sha1(implode(':', $cid_parts));
+    $cid_parts = array(\Drupal::url('<front>', array(), array('absolute' => TRUE)), 'html');
+    $cid = implode(':', $cid_parts);
     $cache_entry = \Drupal::cache('render')->get($cid);
     $expected_cache_tags = array(
-      'theme:stark',
-      'theme_global_settings:1',
-      'block_view:1',
-      'block:powered',
-      'block_plugin:system_powered_by_block',
-      'rendered:1',
+      'config:block_list',
+      'block_view',
+      'config:block.block.powered',
+      'rendered',
     );
+    sort($expected_cache_tags);
     $this->assertIdentical($cache_entry->tags, $expected_cache_tags);
-    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered:en:stark');
+    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered:en:classy');
     $expected_cache_tags = array(
-      'block_view:1',
-      'block:powered',
-      'theme:stark',
-      'block_plugin:system_powered_by_block',
-      'rendered:1',
+      'block_view',
+      'config:block.block.powered',
+      'rendered',
     );
+    sort($expected_cache_tags);
     $this->assertIdentical($cache_entry->tags, $expected_cache_tags);
 
     // The "Powered by Drupal" block is modified; verify a cache miss.
-    $block->set('region', 'content');
+    $block->setRegion('content');
     $block->save();
     $this->drupalGet('<front>');
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
@@ -329,43 +368,34 @@ class BlockTest extends BlockTestBase {
     // Verify a cache hit, but also the presence of the correct cache tags.
     $this->drupalGet('<front>');
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
-    $cid_parts = array(url('<front>', array('absolute' => TRUE)), 'html');
-    $cid = sha1(implode(':', $cid_parts));
+    $cid_parts = array(\Drupal::url('<front>', array(), array('absolute' => TRUE)), 'html');
+    $cid = implode(':', $cid_parts);
     $cache_entry = \Drupal::cache('render')->get($cid);
     $expected_cache_tags = array(
-      'theme:stark',
-      'theme_global_settings:1',
-      'block_view:1',
-      'block:powered-2',
-      'block:powered',
-      'block_plugin:system_powered_by_block',
-      'rendered:1',
+      'config:block_list',
+      'block_view',
+      'config:block.block.powered',
+      'config:block.block.powered-2',
+      'rendered',
     );
+    sort($expected_cache_tags);
     $this->assertEqual($cache_entry->tags, $expected_cache_tags);
     $expected_cache_tags = array(
-      'block_view:1',
-      'block:powered',
-      'theme:stark',
-      'block_plugin:system_powered_by_block',
-      'rendered:1',
+      'block_view',
+      'config:block.block.powered',
+      'rendered',
     );
-    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered:en:stark');
+    sort($expected_cache_tags);
+    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered:en:classy');
     $this->assertIdentical($cache_entry->tags, $expected_cache_tags);
     $expected_cache_tags = array(
-      'block_view:1',
-      'block:powered-2',
-      'theme:stark',
-      'block_plugin:system_powered_by_block',
-      'rendered:1',
+      'block_view',
+      'config:block.block.powered-2',
+      'rendered',
     );
-    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered-2:en:stark');
+    sort($expected_cache_tags);
+    $cache_entry = \Drupal::cache('render')->get('entity_view:block:powered-2:en:classy');
     $this->assertIdentical($cache_entry->tags, $expected_cache_tags);
-
-    // The plugin providing the "Powered by Drupal" block is modified; verify a
-    // cache miss.
-    Cache::invalidateTags(array('block_plugin:system_powered_by_block'));
-    $this->drupalGet('<front>');
-    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
 
     // Now we should have a cache hit again.
     $this->drupalGet('<front>');
@@ -390,11 +420,25 @@ class BlockTest extends BlockTestBase {
     $this->drupalGet('<front>');
     $this->assertText('Powered by Drupal');
 
-    $theme_handler->setDefault('stark');
+    $theme_handler->setDefault('classy');
     $theme_handler->uninstall(['seven']);
 
     // Ensure that the block configuration does not exist anymore.
     $this->assertIdentical(NULL, Block::load($block->id()));
+  }
+
+  /**
+   * Tests the block access.
+   */
+  public function testBlockAccess() {
+    $this->drupalPlaceBlock('test_access', ['region' => 'help']);
+
+    $this->drupalGet('<front>');
+    $this->assertNoText('Hello test world');
+
+    \Drupal::state()->set('test_block_access', TRUE);
+    $this->drupalGet('<front>');
+    $this->assertText('Hello test world');
   }
 
 }

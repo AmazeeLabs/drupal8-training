@@ -32,14 +32,14 @@ use Drupal\views\Views;
  * Simple relationship handler that allows a new version of the primary table
  * to be linked in.
  *
- * The base relationship handler can only handle a single join. Some relationships
- * are more complex and might require chains of joins; for those, you must
- * utilize a custom relationship handler.
+ * The base relationship handler can only handle a single join. Some
+ * relationships are more complex and might require chains of joins; for those,
+ * you must use a custom relationship handler.
  *
  * Definition items:
  * - base: The new base table this relationship will be adding. This does not
  *   have to be a declared base table, but if there are no tables that
- *   utilize this base table, it won't be very effective.
+ *   use this base table, it won't be very effective.
  * - base field: The field to use in the relationship; if left out this will be
  *   assumed to be the primary field.
  * - relationship table: The actual table this relationship operates against.
@@ -53,6 +53,13 @@ use Drupal\views\Views;
  * @ingroup views_relationship_handlers
  */
 abstract class RelationshipPluginBase extends HandlerBase {
+
+  /**
+   * The relationship alias.
+   *
+   * @var string
+   */
+  public $alias;
 
   /**
    * Overrides \Drupal\views\Plugin\views\HandlerBase::init().
@@ -86,7 +93,8 @@ abstract class RelationshipPluginBase extends HandlerBase {
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    // Relationships definitions should define a default label, but if they aren't get another default value.
+    // Relationships definitions should define a default label, but if they
+    // aren't get another default value.
     if (!empty($this->definition['label'])) {
       // Cast the label to a string since it is an object.
       // @see \Drupal\Core\StringTranslation\TranslationWrapper
@@ -97,7 +105,7 @@ abstract class RelationshipPluginBase extends HandlerBase {
     }
 
     $options['admin_label']['default'] = $label;
-    $options['required'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['required'] = array('default' => FALSE);
 
     return $options;
   }
@@ -113,8 +121,8 @@ abstract class RelationshipPluginBase extends HandlerBase {
 
     $form['required'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Require this relationship'),
-      '#description' => t('Enable to hide items that do not contain this relationship'),
+      '#title' => $this->t('Require this relationship'),
+      '#description' => $this->t('Enable to hide items that do not contain this relationship'),
       '#default_value' => !empty($this->options['required']),
     );
   }
@@ -161,6 +169,17 @@ abstract class RelationshipPluginBase extends HandlerBase {
       $access_tag = $table_data['table']['base']['access query tag'];
       $this->query->addTag($access_tag);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    // Add the provider of the relationship's base table to the dependencies.
+    $table_data = $this->getViewsData()->get($this->definition['base']);
+    return [
+      'module' => [$table_data['table']['provider']],
+    ];
   }
 
 }

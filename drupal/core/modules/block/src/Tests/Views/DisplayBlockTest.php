@@ -8,6 +8,7 @@
 namespace Drupal\block\Tests\Views;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\String;
 use Drupal\views\Views;
 use Drupal\views\Tests\ViewTestBase;
@@ -23,7 +24,7 @@ use Drupal\Core\Template\Attribute;
 class DisplayBlockTest extends ViewTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -63,10 +64,10 @@ class DisplayBlockTest extends ViewTestBase {
     // base table.
     $arguments = array(
       ':id' => 'edit-category-lists-views',
-      ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-1',
+      ':li_class' => 'views-block' . Html::getClass($edit['id']) . '-block-1',
       ':href' => \Drupal::Url('block.admin_add', array(
         'plugin_id' => 'views_block:' . $edit['id'] . '-block_1',
-        'theme' => 'stark',
+        'theme' => 'classy',
       )),
       ':text' => $edit['label'],
     );
@@ -94,7 +95,7 @@ class DisplayBlockTest extends ViewTestBase {
     $this->drupalPostForm(NULL, array(), t('Save'));
 
     // Test that the blocks are listed under the correct categories.
-    $category_id = drupal_html_id('edit-category-' . String::checkPlain($category));
+    $category_id = Html::getUniqueId('edit-category-' . String::checkPlain($category));
     $arguments[':id'] = $category_id;
     $this->drupalGet('admin/structure/block');
     $elements = $this->xpath('//details[@id=:id]//li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
@@ -102,10 +103,10 @@ class DisplayBlockTest extends ViewTestBase {
 
     $arguments = array(
       ':id' => 'edit-category-lists-views',
-      ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-2',
+      ':li_class' => 'views-block' . Html::getClass($edit['id']) . '-block-2',
       ':href' => \Drupal::Url('block.admin_add', array(
         'plugin_id' => 'views_block:' . $edit['id'] . '-block_2',
-        'theme' => 'stark',
+        'theme' => 'classy',
       )),
       ':text' => $edit['label'],
     );
@@ -114,10 +115,10 @@ class DisplayBlockTest extends ViewTestBase {
 
     $arguments = array(
       ':id' => $category_id,
-      ':li_class' => 'views-block' . drupal_html_class($edit['id']) . '-block-3',
+      ':li_class' => 'views-block' . Html::getClass($edit['id']) . '-block-3',
       ':href' => \Drupal::Url('block.admin_add', array(
         'plugin_id' => 'views_block:' . $edit['id'] . '-block_3',
-        'theme' => 'stark',
+        'theme' => 'classy',
       )),
       ':text' => $edit['label'],
     );
@@ -128,16 +129,16 @@ class DisplayBlockTest extends ViewTestBase {
   /**
    * Tests removing a block display.
    */
-  protected function testDeleteBlockDisplay() {
+  public function testDeleteBlockDisplay() {
     // To test all combinations possible we first place create two instances
     // of the block display of the first view.
-    $block_1 = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('title' => 'test_view_block-block_1:1'));
-    $block_2 = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('title' => 'test_view_block-block_1:2'));
+    $block_1 = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('label' => 'test_view_block-block_1:1'));
+    $block_2 = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('label' => 'test_view_block-block_1:2'));
 
     // Then we add one instance of blocks for each of the two displays of the
     // second view.
-    $block_3 = $this->drupalPlaceBlock('views_block:test_view_block2-block_1', array('title' => 'test_view_block2-block_1'));
-    $block_4 = $this->drupalPlaceBlock('views_block:test_view_block2-block_2', array('title' => 'test_view_block2-block_2'));
+    $block_3 = $this->drupalPlaceBlock('views_block:test_view_block2-block_1', array('label' => 'test_view_block2-block_1'));
+    $block_4 = $this->drupalPlaceBlock('views_block:test_view_block2-block_2', array('label' => 'test_view_block2-block_2'));
 
     $this->drupalGet('test-page');
     $this->assertBlockAppears($block_1);
@@ -183,7 +184,7 @@ class DisplayBlockTest extends ViewTestBase {
    */
   public function testViewsBlockForm() {
     $this->drupalLogin($this->drupalCreateUser(array('administer blocks')));
-    $default_theme = \Drupal::config('system.theme')->get('default');
+    $default_theme = $this->config('system.theme')->get('default');
     $this->drupalGet('admin/structure/block/add/views_block:test_view_block-block_1/' . $default_theme);
     $elements = $this->xpath('//input[@name="label"]');
     $this->assertTrue(empty($elements), 'The label field is not found for Views blocks.');
@@ -242,7 +243,7 @@ class DisplayBlockTest extends ViewTestBase {
    */
   public function testBlockRendering() {
     // Create a block and set a custom title.
-    $block = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('title' => 'test_view_block-block_1:1', 'views_label' => 'Custom title'));
+    $block = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('label' => 'test_view_block-block_1:1', 'views_label' => 'Custom title'));
     $this->drupalGet('');
 
     $result = $this->xpath('//div[contains(@class, "region-sidebar-first")]/div[contains(@class, "block-views")]/h2');

@@ -10,14 +10,14 @@ namespace Drupal\migrate_drupal\Tests\d6;
 use Drupal\config\Tests\SchemaCheckTestTrait;
 use Drupal\migrate\MigrateMessage;
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to book.settings.yml.
  *
  * @group migrate_drupal
  */
-class MigrateBookConfigsTest extends MigrateDrupalTestBase {
+class MigrateBookConfigsTest extends MigrateDrupal6TestBase {
 
   use SchemaCheckTestTrait;
 
@@ -35,7 +35,7 @@ class MigrateBookConfigsTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_book_settings');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6BookSettings.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, new MigrateMessage());
@@ -46,10 +46,10 @@ class MigrateBookConfigsTest extends MigrateDrupalTestBase {
    * Tests migration of book variables to book.settings.yml.
    */
   public function testBookSettings() {
-    $config = \Drupal::config('book.settings');
-    $this->assertIdentical($config->get('child_type'), 'book');
-    $this->assertIdentical($config->get('block.navigation.mode'), 'all pages');
-    $this->assertIdentical($config->get('allowed_types'), array('book'));
+    $config = $this->config('book.settings');
+    $this->assertIdentical('book', $config->get('child_type'));
+    $this->assertIdentical('all pages', $config->get('block.navigation.mode'));
+    $this->assertIdentical(array('book'), $config->get('allowed_types'));
     $this->assertConfigSchema(\Drupal::service('config.typed'), 'book.settings', $config->get());
   }
 

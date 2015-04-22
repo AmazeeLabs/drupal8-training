@@ -1,7 +1,7 @@
 book.render:
   path: '/book'
   defaults:
-    _content: '\Drupal\book\Controller\BookController::bookRender'
+    _controller: '\Drupal\book\Controller\BookController::bookRender'
     _title: 'Books'
   requirements:
     _permission: 'access content'
@@ -9,7 +9,7 @@ book.render:
 book.admin:
   path: '/admin/structure/book'
   defaults:
-    _content: '\Drupal\book\Controller\BookController::adminOverview'
+    _controller: '\Drupal\book\Controller\BookController::adminOverview'
     _title: 'Books'
   requirements:
     _permission: 'administer book outlines'
@@ -30,7 +30,7 @@ book.export:
     _permission: 'access printer-friendly version'
     _entity_access: 'node.view'
 
-book.outline:
+entity.node.book_outline_form:
   path: '/node/{node}/outline'
   defaults:
     _entity_form: 'node.book_outline'
@@ -51,13 +51,12 @@ book.admin_edit:
     _entity_access: 'node.view'
     node: \d+
 
-book.remove:
+entity.node.book_remove_form:
   path: '/node/{node}/outline/remove'
   defaults:
     _form: '\Drupal\book\Form\BookRemoveForm'
     _title: 'Remove from outline'
   options:
-    _access_mode: 'ALL'
     _node_operation_route: TRUE
   requirements:
     _permission: 'administer book outlines'

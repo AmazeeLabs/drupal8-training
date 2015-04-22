@@ -9,8 +9,8 @@ namespace Drupal\field\Tests\String;
 
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
-use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\entity_test\Entity\EntityTest;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
@@ -28,7 +28,7 @@ class StringFormatterTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('entity', 'field', 'text', 'entity_test', 'system', 'filter', 'user');
+  public static $modules = array('field', 'text', 'entity_test', 'system', 'filter', 'user');
 
   /**
    * @var string
@@ -58,6 +58,8 @@ class StringFormatterTest extends KernelTestBase {
 
     // Configure the theme system.
     $this->installConfig(array('system', 'field'));
+    $this->installSchema('system', 'router');
+    \Drupal::service('router.builder')->rebuild();
     $this->installEntitySchema('entity_test');
 
     $this->entityType = 'entity_test';
@@ -65,7 +67,7 @@ class StringFormatterTest extends KernelTestBase {
     $this->fieldName = Unicode::strtolower($this->randomMachineName());
 
     $field_storage = FieldStorageConfig::create(array(
-      'name' => $this->fieldName,
+      'field_name' => $this->fieldName,
       'entity_type' => $this->entityType,
       'type' => 'string',
     ));
@@ -89,7 +91,7 @@ class StringFormatterTest extends KernelTestBase {
   /**
    * Renders fields of a given entity with a given display.
    *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The entity object with attached fields to render.
    * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
    *   The display to render the fields in.
@@ -97,7 +99,7 @@ class StringFormatterTest extends KernelTestBase {
    * @return string
    *   The rendered entity fields.
    */
-  protected function renderEntityFields(ContentEntityInterface $entity, EntityViewDisplayInterface $display) {
+  protected function renderEntityFields(FieldableEntityInterface $entity, EntityViewDisplayInterface $display) {
     $content = $display->build($entity);
     $content = $this->render($content);
     return $content;
@@ -122,6 +124,23 @@ class StringFormatterTest extends KernelTestBase {
     // Verify the cache tags.
     $build = $entity->{$this->fieldName}->view();
     $this->assertTrue(!isset($build[0]['#cache']), format_string('The string formatter has no cache tags.'));
+
+    // Set the formatter to link to the entity.
+    $this->display->setComponent($this->fieldName, [
+      'type' => 'string',
+      'settings' => [
+        'link_to_entity' => TRUE,
+      ],
+    ]);
+    $this->display->save();
+
+    $value = $this->randomMachineName();
+    $entity->{$this->fieldName}->value = $value;
+    $entity->save();
+
+    $this->renderEntityFields($entity, $this->display);
+    $this->assertLink($value, 0);
+    $this->assertLinkByHref($entity->url());
   }
 
 }

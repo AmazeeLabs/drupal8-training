@@ -8,11 +8,12 @@
 namespace Drupal\comment;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\Core\Url;
 
 /**
  * Defines a class for building markup for comment links on a commented entity.
@@ -66,7 +67,7 @@ class CommentLinkBuilder implements CommentLinkBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function buildCommentedEntityLinks(ContentEntityInterface $entity, array &$context) {
+  public function buildCommentedEntityLinks(FieldableEntityInterface $entity, array &$context) {
     $entity_links = array();
     $view_mode = $context['view_mode'];
     if ($view_mode == 'search_index' || $view_mode == 'search_result' || $view_mode == 'print') {
@@ -108,16 +109,17 @@ class CommentLinkBuilder implements CommentLinkBuilderInterface {
             if (!empty($entity->get($field_name)->comment_count)) {
               $links['comment-comments'] = array(
                 'title' => $this->formatPlural($entity->get($field_name)->comment_count, '1 comment', '@count comments'),
-                'attributes' => array('title' => $this->t('Jump to the first comment of this posting.')),
+                'attributes' => array('title' => $this->t('Jump to the first comment.')),
                 'fragment' => 'comments',
-              ) + $entity->urlInfo()->toArray();
+                'url' => $entity->urlInfo(),
+              );
               if ($this->moduleHandler->moduleExists('history')) {
                 $links['comment-new-comments'] = array(
                   'title' => '',
-                  'href' => '',
+                  'url' => Url::fromRoute('<current>'),
                   'attributes' => array(
                     'class' => 'hidden',
-                    'title' => $this->t('Jump to the first new comment of this posting.'),
+                    'title' => $this->t('Jump to the first new comment.'),
                     'data-history-node-last-comment-timestamp' => $entity->get($field_name)->last_comment_timestamp,
                     'data-history-node-field-name' => $field_name,
                   ),
@@ -132,25 +134,23 @@ class CommentLinkBuilder implements CommentLinkBuilderInterface {
               $links['comment-add'] = array(
                 'title' => $this->t('Add new comment'),
                 'language' => $entity->language(),
-                'attributes' => array('title' => $this->t('Add a new comment to this page.')),
+                'attributes' => array('title' => $this->t('Share your thoughts and opinions.')),
                 'fragment' => 'comment-form',
               );
               if ($comment_form_location == CommentItemInterface::FORM_SEPARATE_PAGE) {
-                $links['comment-add']['route_name'] = 'comment.reply';
-                $links['comment-add']['route_parameters'] = array(
+                $links['comment-add']['url'] = Url::fromRoute('comment.reply', [
                   'entity_type' => $entity->getEntityTypeId(),
                   'entity' => $entity->id(),
                   'field_name' => $field_name,
-                );
+                ]);
               }
               else {
-                $links['comment-add'] += $entity->urlInfo()->toArray();
+                $links['comment-add'] += ['url' => $entity->urlInfo()];
               }
             }
             elseif ($this->currentUser->isAnonymous()) {
               $links['comment-forbidden'] = array(
                 'title' => $this->commentManager->forbiddenMessage($entity, $field_name),
-                'html' => TRUE,
               );
             }
           }
@@ -167,26 +167,24 @@ class CommentLinkBuilder implements CommentLinkBuilderInterface {
               if ($comment_form_location == CommentItemInterface::FORM_SEPARATE_PAGE || (!empty($entity->get($field_name)->comment_count) && $this->currentUser->hasPermission('access comments'))) {
                 $links['comment-add'] = array(
                   'title' => $this->t('Add new comment'),
-                  'attributes' => array('title' => $this->t('Share your thoughts and opinions related to this posting.')),
+                  'attributes' => array('title' => $this->t('Share your thoughts and opinions.')),
                   'fragment' => 'comment-form',
                 );
                 if ($comment_form_location == CommentItemInterface::FORM_SEPARATE_PAGE) {
-                  $links['comment-add']['route_name'] = 'comment.reply';
-                  $links['comment-add']['route_parameters'] = array(
+                  $links['comment-add']['url'] = Url::fromRoute('comment.reply', [
                     'entity_type' => $entity->getEntityTypeId(),
                     'entity' => $entity->id(),
                     'field_name' => $field_name,
-                  );
+                  ]);
                 }
                 else {
-                  $links['comment-add'] += $entity->urlInfo()->toArray();
+                  $links['comment-add']['url'] = $entity->urlInfo();
                 }
               }
             }
             elseif ($this->currentUser->isAnonymous()) {
               $links['comment-forbidden'] = array(
                 'title' => $this->commentManager->forbiddenMessage($entity, $field_name),
-                'html' => TRUE,
               );
             }
           }
@@ -207,7 +205,7 @@ class CommentLinkBuilder implements CommentLinkBuilderInterface {
           $entity_links['comment__' . $field_name]['#post_render_cache']['history_attach_timestamp'] = array(
             array('node_id' => $entity->id()),
           );
-          $entity_links['comment__' . $field_name]['#post_render_cache']['Drupal\comment\CommentViewBuilder::attachNewCommentsLinkMetadata'] = array(
+          $entity_links['comment__' . $field_name]['#post_render_cache']['comment.post_render_cache:attachNewCommentsLinkMetadata'] = array(
             array(
               'entity_type' => $entity->getEntityTypeId(),
               'entity_id' => $entity->id(),

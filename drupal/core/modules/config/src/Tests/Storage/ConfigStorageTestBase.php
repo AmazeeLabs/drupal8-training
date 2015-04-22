@@ -7,7 +7,7 @@
 
 namespace Drupal\config\Tests\Storage;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Base class for testing storage operations.
@@ -15,21 +15,21 @@ use Drupal\simpletest\DrupalUnitTestBase;
  * All configuration storages are expected to behave identically in
  * terms of reading, writing, listing, deleting, as well as error handling.
  *
- * Therefore, storage tests use a uncommon test case class structure;
- * the base class defines the test method(s) to execute, which are identical for
- * all storages. The storage specific test case classes
- * supply the necessary helper methods to interact with the raw/native storage
+ * Therefore, storage tests use an uncommon test case class structure;
+ * the base class defines the test method(s) to execute, which are identical
+ * for all storages. The storage specific test case classes supply the
+ * necessary helper methods to interact with the raw/native storage
  * directly.
  */
-abstract class ConfigStorageTestBase extends DrupalUnitTestBase {
+abstract class ConfigStorageTestBase extends KernelTestBase {
 
   /**
-   * @var \Drupal\Core\Config\StorageInterface;
+   * @var \Drupal\Core\Config\StorageInterface
    */
   protected $storage;
 
   /**
-   * @var \Drupal\Core\Config\StorageInterface;
+   * @var \Drupal\Core\Config\StorageInterface
    */
   protected $invalidStorage;
 

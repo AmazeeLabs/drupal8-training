@@ -24,9 +24,22 @@ abstract class TaxonomyFormatterBase extends FormatterBase {
     $terms = array();
 
     // Collect every possible term attached to any of the fieldable entities.
+    /* @var \Drupal\Core\Field\EntityReferenceFieldItemList $items */
     foreach ($entities_items as $items) {
+      /* @var \Drupal\Core\Entity\ContentEntityBase $parent */
+      $parent = $items->getEntity();
+      $active_langcode = $parent->language()->getId();
+      /* @var \Drupal\taxonomy\Entity\Term $term */
       foreach ($items->referencedEntities() as $term) {
-        $terms[$term->id()] = $term;
+        if ($term->hasTranslation($active_langcode)) {
+          $translated_term = $term->getTranslation($active_langcode);
+          if ($translated_term->access('view')) {
+            $term = $translated_term;
+          }
+        }
+        if (!$term->isNew()) {
+          $terms[$term->id()] = $term;
+        }
       }
     }
     if ($terms) {
@@ -42,7 +55,7 @@ abstract class TaxonomyFormatterBase extends FormatterBase {
             $item->entity = $terms[$item->target_id];
           }
           // Terms to be created are not in $terms, but are still legitimate.
-          elseif ($item->hasUnsavedEntity()) {
+          elseif ($item->hasNewEntity()) {
             // Leave the item in place.
           }
           // Otherwise, unset the instance value, since the term does not exist.

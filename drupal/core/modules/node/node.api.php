@@ -83,7 +83,9 @@ function hook_node_grants(\Drupal\Core\Session\AccountInterface $account, $op) {
   if ($account->hasPermission('access private content')) {
     $grants['example'] = array(1);
   }
-  $grants['example_author'] = array($account->id());
+  if ($account->id()) {
+    $grants['example_author'] = array($account->id());
+  }
   return $grants;
 }
 
@@ -175,14 +177,16 @@ function hook_node_access_records(\Drupal\node\NodeInterface $node) {
     // means there are many groups of just 1 user.
     // Note that an author can always view his or her nodes, even if they
     // have status unpublished.
-    $grants[] = array(
-      'realm' => 'example_author',
-      'gid' => $node->getOwnerId(),
-      'grant_view' => 1,
-      'grant_update' => 1,
-      'grant_delete' => 1,
-      'langcode' => 'ca'
-    );
+    if ($node->getOwnerId()) {
+      $grants[] = array(
+        'realm' => 'example_author',
+        'gid' => $node->getOwnerId(),
+        'grant_view' => 1,
+        'grant_update' => 1,
+        'grant_delete' => 1,
+        'langcode' => 'ca'
+      );
+    }
 
     return $grants;
   }
@@ -348,7 +352,7 @@ function hook_node_access(\Drupal\node\NodeInterface $node, $op, \Drupal\Core\Se
 
     default:
       // No opinion.
-      return AccessResult::create();
+      return AccessResult::neutral();
   }
 }
 
@@ -376,7 +380,7 @@ function hook_node_access(\Drupal\node\NodeInterface $node, $op, \Drupal\Core\Se
  */
 function hook_node_search_result(\Drupal\node\NodeInterface $node, $langcode) {
   $rating = db_query('SELECT SUM(points) FROM {my_rating} WHERE nid = :nid', array('nid' => $node->id()))->fetchField();
-  return array('rating' => format_plural($rating, '1 point', '@count points'));
+  return array('rating' => \Drupal::translation()->formatPlural($rating, '1 point', '@count points'));
 }
 
 /**
@@ -402,65 +406,6 @@ function hook_node_update_index(\Drupal\node\NodeInterface $node, $langcode) {
     $text .= '<h2>' . String::checkPlain($rating->title) . '</h2>' . Xss::filter($rating->description);
   }
   return $text;
-}
-
-/**
- * Perform node validation before a node is created or updated.
- *
- * This hook is invoked from NodeForm::validate(), after a user has
- * finished editing the node and is previewing or submitting it. It is invoked
- * at the end of all the standard validation steps.
- *
- * To indicate a validation error, use $form_state->setErrorByName().
- *
- * Note: Changes made to the $node object within your hook implementation will
- * have no effect.  The preferred method to change a node's content is to use
- * hook_node_presave() instead. If it is really necessary to change the node at
- * the validate stage, you can use form_set_value().
- *
- * @param \Drupal\node\NodeInterface $node
- *   The node being validated.
- * @param $form
- *   The form being used to edit the node.
- * @param $form_state
- *   The current state of the form.
- *
- * @ingroup entity_crud
- */
-function hook_node_validate(\Drupal\node\NodeInterface $node, $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-  if (isset($node->end) && isset($node->start)) {
-    if ($node->start > $node->end) {
-      $form_state->setErrorByName('time', t('An event may not end before it starts.'));
-    }
-  }
-}
-
-/**
- * Act on a node after validated form values have been copied to it.
- *
- * This hook is invoked when a node form is submitted with either the "Save" or
- * "Preview" button, after form values have been copied to the form state's node
- * object, but before the node is saved or previewed. It is a chance for modules
- * to adjust the node's properties from what they are simply after a copy from
- * $form_state->getValues(). This hook is intended for adjusting non-field-related
- * properties.
- *
- * @param \Drupal\node\NodeInterface $node
- *   The node entity being updated in response to a form submission.
- * @param $form
- *   The form being used to edit the node.
- * @param $form_state
- *   The current state of the form.
- *
- * @ingroup entity_crud
- */
-function hook_node_submit(\Drupal\node\NodeInterface $node, $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-  // Decompose the selected menu parent option into 'menu_name' and 'parent', if
-  // the form used the default parent selection widget.
-  $parent = $form_state->getValue(array('menu', 'parent'));
-  if (!empty($parent)) {
-    list($node->menu['menu_name'], $node->menu['parent']) = explode(':', $parent);
-  }
 }
 
 /**
@@ -490,7 +435,7 @@ function hook_node_submit(\Drupal\node\NodeInterface $node, $form, \Drupal\Core\
  *   'recent', or 'comments'. The values should be arrays themselves, with the
  *   following keys available:
  *   - title: (required) The human readable name of the ranking mechanism.
- *   - join: (optional) The part of a query string to join to any additional
+ *   - join: (optional) An array with information to join any additional
  *     necessary table. This is not necessary if the table required is already
  *     joined to by the base query, such as for the {node} table. Other tables
  *     should use the full table name as an alias to avoid naming collisions.
@@ -514,7 +459,12 @@ function hook_ranking() {
         'title' => t('Average vote'),
         // Note that we use i.sid, the search index's search item id, rather than
         // n.nid.
-        'join' => 'LEFT JOIN {vote_node_data} vote_node_data ON vote_node_data.nid = i.sid',
+        'join' => array(
+          'type' => 'LEFT',
+          'table' => 'vote_node_data',
+          'alias' => 'vote_node_data',
+          'on' => 'vote_node_data.nid = i.sid',
+        ),
         // The highest possible score should be 1, and the lowest possible score,
         // always 0, should be 0.
         'score' => 'vote_node_data.average / CAST(%f AS DECIMAL)',
@@ -550,7 +500,6 @@ function hook_node_links_alter(array &$links, NodeInterface $entity, array &$con
       'node-report' => array(
         'title' => t('Report'),
         'href' => "node/{$entity->id()}/report",
-        'html' => TRUE,
         'query' => array('token' => \Drupal::getContainer()->get('csrf_token')->get("node/{$entity->id()}/report")),
       ),
     ),

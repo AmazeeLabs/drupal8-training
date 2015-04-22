@@ -9,6 +9,7 @@ namespace Drupal\Core\Render\Element;
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\Component\Utility\Html as HtmlUtility;
 
 /**
  * Provides a render element for a table.
@@ -131,9 +132,10 @@ class Table extends FormElement {
 
         // Since the #parents of the tableselect form element will equal the
         // #parents of the row element, prevent FormBuilder from auto-generating
-        // an #id for the row element, since drupal_html_id() would automatically
+        // an #id for the row element, since
+        // \Drupal\Component\Utility\Html::getUniqueId() would automatically
         // append a suffix to the tableselect form element's #id otherwise.
-        $row['#id'] = drupal_html_id('edit-' . implode('-', $element_parents) . '-row');
+        $row['#id'] = HtmlUtility::getUniqueId('edit-' . implode('-', $element_parents) . '-row');
 
         // Do not overwrite manually created children.
         if (!isset($row['select'])) {
@@ -171,7 +173,7 @@ class Table extends FormElement {
           $row = array('select' => array()) + $row;
           $row['select'] += array(
             '#type' => $element['#multiple'] ? 'checkbox' : 'radio',
-            '#id' => drupal_html_id('edit-' . implode('-', $element_parents)),
+            '#id' => HtmlUtility::getUniqueId('edit-' . implode('-', $element_parents)),
             // @todo If rows happen to use numeric indexes instead of string keys,
             //   this results in a first row with $key === 0, which is always FALSE.
             '#return_value' => $key,
@@ -234,10 +236,10 @@ class Table extends FormElement {
   }
 
   /**
-   * #pre_render callback to transform children of an element into #rows suitable for theme_table().
+   * #pre_render callback to transform children of an element of #type 'table'.
    *
    * This function converts sub-elements of an element of #type 'table' to be
-   * suitable for theme_table():
+   * suitable for table.html.twig:
    * - The first level of sub-elements are table rows. Only the #attributes
    *   property is taken into account.
    * - The second level of sub-elements is converted into columns for the
@@ -281,7 +283,7 @@ class Table extends FormElement {
    *   $form['table'][$row]['edit'] = array(
    *     '#type' => 'link',
    *     '#title' => t('Edit'),
-   *     '#href' => 'thing/' . $row . '/edit',
+   *     '#url' => Url::fromRoute('entity.test_entity.edit_form', ['test_entity' => $row]),
    *   );
    * }
    * @endcode
@@ -294,7 +296,7 @@ class Table extends FormElement {
    *
    * @return array
    *
-   * @see theme_table()
+   * @see template_preprocess_table()
    * @see drupal_process_attached()
    * @see drupal_attach_tabledrag()
    */

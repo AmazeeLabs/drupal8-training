@@ -9,7 +9,9 @@ namespace Drupal\user\Plugin\views\access;
 
 use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\user\RoleStorageInterface;
 use Drupal\views\Plugin\views\access\AccessPluginBase;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Routing\Route;
 use Drupal\Core\Session\AccountInterface;
 
@@ -32,10 +34,46 @@ class Role extends AccessPluginBase {
   protected $usesOptions = TRUE;
 
   /**
+   * The role storage.
+   *
+   * @var \Drupal\user\RoleStorageInterface
+   */
+  protected $roleStorage;
+
+  /**
+   * Constructs a Role object.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\user\RoleStorageInterface $role_storage
+   *   The role storage.
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RoleStorageInterface $role_storage) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+    $this->roleStorage = $role_storage;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('entity.manager')->getStorage('user_role')
+    );
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function access(AccountInterface $account) {
-    return $account->hasPermission('access all views') || array_intersect(array_filter($this->options['role']), $account->getRoles());
+    return array_intersect(array_filter($this->options['role']), $account->getRoles());
   }
 
   /**
@@ -43,17 +81,17 @@ class Role extends AccessPluginBase {
    */
   public function alterRouteDefinition(Route $route) {
     if ($this->options['role']) {
-      $route->setRequirement('_role', (string) implode(',', $this->options['role']));
+      $route->setRequirement('_role', (string) implode('+', $this->options['role']));
     }
   }
 
   public function summaryTitle() {
     $count = count($this->options['role']);
     if ($count < 1) {
-      return t('No role(s) selected');
+      return $this->t('No role(s) selected');
     }
     elseif ($count > 1) {
-      return t('Multiple roles');
+      return $this->t('Multiple roles');
     }
     else {
       $rids = user_role_names();
@@ -74,10 +112,10 @@ class Role extends AccessPluginBase {
     parent::buildOptionsForm($form, $form_state);
     $form['role'] = array(
       '#type' => 'checkboxes',
-      '#title' => t('Role'),
+      '#title' => $this->t('Role'),
       '#default_value' => $this->options['role'],
       '#options' => array_map('\Drupal\Component\Utility\String::checkPlain', user_role_names()),
-      '#description' => t('Only the checked roles will be able to access this display. Note that users with "access all views" can see any view, regardless of role.'),
+      '#description' => $this->t('Only the checked roles will be able to access this display.'),
     );
   }
 
@@ -86,10 +124,25 @@ class Role extends AccessPluginBase {
     $role = array_filter($role);
 
     if (!$role) {
-      $form_state->setError($form['role'], t('You must select at least one role if type is "by role"'));
+      $form_state->setError($form['role'], $this->t('You must select at least one role if type is "by role"'));
     }
 
     $form_state->setValue(array('access_options', 'role'), $role);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    $dependencies = parent::calculateDependencies();
+
+    foreach (array_keys($this->options['role']) as $rid) {
+      if ($role = $this->roleStorage->load($rid)) {
+        $dependencies[$role->getConfigDependencyKey()][] = $role->getConfigDependencyName();
+      }
+    }
+
+    return $dependencies;
   }
 
 }

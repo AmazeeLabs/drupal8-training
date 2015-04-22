@@ -6,6 +6,7 @@
  */
 
 namespace Drupal\search\Tests;
+use Drupal\Component\Utility\Unicode;
 
 /**
  * Tests that CJK tokenizer works as intended.
@@ -13,6 +14,7 @@ namespace Drupal\search\Tests;
  * @group search
  */
 class SearchTokenizerTest extends SearchTestBase {
+
   /**
    * Verifies that strings of CJK characters are tokenized.
    *
@@ -24,7 +26,7 @@ class SearchTokenizerTest extends SearchTestBase {
   function testTokenizer() {
     // Set the minimum word size to 1 (to split all CJK characters) and make
     // sure CJK tokenizing is turned on.
-    \Drupal::config('search.settings')
+    $this->config('search.settings')
       ->set('index.minimum_word_size', 1)
       ->set('index.overlap_cjk', TRUE)
       ->save();
@@ -97,7 +99,7 @@ class SearchTokenizerTest extends SearchTestBase {
     // Merge into a string and tokenize.
     $string = implode('', $chars);
     $out = trim(search_simplify($string));
-    $expected = drupal_strtolower(implode(' ', $chars));
+    $expected = Unicode::strtolower(implode(' ', $chars));
 
     // Verify that the output matches what we expect.
     $this->assertEqual($out, $expected, 'CJK tokenizer worked on all supplied CJK characters');
@@ -112,9 +114,9 @@ class SearchTokenizerTest extends SearchTestBase {
   function testNoTokenizer() {
     // Set the minimum word size to 1 (to split all CJK characters) and make
     // sure CJK tokenizing is turned on.
-    \Drupal::config('search.settings')
-      ->set('minimum_word_size', 1)
-      ->set('overlap_cjk', TRUE)
+    $this->config('search.settings')
+      ->set('index.minimum_word_size', 1)
+      ->set('index.overlap_cjk', TRUE)
       ->save();
     $this->refreshVariables();
 

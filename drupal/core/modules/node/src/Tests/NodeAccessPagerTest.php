@@ -8,6 +8,7 @@
 namespace Drupal\node\Tests;
 
 use Drupal\comment\CommentInterface;
+use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -16,6 +17,8 @@ use Drupal\simpletest\WebTestBase;
  * @group node
  */
 class NodeAccessPagerTest extends WebTestBase {
+
+  use CommentTestTrait;
 
   /**
    * Modules to enable.
@@ -29,8 +32,8 @@ class NodeAccessPagerTest extends WebTestBase {
 
     node_access_rebuild();
     $this->drupalCreateContentType(array('type' => 'page', 'name' => t('Basic page')));
-    $this->container->get('comment.manager')->addDefaultField('node', 'page');
-    $this->web_user = $this->drupalCreateUser(array('access content', 'access comments', 'node test view'));
+    $this->addDefaultCommentField('node', 'page');
+    $this->webUser = $this->drupalCreateUser(array('access content', 'access comments', 'node test view'));
   }
 
   /**
@@ -55,7 +58,7 @@ class NodeAccessPagerTest extends WebTestBase {
       $comment->save();
     }
 
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
 
     // View the node page. With the default 50 comments per page there should
     // be two pages (0, 1) but no third (2) page.
@@ -71,7 +74,7 @@ class NodeAccessPagerTest extends WebTestBase {
    */
   public function testForumPager() {
     // Look up the forums vocabulary ID.
-    $vid = \Drupal::config('forum.settings')->get('vocabulary');
+    $vid = $this->config('forum.settings')->get('vocabulary');
     $this->assertTrue($vid, 'Forum navigation vocabulary ID is set.');
 
     // Look up the general discussion term.
@@ -92,7 +95,7 @@ class NodeAccessPagerTest extends WebTestBase {
 
     // View the general discussion forum page. With the default 25 nodes per
     // page there should be two pages for 30 nodes, no more.
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
     $this->drupalGet('forum/' . $tid);
     $this->assertRaw('page=1');
     $this->assertNoRaw('page=2');

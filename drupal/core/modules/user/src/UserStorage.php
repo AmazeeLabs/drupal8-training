@@ -15,6 +15,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\Sql\SqlContentEntityStorage;
 use Drupal\Core\Password\PasswordInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -45,9 +46,11 @@ class UserStorage extends SqlContentEntityStorage implements UserStorageInterfac
    *   Cache backend instance to use.
    * @param \Drupal\Core\Password\PasswordInterface $password
    *   The password hashing service.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    */
-  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, CacheBackendInterface $cache, PasswordInterface $password) {
-    parent::__construct($entity_type, $database, $entity_manager, $cache);
+  public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, CacheBackendInterface $cache, PasswordInterface $password, LanguageManagerInterface $language_manager) {
+    parent::__construct($entity_type, $database, $entity_manager, $cache, $language_manager);
 
     $this->password = $password;
   }
@@ -61,27 +64,9 @@ class UserStorage extends SqlContentEntityStorage implements UserStorageInterfac
       $container->get('database'),
       $container->get('entity.manager'),
       $container->get('cache.entity'),
-      $container->get('password')
+      $container->get('password'),
+      $container->get('language_manager')
     );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  function mapFromStorageRecords(array $records) {
-    foreach ($records as $record) {
-      $record->roles = array();
-      if ($record->uid) {
-        $record->roles[] = DRUPAL_AUTHENTICATED_RID;
-      }
-      else {
-        $record->roles[] = DRUPAL_ANONYMOUS_RID;
-      }
-    }
-
-    // Add any additional roles from the database.
-    $this->addRoles($records);
-    return parent::mapFromStorageRecords($records);
   }
 
   /**
@@ -108,43 +93,6 @@ class UserStorage extends SqlContentEntityStorage implements UserStorageInterfac
   /**
    * {@inheritdoc}
    */
-  public function saveRoles(UserInterface $account) {
-    $query = $this->database->insert('users_roles')->fields(array('uid', 'rid'));
-    foreach ($account->getRoles() as $rid) {
-      if (!in_array($rid, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID))) {
-        $query->values(array(
-          'uid' => $account->id(),
-          'rid' => $rid,
-        ));
-      }
-    }
-    $query->execute();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function addRoles(array $users) {
-    if ($users) {
-      $result = $this->database->query('SELECT rid, uid FROM {users_roles} WHERE uid IN (:uids)', array(':uids' => array_keys($users)));
-      foreach ($result as $record) {
-        $users[$record->uid]->roles[] = $record->rid;
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function deleteUserRoles(array $uids) {
-    $this->database->delete('users_roles')
-      ->condition('uid', $uids)
-      ->execute();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function updateLastLoginTimestamp(UserInterface $account) {
     $this->database->update('users_field_data')
       ->fields(array('login' => $account->getLastLoginTime()))
@@ -166,6 +114,18 @@ class UserStorage extends SqlContentEntityStorage implements UserStorageInterfac
       ->execute();
     // Ensure that the entity cache is cleared.
     $this->resetCache(array($account->id()));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function deleteRoleReferences(array $rids) {
+    // Remove the role from all users.
+    $this->database->delete('user__roles')
+        ->condition('roles_target_id', $rids)
+        ->execute();
+
+    $this->resetCache();
   }
 
 }

@@ -7,18 +7,17 @@
 
 namespace Drupal\Core\Field;
 
+use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\Core\Config\Entity\ThirdPartySettingsTrait;
-use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinition;
+use Drupal\Component\Utility\String;
 
 /**
  * Base class for configurable field definitions.
  */
 abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigInterface {
-
-  use ThirdPartySettingsTrait;
 
   /**
    * The field ID.
@@ -32,7 +31,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   public $id;
 
   /**
-   * The name of the field attached to the bundle by this field.
+   * The field name.
    *
    * @var string
    */
@@ -135,7 +134,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * hook_field_schema(). If the number of items exceeds the cardinality of the
    * field, extraneous items will be ignored.
    *
-   * This property is overlooked if the $default_value_function is non-empty.
+   * This property is overlooked if the $default_value_callback is non-empty.
    *
    * Example for a integer field:
    * @code
@@ -153,7 +152,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * The name of a callback function that returns default values.
    *
    * The function will be called with the following arguments:
-   * - \Drupal\Core\Entity\ContentEntityInterface $entity
+   * - \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The entity being created.
    * - \Drupal\Core\Field\FieldDefinitionInterface $definition
    *   The field definition.
@@ -165,7 +164,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    *
    * @var string
    */
-  public $default_value_function = '';
+  public $default_value_callback = '';
 
   /**
    * The field storage object.
@@ -187,6 +186,13 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * @var bool
    */
   protected $bundleRenameAllowed = FALSE;
+
+  /**
+   * Array of constraint options keyed by constraint plugin ID.
+   *
+   * @var array
+   */
+  protected $constraints = [];
 
   /**
    * {@inheritdoc}
@@ -219,7 +225,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
-  public function targetBundle() {
+  public function getTargetBundle() {
     return $this->bundle;
   }
 
@@ -228,15 +234,43 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    */
   public function calculateDependencies() {
     parent::calculateDependencies();
+    // Add dependencies from the field type plugin. We can not use
+    // self::calculatePluginDependencies() because instantiation of a field item
+    // plugin requires a parent entity.
+    /** @var $field_type_manager \Drupal\Core\Field\FieldTypePluginManagerInterface */
+    $field_type_manager = \Drupal::service('plugin.manager.field.field_type');
+    $definition = $field_type_manager->getDefinition($this->getType());
+    $this->addDependency('module', $definition['provider']);
+    // Plugins can declare additional dependencies in their definition.
+    if (isset($definition['config_dependencies'])) {
+      $this->addDependencies($definition['config_dependencies']);
+    }
+    // Let the field type plugin specify its own dependencies.
+    // @see \Drupal\Core\Field\FieldItemInterface::calculateDependencies()
+    $this->addDependencies($definition['class']::calculateDependencies($this));
+
+    // If the target entity type uses entities to manage its bundles then
+    // depend on the bundle entity.
     $bundle_entity_type_id = $this->entityManager()->getDefinition($this->entity_type)->getBundleEntityType();
     if ($bundle_entity_type_id != 'bundle') {
-      // If the target entity type uses entities to manage its bundles then
-      // depend on the bundle entity.
-      $bundle_entity = $this->entityManager()->getStorage($bundle_entity_type_id)->load($this->bundle);
-      $this->addDependency('entity', $bundle_entity->getConfigDependencyName());
+      if (!$bundle_entity = $this->entityManager()->getStorage($bundle_entity_type_id)->load($this->bundle)) {
+        throw new \LogicException(String::format('Missing bundle entity, entity type %type, entity id %bundle.', array('%type' => $bundle_entity_type_id, '%bundle' => $this->bundle)));
+      }
+      $this->addDependency('config', $bundle_entity->getConfigDependencyName());
     }
     return $this->dependencies;
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onDependencyRemoval(array $dependencies) {
+    $field_type_manager = \Drupal::service('plugin.manager.field.field_type');
+    $definition = $field_type_manager->getDefinition($this->getType());
+    $changed = $definition['class']::onDependencyRemoval($this, $dependencies);
+    return $changed;
+  }
+
 
   /**
    * {@inheritdoc}
@@ -332,13 +366,21 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
-  public function getDefaultValue(ContentEntityInterface $entity) {
+  public function getDefaultValue(FieldableEntityInterface $entity) {
     // Allow custom default values function.
-    if ($function = $this->default_value_function) {
-      $value = call_user_func($function, $entity, $this);
+    if ($callback = $this->default_value_callback) {
+      $value = call_user_func($callback, $entity, $this);
     }
     else {
       $value = $this->default_value;
+    }
+    // Normalize into the "array keyed by delta" format.
+    if (isset($value) && !is_array($value)) {
+      $properties = $this->getFieldStorageDefinition()->getPropertyNames();
+      $property = reset($properties);
+      $value = array(
+        array($property => $value),
+      );
     }
     // Allow the field type to process default values.
     $field_item_list_class = $this->getClass();
@@ -403,7 +445,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * {@inheritdoc}
    */
   public function getConstraints() {
-    return \Drupal::typedDataManager()->getDefaultConstraints($this);
+    return \Drupal::typedDataManager()->getDefaultConstraints($this) + $this->constraints;
   }
 
   /**
@@ -423,13 +465,6 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
         ->setSettings($this->getSettings());
     }
     return $this->itemDefinition;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getBundle() {
-    return $this->bundle;
   }
 
   /**
@@ -459,6 +494,46 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * {@inheritdoc}
    */
   public function getConfig($bundle) {
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setConstraints(array $constraints) {
+    $this->constraints = $constraints;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function addConstraint($constraint_name, $options = NULL) {
+    $this->constraints[$constraint_name] = $options;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setPropertyConstraints($name, array $constraints) {
+    $item_constraints = $this->getItemDefinition()->getConstraints();
+    $item_constraints['ComplexData'][$name] = $constraints;
+    $this->getItemDefinition()->setConstraints($item_constraints);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function addPropertyConstraints($name, array $constraints) {
+    $item_constraints = $this->getItemDefinition()->getConstraint('ComplexData') ?: [];
+    if (isset($item_constraints[$name])) {
+      // Add the new property constraints, overwriting as required.
+      $item_constraints[$name] = $constraints + $item_constraints[$name];
+    }
+    else {
+      $item_constraints[$name] = $constraints;
+    }
+    $this->getItemDefinition()->addConstraint('ComplexData', $item_constraints);
     return $this;
   }
 

@@ -117,9 +117,9 @@ abstract class FormTestBase extends UnitTestCase {
   protected $translationManager;
 
   /**
-   * @var \Symfony\Component\HttpKernel\HttpKernel|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\DrupalKernelInterface|\PHPUnit_Framework_MockObject_MockObject
    */
-  protected $httpKernel;
+  protected $kernel;
 
   /**
    * @var \PHPUnit_Framework_MockObject_MockObject|\Psr\Log\LoggerInterface
@@ -142,7 +142,7 @@ abstract class FormTestBase extends UnitTestCase {
     $this->csrfToken = $this->getMockBuilder('Drupal\Core\Access\CsrfTokenGenerator')
       ->disableOriginalConstructor()
       ->getMock();
-    $this->httpKernel = $this->getMockBuilder('Symfony\Component\HttpKernel\HttpKernel')
+    $this->kernel = $this->getMockBuilder('\Drupal\Core\DrupalKernel')
       ->disableOriginalConstructor()
       ->getMock();
     $this->account = $this->getMock('Drupal\Core\Session\AccountInterface');
@@ -160,8 +160,9 @@ abstract class FormTestBase extends UnitTestCase {
       ->setConstructorArgs(array($this->requestStack, $this->urlGenerator))
       ->setMethods(array('batchGet', 'drupalInstallationAttempted'))
       ->getMock();
+    $this->root = dirname(dirname(substr(__DIR__, 0, -strlen(__NAMESPACE__))));
 
-    $this->formBuilder = new TestFormBuilder($this->formValidator, $this->formSubmitter, $this->formCache, $this->moduleHandler, $this->eventDispatcher, $this->requestStack, $this->classResolver, $this->themeManager, $this->csrfToken, $this->httpKernel);
+    $this->formBuilder = new TestFormBuilder($this->formValidator, $this->formSubmitter, $this->formCache, $this->moduleHandler, $this->eventDispatcher, $this->requestStack, $this->classResolver, $this->themeManager, $this->csrfToken, $this->kernel);
     $this->formBuilder->setCurrentUser($this->account);
   }
 
@@ -255,16 +256,6 @@ abstract class FormTestBase extends UnitTestCase {
  * Provides a test form builder class.
  */
 class TestFormBuilder extends FormBuilder {
-  protected static $seenIds = array();
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function sendResponse(Response $response) {
-    parent::sendResponse($response);
-    // Throw an exception instead of exiting.
-    throw new \Exception('exit');
-  }
 
   /**
    * @param \Drupal\Core\Session\AccountInterface $account
@@ -299,34 +290,6 @@ class TestFormBuilder extends FormBuilder {
     }
     return $types[$type];
   }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function drupalHtmlClass($class) {
-    return $class;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function drupalHtmlId($id) {
-    if (isset(static::$seenIds[$id])) {
-      $id = $id . '--' . ++static::$seenIds[$id];
-    }
-    else {
-      static::$seenIds[$id] = 1;
-    }
-    return $id;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function drupalStaticReset($name = NULL) {
-    static::$seenIds = array();
-  }
-
 }
 
 }

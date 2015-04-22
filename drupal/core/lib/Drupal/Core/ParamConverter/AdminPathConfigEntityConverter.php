@@ -18,7 +18,9 @@ use Drupal\Core\Entity\EntityManagerInterface;
  * Converts entity route arguments to unmodified entities as opposed to
  * converting to entities with overrides, such as the negotiated language.
  *
- * This converter applies only if the path is an admin path.
+ * This converter applies only if the path is an admin path, the entity is
+ * a config entity, and the "with_config_overrides" element is not set to TRUE
+ * on the parameter definition.
  *
  * Due to this converter having a higher weight than the default
  * EntityConverter, every time this applies, it takes over the conversion duty
@@ -76,11 +78,7 @@ class AdminPathConfigEntityConverter extends EntityConverter {
 
     if ($storage = $this->entityManager->getStorage($entity_type_id)) {
       // Make sure no overrides are loaded.
-      $old_state = $this->configFactory->getOverrideState();
-      $this->configFactory->setOverrideState(FALSE);
-      $entity = $storage->load($value);
-      $this->configFactory->setOverrideState($old_state);
-      return $entity;
+      return $storage->loadOverrideFree($value);
     }
   }
 
@@ -88,6 +86,10 @@ class AdminPathConfigEntityConverter extends EntityConverter {
    * {@inheritdoc}
    */
   public function applies($definition, $name, Route $route) {
+    if (isset($definition['with_config_overrides']) && $definition['with_config_overrides']) {
+      return FALSE;
+    }
+
     if (parent::applies($definition, $name, $route)) {
       $entity_type_id = substr($definition['type'], strlen('entity:'));
       // If the entity type is dynamic, defer checking to self::convert().

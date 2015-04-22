@@ -28,6 +28,11 @@ class InstallStorage extends FileStorage {
   const CONFIG_INSTALL_DIRECTORY = 'config/install';
 
   /**
+   * Extension sub-directory containing optional configuration for installation.
+   */
+  const CONFIG_OPTIONAL_DIRECTORY = 'config/optional';
+
+  /**
    * Extension sub-directory containing configuration schema.
    */
   const CONFIG_SCHEMA_DIRECTORY = 'config/schema';
@@ -157,7 +162,7 @@ class InstallStorage extends FileStorage {
       if ($profile = drupal_get_profile()) {
         $this->folders += $this->getComponentNames('profile', array($profile));
       }
-      $listing = new ExtensionDiscovery();
+      $listing = new ExtensionDiscovery(DRUPAL_ROOT);
       $this->folders += $this->getComponentNames('module', array_keys($listing->scan('module')));
       $this->folders += $this->getComponentNames('theme', array_keys($listing->scan('theme')));
     }

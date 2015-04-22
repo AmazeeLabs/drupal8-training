@@ -7,14 +7,14 @@
 
 namespace Drupal\user\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests user_install().
  *
  * @group user
  */
-class UserInstallTest extends DrupalUnitTestBase {
+class UserInstallTest extends KernelTestBase {
 
   /**
    * Modules to enable.
@@ -47,8 +47,8 @@ class UserInstallTest extends DrupalUnitTestBase {
 
     // Test that the anonymous and administrators languages are equal to the
     // site's default language.
-    $this->assertEqual($anon->langcode, \Drupal::languageManager()->getDefaultLanguage()->id);
-    $this->assertEqual($admin->langcode, \Drupal::languageManager()->getDefaultLanguage()->id);
+    $this->assertEqual($anon->langcode, \Drupal::languageManager()->getDefaultLanguage()->getId());
+    $this->assertEqual($admin->langcode, \Drupal::languageManager()->getDefaultLanguage()->getId());
 
     // Test that the administrator is active.
     $this->assertEqual($admin->status, 1);

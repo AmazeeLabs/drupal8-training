@@ -6,6 +6,8 @@
  */
 
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\String;
+use Drupal\Core\Url;
 use Drupal\Core\Render\Element;
 use Drupal\locale\SourceString;
 use Drupal\locale\TranslationString;
@@ -33,52 +35,7 @@ function locale_translation_manual_status() {
   if (batch_get()) {
     return batch_process('admin/reports/translations');
   }
-  return new RedirectResponse(url('admin/reports/translations', array('absolute' => TRUE)));
-}
-
-/**
- * Returns HTML for translation edit form.
- *
- * @param array $variables
- *   An associative array containing:
- *   - form: The form that contains the language information.
- *
- * @see locale_translate_edit_form()
- * @ingroup themeable
- */
-function theme_locale_translate_edit_form_strings($variables) {
-  $output = '';
-  $form = $variables['form'];
-  $header = array(
-    t('Source string'),
-    t('Translation for @language', array('@language' => $form['#language'])),
-  );
-  $rows = array();
-  foreach (Element::children($form) as $lid) {
-    $string = $form[$lid];
-    if ($string['plural']['#value']) {
-      $source = drupal_render($string['original_singular']) . '<br />' . drupal_render($string['original_plural']);
-    }
-    else {
-      $source = drupal_render($string['original']);
-    }
-    $source .= empty($string['context']) ? '' : '<br /><small>' . t('In Context') . ':&nbsp;' . $string['context']['#value'] . '</small>';
-    $rows[] = array(
-      array('data' => SafeMarkup::set($source)),
-      array('data' => $string['translations']),
-    );
-  }
-  $table = array(
-    '#type' => 'table',
-    '#header' => $header,
-    '#rows' => $rows,
-    '#empty' => t('No strings available.'),
-    '#attributes' => array('class' => array('locale-translate-edit-table')),
-  );
-  $output .= drupal_render($table);
-  $pager = array('#theme' => 'pager');
-  $output .= drupal_render($pager);
-  return $output;
+  return new RedirectResponse(\Drupal::url('locale.translate_status', array(), array('absolute' => TRUE)));
 }
 
 /**
@@ -95,7 +52,7 @@ function theme_locale_translate_edit_form_strings($variables) {
  *
  * @see \Drupal\locale\Form\TranslationStatusForm
  */
-function template_preprocess_locale_translation_update_info(&$variables) {
+function template_preprocess_locale_translation_update_info(array &$variables) {
   $details = array();
 
   // Build output for available updates.
@@ -104,7 +61,10 @@ function template_preprocess_locale_translation_update_info(&$variables) {
     if ($variables['updates']) {
       foreach ($variables['updates'] as $update) {
         $modules[] = $update['name'];
-        $releases[] = t('@module (@date)', array('@module' => $update['name'], '@date' => format_date($update['timestamp'], 'html_date')));
+        $releases[] = String::format('@module (@date)', array(
+          '@module' => $update['name'],
+          '@date' => format_date($update['timestamp'], 'html_date'),
+        ));
       }
       $variables['modules'] = $modules;
     }
@@ -117,11 +77,15 @@ function template_preprocess_locale_translation_update_info(&$variables) {
   // Build output for updates not found.
   if (isset($variables['not_found'])) {
     $releases = array();
-    $variables['missing_updates_status'] = format_plural(count($variables['not_found']), 'Missing translations for one project', 'Missing translations for @count projects');
+    $variables['missing_updates_status'] = \Drupal::translation()->formatPlural(count($variables['not_found']), 'Missing translations for one project', 'Missing translations for @count projects');
     if ($variables['not_found']) {
       foreach ($variables['not_found'] as $update) {
         $version = $update['version'] ? $update['version'] : t('no version');
-        $releases[] = t('@module (@version).', array('@module' => $update['name'], '@version' => $version)) . ' ' . $update['info'];
+        $releases[] = String::format('@module (@version). !info', array(
+          '@module' => $update['name'],
+          '@version' => $version,
+          '!info' => $update['info'],
+        ));
       }
     }
     $details['missing_updates_list'] = array(
@@ -147,15 +111,15 @@ function template_preprocess_locale_translation_update_info(&$variables) {
  *
  * Default template: locale-translation-last-check.html.twig.
  *
- * @param $variables
+ * @param array $variables
  *   An associative array containing:
  *   - last: The timestamp when the site last checked for available updates.
  *
  * @see \Drupal\locale\Form\TranslationStatusForm
  */
-function template_preprocess_locale_translation_last_check(&$variables) {
+function template_preprocess_locale_translation_last_check(array &$variables) {
   $last = $variables['last'];
   $variables['last_checked'] = ($last != NULL);
   $variables['time'] = \Drupal::service('date.formatter')->formatInterval(REQUEST_TIME - $last);
-  $variables['link'] = l(t('Check manually'), 'admin/reports/translations/check', array('query' => drupal_get_destination()));
+  $variables['link'] = \Drupal::l(t('Check manually'), new Url('locale.check_translation', array(), array('query' => drupal_get_destination())));
 }

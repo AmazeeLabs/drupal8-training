@@ -8,12 +8,11 @@
 namespace Drupal\node;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Config\Entity\ThirdPartySettingsInterface;
 
 /**
  * Provides an interface defining a node type entity.
  */
-interface NodeTypeInterface extends ConfigEntityInterface, ThirdPartySettingsInterface {
+interface NodeTypeInterface extends ConfigEntityInterface {
 
   /**
    * Determines whether the node type is locked.
@@ -71,4 +70,19 @@ interface NodeTypeInterface extends ConfigEntityInterface, ThirdPartySettingsInt
    */
   public function setPreviewMode($preview_mode);
 
+  /**
+   * Returns the help information.
+   *
+   * @return string
+   *   The help information of this node type.
+   */
+  public function getHelp();
+
+  /**
+   * Returns the description.
+   *
+   * @return string
+   *   The description of this node type.
+   */
+  public function getDescription();
 }

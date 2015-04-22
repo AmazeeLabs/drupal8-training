@@ -1,8 +1,14 @@
-base_field: id
-base_table: views_test_data
-core: 8.x
+langcode: en
+status: true
+dependencies: {  }
+id: test_style_html_list
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: id
+core: 8.x
 display:
   default:
     display_plugin: default
@@ -34,7 +40,6 @@ display:
           type: ul
           wrapper_class: ''
           class: ''
-        provider: views
       row:
         type: fields
         options: {  }
@@ -43,9 +48,3 @@ display:
           id: name
           table: views_test_data
           field: name
-          provider: views_test_data
-label: ''
-module: views
-id: test_style_html_list
-tag: ''
-langcode: en

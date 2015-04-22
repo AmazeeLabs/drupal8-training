@@ -63,7 +63,7 @@ abstract class ListItemBase extends FieldItemBase implements OptionsProviderInte
    * {@inheritdoc}
    */
   public function getSettableOptions(AccountInterface $account = NULL) {
-    $allowed_options = options_allowed_values($this->getFieldDefinition(), $this->getEntity());
+    $allowed_options = options_allowed_values($this->getFieldDefinition()->getFieldStorageDefinition(), $this->getEntity());
     return $allowed_options;
   }
 
@@ -150,7 +150,7 @@ abstract class ListItemBase extends FieldItemBase implements OptionsProviderInte
 
       // Prevent removing values currently in use.
       if ($element['#field_has_data']) {
-        $lost_keys = array_diff(array_keys($element['#allowed_values']), array_keys($values));
+        $lost_keys = array_keys(array_diff_key($element['#allowed_values'], $values));
         if (_options_values_in_use($element['#entity_type'], $element['#field_name'], $lost_keys)) {
           $form_state->setError($element, t('Allowed values list: some values are being removed while currently in use.'));
         }

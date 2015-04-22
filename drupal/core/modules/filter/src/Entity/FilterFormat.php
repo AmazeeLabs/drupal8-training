@@ -7,11 +7,12 @@
 
 namespace Drupal\filter\Entity;
 
+use Drupal\Component\Plugin\PluginInspectionInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\Core\Entity\EntityWithPluginBagsInterface;
+use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\filter\FilterFormatInterface;
-use Drupal\filter\FilterBag;
+use Drupal\filter\FilterPluginCollection;
 use Drupal\filter\Plugin\FilterInterface;
 
 /**
@@ -38,12 +39,12 @@ use Drupal\filter\Plugin\FilterInterface;
  *     "status" = "status"
  *   },
  *   links = {
- *     "edit-form" = "entity.filter_format.edit_form",
- *     "disable" = "entity.filter_format.disable"
+ *     "edit-form" = "/admin/config/content/formats/manage/{filter_format}",
+ *     "disable" = "/admin/config/content/formats/manage/{filter_format}/disable"
  *   }
  * )
  */
-class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, EntityWithPluginBagsInterface {
+class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, EntityWithPluginCollectionInterface {
 
   /**
    * Unique machine name of the format.
@@ -52,7 +53,7 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    *
    * @var string
    */
-  public $format;
+  protected $format;
 
   /**
    * Unique label of the text format.
@@ -65,7 +66,7 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    *
    * @var string
    */
-  public $name;
+  protected $name;
 
   /**
    * Weight of this format in the text format selector.
@@ -75,7 +76,7 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    *
    * @var int
    */
-  public $weight = 0;
+  protected $weight = 0;
 
   /**
    * List of user role IDs to grant access to use this format on initial creation.
@@ -98,7 +99,7 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    * An associative array of filters assigned to the text format, keyed by the
    * instance ID of each filter and using the properties:
    * - id: The plugin ID of the filter plugin instance.
-   * - module: The name of the module providing the filter.
+   * - provider: The name of the provider that owns the filter.
    * - status: (optional) A Boolean indicating whether the filter is
    *   enabled in the text format. Defaults to FALSE.
    * - weight: (optional) The weight of the filter in the text format. Defaults
@@ -114,9 +115,9 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
   /**
    * Holds the collection of filters that are attached to this format.
    *
-   * @var \Drupal\filter\FilterBag
+   * @var \Drupal\filter\FilterPluginCollection
    */
-  protected $filterBag;
+  protected $filterCollection;
 
   /**
    * {@inheritdoc}
@@ -129,20 +130,20 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    * {@inheritdoc}
    */
   public function filters($instance_id = NULL) {
-    if (!isset($this->filterBag)) {
-      $this->filterBag = new FilterBag(\Drupal::service('plugin.manager.filter'), $this->filters);
-      $this->filterBag->sort();
+    if (!isset($this->filterCollection)) {
+      $this->filterCollection = new FilterPluginCollection(\Drupal::service('plugin.manager.filter'), $this->filters);
+      $this->filterCollection->sort();
     }
     if (isset($instance_id)) {
-      return $this->filterBag->get($instance_id);
+      return $this->filterCollection->get($instance_id);
     }
-    return $this->filterBag;
+    return $this->filterCollection;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getPluginBags() {
+  public function getPluginCollections() {
     return array('filters' => $this->filters());
   }
 
@@ -151,8 +152,8 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
    */
   public function setFilterConfig($instance_id, array $configuration) {
     $this->filters[$instance_id] = $configuration;
-    if (isset($this->filterBag)) {
-      $this->filterBag->setInstanceConfiguration($instance_id, $configuration);
+    if (isset($this->filterCollection)) {
+      $this->filterCollection->setInstanceConfiguration($instance_id, $configuration);
     }
     return $this;
   }
@@ -384,6 +385,44 @@ class FilterFormat extends ConfigEntityBase implements FilterFormatInterface, En
       }
 
       return $restrictions;
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function removeFilter($instance_id) {
+    unset($this->filters[$instance_id]);
+    $this->filterCollection->removeInstanceId($instance_id);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onDependencyRemoval(array $dependencies) {
+    $changed = parent::onDependencyRemoval($dependencies);
+    $filters = $this->filters();
+    foreach ($filters as $filter) {
+      // Remove disabled filters, so that this FilterFormat config entity can
+      // continue to exist.
+      if (!$filter->status && in_array($filter->provider, $dependencies['module'])) {
+        $this->removeFilter($filter->getPluginId());
+        $changed = TRUE;
+      }
+    }
+    return $changed;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function calculatePluginDependencies(PluginInspectionInterface $instance) {
+    // Only add dependencies for plugins that are actually configured. This is
+    // necessary because the filter plugin collection will return all available
+    // filter plugins.
+    // @see \Drupal\filter\FilterPluginCollection::getConfiguration()
+    if (isset($this->filters[$instance->getPluginId()])) {
+      parent::calculatePluginDependencies($instance);
     }
   }
 

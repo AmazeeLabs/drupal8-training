@@ -8,14 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade variables to filter.formats.*.yml.
  *
  * @group migrate_drupal
  */
-class MigrateFilterFormatTest extends MigrateDrupalTestBase {
+class MigrateFilterFormatTest extends MigrateDrupal6TestBase {
 
   /**
    * {@inheritdoc}
@@ -29,7 +29,9 @@ class MigrateFilterFormatTest extends MigrateDrupalTestBase {
     parent::setUp();
     $migration = entity_load('migration', 'd6_filter_format');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6FilterFormat.php',
+      $this->getDumpDirectory() . '/Filters.php',
+      $this->getDumpDirectory() . '/FilterFormats.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -55,10 +57,10 @@ class MigrateFilterFormatTest extends MigrateDrupalTestBase {
     $this->assertFalse(isset($filters['filter_html_image_secure']));
 
     // Check variables migrated into filter.
-    $this->assertIdentical($filters['filter_html']['settings']['allowed_html'], '<a> <em> <strong> <cite> <code> <ul> <ol> <li> <dl> <dt> <dd>');
-    $this->assertIdentical($filters['filter_html']['settings']['filter_html_help'], TRUE);
-    $this->assertIdentical($filters['filter_html']['settings']['filter_html_nofollow'], FALSE);
-    $this->assertIdentical($filters['filter_url']['settings']['filter_url_length'], 72);
+    $this->assertIdentical('<a> <em> <strong> <cite> <code> <ul> <ol> <li> <dl> <dt> <dd>', $filters['filter_html']['settings']['allowed_html']);
+    $this->assertIdentical(TRUE, $filters['filter_html']['settings']['filter_html_help']);
+    $this->assertIdentical(FALSE, $filters['filter_html']['settings']['filter_html_nofollow']);
+    $this->assertIdentical(72, $filters['filter_url']['settings']['filter_url_length']);
   }
 
 }

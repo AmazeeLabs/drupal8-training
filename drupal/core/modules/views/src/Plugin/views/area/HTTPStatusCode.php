@@ -48,11 +48,11 @@ class HTTPStatusCode extends AreaPluginBase {
 
     // Add the HTTP status code, so it's easier for people to find it.
     array_walk($options, function($title, $code) use(&$options) {
-      $options[$code] = t('@code (!title)', array('@code' => $code, '!title' => $title));
+      $options[$code] = $this->t('@code (!title)', array('@code' => $code, '!title' => $title));
     });
 
     $form['status_code'] = array(
-      '#title' => t('HTTP status code'),
+      '#title' => $this->t('HTTP status code'),
       '#type' => 'select',
       '#default_value' => $this->options['status_code'],
       '#options' => $options,
@@ -64,8 +64,8 @@ class HTTPStatusCode extends AreaPluginBase {
    */
   function render($empty = FALSE) {
     if (!$empty || !empty($this->options['empty'])) {
-      $this->view->getResponse()->setStatusCode($this->options['status_code']);
-      $this->view->getRequest()->attributes->set('_http_statuscode', $this->options['status_code']);
+      $build['#attached']['http_header'][] = ['Status', $this->options['status_code']];
+      return $build;
     }
   }
 

@@ -5,10 +5,11 @@
  * Provide structure for the administrative interface to Views.
  */
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
 use Drupal\views\Views;
 use Drupal\views\ViewExecutable;
-use Drupal\views\ViewStorageInterface;
 use Drupal\views_ui\ViewUI;
 use Drupal\views\Analyzer;
 use Drupal\Core\Ajax\AjaxResponse;
@@ -27,9 +28,9 @@ function views_ui_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Creating and managing views.') . '</dt>';
-      $output .= '<dd>' . t('Views can be created from the <a href="@list">Views list page</a> by using the "Add new view" action. Existing views can be managed from the <a href="@list">Views list page</a> by locating the view in the "Enabled" or "Disabled" list and selecting the desired operation action, for example "Edit".', array('@list' => \Drupal::url('views_ui.list', array('name' => 'views_ui')))) . '</dd>';
+      $output .= '<dd>' . t('Views can be created from the <a href="@list">Views list page</a> by using the "Add new view" action. Existing views can be managed from the <a href="@list">Views list page</a> by locating the view in the "Enabled" or "Disabled" list and selecting the desired operation action, for example "Edit".', array('@list' => \Drupal::url('entity.view.collection', array('name' => 'views_ui')))) . '</dd>';
       $output .= '<dt>' . t('Enabling and disabling views.') . '<dt>';
-      $output .= '<dd>' . t('Views can be enabled or disabled from the <a href="@list">Views list page</a>. To enable a view, find the view within the "Disabled" list and select the "Enable" operation. To disable a view find the view within the "Enabled" list and select the "Disable" operation.', array('@list' => \Drupal::url('views_ui.list', array('name' => 'views_ui')))) . '</dd>';
+      $output .= '<dd>' . t('Views can be enabled or disabled from the <a href="@list">Views list page</a>. To enable a view, find the view within the "Disabled" list and select the "Enable" operation. To disable a view find the view within the "Enabled" list and select the "Disable" operation.', array('@list' => \Drupal::url('entity.view.collection', array('name' => 'views_ui')))) . '</dd>';
       $output .= '<dt>' . t('Exporting and importing views.') . '</dt>';
       $output .= '<dd>' . t('Views can be exported and imported as configuration files by using the <a href="@config">Configuration Manager module</a>.', array('@config' => \Drupal::url('help.page', array('name' => 'config')))) . '</dd>';
       $output .= '<dt>' . t('Theming views.') . '</dt>';
@@ -49,17 +50,18 @@ function views_ui_entity_type_build(array &$entity_types) {
     ->setFormClass('add', 'Drupal\views_ui\ViewAddForm')
     ->setFormClass('preview', 'Drupal\views_ui\ViewPreviewForm')
     ->setFormClass('duplicate', 'Drupal\views_ui\ViewDuplicateForm')
-    ->setFormClass('delete', 'Drupal\views_ui\ViewDeleteForm')
+    ->setFormClass('delete', 'Drupal\Core\Entity\EntityDeleteForm')
     ->setFormClass('break_lock', 'Drupal\views_ui\Form\BreakLockForm')
     ->setListBuilderClass('Drupal\views_ui\ViewListBuilder')
-    ->setLinkTemplate('edit-form', 'entity.view.edit_form')
-    ->setLinkTemplate('edit-display-form', 'entity.view.edit_display_form')
-    ->setLinkTemplate('preview-form', 'entity.view.preview_form')
-    ->setLinkTemplate('duplicate-form', 'entity.view.duplicate_form')
-    ->setLinkTemplate('delete-form', 'entity.view.delete_form')
-    ->setLinkTemplate('enable', 'entity.view.enable')
-    ->setLinkTemplate('disable', 'entity.view.disable')
-    ->setLinkTemplate('break-lock-form', 'entity.view.break_lock_form');
+    ->setLinkTemplate('edit-form', '/admin/structure/views/view/{view}')
+    ->setLinkTemplate('edit-display-form', '/admin/structure/views/view/{view}/edit/{display_id}')
+    ->setLinkTemplate('preview-form', '/admin/structure/views/view/{view}/preview/{display_id}')
+    ->setLinkTemplate('duplicate-form', '/admin/structure/views/view/{view}/duplicate')
+    ->setLinkTemplate('delete-form', '/admin/structure/views/view/{view}/delete')
+    ->setLinkTemplate('enable', '/admin/structure/views/view/{view}/enable')
+    ->setLinkTemplate('disable', '/admin/structure/views/view/{view}/disable')
+    ->setLinkTemplate('break-lock-form', '/admin/structure/views/view/{view}/break-lock')
+    ->setLinkTemplate('collection', '/admin/structure/views');
 }
 
 /**
@@ -70,57 +72,50 @@ function views_ui_theme() {
     // edit a view
     'views_ui_display_tab_setting' => array(
       'variables' => array('description' => '', 'link' => '', 'settings_links' => array(), 'overridden' => FALSE, 'defaulted' => FALSE, 'description_separator' => TRUE, 'class' => array()),
-      'template' => 'views-ui-display-tab-setting',
       'file' => 'views_ui.theme.inc',
     ),
     'views_ui_display_tab_bucket' => array(
       'render element' => 'element',
-      'template' => 'views-ui-display-tab-bucket',
       'file' => 'views_ui.theme.inc',
     ),
     'views_ui_rearrange_filter_form' => array(
       'render element' => 'form',
       'file' => 'views_ui.theme.inc',
-      'template' => 'views-ui-rearrange-filter-form',
     ),
     'views_ui_expose_filter_form' => array(
       'render element' => 'form',
       'file' => 'views_ui.theme.inc',
-      'template' => 'views-ui-expose-filter-form',
     ),
 
     // list views
     'views_ui_view_info' => array(
       'variables' => array('view' => NULL, 'displays' => NULL),
       'file' => 'views_ui.theme.inc',
-      'template' => 'views-ui-view-info',
     ),
 
     // Group of filters.
     'views_ui_build_group_filter_form' => array(
       'render element' => 'form',
       'file' => 'views_ui.theme.inc',
+      'function' => 'theme_views_ui_build_group_filter_form',
     ),
 
     // On behalf of a plugin
     'views_ui_style_plugin_table' => array(
       'render element' => 'form',
       'file' => 'views_ui.theme.inc',
-      'template' => 'views-ui-style-plugin-table',
     ),
 
     // When previewing a view.
     'views_ui_view_preview_section' => array(
       'variables' => array('view' => NULL, 'section' => NULL, 'content' => NULL, 'links' => ''),
       'file' => 'views_ui.theme.inc',
-      'template' => 'views-ui-view-preview-section',
     ),
 
     // Generic container wrapper, to use instead of theme_container when an id
     // is not desired.
     'views_ui_container' => array(
       'variables' => array('children' => NULL, 'attributes' => array()),
-      'template' => 'views-ui-container',
       'file' => 'views_ui.theme.inc',
     ),
   );
@@ -180,13 +175,13 @@ function views_ui_view_preview_section_handler_links(ViewExecutable $view, $type
     $field_name = $handler->adminLabel(TRUE);
     $links[$type . '-edit-' . $id] = array(
       'title' => t('Edit @section', array('@section' => $field_name)),
-      'href' => "admin/structure/views/nojs/handler/{$view->storage->id()}/{$display['id']}/$type/$id",
+      'url' => Url::fromRoute('views_ui.form_handler', ['js' => 'nojs', 'view' => $view->storage->id(), 'display_id' => $display['id'], 'type' => $type, 'id' => $id]),
       'attributes' => array('class' => array('views-ajax-link')),
     );
   }
   $links[$type . '-add'] = array(
     'title' => t('Add new'),
-    'href' => "admin/structure/views/nojs/add-handler/{$view->storage->id()}/{$display['id']}/$type",
+    'url' => Url::fromRoute('views_ui.form_add_handler', ['js' => 'nojs', 'view' => $view->storage->id(), 'display_id' => $display['id'], 'type' => $type]),
     'attributes' => array('class' => array('views-ajax-link')),
   );
 
@@ -201,7 +196,7 @@ function views_ui_view_preview_section_display_category_links(ViewExecutable $vi
   $links = array(
     $type . '-edit' => array(
       'title' => t('Edit @section', array('@section' => $title)),
-      'href' => "admin/structure/views/nojs/display/{$view->storage->id()}/{$display['id']}/$type",
+      'url' => Url::fromRoute('views_ui.form_display', ['js' => 'nojs', 'view' => $view->storage->id(), 'display_id' => $display['id'], 'type' => $type]),
       'attributes' => array('class' => array('views-ajax-link')),
     ),
   );
@@ -252,8 +247,8 @@ function views_ui_contextual_links_view_alter(&$element, $items) {
   // screen.
   elseif (!empty($element['#links']['entityviewedit-form'])) {
     $display_id = $items['entity.view.edit_form']['metadata']['display_id'];
-    $element['#links']['entityviewedit-form']['route_parameters']['display_id'] = $display_id;
-    $element['#links']['entityviewedit-form']['route_name'] = 'entity.view.edit_display_form';
+    $route_parameters = $element['#links']['entityviewedit-form']['url']->getRouteParameters() + ['display_id' => $display_id];
+    $element['#links']['entityviewedit-form']['url'] = Url::fromRoute('entity.view.edit_display_form', $route_parameters);
   }
 }
 
@@ -332,8 +327,8 @@ function views_ui_views_analyze(ViewExecutable $view) {
  * This is often used in the UI to ensure long strings fit.
  */
 function views_ui_truncate($string, $length) {
-  if (drupal_strlen($string) > $length) {
-    $string = drupal_substr($string, 0, $length);
+  if (Unicode::strlen($string) > $length) {
+    $string = Unicode::substr($string, 0, $length);
     $string .= '...';
   }
 

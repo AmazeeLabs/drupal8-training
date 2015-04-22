@@ -7,6 +7,7 @@
 
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\Xss;
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Render\Element;
@@ -53,14 +54,10 @@ function _system_is_incompatible(&$incompatible, $files, Extension $file) {
  */
 function template_preprocess_admin_block_content(&$variables) {
   if (!empty($variables['content'])) {
-    $compact = system_admin_compact_mode();
-    $variables['attributes'] = array('class' => array('admin-list'));
-    if ($compact) {
-      $variables['attributes']['class'][] = 'compact';
-    }
+    $variables['compact'] = system_admin_compact_mode();
     foreach ($variables['content'] as $key => $item) {
-      $variables['content'][$key]['link'] = \Drupal::linkGenerator()->generateFromUrl($item['title'], $item['url']);
-      if (!$compact && isset($item['description'])) {
+      $variables['content'][$key]['link'] = \Drupal::l($item['title'], $item['url']);
+      if (!$variables['compact'] && isset($item['description'])) {
         $variables['content'][$key]['description'] = Xss::filterAdmin($item['description']);
       }
       else {
@@ -84,7 +81,7 @@ function template_preprocess_admin_block_content(&$variables) {
  */
 function template_preprocess_admin_page(&$variables) {
   $variables['system_compact_link'] = array(
-    '#theme' => 'system_compact_link',
+    '#type' => 'system_compact_link',
   );
   $variables['containers'] = array();
   $stripe = 0;
@@ -113,7 +110,7 @@ function template_preprocess_admin_page(&$variables) {
  */
 function template_preprocess_system_admin_index(&$variables) {
   $variables['system_compact_link'] = array(
-    '#theme' => 'system_compact_link',
+    '#type' => 'system_compact_link',
   );
   $variables['containers'] = array();
   $stripe = 0;
@@ -164,19 +161,19 @@ function template_preprocess_status_report(&$variables) {
   $severities = array(
     REQUIREMENT_INFO => array(
       'title' => t('Info'),
-      'class' => 'info',
+      'status' => 'info',
     ),
     REQUIREMENT_OK => array(
       'title' => t('OK'),
-      'class' => 'ok',
+      'status' => 'ok',
     ),
     REQUIREMENT_WARNING => array(
       'title' => t('Warning'),
-      'class' => 'warning',
+      'status' => 'warning',
     ),
     REQUIREMENT_ERROR => array(
       'title' => t('Error'),
-      'class' => 'error',
+      'status' => 'error',
     ),
   );
 
@@ -194,8 +191,8 @@ function template_preprocess_status_report(&$variables) {
     else {
       $severity = $severities[REQUIREMENT_INFO];
     }
-    $variables['requirements'][$i]['severity_class'] = $severity['class'];
     $variables['requirements'][$i]['severity_title'] = $severity['title'];
+    $variables['requirements'][$i]['severity_status'] = $severity['status'];
   }
 }
 
@@ -231,13 +228,15 @@ function theme_system_modules_details($variables) {
     $row[] = array('class' => array('checkbox'), 'data' => drupal_render($module['enable']));
 
     // Add the module label and expand/collapse functionalty.
-    $col2 = '<label id="module-' . $key . '" for="' . $module['enable']['#id'] . '" class="module-name table-filter-text-source">' . drupal_render($module['name']) . '</label>';
+    $id = Html::getUniqueId('module-' . $key);
+    $col2 = '<label id="' . $id . '" for="' . $module['enable']['#id'] . '" class="module-name table-filter-text-source">' . drupal_render($module['name']) . '</label>';
     $row[] = array('class' => array('module'), 'data' => SafeMarkup::set($col2));
 
     // Add the description, along with any modules it requires.
     $description = '';
+    $description .= '<div class="requirements">';
+    $description .= '<div class="admin-requirements">' . t('Machine name: !machine-name', array('!machine-name' => '<span dir="ltr" class="table-filter-text-source">' . $key . '</span>')) . '</div>';
     if ($version || $requires || $required_by) {
-      $description .= ' <div class="requirements">';
       if ($version) {
         $description .= '<div class="admin-requirements">' . t('Version: !module-version', array('!module-version' => drupal_render($module['version']))) . '</div>';
       }
@@ -247,11 +246,11 @@ function theme_system_modules_details($variables) {
       if ($required_by) {
         $description .= '<div class="admin-requirements">' . t('Required by: !module-list', array('!module-list' => implode(', ', $module['#required_by']))) . '</div>';
       }
-      $description .= '</div>';
     }
+    $description .= '</div>';
     $links = '';
-    foreach (array('help', 'permissions', 'configure') as $key) {
-      $links .= drupal_render($module['links'][$key]);
+    foreach (array('help', 'permissions', 'configure') as $link_type) {
+      $links .= drupal_render($module['links'][$link_type]);
     }
     if ($links) {
       $description .= '  <div class="links">';
@@ -262,7 +261,7 @@ function theme_system_modules_details($variables) {
       '#type' => 'details',
       '#title' => SafeMarkup::set('<span class="text"> ' . drupal_render($module['description']) . '</span>'),
       '#attributes' => array('id' => $module['enable']['#id'] . '-description'),
-      '#description' => SafeMarkup::set($description),
+      '#description' => $description,
     );
     $col4 = drupal_render($details);
     $row[] = array('class' => array('description', 'expand'), 'data' => $col4);
@@ -304,14 +303,16 @@ function theme_system_modules_uninstall($variables) {
   // Display table.
   $rows = array();
   foreach (Element::children($form['modules']) as $module) {
+    $disabled_message = '';
+    // Add the modules requiring the module in question as a validation reason.
     if (!empty($form['modules'][$module]['#required_by'])) {
-      $disabled_message = format_plural(count($form['modules'][$module]['#required_by']),
-        'To uninstall @module, the following module must be uninstalled first: @required_modules',
-        'To uninstall @module, the following modules must be uninstalled first: @required_modules',
-        array('@module' => $form['modules'][$module]['#module_name'], '@required_modules' => implode(', ', $form['modules'][$module]['#required_by'])));
+      $form['modules'][$module]['#validation_reasons'][] = \Drupal::translation()->translate('Required by: @modules', array('@modules' => implode(', ',$form['modules'][$module]['#required_by'])));
     }
-    else {
-      $disabled_message = '';
+    if (!empty($form['modules'][$module]['#validation_reasons'])) {
+      $disabled_message = \Drupal::translation()->formatPlural(count($form['modules'][$module]['#validation_reasons']),
+        'The following reason prevents @module from being uninstalled: @reasons',
+        'The following reasons prevents @module from being uninstalled: @reasons',
+        array('@module' => $form['modules'][$module]['#module_name'], '@reasons' => implode('; ', $form['modules'][$module]['#validation_reasons'])));
     }
     $rows[] = array(
       array('data' => drupal_render($form['uninstall'][$module]), 'align' => 'center'),
@@ -374,7 +375,7 @@ function template_preprocess_system_themes_page(&$variables) {
     $theme_group['state'] = $state;
     $theme_group['title'] = $title;
     $theme_group['themes'] = array();
-    $theme_group['attributes'] = new Attribute(array('class' => array('system-themes-list', 'system-themes-list-' . $state, 'clearfix')));
+    $theme_group['attributes'] = new Attribute();
 
     foreach ($theme_groups[$state] as $theme) {
       $current_theme = array();
@@ -402,13 +403,12 @@ function template_preprocess_system_themes_page(&$variables) {
       // Localize the theme description.
       $current_theme['description'] = t($theme->info['description']);
 
-      // Style theme info.
-      $theme->classes[] = 'theme-selector';
-      $theme->classes[] = 'clearfix';
-      $current_theme['attributes'] = new Attribute(array('class' => $theme->classes));
+      $current_theme['attributes'] = new Attribute();
       $current_theme['name'] = $theme->info['name'];
       $current_theme['version'] = isset($theme->info['version']) ? $theme->info['version'] : '';
       $current_theme['notes'] = $theme->notes;
+      $current_theme['is_default'] = $theme->is_default;
+      $current_theme['is_admin'] = $theme->is_admin;
 
       // Make sure to provide feedback on compatibility.
       $current_theme['incompatible'] = '';

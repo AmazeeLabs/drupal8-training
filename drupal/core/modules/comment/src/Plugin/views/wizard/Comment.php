@@ -19,7 +19,7 @@ use Drupal\views\Plugin\views\wizard\WizardPluginBase;
  *
  * @ViewsWizard(
  *   id = "comment",
- *   base_table = "comment",
+ *   base_table = "comment_field_data",
  *   title = @Translation("Comments")
  * )
  */
@@ -31,21 +31,6 @@ class Comment extends WizardPluginBase {
   protected $createdColumn = 'created';
 
   /**
-   * Set default values for the path field options.
-   */
-  protected $pathField = array(
-    'id' => 'cid',
-    'table' => 'comment',
-    'field' => 'cid',
-    'exclude' => TRUE,
-    'link_to_comment' => FALSE,
-    'alter' => array(
-      'alter_text' => TRUE,
-      'text' => 'comment/[cid]#comment-[cid]'
-    ),
-  );
-
-  /**
    * Set default values for the filters.
    */
   protected $filters = array(
@@ -53,15 +38,19 @@ class Comment extends WizardPluginBase {
       'value' => TRUE,
       'table' => 'comment_field_data',
       'field' => 'status',
-      'provider' => 'comment'
+      'plugin_id' => 'boolean',
+      'entity_type' => 'comment',
+      'entity_field' => 'status',
     ),
     'status_node' => array(
       'value' => TRUE,
       'table' => 'node_field_data',
       'field' => 'status',
-      'provider' => 'node',
+      'plugin_id' => 'boolean',
       'relationship' => 'node',
-    )
+      'entity_type' => 'node',
+      'entity_field' => 'status',
+    ),
   );
 
   /**
@@ -69,68 +58,9 @@ class Comment extends WizardPluginBase {
    */
   protected function rowStyleOptions() {
     $options = array();
-    $options['comment'] = t('comments');
-    $options['fields'] = t('fields');
+    $options['entity:comment'] = $this->t('comments');
+    $options['fields'] = $this->t('fields');
     return $options;
-  }
-
-  protected function buildFormStyle(array &$form, FormStateInterface $form_state, $type) {
-    parent::buildFormStyle($form, $form_state, $type);
-    $style_form =& $form['displays'][$type]['options']['style'];
-    // Some style plugins don't support row plugins so stop here if that's the
-    // case.
-    if (!isset($style_form['row_plugin']['#default_value'])) {
-      return;
-    }
-    $row_plugin = $style_form['row_plugin']['#default_value'];
-    switch ($row_plugin) {
-      case 'comment':
-        $style_form['row_options']['links'] = array(
-          '#type' => 'select',
-          '#title' => t('Should links be displayed below each comment'),
-          '#title_display' => 'invisible',
-          '#options' => array(
-            1 => t('with links (allow users to reply to the comment, etc.)'),
-            0 => t('without links'),
-          ),
-          '#default_value' => 1,
-        );
-        break;
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function pageDisplayOptions(array $form, FormStateInterface $form_state) {
-    $display_options = parent::pageDisplayOptions($form, $form_state);
-    $row_plugin = $form_state->getValue(array('page', 'style', 'row_plugin'));
-    $row_options = $form_state->getValue(array('page', 'style', 'row_options'), array());
-    $this->display_options_row($display_options, $row_plugin, $row_options);
-    return $display_options;
-  }
-
-  /**
-   * Overrides Drupal\views\Plugin\views\wizard\WizardPluginBase::blockDisplayOptions().
-   */
-  protected function blockDisplayOptions(array $form, FormStateInterface $form_state) {
-    $display_options = parent::blockDisplayOptions($form, $form_state);
-    $row_plugin = $form_state->getValue(array('block', 'style', 'row_plugin'));
-    $row_options = $form_state->getValue(array('block', 'style', 'row_options'), array());
-    $this->display_options_row($display_options, $row_plugin, $row_options);
-    return $display_options;
-  }
-
-  /**
-   * Set the row style and row style plugins to the display_options.
-   */
-  protected  function display_options_row(&$display_options, $row_plugin, $row_options) {
-    switch ($row_plugin) {
-      case 'comment':
-        $display_options['row']['type'] = 'entity:comment';
-        $display_options['row']['options']['links'] = !empty($row_options['links']);
-        break;
-    }
   }
 
   /**
@@ -141,15 +71,15 @@ class Comment extends WizardPluginBase {
 
     // Add permission-based access control.
     $display_options['access']['type'] = 'perm';
-    $display_options['access']['provider'] = 'user';
+    $display_options['access']['options']['perm'] = 'access comments';
 
     // Add a relationship to nodes.
     $display_options['relationships']['node']['id'] = 'node';
     $display_options['relationships']['node']['table'] = 'comment_field_data';
     $display_options['relationships']['node']['field'] = 'node';
+    $display_options['relationships']['node']['entity_type'] = 'comment_field_data';
     $display_options['relationships']['node']['required'] = 1;
     $display_options['relationships']['node']['plugin_id'] = 'standard';
-    $display_options['relationships']['node']['provider'] = 'views';
 
     // Remove the default fields, since we are customizing them here.
     unset($display_options['fields']);
@@ -158,7 +88,8 @@ class Comment extends WizardPluginBase {
     $display_options['fields']['subject']['id'] = 'subject';
     $display_options['fields']['subject']['table'] = 'comment_field_data';
     $display_options['fields']['subject']['field'] = 'subject';
-    $display_options['fields']['subject']['provider'] = 'comment';
+    $display_options['fields']['subject']['entity_type'] = 'comment';
+    $display_options['fields']['subject']['entity_field'] = 'subject';
     $display_options['fields']['subject']['label'] = '';
     $display_options['fields']['subject']['alter']['alter_text'] = 0;
     $display_options['fields']['subject']['alter']['make_link'] = 0;
@@ -171,6 +102,7 @@ class Comment extends WizardPluginBase {
     $display_options['fields']['subject']['hide_empty'] = 0;
     $display_options['fields']['subject']['empty_zero'] = 0;
     $display_options['fields']['subject']['link_to_comment'] = 1;
+    $display_options['fields']['subject']['plugin_id'] = 'comment';
 
     return $display_options;
   }

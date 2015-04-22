@@ -2,6 +2,12 @@ name: 'Locale Test Not Development Release'
 type: module
 description: 'The first release with the same major release number which is not a development release.'
 package: Testing
-version: VERSION
-core: 8.x
+# version: VERSION
+# core: 8.x
 hidden: true
+
+# Information added by Drupal.org packaging script on 2015-03-25
+version: '8.0.0-beta9'
+core: '8.x'
+project: 'drupal'
+datestamp: 1427300653

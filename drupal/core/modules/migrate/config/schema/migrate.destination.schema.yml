@@ -3,6 +3,11 @@
 migrate.destination.*:
   type: migrate_destination
   label: 'Default destination'
+  mapping:
+    no_stub:
+      type: boolean
+      label: 'Whether stubbing is allowed.'
+      default: false
 
 migrate.destination.config:
   type: migrate_destination
@@ -12,7 +17,7 @@ migrate.destination.config:
       type: string
       label: 'Configuration name'
 
-"migrate.destination.entity:user":
+migrate.destination.entity:user:
   type: migrate_destination
   label: 'User'
   mapping:
@@ -20,7 +25,7 @@ migrate.destination.config:
       type: boolean
       label: 'Passwords'
 
-"migrate.destination.entity:file":
+migrate.destination.entity:file:
   type: migrate_destination
   label: 'Picture'
   mapping:

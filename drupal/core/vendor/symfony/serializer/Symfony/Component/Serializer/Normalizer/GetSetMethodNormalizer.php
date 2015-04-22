@@ -11,7 +11,9 @@
 
 namespace Symfony\Component\Serializer\Normalizer;
 
+use Symfony\Component\Serializer\Exception\CircularReferenceException;
 use Symfony\Component\Serializer\Exception\InvalidArgumentException;
+use Symfony\Component\Serializer\Exception\LogicException;
 use Symfony\Component\Serializer\Exception\RuntimeException;
 
 /**
@@ -33,12 +35,49 @@ use Symfony\Component\Serializer\Exception\RuntimeException;
  * takes place.
  *
  * @author Nils Adermann <naderman@naderman.de>
+ * @author Kévin Dunglas <dunglas@gmail.com>
  */
 class GetSetMethodNormalizer extends SerializerAwareNormalizer implements NormalizerInterface, DenormalizerInterface
 {
+    protected $circularReferenceLimit = 1;
+    protected $circularReferenceHandler;
     protected $callbacks = array();
     protected $ignoredAttributes = array();
     protected $camelizedAttributes = array();
+
+    /**
+     * Set circular reference limit.
+     *
+     * @param $circularReferenceLimit limit of iterations for the same object
+     *
+     * @return self
+     */
+    public function setCircularReferenceLimit($circularReferenceLimit)
+    {
+        $this->circularReferenceLimit = $circularReferenceLimit;
+
+        return $this;
+    }
+
+    /**
+     * Set circular reference handler.
+     *
+     * @param callable $circularReferenceHandler
+     *
+     * @return self
+     *
+     * @throws InvalidArgumentException
+     */
+    public function setCircularReferenceHandler($circularReferenceHandler)
+    {
+        if (!is_callable($circularReferenceHandler)) {
+            throw new InvalidArgumentException('The given circular reference handler is not callable.');
+        }
+
+        $this->circularReferenceHandler = $circularReferenceHandler;
+
+        return $this;
+    }
 
     /**
      * Set normalization callbacks.
@@ -47,7 +86,7 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
      *
      * @throws InvalidArgumentException if a non-callable callback is set
      *
-     * @return GetSetMethodNormalizer
+     * @return self
      */
     public function setCallbacks(array $callbacks)
     {
@@ -62,11 +101,11 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
     }
 
     /**
-     * Set ignored attributes for normalization
+     * Set ignored attributes for normalization.
      *
      * @param array $ignoredAttributes
      *
-     * @return GetSetMethodNormalizer
+     * @return self
      */
     public function setIgnoredAttributes(array $ignoredAttributes)
     {
@@ -76,11 +115,11 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
     }
 
     /**
-     * Set attributes to be camelized on denormalize
+     * Set attributes to be camelized on denormalize.
      *
      * @param array $camelizedAttributes
      *
-     * @return GetSetMethodNormalizer
+     * @return self
      */
     public function setCamelizedAttributes(array $camelizedAttributes)
     {
@@ -94,6 +133,24 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
      */
     public function normalize($object, $format = null, array $context = array())
     {
+        $objectHash = spl_object_hash($object);
+
+        if (isset($context['circular_reference_limit'][$objectHash])) {
+            if ($context['circular_reference_limit'][$objectHash] >= $this->circularReferenceLimit) {
+                unset($context['circular_reference_limit'][$objectHash]);
+
+                if ($this->circularReferenceHandler) {
+                    return call_user_func($this->circularReferenceHandler, $object);
+                }
+
+                throw new CircularReferenceException(sprintf('A circular reference has been detected (configured limit: %d).', $this->circularReferenceLimit));
+            }
+
+            $context['circular_reference_limit'][$objectHash]++;
+        } else {
+            $context['circular_reference_limit'][$objectHash] = 1;
+        }
+
         $reflectionObject = new \ReflectionObject($object);
         $reflectionMethods = $reflectionObject->getMethods(\ReflectionMethod::IS_PUBLIC);
 
@@ -112,9 +169,10 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
                 }
                 if (null !== $attributeValue && !is_scalar($attributeValue)) {
                     if (!$this->serializer instanceof NormalizerInterface) {
-                        throw new \LogicException(sprintf('Cannot normalize attribute "%s" because injected serializer is not a normalizer', $attributeName));
+                        throw new LogicException(sprintf('Cannot normalize attribute "%s" because injected serializer is not a normalizer', $attributeName));
                     }
-                    $attributeValue = $this->serializer->normalize($attributeValue, $format);
+
+                    $attributeValue = $this->serializer->normalize($attributeValue, $format, $context);
                 }
 
                 $attributes[$attributeName] = $attributeValue;
@@ -129,6 +187,18 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
      */
     public function denormalize($data, $class, $format = null, array $context = array())
     {
+        if (is_array($data) || is_object($data) && $data instanceof \ArrayAccess) {
+            $normalizedData = $data;
+        } elseif (is_object($data)) {
+            $normalizedData = array();
+
+            foreach ($data as $attribute => $value) {
+                $normalizedData[$attribute] = $value;
+            }
+        } else {
+            $normalizedData = array();
+        }
+
         $reflectionClass = new \ReflectionClass($class);
         $constructor = $reflectionClass->getConstructor();
 
@@ -139,10 +209,10 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
             foreach ($constructorParameters as $constructorParameter) {
                 $paramName = lcfirst($this->formatAttribute($constructorParameter->name));
 
-                if (isset($data[$paramName])) {
-                    $params[] = $data[$paramName];
+                if (isset($normalizedData[$paramName])) {
+                    $params[] = $normalizedData[$paramName];
                     // don't run set for a parameter passed to the constructor
-                    unset($data[$paramName]);
+                    unset($normalizedData[$paramName]);
                 } elseif ($constructorParameter->isOptional()) {
                     $params[] = $constructorParameter->getDefaultValue();
                 } else {
@@ -156,10 +226,10 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
 
             $object = $reflectionClass->newInstanceArgs($params);
         } else {
-            $object = new $class;
+            $object = new $class();
         }
 
-        foreach ($data as $attribute => $value) {
+        foreach ($normalizedData as $attribute => $value) {
             $setter = 'set'.$this->formatAttribute($attribute);
 
             if (method_exists($object, $setter)) {
@@ -173,9 +243,10 @@ class GetSetMethodNormalizer extends SerializerAwareNormalizer implements Normal
     /**
      * Format attribute name to access parameters or methods
      * As option, if attribute name is found on camelizedAttributes array
-     * returns attribute name in camelcase format
+     * returns attribute name in camelcase format.
      *
      * @param string $attributeName
+     *
      * @return string
      */
     protected function formatAttribute($attributeName)

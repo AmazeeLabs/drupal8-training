@@ -5,8 +5,10 @@
  * Callbacks and theming for the CKEditor toolbar configuration UI.
  */
 
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Template\Attribute;
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Language\LanguageInterface;
 
 /**
  * Prepares variables for CKEditor settings toolbar templates.
@@ -19,9 +21,7 @@ use Drupal\Component\Utility\SafeMarkup;
  *   - plugins: A list of plugins.
  */
 function template_preprocess_ckeditor_settings_toolbar(&$variables) {
-  // Simplify the language direction information for toolbar buttons.
   $language_interface = \Drupal::languageManager()->getCurrentLanguage();
-  $language_direction = $language_interface->direction ? 'rtl' : 'ltr';
 
   // Create lists of active and disabled buttons.
   $editor = $variables['editor'];
@@ -61,7 +61,7 @@ function template_preprocess_ckeditor_settings_toolbar(&$variables) {
   }
   $disabled_buttons = array_diff_key($buttons, $multiple_buttons);
 
-  $rtl = $language_direction === 'rtl' ? '_rtl' : '';
+  $rtl = $language_interface->getDirection() === LanguageInterface::DIRECTION_RTL ? '_rtl' : '';
 
   $build_button_item = function($button, $rtl) {
     // Value of the button item.
@@ -84,15 +84,9 @@ function template_preprocess_ckeditor_settings_toolbar(&$variables) {
       $value = '?';
     }
 
-    // Set additional attribute on the button if it can occur multiple times.
-    if (!empty($button['multiple'])) {
-      $button['attributes']['class'][] = 'ckeditor-multiple-button';
-    }
-
     // Build the button attributes.
     $attributes = array(
       'data-drupal-ckeditor-button-name' => $button['name'],
-      'class' => array('ckeditor-button'),
     );
     if (!empty($button['attributes'])) {
       $attributes = array_merge($attributes, $button['attributes']);
@@ -108,6 +102,11 @@ function template_preprocess_ckeditor_settings_toolbar(&$variables) {
       $button_item['group'] = $button['group'];
     }
 
+    // Set additional flag on the button if it can occur multiple times.
+    if (!empty($button['multiple'])) {
+      $button_item['multiple'] = true;
+    }
+
     return $button_item;
   };
 
@@ -116,7 +115,7 @@ function template_preprocess_ckeditor_settings_toolbar(&$variables) {
   foreach ($active_buttons as $row_number => $button_row) {
     foreach ($button_groups[$row_number] as $group_name) {
       $variables['active_buttons'][$row_number][$group_name] = array(
-        'group_name_class' => drupal_html_class($group_name),
+        'group_name_class' => Html::getClass($group_name),
         'buttons' => array(),
       );
       $buttons = array_filter($button_row, function ($button) use ($group_name) {

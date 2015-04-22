@@ -7,7 +7,6 @@
 
 namespace Drupal\system\Plugin\Block;
 
-use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Form\FormStateInterface;
@@ -84,7 +83,7 @@ class SystemMenuBlock extends BlockBase implements ContainerFactoryPluginInterfa
     $defaults = $this->defaultConfiguration();
     $form['menu_levels'] = array(
       '#type' => 'details',
-      '#title' => t('Menu levels'),
+      '#title' => $this->t('Menu levels'),
       // Open if not set to defaults.
       '#open' => $defaults['level'] !== $config['level'] || $defaults['depth'] !== $config['depth'],
       '#process' => [[get_class(), 'processMenuLevelParents']],
@@ -124,6 +123,14 @@ class SystemMenuBlock extends BlockBase implements ContainerFactoryPluginInterfa
   public static function processMenuLevelParents(&$element, FormStateInterface $form_state, &$complete_form) {
     array_pop($element['#parents']);
     return $element;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function blockSubmit($form, FormStateInterface $form_state) {
+    $this->configuration['level'] = $form_state->getValue('level');
+    $this->configuration['depth'] = $form_state->getValue('depth');
   }
 
   /**
@@ -176,31 +183,26 @@ class SystemMenuBlock extends BlockBase implements ContainerFactoryPluginInterfa
   /**
    * {@inheritdoc}
    */
-  public function getCacheKeys() {
-    // Add a key for the active menu trail.
-    $menu = $this->getDerivativeId();
-    return array_merge(parent::getCacheKeys(), array($this->menuActiveTrail->getActiveTrailCacheKey($menu)));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getCacheTags() {
     // Even when the menu block renders to the empty string for a user, we want
     // the cache tag for this menu to be set: whenever the menu is changed, this
     // menu block must also be re-rendered for that user, because maybe a menu
     // link that is accessible for that user has been added.
-    $tags = array('menu' => array($this->getDerivativeId()));
-    return NestedArray::mergeDeep(parent::getCacheTags(), $tags);
+    $cache_tags = parent::getCacheTags();
+    $cache_tags[] = 'config:system.menu.' . $this->getDerivativeId();
+    return $cache_tags;
   }
 
   /**
    * {@inheritdoc}
    */
   protected function getRequiredCacheContexts() {
-    // Menu blocks must be cached per role: different roles may have access to
-    // different menu links.
-    return array('cache_context.user.roles', 'cache_context.language');
+    // Menu blocks must be cached per role and per active trail.
+    $menu_name = $this->getDerivativeId();
+    return [
+      'user.roles',
+      'route.menu_active_trails:' . $menu_name,
+    ];
   }
 
 }

@@ -7,6 +7,8 @@
 
 namespace Drupal\views\Tests\Plugin;
 
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Url;
 use Drupal\views\Tests\ViewTestBase;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Views;
@@ -100,6 +102,11 @@ class ExposedFormTest extends ViewTestBase {
     // Test the button is hidden after reset.
     $this->assertNoField('edit-reset');
 
+    // Test the reset works with type set.
+    $this->drupalGet('test_exposed_form_buttons', array('query' => array('type' => 'article', 'op' => 'Reset')));
+    $this->assertResponse(200);
+    $this->assertFieldById('edit-type', 'All', 'Article type filter has been reset.');
+
     // Rename the label of the reset button.
     $view = Views::getView('test_exposed_form_buttons');
     $view->setDisplay();
@@ -125,12 +132,16 @@ class ExposedFormTest extends ViewTestBase {
     $this->executeView($view);
     $exposed_form = $view->display_handler->getPlugin('exposed_form');
     $output = $exposed_form->renderExposedForm();
-    $this->drupalSetContent(drupal_render($output));
+    $this->setRawContent(drupal_render($output));
 
     $this->assertFieldByXpath('//form/@id', $this->getExpectedExposedFormId($view), 'Expected form ID found.');
 
-    $expected_action = url($view->display_handler->getUrl());
+    $view->setDisplay('page_1');
+    $expected_action = $view->display_handler->getUrlInfo()->toString();
     $this->assertFieldByXPath('//form/@action', $expected_action, 'The expected value for the action attribute was found.');
+    // Make sure the description is shown.
+    $result = $this->xpath('//form//div[contains(@id, :id) and normalize-space(text())=:description]', array(':id' => 'edit-type--description', ':description' => t('Exposed description')));
+    $this->assertEqual(count($result), 1, 'Filter description was found.');
   }
 
   /**
@@ -143,11 +154,11 @@ class ExposedFormTest extends ViewTestBase {
     $this->drupalGet('test_exposed_block');
 
     // Test there is an exposed form in a block.
-    $xpath = $this->buildXPathQuery('//div[@id=:id]/div/form/@id', array(':id' => drupal_html_id('block-' . $block->id())));
+    $xpath = $this->buildXPathQuery('//div[@id=:id]/form/@id', array(':id' => Html::getUniqueId('block-' . $block->id())));
     $this->assertFieldByXpath($xpath, $this->getExpectedExposedFormId($view), 'Expected form found in views block.');
 
     // Test there is not an exposed form in the view page content area.
-    $xpath = $this->buildXPathQuery('//div[@class="view-content"]/form/@id', array(':id' => drupal_html_id('block-' . $block->id())));
+    $xpath = $this->buildXPathQuery('//div[@class="view-content"]/form/@id', array(':id' => Html::getUniqueId('block-' . $block->id())));
     $this->assertNoFieldByXpath($xpath, $this->getExpectedExposedFormId($view), 'No exposed form found in views content region.');
 
     // Test there is only one views exposed form on the page.
@@ -189,7 +200,7 @@ class ExposedFormTest extends ViewTestBase {
    *   The form ID.
    */
   protected function getExpectedExposedFormId(ViewExecutable $view) {
-    return drupal_clean_css_identifier('views-exposed-form-' . $view->storage->id() . '-' . $view->current_display);
+    return Html::cleanCssIdentifier('views-exposed-form-' . $view->storage->id() . '-' . $view->current_display);
   }
 
 }

@@ -7,11 +7,15 @@
 
 namespace Drupal\views\Plugin\views\display;
 
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Routing\UrlGeneratorTrait;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Routing\RouteCompiler;
 use Drupal\Core\Routing\RouteProviderInterface;
+use Drupal\Core\Url;
 use Drupal\views\Views;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -26,6 +30,8 @@ use Symfony\Component\Routing\RouteCollection;
  * @see \Drupal\views\EventSubscriber\RouteSubscriber
  */
 abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouterInterface {
+
+  use UrlGeneratorTrait;
 
   /**
    * The route provider.
@@ -194,9 +200,6 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $access_plugin = Views::pluginManager('access')->createInstance('none');
     }
     $access_plugin->alterRouteDefinition($route);
-    // @todo Figure out whether _access_mode ANY is the proper one. This is
-    //   particular important for altering routes.
-    $route->setOption('_access_mode', AccessManagerInterface::ACCESS_MODE_ANY);
 
     // Set the argument map, in order to support named parameters.
     $route->setOption('_view_argument_map', $argument_map);
@@ -291,8 +294,6 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       }
     }
 
-    $view_route_names = $this->state->get('views.view_route_names') ?: array();
-
     $path = implode('/', $bits);
     $view_id = $this->view->storage->id();
     $display_id = $this->display['id'];
@@ -306,7 +307,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         // Some views might override existing paths, so we have to set the route
         // name based upon the altering.
         $links[$menu_link_id] = array(
-          'route_name' => isset($view_route_names[$view_id_display]) ? $view_route_names[$view_id_display] : "view.$view_id_display",
+          'route_name' => $this->getRouteName(),
           // Identify URL embedded arguments and correlate them to a handler.
           'load arguments'  => array($this->view->storage->id(), $this->display['id'], '%index'),
           'id' => $menu_link_id,
@@ -356,7 +357,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     parent::optionsSummary($categories, $options);
 
     $categories['page'] = array(
-      'title' => t('Page settings'),
+      'title' => $this->t('Page settings'),
       'column' => 'second',
       'build' => array(
         '#weight' => -10,
@@ -366,7 +367,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     $path = strip_tags($this->getOption('path'));
 
     if (empty($path)) {
-      $path = t('No path is set');
+      $path = $this->t('No path is set');
     }
     else {
       $path = '/' . $path;
@@ -374,7 +375,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     $options['path'] = array(
       'category' => 'page',
-      'title' => t('Path'),
+      'title' => $this->t('Path'),
       'value' => views_ui_truncate($path, 24),
     );
   }
@@ -387,15 +388,15 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     switch ($form_state->get('section')) {
       case 'path':
-        $form['#title'] .= t('The menu path or URL of this view');
+        $form['#title'] .= $this->t('The menu path or URL of this view');
         $form['path'] = array(
           '#type' => 'textfield',
-          '#title' => t('Path'),
-          '#description' => t('This view will be displayed by visiting this path on your site. You may use "%" in your URL to represent values that will be used for contextual filters: For example, "node/%/feed". If needed you can even specify named route parameters like taxonomy/term/%taxonomy_term'),
+          '#title' => $this->t('Path'),
+          '#description' => $this->t('This view will be displayed by visiting this path on your site. You may use "%" in your URL to represent values that will be used for contextual filters: For example, "node/%/feed". If needed you can even specify named route parameters like taxonomy/term/%taxonomy_term'),
           '#default_value' => $this->getOption('path'),
-          '#field_prefix' => '<span dir="ltr">' . url(NULL, array('absolute' => TRUE)),
+          '#field_prefix' => '<span dir="ltr">' . $this->url('<none>', [], ['absolute' => TRUE]),
           '#field_suffix' => '</span>&lrm;',
-          '#attributes' => array('dir' => 'ltr'),
+          '#attributes' => array('dir' => LanguageInterface::DIRECTION_LTR),
           // Account for the leading backslash.
           '#maxlength' => 254,
         );
@@ -446,6 +447,19 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $errors[] = $this->t('"%" may not be used for the first segment of a path.');
     }
 
+    $parsed_url = UrlHelper::parse($path);
+    if (empty($parsed_url['path'])) {
+      $errors[] = $this->t('Path is empty.');
+    }
+
+    if (!empty($parsed_url['query'])) {
+      $errors[] = $this->t('No query allowed.');
+    }
+
+    if (!parse_url('internal:/' . $path)) {
+      $errors[] = $this->t('Invalid path. Valid characters are alphanumerics as well as "-", ".", "_" and "~".');
+    }
+
     $path_sections = explode('/', $path);
     // Symfony routing does not allow to use numeric placeholders.
     // @see \Symfony\Component\Routing\RouteCompiler
@@ -470,5 +484,32 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     return $errors;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getUrlInfo() {
+    return Url::fromRoute($this->getRouteName());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRouteName() {
+    $view_id = $this->view->storage->id();
+    $display_id = $this->display['id'];
+    $view_route_key = "$view_id.$display_id";
+
+    // Check for overridden route names.
+    $view_route_names = $this->getAlteredRouteNames();
+
+    return (isset($view_route_names[$view_route_key]) ? $view_route_names[$view_route_key] : "view.$view_route_key");
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getAlteredRouteNames() {
+    return $this->state->get('views.view_route_names') ?: array();
+  }
 
 }

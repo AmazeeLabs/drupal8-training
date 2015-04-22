@@ -63,6 +63,7 @@ Cron system
 
 CSS
 - John Albin Wilkins 'JohnAlbin' http://drupal.org/user/32095
+- Lewis Nyman 'LewisNyman' https://drupal.org/user/751964
 
 Database system
 - Larry Garfield 'Crell' http://drupal.org/user/26398
@@ -132,7 +133,7 @@ Markup
 
 Migrate
 - Ben Dougherty 'benjy' https://drupal.org/user/1852732
-- Claudiu Cristea "claudiu.cristea"  https://drupal.org/user/56348
+- Michael Anello 'ultimike' https://drupal.org/user/51132
 - Mike Ryan 'mikeryan' http://drupal.org/user/4420
 
 Menu system
@@ -164,7 +165,6 @@ Routing system
 Theme system
 - Alex Bronstein 'effulgentsia' http://drupal.org/user/78040
 - John Albin Wilkins 'JohnAlbin' http://drupal.org/user/32095
-- Mark Carver 'Mark Carver' http://drupal.org/user/501638
 - Jen Lampton 'jenlampton' http://drupal.org/user/85586
 - Scott Reeves 'Cottser' http://drupal.org/user/1167326
 - Fabian Franz 'Fabianx' http://drupal.org/user/693738
@@ -250,7 +250,7 @@ CKEditor module
 - Wim Leers 'Wim Leers' http://drupal.org/user/99777
 
 Color module
-- Mark Carver 'Mark Carver' https://drupal.org/user/501638
+- ?
 
 Comment module
 - Dick Olsson 'dixon_' http://drupal.org/user/239911
@@ -334,14 +334,17 @@ Menu UI module
 - ?
 
 Menu Link module
-- Andrei Mateescu 'amateescu' http://drupal.org/user/729614
 - Peter Wolanin 'pwolanin' http://drupal.org/user/49851
 
 Migrate module
-- ?
+- Ben Dougherty 'benjy' https://drupal.org/user/1852732
+- Michael Anello 'ultimike' https://drupal.org/user/51132
+- Mike Ryan 'mikeryan' http://drupal.org/user/4420
 
 Migrate (Drupal) module
-- ?
+- Ben Dougherty 'benjy' https://drupal.org/user/1852732
+- Michael Anello 'ultimike' https://drupal.org/user/51132
+- Mike Ryan 'mikeryan' http://drupal.org/user/4420
 
 Node module
 - Moshe Weitzman 'moshe weitzman' http://drupal.org/user/23
@@ -382,7 +385,8 @@ Serialization module
 - Damian Lee 'damiankloip' http://drupal.org/user/1037976
 
 Shortcut module
-- ?
+- Tobias Stöckler 'tstoeckler' https://www.drupal.org/user/107158
+- Jibran Ijaz 'jibran' https://www.drupal.org/user/1198144
 
 Simpletest module
 - Daniel F. Kudwien 'sun' http://drupal.org/user/54136
@@ -440,7 +444,7 @@ Theme maintainers
 
 Bartik theme
 - Jen Simmons 'jensimmons' http://drupal.org/user/140882
-- Jeff Burns 'Jeff Burnz' http://drupal.org/user/61393
+- Emma Maria Karayiannis 'emma.maria' https://drupal.org/user/2104556
 
 Seven theme
 - Lewis Nyman 'LewisNyman' https://drupal.org/user/751964

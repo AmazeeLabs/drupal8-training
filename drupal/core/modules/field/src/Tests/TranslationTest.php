@@ -7,6 +7,7 @@
 
 namespace Drupal\field\Tests;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
@@ -41,7 +42,6 @@ class TranslationTest extends FieldUnitTestBase {
    */
   protected $entity_type = 'test_entity';
 
-
   /**
    * An array defining the field storage to use in this test.
    *
@@ -70,21 +70,23 @@ class TranslationTest extends FieldUnitTestBase {
    */
   protected $field;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
 
     $this->installConfig(array('language'));
 
-    $this->field_name = drupal_strtolower($this->randomMachineName());
+    $this->field_name = Unicode::strtolower($this->randomMachineName());
 
     $this->entity_type = 'entity_test';
 
     $this->field_storage_definition = array(
-      'name' => $this->field_name,
+      'field_name' => $this->field_name,
       'entity_type' => $this->entity_type,
       'type' => 'test_field',
       'cardinality' => 4,
-      'translatable' => TRUE,
     );
     $this->fieldStorage = entity_create('field_storage_config', $this->field_storage_definition);
     $this->fieldStorage->save();
@@ -138,9 +140,9 @@ class TranslationTest extends FieldUnitTestBase {
     }
 
     // Test default values.
-    $field_name_default = drupal_strtolower($this->randomMachineName() . '_field_name');
+    $field_name_default = Unicode::strtolower($this->randomMachineName() . '_field_name');
     $field_storage_definition = $this->field_storage_definition;
-    $field_storage_definition['name'] = $field_name_default;
+    $field_storage_definition['field_name'] = $field_name_default;
     $field_storage = entity_create('field_storage_config', $field_storage_definition);
     $field_storage->save();
 
@@ -167,7 +169,7 @@ class TranslationTest extends FieldUnitTestBase {
 
     // @todo Test every translation once the Entity Translation API allows for
     //   multilingual defaults.
-    $langcode = $entity->language()->id;
+    $langcode = $entity->language()->getId();
     $this->assertEqual($entity->getTranslation($langcode)->{$field_name_default}->getValue(), $field->default_value, format_string('Default value correctly populated for language %language.', array('%language' => $langcode)));
 
     // Check that explicit empty values are not overridden with default values.
@@ -185,6 +187,19 @@ class TranslationTest extends FieldUnitTestBase {
         $this->assertEqual($entity->getTranslation($langcode)->{$field_name_default}->getValue(), $empty_items, format_string('Empty value correctly populated for language %language.', array('%language' => $langcode)));
       }
     }
+  }
+
+  /**
+   * Tests field access.
+   *
+   * Regression test to verify that fieldAccess() can be called while only
+   * passing the required parameters.
+   *
+   * @see https://www.drupal.org/node/2404739
+   */
+  public function testFieldAccess() {
+    $access_control_handler = \Drupal::entityManager()->getAccessControlHandler($this->entity_type);
+    $this->assertTrue($access_control_handler->fieldAccess('view', $this->field));
   }
 
 }

@@ -36,7 +36,7 @@ class HistoryTest extends WebTestBase {
    *
    * @var object
    */
-  protected $test_node;
+  protected $testNode;
 
   protected function setUp() {
     parent::setUp();
@@ -45,7 +45,7 @@ class HistoryTest extends WebTestBase {
 
     $this->user = $this->drupalCreateUser(array('create page content', 'access content'));
     $this->drupalLogin($this->user);
-    $this->test_node = $this->drupalCreateNode(array('type' => 'page', 'uid' => $this->user->id()));
+    $this->testNode = $this->drupalCreateNode(array('type' => 'page', 'uid' => $this->user->id()));
   }
 
   /**
@@ -75,7 +75,7 @@ class HistoryTest extends WebTestBase {
 
     // Perform HTTP request.
     return $this->curlExec(array(
-      CURLOPT_URL => url('history/get_node_read_timestamps', array('absolute' => TRUE)),
+      CURLOPT_URL => \Drupal::url('history.get_last_node_view', array(), array('absolute' => TRUE)),
       CURLOPT_POST => TRUE,
       CURLOPT_POSTFIELDS => $post,
       CURLOPT_HTTPHEADER => array(
@@ -96,7 +96,7 @@ class HistoryTest extends WebTestBase {
    */
   protected function markNodeAsRead($node_id) {
     return $this->curlExec(array(
-      CURLOPT_URL => url('history/' . $node_id . '/read', array('absolute' => TRUE)),
+      CURLOPT_URL => \Drupal::url('history.read_node', array('node' => $node_id), array('absolute' => TRUE)),
       CURLOPT_HTTPHEADER => array(
         'Accept: application/json',
       ),
@@ -107,7 +107,7 @@ class HistoryTest extends WebTestBase {
    * Verifies that the history endpoints work.
    */
   function testHistory() {
-    $nid = $this->test_node->id();
+    $nid = $this->testNode->id();
 
     // Retrieve "last read" timestamp for test node, for the current user.
     $response = $this->getNodeReadTimestamps(array($nid));
@@ -118,9 +118,10 @@ class HistoryTest extends WebTestBase {
     // View the node.
     $this->drupalGet('node/' . $nid);
     // JavaScript present to record the node read.
-    $settings = $this->drupalGetSettings();
-    $this->assertTrue(isset($settings['ajaxPageState']['js']['core/modules/history/js/history.js']), 'drupal.history library is present.');
-    $this->assertRaw('Drupal.history.markAsRead(' . $nid . ')', 'History module JavaScript API call to mark node as read present on page.');
+    $settings = $this->getDrupalSettings();
+    $libraries = explode(',', $settings['ajaxPageState']['libraries']);
+    $this->assertTrue(in_array('history/mark-as-read', $libraries), 'history/mark-as-read library is present.');
+    $this->assertEqual([$nid => TRUE], $settings['history']['nodesToMarkAsRead'], 'drupalSettings to mark node as read are present.');
 
     // Simulate JavaScript: perform HTTP request to mark node as read.
     $response = $this->markNodeAsRead($nid);

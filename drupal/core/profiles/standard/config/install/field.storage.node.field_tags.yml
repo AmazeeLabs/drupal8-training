@@ -1,5 +1,5 @@
 id: node.field_tags
-name: field_tags
+field_name: field_tags
 entity_type: node
 type: taxonomy_term_reference
 module: taxonomy
@@ -15,8 +15,9 @@ indexes:
   target_id:
     - target_id
 status: true
-langcode: und
+langcode: en
 dependencies:
   module:
     - node
     - taxonomy
+persist_with_no_fields: false

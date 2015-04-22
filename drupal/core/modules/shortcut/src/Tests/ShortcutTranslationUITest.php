@@ -25,6 +25,7 @@ class ShortcutTranslationUITest extends ContentTranslationUITest {
   public static $modules = array(
     'language',
     'content_translation',
+    'link',
     'shortcut',
     'toolbar'
   );
@@ -35,7 +36,6 @@ class ShortcutTranslationUITest extends ContentTranslationUITest {
   protected function setUp() {
     $this->entityTypeId = 'shortcut';
     $this->bundle = 'default';
-    $this->fieldName = 'title';
     parent::setUp();
   }
 
@@ -50,8 +50,15 @@ class ShortcutTranslationUITest extends ContentTranslationUITest {
    * {@inheritdoc}
    */
   protected function createEntity($values, $langcode, $bundle_name = NULL) {
-    $values['route_name'] = 'user.page';
+    $values['link']['uri'] = 'internal:/user';
     return parent::createEntity($values, $langcode, $bundle_name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getNewEntityValues($langcode) {
+    return array('title' => array(array('value' => $this->randomMachineName()))) + parent::getNewEntityValues($langcode);
   }
 
   protected function doTestBasicTranslation() {
@@ -68,6 +75,29 @@ class ShortcutTranslationUITest extends ContentTranslationUITest {
         $label = $entity->getTranslation($langcode)->label();
         $elements = $this->xpath('//nav[contains(@class, "toolbar-lining")]/ul[@class="menu"]/li/a[contains(@href, :href) and normalize-space(text())=:label]', array(':href' => $expected_path, ':label' => $label));
         $this->assertTrue(!empty($elements), format_string('Translated @language shortcut link @label found.', array('@label' => $label, '@language' => $language->getName())));
+      }
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function doTestTranslationEdit() {
+    $entity = entity_load($this->entityTypeId, $this->entityId, TRUE);
+    $languages = $this->container->get('language_manager')->getLanguages();
+
+    foreach ($this->langcodes as $langcode) {
+      // We only want to test the title for non-english translations.
+      if ($langcode != 'en') {
+        $options = array('language' => $languages[$langcode]);
+        $url = $entity->urlInfo('edit-form', $options);
+        $this->drupalGet($url);
+
+        $title = t('@title [%language translation]', array(
+          '@title' => $entity->getTranslation($langcode)->label(),
+          '%language' => $languages[$langcode]->getName(),
+        ));
+        $this->assertRaw($title);
       }
     }
   }

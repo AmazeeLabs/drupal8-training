@@ -7,21 +7,21 @@
 
 namespace Drupal\node\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Tests the node_last_changed() function.
  *
  * @group node
  */
-class NodeLastChangedTest extends DrupalUnitTestBase {
+class NodeLastChangedTest extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('entity', 'user', 'node', 'field', 'system', 'text', 'filter');
+  public static $modules = array('user', 'node', 'field', 'system', 'text', 'filter');
 
   protected function setUp() {
     parent::setUp();
@@ -40,7 +40,7 @@ class NodeLastChangedTest extends DrupalUnitTestBase {
     $changed_timestamp = node_last_changed($node->id());
     $this->assertEqual($changed_timestamp, $node->getChangedTime(), 'Expected last changed timestamp returned.');
 
-    $changed_timestamp = node_last_changed($node->id(), $node->language()->id);
+    $changed_timestamp = node_last_changed($node->id(), $node->language()->getId());
     $this->assertEqual($changed_timestamp, $node->getChangedTime(), 'Expected last changed timestamp returned.');
   }
 }

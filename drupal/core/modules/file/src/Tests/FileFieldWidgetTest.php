@@ -8,7 +8,11 @@
 namespace Drupal\file\Tests;
 
 use Drupal\comment\Entity\Comment;
+use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Component\Utility\Html;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\field_ui\Tests\FieldUiTestTrait;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests the file field widget, single and multi-valued, with and without AJAX,
@@ -18,17 +22,29 @@ use Drupal\field\Entity\FieldConfig;
  */
 class FileFieldWidgetTest extends FileFieldTestBase {
 
+  use CommentTestTrait;
+  use FieldUiTestTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+    $this->drupalPlaceBlock('system_breadcrumb_block');
+  }
+
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('comment');
+  public static $modules = array('comment', 'block');
 
   /**
    * Tests upload and remove buttons for a single-valued File field.
    */
   function testSingleValuedWidget() {
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
     $type_name = 'article';
     $field_name = strtolower($this->randomMachineName());
     $this->createFileField($field_name, 'node', $type_name);
@@ -41,7 +57,8 @@ class FileFieldWidgetTest extends FileFieldTestBase {
       // @todo This only tests a 'nojs' submission, because drupalPostAjaxForm()
       //   does not yet support file uploads.
       $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
-      $node = node_load($nid, TRUE);
+      $node_storage->resetCache(array($nid));
+      $node = $node_storage->load($nid);
       $node_file = file_load($node->{$field_name}->target_id);
       $this->assertFileExists($node_file, 'New file saved to disk on node creation.');
 
@@ -69,12 +86,13 @@ class FileFieldWidgetTest extends FileFieldTestBase {
       $this->assertNoFieldByXPath('//input[@type="submit"]', t('Remove'), 'After clicking the "Remove" button, it is no longer displayed.');
       $this->assertFieldByXpath('//input[@type="submit"]', t('Upload'), 'After clicking the "Remove" button, the "Upload" button is displayed.');
       // Test label has correct 'for' attribute.
-      $label = $this->xpath("//label[@for='edit-" . drupal_clean_css_identifier($field_name) . "-0-upload']");
+      $label = $this->xpath("//label[@for='edit-" . Html::cleanCssIdentifier($field_name) . "-0-upload']");
       $this->assertTrue(isset($label[0]), 'Label for upload found.');
 
       // Save the node and ensure it does not have the file.
       $this->drupalPostForm(NULL, array(), t('Save and keep published'));
-      $node = node_load($nid, TRUE);
+      $node_storage->resetCache(array($nid));
+      $node = $node_storage->load($nid);
       $this->assertTrue(empty($node->{$field_name}->target_id), 'File was successfully removed from the node.');
     }
   }
@@ -83,6 +101,7 @@ class FileFieldWidgetTest extends FileFieldTestBase {
    * Tests upload and remove buttons for multiple multi-valued File fields.
    */
   function testMultiValuedWidget() {
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
     $type_name = 'article';
     // Use explicit names instead of random names for those fields, because of a
     // bug in drupalPostForm() with multiple file uploads in one form, where the
@@ -191,7 +210,8 @@ class FileFieldWidgetTest extends FileFieldTestBase {
       $matches = array();
       preg_match('/node\/([0-9]+)/', $this->getUrl(), $matches);
       $nid = $matches[1];
-      $node = node_load($nid, TRUE);
+      $node_storage->resetCache(array($nid));
+      $node = $node_storage->load($nid);
       $this->assertTrue(empty($node->{$field_name}->target_id), 'Node was successfully saved without any files.');
     }
   }
@@ -200,8 +220,9 @@ class FileFieldWidgetTest extends FileFieldTestBase {
    * Tests a file field with a "Private files" upload destination setting.
    */
   function testPrivateFileSetting() {
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
     // Grant the admin user required permissions.
-    user_role_grant_permissions($this->admin_user->roles[0]->target_id, array('administer node fields'));
+    user_role_grant_permissions($this->adminUser->roles[0]->target_id, array('administer node fields'));
 
     $type_name = 'article';
     $field_name = strtolower($this->randomMachineName());
@@ -214,7 +235,8 @@ class FileFieldWidgetTest extends FileFieldTestBase {
     $edit = array('field_storage[settings][uri_scheme]' => 'private');
     $this->drupalPostForm("admin/structure/types/manage/$type_name/fields/$field->id/storage", $edit, t('Save field settings'));
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
-    $node = node_load($nid, TRUE);
+    $node_storage->resetCache(array($nid));
+    $node = $node_storage->load($nid);
     $node_file = file_load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, 'New file saved to disk on node creation.');
 
@@ -240,25 +262,21 @@ class FileFieldWidgetTest extends FileFieldTestBase {
     $user = $this->drupalCreateUser(array('access comments'));
 
     // Grant the admin user required comment permissions.
-    $roles = $this->admin_user->getRoles();
+    $roles = $this->adminUser->getRoles();
     user_role_grant_permissions($roles[1], array('administer comment fields', 'administer comments'));
 
     // Revoke access comments permission from anon user, grant post to
     // authenticated.
-    user_role_revoke_permissions(DRUPAL_ANONYMOUS_RID, array('access comments'));
-    user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('post comments', 'skip comment approval'));
+    user_role_revoke_permissions(RoleInterface::ANONYMOUS_ID, array('access comments'));
+    user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array('post comments', 'skip comment approval'));
 
     // Create a new field.
-    $this->container->get('comment.manager')->addDefaultField('node', 'article');
-    $edit = array(
-      'fields[_add_new_field][label]' => $label = $this->randomMachineName(),
-      'fields[_add_new_field][field_name]' => $name = strtolower($this->randomMachineName()),
-      'fields[_add_new_field][type]' => 'file',
-    );
-    $this->drupalPostForm('admin/structure/comment/manage/comment/fields', $edit, t('Save'));
-    $edit = array('field_storage[settings][uri_scheme]' => 'private');
-    $this->drupalPostForm(NULL, $edit, t('Save field settings'));
-    $this->drupalPostForm(NULL, array(), t('Save settings'));
+    $this->addDefaultCommentField('node', 'article');
+
+    $name = strtolower($this->randomMachineName());
+    $label = $this->randomMachineName();
+    $storage_edit = array('field_storage[settings][uri_scheme]' => 'private');
+    $this->fieldUIAddNewField('admin/structure/comment/manage/comment', $name, $label, 'file', $storage_edit);
 
     // Manually clear cache on the tester side.
     \Drupal::entityManager()->clearCachedFieldDefinitions();
@@ -300,7 +318,7 @@ class FileFieldWidgetTest extends FileFieldTestBase {
     $this->assertResponse(403, 'Confirmed that access is denied for the file without the needed permission.');
 
     // Unpublishes node.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->drupalPostForm('node/' . $node->id() . '/edit', array(), t('Save and unpublish'));
 
     // Ensures normal user can no longer download the file.

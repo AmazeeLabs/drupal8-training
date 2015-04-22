@@ -12,6 +12,8 @@ use Drupal\Component\Utility\Xss;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Datetime\DateFormatter;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\Url;
 use Drupal\node\NodeTypeInterface;
 use Drupal\node\NodeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -29,20 +31,33 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
   protected $dateFormatter;
 
   /**
+   * The renderer service.
+   *
+   * @var \Drupal\Core\Render\RendererInterface
+   */
+  protected $renderer;
+
+  /**
    * Constructs a NodeController object.
    *
    * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
    *   The date formatter service.
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The renderer service.
    */
-  public function __construct(DateFormatter $date_formatter) {
+  public function __construct(DateFormatter $date_formatter, RendererInterface $renderer) {
     $this->dateFormatter = $date_formatter;
+    $this->renderer = $renderer;
   }
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
-    return new static($container->get('date.formatter'));
+    return new static(
+      $container->get('date.formatter'),
+      $container->get('renderer')
+    );
   }
 
 
@@ -64,15 +79,15 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
 
     // Only use node types the user has access to.
     foreach ($this->entityManager()->getStorage('node_type')->loadMultiple() as $type) {
-      if ($this->entityManager()->getAccessControlHandler('node')->createAccess($type->type)) {
-        $content[$type->type] = $type;
+      if ($this->entityManager()->getAccessControlHandler('node')->createAccess($type->id())) {
+        $content[$type->id()] = $type;
       }
     }
 
     // Bypass the node/add listing if only one content type is available.
     if (count($content) == 1) {
       $type = array_shift($content);
-      return $this->redirect('node.add', array('node_type' => $type->type));
+      return $this->redirect('node.add', array('node_type' => $type->id()));
     }
 
     return array(
@@ -92,7 +107,7 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
    */
   public function add(NodeTypeInterface $node_type) {
     $node = $this->entityManager()->getStorage('node')->create(array(
-      'type' => $node_type->type,
+      'type' => $node_type->id(),
     ));
 
     $form = $this->entityFormBuilder()->getForm($node);
@@ -111,7 +126,7 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
    */
   public function revisionShow($node_revision) {
     $node = $this->entityManager()->getStorage('node')->loadRevision($node_revision);
-    $node_view_controller = new NodeViewController($this->entityManager);
+    $node_view_controller = new NodeViewController($this->entityManager, $this->renderer);
     $page = $node_view_controller->view($node);
     unset($page['nodes'][$node->id()]['#cache']);
     return $page;
@@ -167,7 +182,7 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
             '#theme' => 'username',
             '#account' => $revision_author,
           );
-          $row[] = array('data' => $this->t('!date by !username', array('!date' => $this->l($this->dateFormatter->format($revision->revision_timestamp->value, 'short'), 'entity.node.canonical', array('node' => $node->id())), '!username' => drupal_render($username)))
+          $row[] = array('data' => $this->t('!date by !username', array('!date' => $node->link($this->dateFormatter->format($revision->revision_timestamp->value, 'short')), '!username' => drupal_render($username)))
             . (($revision->revision_log->value != '') ? '<p class="revision-log">' . Xss::filter($revision->revision_log->value) . '</p>' : ''),
             'class' => array('revision-current'));
           $row[] = array('data' => String::placeholder($this->t('current revision')), 'class' => array('revision-current'));
@@ -177,22 +192,20 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
             '#theme' => 'username',
             '#account' => $revision_author,
           );
-          $row[] = $this->t('!date by !username', array('!date' => $this->l($this->dateFormatter->format($revision->revision_timestamp->value, 'short'), 'node.revision_show', array('node' => $node->id(), 'node_revision' => $vid)), '!username' => drupal_render($username)))
+          $row[] = $this->t('!date by !username', array('!date' => $this->l($this->dateFormatter->format($revision->revision_timestamp->value, 'short'), new Url('node.revision_show', array('node' => $node->id(), 'node_revision' => $vid))), '!username' => drupal_render($username)))
             . (($revision->revision_log->value != '') ? '<p class="revision-log">' . Xss::filter($revision->revision_log->value) . '</p>' : '');
 
           if ($revert_permission) {
             $links['revert'] = array(
               'title' => $this->t('Revert'),
-              'route_name' => 'node.revision_revert_confirm',
-              'route_parameters' => array('node' => $node->id(), 'node_revision' => $vid),
+              'url' => Url::fromRoute('node.revision_revert_confirm', ['node' => $node->id(), 'node_revision' => $vid]),
             );
           }
 
           if ($delete_permission) {
             $links['delete'] = array(
               'title' => $this->t('Delete'),
-              'route_name' => 'node.revision_delete_confirm',
-              'route_parameters' => array('node' => $node->id(), 'node_revision' => $vid),
+              'url' => Url::fromRoute('node.revision_delete_confirm', ['node' => $node->id(), 'node_revision' => $vid]),
             );
           }
 
@@ -230,7 +243,7 @@ class NodeController extends ControllerBase implements ContainerInjectionInterfa
    *   The page title.
    */
   public function addPageTitle(NodeTypeInterface $node_type) {
-    return $this->t('Create @name', array('@name' => $node_type->name));
+    return $this->t('Create @name', array('@name' => $node_type->label()));
   }
 
 }

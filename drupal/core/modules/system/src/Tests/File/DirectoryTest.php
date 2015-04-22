@@ -7,6 +7,8 @@
 
 namespace Drupal\system\Tests\File;
 
+use Drupal\Component\PhpStorage\FileStorage;
+
 /**
  * Tests operations dealing with directories.
  *
@@ -93,7 +95,7 @@ class DirectoryTest extends FileTestBase {
     $this->assertTrue(is_file(file_default_scheme() . '://.htaccess'), 'Successfully re-created the .htaccess file in the files directory.', 'File');
     // Verify contents of .htaccess file.
     $file = file_get_contents(file_default_scheme() . '://.htaccess');
-    $this->assertEqual($file, file_htaccess_lines(FALSE), 'The .htaccess file contains the proper content.', 'File');
+    $this->assertEqual($file, FileStorage::htaccessLines(FALSE), 'The .htaccess file contains the proper content.', 'File');
   }
 
   /**
@@ -155,7 +157,7 @@ class DirectoryTest extends FileTestBase {
    */
   function testFileDirectoryTemp() {
     // Start with an empty variable to ensure we have a clean slate.
-    $config = \Drupal::config('system.file');
+    $config = $this->config('system.file');
     $config->set('path.temporary', '')->save();
     $tmp_directory = file_directory_temp();
     $this->assertEqual(empty($tmp_directory), FALSE, 'file_directory_temp() returned a non-empty value.');

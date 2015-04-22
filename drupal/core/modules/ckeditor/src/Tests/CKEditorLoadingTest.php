@@ -23,6 +23,20 @@ class CKEditorLoadingTest extends WebTestBase {
    */
   public static $modules = array('filter', 'editor', 'ckeditor', 'node');
 
+  /**
+   * An untrusted user with access to only the 'plain_text' format.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $untrustedUser;
+
+  /**
+   * A normal user with access to the 'plain_text' and 'filtered_html' formats.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $normalUser;
+
   protected function setUp() {
     parent::setUp();
 
@@ -56,11 +70,8 @@ class CKEditorLoadingTest extends WebTestBase {
       'name' => 'Article',
     ));
 
-    // Create 2 users, each with access to different text formats:
-    //   - "untrusted": plain_text
-    //   - "normal": plain_text, filtered_html
-    $this->untrusted_user = $this->drupalCreateUser(array('create article content', 'edit any article content'));
-    $this->normal_user = $this->drupalCreateUser(array('create article content', 'edit any article content', 'use text format filtered_html', 'use text format full_html'));
+    $this->untrustedUser = $this->drupalCreateUser(array('create article content', 'edit any article content'));
+    $this->normalUser = $this->drupalCreateUser(array('create article content', 'edit any article content', 'use text format filtered_html', 'use text format full_html'));
   }
 
   /**
@@ -70,7 +81,7 @@ class CKEditorLoadingTest extends WebTestBase {
     // The untrusted user:
     // - has access to 1 text format (plain_text);
     // - doesn't have access to the filtered_html text format, so: no text editor.
-    $this->drupalLogin($this->untrusted_user);
+    $this->drupalLogin($this->untrustedUser);
     $this->drupalGet('node/add/article');
     list($settings, $editor_settings_present, $editor_js_present, $body, $format_selector) = $this->getThingsToCheck();
     $this->assertFalse($editor_settings_present, 'No Text Editor module settings.');
@@ -88,7 +99,7 @@ class CKEditorLoadingTest extends WebTestBase {
     // The normal user:
     // - has access to 2 text formats;
     // - does have access to the filtered_html text format, so: CKEditor.
-    $this->drupalLogin($this->normal_user);
+    $this->drupalLogin($this->normalUser);
     $this->drupalGet('node/add/article');
     list($settings, $editor_settings_present, $editor_js_present, $body, $format_selector) = $this->getThingsToCheck();
     $ckeditor_plugin = $this->container->get('plugin.manager.editor')->createInstance('ckeditor');
@@ -107,19 +118,17 @@ class CKEditorLoadingTest extends WebTestBase {
     $this->assertTrue(count($format_selector) === 1, 'A single text format selector exists on the page.');
     $specific_format_selector = $this->xpath('//select[contains(@class, "filter-list") and contains(@class, "editor") and @data-editor-for="edit-body-0-value"]');
     $this->assertTrue(count($specific_format_selector) === 1, 'A single text format selector exists on the page and has the "editor" class and a "data-editor-for" attribute with the correct value.');
-    $this->assertTrue(isset($settings['ajaxPageState']['js']['core/modules/ckeditor/js/ckeditor.js']), 'CKEditor glue JS is present.');
-    $this->assertTrue(isset($settings['ajaxPageState']['js']['core/assets/vendor/ckeditor/ckeditor.js']), 'CKEditor lib JS is present.');
+    $this->assertTrue(in_array('ckeditor/drupal.ckeditor', explode(',', $settings['ajaxPageState']['libraries'])), 'CKEditor glue library is present.');
 
     // Enable the ckeditor_test module, customize configuration. In this case,
     // there is additional CSS and JS to be loaded.
     // NOTE: the tests in CKEditorTest already ensure that changing the
     // configuration also results in modified CKEditor configuration, so we
     // don't test that here.
-    \Drupal::moduleHandler()->install(array('ckeditor_test'));
-    $this->resetAll();
+    \Drupal::service('module_installer')->install(array('ckeditor_test'));
     $this->container->get('plugin.manager.ckeditor.plugin')->clearCachedDefinitions();
     $editor_settings = $editor->getSettings();
-    $editor_settings['toolbar']['buttons'][0][] = 'Llama';
+    $editor_settings['toolbar']['rows'][0][0]['items'][] = 'Llama';
     $editor->setSettings($editor_settings);
     $editor->save();
     $this->drupalGet('node/add/article');
@@ -136,19 +145,20 @@ class CKEditorLoadingTest extends WebTestBase {
     $this->assertTrue($editor_settings_present, "Text Editor module's JavaScript settings are on the page.");
     $this->assertIdentical($expected, $settings['editor'], "Text Editor module's JavaScript settings on the page are correct.");
     $this->assertTrue($editor_js_present, 'Text Editor JavaScript is present.');
-    $this->assertTrue(isset($settings['ajaxPageState']['js']['core/modules/ckeditor/js/ckeditor.js']), 'CKEditor glue JS is present.');
-    $this->assertTrue(isset($settings['ajaxPageState']['js']['core/assets/vendor/ckeditor/ckeditor.js']), 'CKEditor lib JS is present.');
+    $this->assertTrue(in_array('ckeditor/drupal.ckeditor', explode(',', $settings['ajaxPageState']['libraries'])), 'CKEditor glue library is present.');
   }
 
   protected function getThingsToCheck() {
-    $settings = $this->drupalGetSettings();
+    $settings = $this->getDrupalSettings();
     return array(
       // JavaScript settings.
       $settings,
       // Editor.module's JS settings present.
       isset($settings['editor']),
-      // Editor.module's JS present.
-      isset($settings['ajaxPageState']['js']['core/modules/editor/js/editor.js']),
+      // Editor.module's JS present. Note: ckeditor/drupal.ckeditor depends on
+      // editor/drupal.editor, hence presence of the former implies presence of
+      // the latter.
+      isset($settings['ajaxPageState']) && in_array('ckeditor/drupal.ckeditor', explode(',', $settings['ajaxPageState']['libraries'])),
       // Body field.
       $this->xpath('//textarea[@id="edit-body-0-value"]'),
       // Format selector.

@@ -8,14 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upgrade comment variables to field.instance.node.*.comment.yml.
  *
  * @group migrate_drupal
  */
-class MigrateCommentVariableInstanceTest extends MigrateDrupalTestBase {
+class MigrateCommentVariableInstanceTest extends MigrateDrupal6TestBase {
 
   static $modules = array('comment', 'node');
 
@@ -35,25 +35,26 @@ class MigrateCommentVariableInstanceTest extends MigrateDrupalTestBase {
     );
     $this->prepareMigrations($id_mappings);
 
-    foreach (array('page', 'story') as $type) {
+    foreach (array('page', 'story', 'article') as $type) {
       entity_create('node_type', array('type' => $type))->save();
     }
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-        'name' => 'comment',
-        'type' => 'comment',
-        'translatable' => '0',
+      'field_name' => 'comment',
+      'type' => 'comment',
+      'translatable' => '0',
     ))->save();
     entity_create('field_storage_config', array(
       'entity_type' => 'node',
-        'name' => 'comment_no_subject',
-        'type' => 'comment',
-        'translatable' => '0',
+      'field_name' => 'comment_no_subject',
+      'type' => 'comment',
+      'translatable' => '0',
     ))->save();
     /** @var \Drupal\migrate\entity\Migration $migration */
     $migration = entity_load('migration', 'd6_comment_field_instance');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6CommentVariable.php',
+      $this->getDumpDirectory() . '/Variable.php',
+      $this->getDumpDirectory() . '/NodeType.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -65,24 +66,24 @@ class MigrateCommentVariableInstanceTest extends MigrateDrupalTestBase {
    */
   public function testCommentFieldInstance() {
     $node = entity_create('node', array('type' => 'page'));
-    $this->assertEqual($node->comment->status, 0);
-    $this->assertEqual($node->comment->getFieldDefinition()->getName(), 'comment');
+    $this->assertIdentical(0, $node->comment->status);
+    $this->assertIdentical('comment', $node->comment->getFieldDefinition()->getName());
     $settings = $node->comment->getFieldDefinition()->getSettings();
-    $this->assertEqual($settings['default_mode'], 4);
-    $this->assertEqual($settings['per_page'], 50);
-    $this->assertEqual($settings['anonymous'], 0);
-    $this->assertEqual($settings['form_location'], 0);
-    $this->assertEqual($settings['preview'], 1);
+    $this->assertIdentical(4, $settings['default_mode']);
+    $this->assertIdentical(50, $settings['per_page']);
+    $this->assertIdentical(0, $settings['anonymous']);
+    $this->assertIdentical(FALSE, $settings['form_location']);
+    $this->assertIdentical(1, $settings['preview']);
 
     $node = entity_create('node', array('type' => 'story'));
-    $this->assertEqual($node->comment_no_subject->status, 2);
-    $this->assertEqual($node->comment_no_subject->getFieldDefinition()->getName(), 'comment_no_subject');
+    $this->assertIdentical(2, $node->comment_no_subject->status);
+    $this->assertIdentical('comment_no_subject', $node->comment_no_subject->getFieldDefinition()->getName());
     $settings = $node->comment_no_subject->getFieldDefinition()->getSettings();
-    $this->assertEqual($settings['default_mode'], 2);
-    $this->assertEqual($settings['per_page'], 70);
-    $this->assertEqual($settings['anonymous'], 1);
-    $this->assertEqual($settings['form_location'], 0);
-    $this->assertEqual($settings['preview'], 0);
+    $this->assertIdentical(2, $settings['default_mode']);
+    $this->assertIdentical(70, $settings['per_page']);
+    $this->assertIdentical(1, $settings['anonymous']);
+    $this->assertIdentical(FALSE, $settings['form_location']);
+    $this->assertIdentical(0, $settings['preview']);
   }
 
 }

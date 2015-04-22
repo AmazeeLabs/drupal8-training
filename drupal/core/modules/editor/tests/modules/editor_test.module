@@ -8,27 +8,6 @@
 use Drupal\filter\FilterFormatInterface;
 
 /**
- * Implements hook_editor_default_settings().
- */
-function editor_test_editor_default_settings($editor) {
-  if ($editor === 'unicorn') {
-    return array(
-      'rainbows' => TRUE,
-      'sparkles' => TRUE,
-    );
-  }
-}
-
-/**
- * Implements hook_editor_default_settings_alter().
- */
-function editor_test_editor_default_settings_alter(&$settings, $editor) {
-  if ($editor === 'unicorn' && isset($settings['sparkles'])) {
-    $settings['sparkles'] = FALSE;
-  }
-}
-
-/**
  * Implements hook_editor_js_settings_alter().
  */
 function editor_test_editor_js_settings_alter(&$settings) {
@@ -54,5 +33,14 @@ function editor_test_editor_xss_filter_alter(&$editor_xss_filter_class, FilterFo
   $filters = $format->filters()->getAll();
   if (isset($filters['filter_html']) && $filters['filter_html']->status) {
     $editor_xss_filter_class = '\Drupal\editor_test\EditorXssFilter\Insecure';
+  }
+}
+
+/**
+ * Implements hook_editor_info_alter().
+ */
+function editor_test_editor_info_alter(&$items) {
+  if (!\Drupal::state()->get('editor_test_give_me_a_trex_thanks', FALSE)) {
+    unset($items['trex']);
   }
 }

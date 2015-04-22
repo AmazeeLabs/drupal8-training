@@ -12,7 +12,7 @@
 namespace Symfony\Component\ClassLoader;
 
 /**
- * ClassLoader implements an PSR-0 class loader
+ * ClassLoader implements an PSR-0 class loader.
  *
  * See https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-0.md
  *
@@ -76,7 +76,7 @@ class ClassLoader
     }
 
     /**
-     * Registers a set of classes
+     * Registers a set of classes.
      *
      * @param string       $prefix The classes prefix
      * @param array|string $paths  The location(s) of the classes
@@ -103,18 +103,18 @@ class ClassLoader
     /**
      * Turns on searching the include for class files.
      *
-     * @param Boolean $useIncludePath
+     * @param bool $useIncludePath
      */
     public function setUseIncludePath($useIncludePath)
     {
-        $this->useIncludePath = $useIncludePath;
+        $this->useIncludePath = (bool) $useIncludePath;
     }
 
     /**
      * Can be used to check if the autoloader uses the include path to check
      * for classes.
      *
-     * @return Boolean
+     * @return bool
      */
     public function getUseIncludePath()
     {
@@ -124,7 +124,7 @@ class ClassLoader
     /**
      * Registers this instance as an autoloader.
      *
-     * @param Boolean $prepend Whether to prepend the autoloader or not
+     * @param bool $prepend Whether to prepend the autoloader or not
      */
     public function register($prepend = false)
     {
@@ -144,7 +144,7 @@ class ClassLoader
      *
      * @param string $class The name of the class
      *
-     * @return Boolean|null True, if loaded
+     * @return bool|null True, if loaded
      */
     public function loadClass($class)
     {

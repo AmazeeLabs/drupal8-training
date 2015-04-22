@@ -41,7 +41,6 @@ function link_theme() {
   return array(
     'link_formatter_link_separate' => array(
       'variables' => array('title' => NULL, 'url_title' => NULL, 'url' => NULL),
-      'template' => 'link-formatter-link-separate',
     ),
   );
 }
@@ -65,10 +64,5 @@ function template_preprocess_link_formatter_link_separate(&$variables) {
     $variables['title'] = String::checkPlain($variables['title']);
   }
 
-  if (!$variables['url']->isExternal()) {
-    $variables['link'] = \Drupal::linkGenerator()->generateFromUrl($variables['url_title'], $variables['url']);
-  }
-  else {
-    $variables['link'] = l($variables['url_title'], $variables['url']->getPath(), $variables['url']->getOptions());
-  }
+  $variables['link'] = \Drupal::l($variables['url_title'], $variables['url']);
 }

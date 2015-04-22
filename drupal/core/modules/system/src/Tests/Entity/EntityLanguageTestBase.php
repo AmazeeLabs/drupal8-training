@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\field\Entity\FieldConfig;
 
@@ -50,9 +51,12 @@ abstract class EntityLanguageTestBase extends EntityUnitTestBase {
 
     $this->languageManager = $this->container->get('language_manager');
 
-    $this->installEntitySchema('entity_test_rev');
-    $this->installEntitySchema('entity_test_mul');
-    $this->installEntitySchema('entity_test_mulrev');
+    foreach (entity_test_entity_types() as $entity_type_id) {
+      // The entity_test schema is installed by the parent.
+      if ($entity_type_id != 'entity_test') {
+        $this->installEntitySchema($entity_type_id);
+      }
+    }
 
     $this->installConfig(array('language'));
 
@@ -63,15 +67,15 @@ abstract class EntityLanguageTestBase extends EntityUnitTestBase {
     $this->state->set('entity_test.translation', TRUE);
 
     // Create a translatable test field.
-    $this->field_name = drupal_strtolower($this->randomMachineName() . '_field_name');
+    $this->field_name = Unicode::strtolower($this->randomMachineName() . '_field_name');
 
     // Create an untranslatable test field.
-    $this->untranslatable_field_name = drupal_strtolower($this->randomMachineName() . '_field_name');
+    $this->untranslatable_field_name = Unicode::strtolower($this->randomMachineName() . '_field_name');
 
     // Create field fields in all entity variations.
     foreach (entity_test_entity_types() as $entity_type) {
       entity_create('field_storage_config', array(
-        'name' => $this->field_name,
+        'field_name' => $this->field_name,
         'entity_type' => $entity_type,
         'type' => 'text',
         'cardinality' => 4,
@@ -82,10 +86,10 @@ abstract class EntityLanguageTestBase extends EntityUnitTestBase {
         'bundle' => $entity_type,
         'translatable' => TRUE,
       ))->save();
-      $this->field[$entity_type] = entity_load('field_config', $entity_type . '.' . $entity_type . '.' . $this->field_name);
+      $this->field[$entity_type] = FieldConfig::load($entity_type . '.' . $entity_type . '.' . $this->field_name);
 
       entity_create('field_storage_config', array(
-        'name' => $this->untranslatable_field_name,
+        'field_name' => $this->untranslatable_field_name,
         'entity_type' => $entity_type,
         'type' => 'text',
         'cardinality' => 4,
@@ -109,7 +113,7 @@ abstract class EntityLanguageTestBase extends EntityUnitTestBase {
         'label' => $this->randomString(),
         'weight' => $i,
       ));
-      $this->langcodes[$i] = $language->id();
+      $this->langcodes[$i] = $language->getId();
       $language->save();
     }
   }

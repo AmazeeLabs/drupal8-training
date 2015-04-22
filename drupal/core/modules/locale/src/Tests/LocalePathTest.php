@@ -8,6 +8,7 @@
 namespace Drupal\locale\Tests;
 
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Url;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -31,7 +32,7 @@ class LocalePathTest extends WebTestBase {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
-    \Drupal::config('system.site')->set('page.front', 'node')->save();
+    $this->config('system.site')->set('page.front', 'node')->save();
   }
 
   /**
@@ -121,7 +122,7 @@ class LocalePathTest extends WebTestBase {
     $edit = array(
       'source'   => 'node/' . $first_node->id(),
       'alias'    => $custom_path,
-      'langcode' => $first_node->language()->id,
+      'langcode' => $first_node->language()->getId(),
     );
     $this->container->get('path.alias_storage')->save($edit['source'], $edit['alias'], $edit['langcode']);
 
@@ -130,13 +131,13 @@ class LocalePathTest extends WebTestBase {
     $edit = array(
       'source'   => 'node/' . $second_node->id(),
       'alias'    => $custom_path,
-      'langcode' => $second_node->language()->id,
+      'langcode' => $second_node->language()->getId(),
     );
     $this->container->get('path.alias_storage')->save($edit['source'], $edit['alias'], $edit['langcode']);
 
     // Test that both node titles link to our path alias.
     $this->drupalGet('admin/content');
-    $custom_path_url = base_path() . $GLOBALS['script_path'] . $custom_path;
+    $custom_path_url = Url::fromUserInput('/' . $custom_path)->toString();
     $elements = $this->xpath('//a[@href=:href and normalize-space(text())=:title]', array(':href' => $custom_path_url, ':title' => $first_node->label()));
     $this->assertTrue(!empty($elements), 'First node links to the path alias.');
     $elements = $this->xpath('//a[@href=:href and normalize-space(text())=:title]', array(':href' => $custom_path_url, ':title' => $second_node->label()));

@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\views\style;
 
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 
 /**
  * Default style plugin to render an RSS feed.
@@ -32,8 +33,7 @@ class Rss extends StylePluginBase {
    */
   protected $usesRowPlugin = TRUE;
 
-  public function attachTo(array &$build, $display_id, $path, $title) {
-    $display = $this->view->displayHandlers->get($display_id);
+  public function attachTo(array &$build, $display_id, Url $feed_url, $title) {
     $url_options = array();
     $input = $this->view->getExposedInput();
     if ($input) {
@@ -41,35 +41,28 @@ class Rss extends StylePluginBase {
     }
     $url_options['absolute'] = TRUE;
 
-    $url = url($this->view->getUrl(NULL, $path), $url_options);
-    if ($display->hasPath()) {
-      if (empty($this->preview)) {
-        // Add a call for drupal_add_feed to the view attached data.
-        $build['#attached']['drupal_add_feed'][] = array($url, $title);
-      }
-    }
-    else {
-      $feed_icon = array(
-        '#theme' => 'feed_icon',
-        '#url' => $url,
-        '#title' => $title,
-      );
-      $this->view->feed_icon = $feed_icon;
+    $url = $feed_url->setOptions($url_options)->toString();
 
-      // Add a call for drupal_add_html_head_link to the view attached data.
-      $build['#attached']['drupal_add_html_head_link'][][] = array(
-        'rel' => 'alternate',
-        'type' => 'application/rss+xml',
-        'title' => $title,
-        'href' => $url,
-      );
-    }
+    // Add the RSS icon to the view.
+    $this->view->feedIcons[] = [
+      '#theme' => 'feed_icon',
+      '#url' => $url,
+      '#title' => $title,
+    ];
+
+    // Attach a link to the RSS feed, which is an alternate representation.
+    $build['#attached']['html_head_link'][][] = array(
+      'rel' => 'alternate',
+      'type' => 'application/rss+xml',
+      'title' => $title,
+      'href' => $url,
+    );
   }
 
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['description'] = array('default' => '', 'translatable' => TRUE);
+    $options['description'] = array('default' => '');
 
     return $options;
   }
@@ -79,9 +72,9 @@ class Rss extends StylePluginBase {
 
     $form['description'] = array(
       '#type' => 'textfield',
-      '#title' => t('RSS description'),
+      '#title' => $this->t('RSS description'),
       '#default_value' => $this->options['description'],
-      '#description' => t('This will appear in the RSS feed itself.'),
+      '#description' => $this->t('This will appear in the RSS feed itself.'),
       '#maxlength' => 1024,
     );
   }

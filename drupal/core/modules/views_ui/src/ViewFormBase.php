@@ -30,10 +30,6 @@ abstract class ViewFormBase extends EntityForm {
   public function init(FormStateInterface $form_state) {
     parent::init($form_state);
 
-    if ($display_id = \Drupal::request()->attributes->get('display_id')) {
-      $this->displayID = $display_id;
-    }
-
     // @todo Remove the need for this.
     $form_state->loadInclude('views_ui', 'inc', 'admin');
     $form_state->set('view', $this->entity);
@@ -42,11 +38,24 @@ abstract class ViewFormBase extends EntityForm {
   /**
    * {@inheritdoc}
    */
+  public function buildForm(array $form, FormStateInterface $form_state, $display_id = NULL) {
+    if (isset($display_id) && $form_state->has('display_id') && ($display_id !== $form_state->get('display_id'))) {
+      throw new \InvalidArgumentException('Mismatch between $form_state->get(\'display_id\') and $display_id.');
+    }
+    $this->displayID = $form_state->has('display_id') ? $form_state->get('display_id') : $display_id;
+    return parent::buildForm($form, $form_state);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function prepareEntity() {
     // Determine the displays available for editing.
     if ($tabs = $this->getDisplayTabs($this->entity)) {
-      // If a display isn't specified, use the first one.
       if (empty($this->displayID)) {
+        // If a display isn't specified, use the first one after sorting by
+        // #weight.
+        uasort($tabs, 'Drupal\Component\Utility\SortArray::sortByWeightProperty');
         foreach ($tabs as $id => $tab) {
           if (!isset($tab['#access']) || $tab['#access']) {
             $this->displayID = $id;
@@ -67,27 +76,6 @@ abstract class ViewFormBase extends EntityForm {
     elseif ($this->displayID) {
       throw new NotFoundHttpException();
     }
-  }
-
-  /**
-   * Creates an array of Views admin CSS for adding or attaching.
-   *
-   * This returns an array of arrays. Each array represents a single
-   * file. The array format is:
-   * - file: The fully qualified name of the file to send to _drupal_add_css
-   * - options: An array of options to pass to _drupal_add_css.
-   */
-  public static function getAdminCSS() {
-    $module_path = drupal_get_path('module', 'views_ui');
-    $list = array();
-    $list[$module_path . '/css/views_ui.admin.css'] = array();
-    $list[$module_path . '/css/views_ui.admin.theme.css'] = array();
-
-    if (\Drupal::moduleHandler()->moduleExists('contextual')) {
-      $list[$module_path . '/css/views_ui.contextual.css'] = array();
-    }
-
-    return $list;
   }
 
   /**
@@ -122,9 +110,9 @@ abstract class ViewFormBase extends EntityForm {
         '#link' => array(
           'title' => $this->getDisplayLabel($view, $id),
           'localized_options' => array(),
-        ) + $view->urlInfo('edit-display-form')->toArray(),
+          'url' => $view->urlInfo('edit-display-form')->setRouteParameter('display_id', $id),
+        ),
       );
-      $tabs[$id]['#link']['route_parameters']['display_id'] = $id;
       if (!empty($display['deleted'])) {
         $tabs[$id]['#link']['localized_options']['attributes']['class'][] = 'views-display-deleted-link';
       }

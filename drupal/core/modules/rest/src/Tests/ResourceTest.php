@@ -17,7 +17,7 @@ use Drupal\rest\Tests\RESTTestBase;
 class ResourceTest extends RESTTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -28,7 +28,7 @@ class ResourceTest extends RESTTestBase {
    */
   protected function setUp() {
     parent::setUp();
-    $this->config = \Drupal::config('rest.settings');
+    $this->config = $this->config('rest.settings');
 
     // Create an entity programmatically.
     $this->entity = $this->entityCreate('entity_test');
@@ -55,8 +55,12 @@ class ResourceTest extends RESTTestBase {
     $this->rebuildCache();
 
     // Verify that accessing the resource returns 401.
-    $response = $this->httpRequest($this->entity->getSystemPath(), 'GET', NULL, $this->defaultMimeType);
-    $this->assertResponse('404', 'HTTP response code is 404 when the resource does not define formats.');
+    $response = $this->httpRequest($this->entity->urlInfo(), 'GET', NULL, $this->defaultMimeType);
+    // AcceptHeaderMatcher considers the canonical, non-REST route a match, but
+    // a lower quality one: no format restrictions means there's always a match,
+    // and hence when there is no matching REST route, the non-REST route is
+    // used, but it can't render into application/hal+json, so it returns a 406.
+    $this->assertResponse('406', 'HTTP response code is 406 when the resource does not define formats, because it falls back to the canonical, non-REST route.');
     $this->curlClose();
   }
 
@@ -80,8 +84,12 @@ class ResourceTest extends RESTTestBase {
     $this->rebuildCache();
 
     // Verify that accessing the resource returns 401.
-    $response = $this->httpRequest($this->entity->getSystemPath(), 'GET', NULL, $this->defaultMimeType);
-    $this->assertResponse('404', 'HTTP response code is 404 when the resource does not define authentication.');
+    $response = $this->httpRequest($this->entity->urlInfo(), 'GET', NULL, $this->defaultMimeType);
+    // AcceptHeaderMatcher considers the canonical, non-REST route a match, but
+    // a lower quality one: no format restrictions means there's always a match,
+    // and hence when there is no matching REST route, the non-REST route is
+    // used, but it can't render into application/hal+json, so it returns a 406.
+    $this->assertResponse('406', 'HTTP response code is 406 when the resource does not define formats, because it falls back to the canonical, non-REST route.');
     $this->curlClose();
   }
 

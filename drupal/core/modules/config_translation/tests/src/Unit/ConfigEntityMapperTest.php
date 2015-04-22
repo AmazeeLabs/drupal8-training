@@ -8,6 +8,7 @@
 namespace Drupal\Tests\config_translation\Unit;
 
 use Drupal\config_translation\ConfigEntityMapper;
+use Drupal\Core\Url;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\Routing\Route;
 
@@ -46,6 +47,13 @@ class ConfigEntityMapperTest extends UnitTestCase {
    */
   protected $routeProvider;
 
+  /**
+   * The mocked language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManagerInterface $language_manager|\PHPUnit_Framework_MockObject_MockObject
+   */
+  protected $languageManager;
+
   protected function setUp() {
     $this->entityManager = $this->getMock('Drupal\Core\Entity\EntityManagerInterface');
 
@@ -74,6 +82,8 @@ class ConfigEntityMapperTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
 
+    $this->languageManager = $this->getMock('Drupal\Core\Language\LanguageManagerInterface');
+
     $this->configEntityMapper = new ConfigEntityMapper(
       'configurable_language',
       $definition,
@@ -83,7 +93,8 @@ class ConfigEntityMapperTest extends UnitTestCase {
       $this->getMock('Drupal\config_translation\ConfigMapperManagerInterface'),
       $this->routeProvider,
       $this->getStringTranslationStub(),
-      $this->entityManager
+      $this->entityManager,
+      $this->languageManager
     );
   }
 
@@ -188,11 +199,11 @@ class ConfigEntityMapperTest extends UnitTestCase {
     $expected = array(
       'list' => array(
         'title' => 'List',
-        'href' => 'admin/config/regional/config-translation/configurable_language',
-      )
+        'url' => Url::fromRoute('config_translation.entity_list', ['mapper_id' => 'configurable_language']),
+      ),
     );
 
-    $this->assertSame($expected, $result);
+    $this->assertEquals($expected, $result);
   }
 
 }

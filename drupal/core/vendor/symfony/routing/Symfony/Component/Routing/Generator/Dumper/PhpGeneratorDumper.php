@@ -38,7 +38,7 @@ class PhpGeneratorDumper extends GeneratorDumper
     public function dump(array $options = array())
     {
         $options = array_merge(array(
-            'class'      => 'ProjectUrlGenerator',
+            'class' => 'ProjectUrlGenerator',
             'base_class' => 'Symfony\\Component\\Routing\\Generator\\UrlGenerator',
         ), $options);
 
@@ -57,7 +57,7 @@ use Psr\Log\LoggerInterface;
  */
 class {$options['class']} extends {$options['base_class']}
 {
-    static private \$declaredRoutes = {$this->generateDeclaredRoutes()};
+    private static \$declaredRoutes = {$this->generateDeclaredRoutes()};
 
     /**
      * Constructor.

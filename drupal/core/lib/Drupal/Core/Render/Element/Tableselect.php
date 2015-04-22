@@ -9,6 +9,7 @@ namespace Drupal\Core\Render\Element;
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\Component\Utility\Html as HtmlUtility;
 
 /**
  * Provides a form element for a table with radios or checkboxes in left column.
@@ -132,11 +133,11 @@ class Tableselect extends Table {
         // Render the checkbox / radio element.
         $row['data'][] = drupal_render($element[$key]);
 
-        // As theme_table only maps header and row columns by order, create the
-        // correct order by iterating over the header fields.
+        // As table.html.twig only maps header and row columns by order, create
+        // the correct order by iterating over the header fields.
         foreach ($element['#header'] as $fieldname => $title) {
-          // A row cell can span over multiple headers, which means less row cells
-          // than headers could be present.
+          // A row cell can span over multiple headers, which means less row
+          // cells than headers could be present.
           if (isset($element['#options'][$key][$fieldname])) {
             // A header can span over multiple cells and in this case the cells
             // are passed in an array. The order of this array determines the
@@ -236,7 +237,7 @@ class Tableselect extends Table {
               '#default_value' => ($element['#default_value'] == $key) ? $key : NULL,
               '#attributes' => $element['#attributes'],
               '#parents' => $element['#parents'],
-              '#id' => drupal_html_id('edit-' . implode('-', $parents_for_id)),
+              '#id' => HtmlUtility::getUniqueId('edit-' . implode('-', $parents_for_id)),
               '#ajax' => isset($element['#ajax']) ? $element['#ajax'] : NULL,
             );
           }

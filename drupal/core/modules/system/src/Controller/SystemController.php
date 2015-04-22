@@ -15,6 +15,7 @@ use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Menu\MenuLinkTreeInterface;
 use Drupal\Core\Menu\MenuTreeParameters;
 use Drupal\Core\Theme\ThemeAccessCheck;
+use Drupal\Core\Url;
 use Drupal\system\SystemManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -116,7 +117,7 @@ class SystemController extends ControllerBase {
   public function overview($link_id) {
     // Check for status report errors.
     if ($this->systemManager->checkRequirements() && $this->currentUser()->hasPermission('administer site configuration')) {
-      drupal_set_message($this->t('One or more problems were detected with your Drupal installation. Check the <a href="@status">status report</a> for more information.', array('@status' => url('admin/reports/status'))), 'error');
+      drupal_set_message($this->t('One or more problems were detected with your Drupal installation. Check the <a href="@status">status report</a> for more information.', array('@status' => $this->url('system.status'))), 'error');
     }
     // Load all menu links below it.
     $parameters = new MenuTreeParameters();
@@ -200,6 +201,7 @@ class SystemController extends ControllerBase {
         continue;
       }
       $theme->is_default = ($theme->getName() == $theme_default);
+      $theme->is_admin = ($theme->getName() == $admin_theme || ($theme->is_default && $admin_theme == '0'));
 
       // Identify theme screenshot.
       $theme->screenshot = NULL;
@@ -242,24 +244,33 @@ class SystemController extends ControllerBase {
         if ($this->themeAccess->checkAccess($theme->getName())) {
           $theme->operations[] = array(
             'title' => $this->t('Settings'),
-            'route_name' => 'system.theme_settings_theme',
-            'route_parameters' => array('theme' => $theme->getName()),
+            'url' => Url::fromRoute('system.theme_settings_theme', ['theme' => $theme->getName()]),
             'attributes' => array('title' => $this->t('Settings for !theme theme', array('!theme' => $theme->info['name']))),
           );
         }
         if (!empty($theme->status)) {
           if (!$theme->is_default) {
-            if ($theme->getName() != $admin_theme) {
+            $theme_uninstallable = TRUE;
+            if ($theme->getName() == $admin_theme) {
+              $theme_uninstallable = FALSE;
+            }
+            // Check it isn't the base of theme of an installed theme.
+            foreach ($theme->required_by as $themename => $dependency) {
+              if (!empty($themes[$themename]->status)) {
+                $theme_uninstallable = FALSE;
+              }
+            }
+            if ($theme_uninstallable) {
               $theme->operations[] = array(
                 'title' => $this->t('Uninstall'),
-                'route_name' => 'system.theme_uninstall',
+                'url' => Url::fromRoute('system.theme_uninstall'),
                 'query' => $query,
                 'attributes' => array('title' => $this->t('Uninstall !theme theme', array('!theme' => $theme->info['name']))),
               );
             }
             $theme->operations[] = array(
               'title' => $this->t('Set as default'),
-              'route_name' => 'system.theme_set_default',
+              'url' => Url::fromRoute('system.theme_set_default'),
               'query' => $query,
               'attributes' => array('title' => $this->t('Set !theme as default theme', array('!theme' => $theme->info['name']))),
             );
@@ -269,13 +280,13 @@ class SystemController extends ControllerBase {
         else {
           $theme->operations[] = array(
             'title' => $this->t('Install'),
-            'route_name' => 'system.theme_install',
+            'url' => Url::fromRoute('system.theme_install'),
             'query' => $query,
             'attributes' => array('title' => $this->t('Install !theme theme', array('!theme' => $theme->info['name']))),
           );
           $theme->operations[] = array(
             'title' => $this->t('Install and set as default'),
-            'route_name' => 'system.theme_set_default',
+            'url' => Url::fromRoute('system.theme_set_default'),
             'query' => $query,
             'attributes' => array('title' => $this->t('Install !theme as default theme', array('!theme' => $theme->info['name']))),
           );
@@ -284,13 +295,10 @@ class SystemController extends ControllerBase {
 
       // Add notes to default and administration theme.
       $theme->notes = array();
-      $theme->classes = array();
       if ($theme->is_default) {
-        $theme->classes[] = 'theme-default';
         $theme->notes[] = $this->t('default theme');
       }
-      if ($theme->getName() == $admin_theme || ($theme->is_default && $admin_theme == '0')) {
-        $theme->classes[] = 'theme-admin';
+      if ($theme->is_admin) {
         $theme->notes[] = $this->t('admin theme');
       }
 
@@ -351,21 +359,24 @@ class SystemController extends ControllerBase {
     // An active link's path is equal to the current path, so search the HTML
     // for an attribute with that value.
     $offset = 0;
-    while ((strpos($element['#markup'], 'data-drupal-link-system-path="' . $context['path'] . '"', $offset) !== FALSE || ($context['front'] && strpos($element['#markup'], 'data-drupal-link-system-path="&lt;front&gt;"', $offset) !== FALSE))) {
+    while (strpos($element['#markup'], $search_key_current_path, $offset) !== FALSE || ($context['front'] && strpos($element['#markup'], $search_key_front, $offset) !== FALSE)) {
       $pos_current_path = strpos($element['#markup'], $search_key_current_path, $offset);
       $pos_front = strpos($element['#markup'], $search_key_front, $offset);
 
-      // Determine which of the two values matched: the exact path, or the
-      // <front> special case.
+      // Determine which of the two values is the next match: the exact path, or
+      // the <front> special case.
       $pos_match = NULL;
-      $type_match = NULL;
-      if ($pos_current_path !== FALSE) {
+      if ($pos_front === FALSE) {
         $pos_match = $pos_current_path;
-        $type_match = 'path';
       }
-      elseif ($context['front'] && $pos_front !== FALSE) {
+      elseif ($pos_current_path === FALSE) {
         $pos_match = $pos_front;
-        $type_match = 'front';
+      }
+      elseif ($pos_current_path < $pos_front) {
+        $pos_match = $pos_current_path;
+      }
+      else {
+        $pos_match = $pos_front;
       }
 
       // Find beginning and ending of opening tag.
@@ -392,32 +403,34 @@ class SystemController extends ControllerBase {
       @$dom->loadHTML('<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head><body>' . $tag . '</body></html>');
       $node = $dom->getElementsByTagName('body')->item(0)->firstChild;
 
+      // Ensure we don't set the "active" class twice on the same element.
+      $class = $node->getAttribute('class');
+      $add_active = !in_array('active', explode(' ', $class));
+
       // The language of an active link is equal to the current language.
-      $is_active = TRUE;
-      if ($context['language']) {
+      if ($add_active && $context['language']) {
         if ($node->hasAttribute('hreflang') && $node->getAttribute('hreflang') !== $context['language']) {
-          $is_active = FALSE;
+          $add_active = FALSE;
         }
       }
       // The query parameters of an active link are equal to the current
       // parameters.
-      if ($is_active) {
+      if ($add_active) {
         if ($context['query']) {
           if (!$node->hasAttribute('data-drupal-link-query') || $node->getAttribute('data-drupal-link-query') !== Json::encode($context['query'])) {
-            $is_active = FALSE;
+            $add_active = FALSE;
           }
         }
         else {
           if ($node->hasAttribute('data-drupal-link-query')) {
-            $is_active = FALSE;
+            $add_active = FALSE;
           }
         }
       }
 
-      // Only if the the path, the language and the query match, we set the
+      // Only if the path, the language and the query match, we set the
       // "active" class.
-      if ($is_active) {
-        $class = $node->getAttribute('class');
+      if ($add_active) {
         if (strlen($class) > 0) {
           $class .= ' ';
         }

@@ -7,11 +7,13 @@
 
 namespace Drupal\locale;
 
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\TypedData\ContextAwareInterface;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\Config\Schema\Element;
-use Drupal\Core\Config\Schema\ArrayElement;
 use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\TypedData\TraversableTypedDataInterface;
+use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * Defines the locale configuration wrapper object.
@@ -47,6 +49,13 @@ class LocaleTypedConfig extends Element {
   protected $typedConfigManager;
 
   /**
+   * The language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManagerInterface
+   */
+  protected $languageManager;
+
+  /**
    * Constructs a configuration wrapper object.
    *
    * @param \Drupal\Core\TypedData\DataDefinitionInterface $definition
@@ -59,12 +68,15 @@ class LocaleTypedConfig extends Element {
    *   The locale configuration manager object.
    * @param \Drupal\locale\TypedConfigManagerInterface $typed_config;
    *   The typed configuration manager interface.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
    */
-  public function __construct(DataDefinitionInterface $definition, $name, $langcode, LocaleConfigManager $locale_config, TypedConfigManagerInterface $typed_config) {
+  public function __construct(DataDefinitionInterface $definition, $name, $langcode, LocaleConfigManager $locale_config, TypedConfigManagerInterface $typed_config, LanguageManagerInterface $language_manager) {
     parent::__construct($definition, $name);
     $this->langcode = $langcode;
     $this->localeConfig = $locale_config;
     $this->typedConfigManager = $typed_config;
+    $this->languageManager = $language_manager;
   }
 
   /**
@@ -90,7 +102,7 @@ class LocaleTypedConfig extends Element {
    * {@inheritdoc}
    */
   public function language() {
-    return language_load($this->langcode);
+    return $this->languageManager->getLanguage($this->langcode);
   }
 
   /**
@@ -114,9 +126,8 @@ class LocaleTypedConfig extends Element {
   /**
    * Gets translated configuration data for a typed configuration element.
    *
-   * @param mixed $element
-   *   Typed configuration element, either \Drupal\Core\Config\Schema\Element or
-   *   \Drupal\Core\Config\Schema\ArrayElement.
+   * @param \Drupal\Core\TypedData\TypedDataInterface $element
+   *   Typed configuration element.
    * @param array $options
    *   Array with translation options that must contain the keys defined in
    *   \Drupal\locale\LocaleTypedConfig::translateElement().
@@ -125,9 +136,9 @@ class LocaleTypedConfig extends Element {
    *   Configuration data translated to the requested language if available,
    *   an empty array otherwise.
    */
-  protected function getElementTranslation($element, array $options) {
+  protected function getElementTranslation(TypedDataInterface $element, array $options) {
     $translation = array();
-    if ($element instanceof ArrayElement) {
+    if ($element instanceof TraversableTypedDataInterface) {
       $translation = $this->getArrayTranslation($element, $options);
     }
     elseif ($this->translateElement($element, $options)) {
@@ -137,9 +148,9 @@ class LocaleTypedConfig extends Element {
   }
 
   /**
-   * Gets translated configuration data for an element of type ArrayElement.
+   * Gets translated configuration data for a traversable element.
    *
-   * @param \Drupal\Core\Config\Schema\ArrayElement $element
+   * @param \Drupal\Core\TypedData\TraversableTypedDataInterface $element
    *   Typed configuration array element.
    * @param array $options
    *   Array with translation options that must contain the keys defined in
@@ -148,7 +159,7 @@ class LocaleTypedConfig extends Element {
    * @return array
    *   Configuration data translated to the requested language.
    */
-  protected function getArrayTranslation(ArrayElement $element, array $options) {
+  protected function getArrayTranslation(TraversableTypedDataInterface $element, array $options) {
     $translation = array();
     foreach ($element as $key => $property) {
       $value = $this->getElementTranslation($property, $options);
@@ -179,7 +190,7 @@ class LocaleTypedConfig extends Element {
    * @return bool
    *   Whether the element fits the translation criteria.
    */
-  protected function translateElement(\Drupal\Core\TypedData\TypedDataInterface $element, array $options) {
+  protected function translateElement(TypedDataInterface $element, array $options) {
     if ($this->canTranslate($options['source'], $options['target'])) {
       $definition = $element->getDataDefinition();
       $value = $element->getValue();

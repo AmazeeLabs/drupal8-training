@@ -67,7 +67,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="120" height="60" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="120" height="60" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -88,7 +88,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="60" height="120" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="60" height="120" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -110,7 +110,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="45" height="90" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="45" height="90" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -132,7 +132,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="45" height="90" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="45" height="90" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -150,7 +150,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="45" height="90" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="45" height="90" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -171,7 +171,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -191,7 +191,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" width="30" height="30" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" width="30" height="30" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -212,7 +212,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $effect_id = $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" alt="" class="image-style-test" />');
     $this->assertFalse(file_exists($generated_uri), 'Generated file does not exist.');
     $this->drupalGet($url);
     $this->assertResponse(200, 'Image was generated at the URL.');
@@ -221,8 +221,7 @@ class ImageDimensionsTest extends WebTestBase {
     $effect_plugin = $style->getEffect($effect_id);
     $style->deleteImageEffect($effect_plugin);
 
-    // Ensure that an effect with no dimensions callback unsets the dimensions.
-    // This ensures compatibility with 7.0 contrib modules.
+    // Ensure that an effect can unset dimensions.
     $effect = array(
       'id' => 'image_module_test_null',
       'data' => array(),
@@ -231,7 +230,7 @@ class ImageDimensionsTest extends WebTestBase {
 
     $style->addImageEffect($effect);
     $style->save();
-    $this->assertEqual($this->getImageTag($variables), '<img class="image-style-test" src="' . $url . '" alt="" />');
+    $this->assertEqual($this->getImageTag($variables), '<img src="' . $url . '" alt="" class="image-style-test" />');
   }
 
   /**

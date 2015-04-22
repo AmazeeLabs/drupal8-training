@@ -7,6 +7,11 @@
 
 namespace Drupal\node\Tests\Views;
 
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Url;
+use Drupal\node\Entity\Node;
+use Drupal\system\Tests\Cache\AssertPageCacheContextsAndTagsTrait;
+use Drupal\views\Tests\AssertViewsCacheTagsTrait;
 use Drupal\views\Tests\ViewTestBase;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Views;
@@ -17,6 +22,14 @@ use Drupal\views\Views;
  * @group node
  */
 class FrontPageTest extends ViewTestBase {
+
+  use AssertPageCacheContextsAndTagsTrait;
+  use AssertViewsCacheTagsTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $dumpHeaders = TRUE;
 
   /**
    * The entity storage for nodes.
@@ -30,12 +43,13 @@ class FrontPageTest extends ViewTestBase {
    *
    * @var array
    */
-  public static $modules = array('node');
+  public static $modules = array('node', 'contextual');
 
   protected function setUp() {
     parent::setUp();
 
-    $this->nodeStorage = $this->container->get('entity.manager')->getStorage('node');
+    $this->nodeStorage = $this->container->get('entity.manager')
+      ->getStorage('node');
   }
 
   /**
@@ -43,12 +57,25 @@ class FrontPageTest extends ViewTestBase {
    */
   public function testFrontPage() {
     $site_name = $this->randomMachineName();
-    $this->container->get('config.factory')
-      ->get('system.site')
+    $this->config('system.site')
       ->set('name', $site_name)
       ->save();
 
     $view = Views::getView('frontpage');
+
+    // Tests \Drupal\node\Plugin\views\row\RssPluginBase::calculateDependencies().
+    $expected = [
+      'config' => [
+        'core.entity_view_mode.node.rss',
+        'core.entity_view_mode.node.teaser',
+      ],
+      'module' => [
+        'node',
+        'user',
+      ],
+    ];
+    $this->assertIdentical($expected, $view->calculateDependencies());
+
     $view->setDisplay('page_1');
     $this->executeView($view);
     $view->preview();
@@ -150,14 +177,176 @@ class FrontPageTest extends ViewTestBase {
   public function testAdminFrontPage() {
     // When a user with sufficient permissions is logged in, views_ui adds
     // contextual links to the homepage view. This verifies there are no errors.
-    \Drupal::moduleHandler()->install(array('views_ui'));
+    \Drupal::service('module_installer')->install(array('views_ui'));
     // Login root user with sufficient permissions.
-    $this->drupalLogin($this->root_user);
+    $this->drupalLogin($this->rootUser);
     // Test frontpage view.
     $this->drupalGet('node');
     $this->assertResponse(200);
     // Check that the frontpage view was rendered.
     $this->assertPattern('/class=".+view-frontpage/', 'Frontpage view was rendered');
+  }
+
+  /**
+   * Tests the cache tags when using the "none" cache plugin.
+   */
+  public function testCacheTagsWithCachePluginNone() {
+    $this->enablePageCaching();
+    $this->assertFrontPageViewCacheTags(FALSE);
+  }
+
+  /**
+   * Tests the cache tags when using the "tag" cache plugin.
+   */
+  public function testCacheTagsWithCachePluginTag() {
+    $this->enablePageCaching();
+
+    $view = Views::getView('frontpage');
+    $view->setDisplay('page_1');
+    $view->display_handler->overrideOption('cache', [
+      'type' => 'tag',
+    ]);
+    $view->save();
+
+    $this->assertFrontPageViewCacheTags(TRUE);
+  }
+
+  /**
+   * Tests the cache tags when using the "time" cache plugin.
+   */
+  public function testCacheTagsWithCachePluginTime() {
+    $this->enablePageCaching();
+
+    $view = Views::getView('frontpage');
+    $view->setDisplay('page_1');
+    $view->display_handler->overrideOption('cache', [
+      'type' => 'time',
+      'options' => [
+        'results_lifespan' => 3600,
+        'output_lifespan' => 3600,
+      ],
+    ]);
+    $view->save();
+
+    $this->assertFrontPageViewCacheTags(TRUE);
+  }
+
+  /**
+   * Tests the cache tags on the front page.
+   *
+   * @param bool $do_assert_views_caches
+   *   Whether to check Views' result & output caches.
+   */
+  protected function assertFrontPageViewCacheTags($do_assert_views_caches) {
+    $view = Views::getView('frontpage');
+    $view->setDisplay('page_1');
+
+    $cache_contexts = ['user.node_grants:view', 'languages'];
+
+    // Test before there are any nodes.
+    $empty_node_listing_cache_tags = [
+      'config:views.view.frontpage',
+      'node_list',
+    ];
+    $this->assertViewsCacheTags(
+      $view,
+      $empty_node_listing_cache_tags,
+      $do_assert_views_caches,
+      $empty_node_listing_cache_tags
+    );
+    $this->assertPageCacheContextsAndTags(
+      Url::fromRoute('view.frontpage.page_1'),
+      $cache_contexts,
+      Cache::mergeTags($empty_node_listing_cache_tags, ['rendered'])
+    );
+
+    // Create some nodes on the frontpage view. Add more than 10 nodes in order
+    // to enable paging.
+    $this->drupalCreateContentType(['type' => 'article']);
+    for ($i = 0; $i < 15; $i++) {
+      $node = Node::create([
+        'body' => [
+          [
+            'value' => $this->randomMachineName(32),
+            'format' => filter_default_format(),
+          ]
+        ],
+        'type' => 'article',
+        'created' => $i,
+        'title' => $this->randomMachineName(8),
+        'nid' => $i + 1,
+      ]);
+      $node->enforceIsNew(TRUE);
+      $node->save();
+    }
+    $cache_contexts = Cache::mergeContexts($cache_contexts, [
+      'theme',
+      'timezone',
+      'user.roles'
+    ]);
+
+    // First page.
+    $first_page_result_cache_tags = [
+      'config:views.view.frontpage',
+      'node_list',
+      'node:6',
+      'node:7',
+      'node:8',
+      'node:9',
+      'node:10',
+      'node:11',
+      'node:12',
+      'node:13',
+      'node:14',
+      'node:15',
+    ];
+    $first_page_output_cache_tags = Cache::mergeTags($first_page_result_cache_tags, [
+      'config:filter.format.plain_text',
+      'node_view',
+      'user_view',
+      'user:0',
+    ]);
+    $view->setDisplay('page_1');
+    $view->setCurrentPage(0);
+    $this->assertViewsCacheTags(
+      $view,
+      $first_page_result_cache_tags,
+      $do_assert_views_caches,
+      $first_page_output_cache_tags
+    );
+    $this->assertPageCacheContextsAndTags(
+      Url::fromRoute('view.frontpage.page_1'),
+      $cache_contexts,
+      Cache::mergeTags($first_page_output_cache_tags, ['rendered'])
+    );
+
+    // Second page.
+    $this->assertPageCacheContextsAndTags(Url::fromRoute('view.frontpage.page_1', [], ['query' => ['page' => 1]]), $cache_contexts, [
+      // The cache tags for the listed nodes.
+      'node:1',
+      'node:2',
+      'node:3',
+      'node:4',
+      'node:5',
+      // The rest.
+      'config:filter.format.plain_text',
+      'config:views.view.frontpage',
+      'node_list',
+      'node_view',
+      'user_view',
+      'user:0',
+      'rendered',
+    ]);
+
+    // Let's update a node title on the first page and ensure that the page
+    // cache entry invalidates.
+    $node = Node::load(10);
+    $title = $node->getTitle() . 'a';
+    $node->setTitle($title);
+    $node->save();
+
+    $this->drupalGet(Url::fromRoute('view.frontpage.page_1'));
+    $this->assertText($title);
   }
 
 }

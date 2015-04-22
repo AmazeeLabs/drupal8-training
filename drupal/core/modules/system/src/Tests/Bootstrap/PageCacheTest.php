@@ -8,9 +8,10 @@
 namespace Drupal\system\Tests\Bootstrap;
 
 use Drupal\Component\Datetime\DateTimePlus;
-use Symfony\Component\Routing\RequestContext;
+use Drupal\Core\Routing\RequestContext;
 use Drupal\simpletest\WebTestBase;
 use Drupal\Core\Cache\Cache;
+use Drupal\user\Entity\Role;
 
 /**
  * Enables the page cache and tests it with various HTTP requests.
@@ -31,7 +32,7 @@ class PageCacheTest extends WebTestBase {
   protected function setUp() {
     parent::setUp();
 
-    \Drupal::config('system.site')
+    $this->config('system.site')
       ->set('name', 'Drupal')
       ->set('page.front', 'test-page')
       ->save();
@@ -44,29 +45,27 @@ class PageCacheTest extends WebTestBase {
    * persisted.
    */
   function testPageCacheTags() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
 
     $path = 'system-test/cache_tags_page';
-    $tags = array('system_test_cache_tags_page' => TRUE);
+    $tags = array('system_test_cache_tags_page');
     $this->drupalGet($path);
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
 
     // Verify a cache hit, but also the presence of the correct cache tags.
     $this->drupalGet($path);
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
-    $cid_parts = array(url($path, array('absolute' => TRUE)), 'html');
-    $cid = sha1(implode(':', $cid_parts));
+    $cid_parts = array(\Drupal::url('system_test.cache_tags_page', array(), array('absolute' => TRUE)), 'html');
+    $cid = implode(':', $cid_parts);
     $cache_entry = \Drupal::cache('render')->get($cid);
     sort($cache_entry->tags);
     $expected_tags = array(
-      'pre_render:1',
-      'rendered:1',
-      'system_test_cache_tags_page:1',
-      'theme:stark',
-      'theme_global_settings:1',
+      'pre_render',
+      'rendered',
+      'system_test_cache_tags_page',
     );
     $this->assertIdentical($cache_entry->tags, $expected_tags);
 
@@ -79,7 +78,7 @@ class PageCacheTest extends WebTestBase {
    * Tests support for different cache items with different Accept headers.
    */
   function testAcceptHeaderRequests() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -100,13 +99,57 @@ class PageCacheTest extends WebTestBase {
     $this->drupalGet($accept_header_cache_uri, array(), $json_accept_header);
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT', 'Json response was cached.');
     $this->assertRaw('{"content":"oh hai this is json"}', 'The correct Json response was returned.');
+
+    // Enable REST support for nodes and hal+json.
+    \Drupal::service('module_installer')->install(['node', 'rest', 'hal']);
+    $this->drupalCreateContentType(['type' => 'article']);
+    $node = $this->drupalCreateNode(['type' => 'article']);
+    $node_uri = 'node/' . $node->id();
+    $hal_json_accept_header = ['Accept: application/hal+json'];
+    /** @var \Drupal\user\RoleInterface $role */
+    $role = Role::load('anonymous');
+    $role->grantPermission('restful get entity:node');
+    $role->save();
+
+    $this->drupalGet($node_uri);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'text/html; charset=UTF-8');
+    $this->drupalGet($node_uri);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'text/html; charset=UTF-8');
+
+    // Now request a HAL page, we expect that the first request is a cache miss
+    // and it serves HTML.
+    $this->drupalGet($node_uri, [], $hal_json_accept_header);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'application/hal+json');
+    $this->drupalGet($node_uri, [], $hal_json_accept_header);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'application/hal+json');
+
+    // Clear the page cache. After that request a HAL request, followed by an
+    // ordinary HTML one.
+    \Drupal::cache('render')->deleteAll();
+    $this->drupalGet($node_uri, [], $hal_json_accept_header);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'application/hal+json');
+    $this->drupalGet($node_uri, [], $hal_json_accept_header);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'application/hal+json');
+
+    $this->drupalGet($node_uri);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'text/html; charset=UTF-8');
+    $this->drupalGet($node_uri);
+    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
+    $this->assertEqual($this->drupalGetHeader('Content-Type'), 'text/html; charset=UTF-8');
   }
 
   /**
    * Tests support of requests with If-Modified-Since and If-None-Match headers.
    */
   function testConditionalRequests() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -151,7 +194,7 @@ class PageCacheTest extends WebTestBase {
    * Tests cache headers.
    */
   function testPageCache() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->set('response.gzip', 1);
@@ -197,7 +240,7 @@ class PageCacheTest extends WebTestBase {
    * Tests the omit_vary_cookie setting.
    */
   public function testPageCacheWithoutVaryCookie() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -227,7 +270,7 @@ class PageCacheTest extends WebTestBase {
    * mod_deflate Apache module.
    */
   function testPageCompression() {
-    $config = \Drupal::config('system.performance');
+    $config = $this->config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->set('response.gzip', 1);
@@ -236,21 +279,21 @@ class PageCacheTest extends WebTestBase {
     // Fill the cache and verify that output is compressed.
     $this->drupalGet('', array(), array('Accept-Encoding: gzip,deflate'));
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS', 'Page was not cached.');
-    $this->drupalSetContent(gzinflate(substr($this->drupalGetContent(), 10, -8)));
+    $this->setRawContent(gzinflate(substr($this->getRawContent(), 10, -8)));
     $this->assertRaw('</html>', 'Page was gzip compressed.');
 
     // Verify that cached output is compressed.
     $this->drupalGet('', array(), array('Accept-Encoding: gzip,deflate'));
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT', 'Page was cached.');
     $this->assertEqual($this->drupalGetHeader('Content-Encoding'), 'gzip', 'A Content-Encoding header was sent.');
-    $this->drupalSetContent(gzinflate(substr($this->drupalGetContent(), 10, -8)));
+    $this->setRawContent(gzinflate(substr($this->getRawContent(), 10, -8)));
     $this->assertRaw('</html>', 'Page was gzip compressed.');
 
     // Verify that a client without compression support gets an uncompressed page.
     $this->drupalGet('');
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT', 'Page was cached.');
     $this->assertFalse($this->drupalGetHeader('Content-Encoding'), 'A Content-Encoding header was not sent.');
-    $this->assertTitle(t('Test page | @site-name', array('@site-name' => \Drupal::config('system.site')->get('name'))), 'Site title matches.');
+    $this->assertTitle(t('Test page | @site-name', array('@site-name' => $this->config('system.site')->get('name'))), 'Site title matches.');
     $this->assertRaw('</html>', 'Page was not compressed.');
 
     // Disable compression mode.
@@ -259,7 +302,7 @@ class PageCacheTest extends WebTestBase {
 
     // Verify if cached page is still available for a client with compression support.
     $this->drupalGet('', array(), array('Accept-Encoding: gzip,deflate'));
-    $this->drupalSetContent(gzinflate(substr($this->drupalGetContent(), 10, -8)));
+    $this->setRawContent(gzinflate(substr($this->getRawContent(), 10, -8)));
     $this->assertRaw('</html>', 'Page was delivered after compression mode is changed (compression support enabled).');
 
     // Verify if cached page is still available for a client without compression support.

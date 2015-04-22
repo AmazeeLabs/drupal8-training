@@ -38,18 +38,18 @@ use Drupal\user\UserInterface;
  *   base_table = "comment",
  *   data_table = "comment_field_data",
  *   uri_callback = "comment_uri",
- *   fieldable = TRUE,
  *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "cid",
  *     "bundle" = "comment_type",
  *     "label" = "subject",
+ *     "langcode" = "langcode",
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "canonical" = "entity.comment.canonical",
- *     "delete-form" = "entity.comment.delete_form",
- *     "edit-form" = "entity.comment.edit_form",
+ *     "canonical" = "/comment/{comment}",
+ *     "delete-form" = "/comment/{comment}/delete",
+ *     "edit-form" = "/comment/{comment}/edit",
  *   },
  *   bundle_entity_type = "comment_type",
  *   field_ui_base_route  = "entity.comment_type.edit_form",
@@ -222,8 +222,16 @@ class Comment extends ContentEntityBase implements CommentInterface {
       ->setRequired(TRUE);
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
-      ->setLabel(t('Language code'))
-      ->setDescription(t('The comment language code.'));
+      ->setLabel(t('Language'))
+      ->setDescription(t('The comment language code.'))
+      ->setTranslatable(TRUE)
+      ->setDisplayOptions('view', array(
+        'type' => 'hidden',
+      ))
+      ->setDisplayOptions('form', array(
+        'type' => 'language_select',
+        'weight' => 2,
+      ));
 
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))

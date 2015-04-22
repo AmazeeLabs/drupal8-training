@@ -1,13 +1,13 @@
 id: user.user_picture
 status: true
 langcode: en
-name: user_picture
+field_name: user_picture
 entity_type: user
 type: image
 settings:
   uri_scheme: public
   default_image:
-    fid: null
+    uuid: null
     alt: ''
     title: ''
     width: null
@@ -15,7 +15,6 @@ settings:
 module: image
 locked: false
 cardinality: 1
-translatable: false
 indexes:
   target_id:
     - target_id
@@ -23,3 +22,4 @@ dependencies:
   module:
     - image
     - user
+persist_with_no_fields: false

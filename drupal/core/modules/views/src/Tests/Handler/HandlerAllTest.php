@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Tests\Handler;
 
+use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\HandlerBase;
 use Drupal\views\Plugin\views\filter\InOperator;
@@ -17,6 +18,8 @@ use Drupal\views\Plugin\views\filter\InOperator;
  * @group views
  */
 class HandlerAllTest extends HandlerTestBase {
+
+  use CommentTestTrait;
 
   /**
    * Modules to enable.
@@ -48,7 +51,7 @@ class HandlerAllTest extends HandlerTestBase {
    */
   public function testHandlers() {
     $this->drupalCreateContentType(array('type' => 'article'));
-    $this->container->get('comment.manager')->addDefaultField('node', 'article');
+    $this->addDefaultCommentField('node', 'article');
 
     $object_types = array_keys(ViewExecutable::getHandlerTypes());
     foreach ($this->container->get('views.views_data')->get() as $base_table => $info) {
@@ -60,8 +63,8 @@ class HandlerAllTest extends HandlerTestBase {
       $view = $view->getExecutable();
 
       // @todo The groupwise relationship is currently broken.
-      $exclude[] = 'taxonomy_term_data:tid_representative';
-      $exclude[] = 'users:uid_representative';
+      $exclude[] = 'taxonomy_term_field_data:tid_representative';
+      $exclude[] = 'users_field_data:uid_representative';
 
       // Go through all fields and there through all handler types.
       foreach ($info as $field => $field_info) {
@@ -76,8 +79,12 @@ class HandlerAllTest extends HandlerTestBase {
               $options = array();
               if ($type == 'filter') {
                 $handler = $this->container->get("plugin.manager.views.$type")->getHandler($item);
+                // Set the value to use for the filter based on the filter type.
                 if ($handler instanceof InOperator) {
                   $options['value'] = array(1);
+                }
+                else {
+                  $options['value'] = 1;
                 }
               }
               $view->addHandler('default', $type, $base_table, $field, $options);

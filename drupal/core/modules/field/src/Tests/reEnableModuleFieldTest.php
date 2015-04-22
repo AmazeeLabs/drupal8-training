@@ -39,12 +39,14 @@ class reEnableModuleFieldTest extends WebTestBase {
 
   /**
    * Test the behavior of a field module after being disabled and re-enabled.
+   *
+   * @see field_system_info_alter()
    */
   function testReEnabledField() {
 
     // Add a telephone field to the article content type.
     $field_storage = entity_create('field_storage_config', array(
-      'name' => 'field_telephone',
+      'field_name' => 'field_telephone',
       'entity_type' => 'node',
       'type' => 'telephone',
     ));

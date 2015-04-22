@@ -9,6 +9,7 @@ namespace Drupal\rest\LinkManager;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Utility\UnroutedUrlAssemblerInterface;
 
 class TypeLinkManager implements TypeLinkManagerInterface {
 
@@ -20,13 +21,23 @@ class TypeLinkManager implements TypeLinkManagerInterface {
   protected $cache;
 
   /**
+   * The unrouted URL assembler.
+   *
+   * @var \Drupal\Core\Utility\UnroutedUrlAssemblerInterface
+   */
+  protected $urlAssembler;
+
+  /**
    * Constructor.
    *
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
    *   The injected cache backend for caching type URIs.
+   * @param \Drupal\Core\Utility\UnroutedUrlAssemblerInterface $url_assembler
+   *   The unrouted URL assembler.
    */
-  public function __construct(CacheBackendInterface $cache) {
+  public function __construct(CacheBackendInterface $cache, UnroutedUrlAssemblerInterface $url_assembler) {
     $this->cache = $cache;
+    $this->urlAssembler = $url_assembler;
   }
 
   /**
@@ -42,7 +53,7 @@ class TypeLinkManager implements TypeLinkManagerInterface {
    */
   public function getTypeUri($entity_type, $bundle) {
     // @todo Make the base path configurable.
-    return url("rest/type/$entity_type/$bundle", array('absolute' => TRUE));
+    return $this->urlAssembler->assemble("base:rest/type/$entity_type/$bundle", array('absolute' => TRUE));
   }
 
   /**
@@ -63,7 +74,7 @@ class TypeLinkManager implements TypeLinkManagerInterface {
    *   An array of typed data ids (entity_type and bundle) keyed by
    *   corresponding type URI.
    */
-  public function getTypes() {
+  protected function getTypes() {
     $cid = 'rest:links:types';
     $cache = $this->cache->get($cid);
     if (!$cache) {
@@ -99,6 +110,6 @@ class TypeLinkManager implements TypeLinkManagerInterface {
     }
     // These URIs only change when entity info changes, so cache it permanently
     // and only clear it when entity_info is cleared.
-    $this->cache->set('rest:links:types', $data, Cache::PERMANENT, array('entity_types' => TRUE));
+    $this->cache->set('rest:links:types', $data, Cache::PERMANENT, array('entity_types'));
   }
 }

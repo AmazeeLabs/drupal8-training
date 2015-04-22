@@ -10,24 +10,24 @@ use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
+ * Implements hook_preprocess_HOOK() for HTML document templates.
+ */
+function seven_preprocess_html(&$variables) {
+  // If on a node add or edit page, add a node-layout class.
+  $path_args = explode('/', \Drupal::request()->getPathInfo());
+  if ($suggestions = theme_get_suggestions($path_args, 'page', '-')) {
+    foreach ($suggestions as $suggestion) {
+      if ($suggestion === 'page-node-edit' || strpos($suggestion, 'page-node-add') !== FALSE) {
+        $variables['attributes']['class'][] = 'node-form-layout';
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_preprocess_HOOK() for page templates.
  */
 function seven_preprocess_page(&$variables) {
-  /** @var \Drupal\Core\Page\HtmlPage $page_object */
-  $page_object = $variables['page']['#page'];
-  $attributes = $page_object->getBodyAttributes();
-  $classes = $attributes['class'];
-  // Add information about the number of sidebars.
-
-  if (!empty($variables['page']['sidebar_first'])) {
-    $classes[] = 'layout-one-sidebar';
-    $classes[] = 'layout-sidebar-first';
-  }
-  else {
-    $classes[] = 'layout-no-sidebars';
-  }
-  $attributes['class'] = $classes;
-
   $variables['primary_local_tasks'] = $variables['tabs'];
   unset($variables['primary_local_tasks']['#secondary']);
   $variables['secondary_local_tasks'] = array(
@@ -72,10 +72,11 @@ function seven_preprocess_menu_local_task(&$variables) {
  */
 function seven_preprocess_node_add_list(&$variables) {
   if (!empty($variables['content'])) {
+    /** @var \Drupal\node\NodeTypeInterface $type */
     foreach ($variables['content'] as $type) {
-      $variables['types'][$type->type]['label'] = String::checkPlain($type->name);
-      $variables['types'][$type->type]['description'] = Xss::filterAdmin($type->description);
-      $variables['types'][$type->type]['url'] = \Drupal::url('node.add', array('node_type' => $type->type));
+      $variables['types'][$type->id()]['label'] = String::checkPlain($type->label());
+      $variables['types'][$type->id()]['description'] = Xss::filterAdmin($type->getDescription());
+      $variables['types'][$type->id()]['url'] = \Drupal::url('node.add', array('node_type' => $type->id()));
     }
   }
 }
@@ -90,7 +91,7 @@ function seven_preprocess_block_content_add_list(&$variables) {
   if (!empty($variables['content'])) {
     foreach ($variables['content'] as $type) {
       $variables['types'][$type->id()]['label'] = String::checkPlain($type->label());
-      $variables['types'][$type->id()]['description'] = Xss::filterAdmin($type->description);
+      $variables['types'][$type->id()]['description'] = Xss::filterAdmin($type->getDescription());
       $options = array('query' => \Drupal::request()->query->all());
       $variables['types'][$type->id()]['url'] = \Drupal::url('block_content.add_form', array('block_content_type' => $type->id()), $options);
     }
@@ -128,14 +129,7 @@ function seven_preprocess_menu_local_action(array &$variables) {
   $variables['link']['#options']['attributes']['class'][] = 'button--small';
 
   // We require Modernizr's touch test for button styling.
-  $libraries = array(
-    '#attached' => array(
-      'library' => array(
-        'core/modernizr',
-      ),
-    ),
-  );
-  drupal_render($libraries);
+  $variables['#attached']['library'][] = 'core/modernizr';
 }
 
 /**
@@ -152,45 +146,16 @@ function seven_element_info_alter(&$type) {
  * Implements hook_preprocess_install_page().
  */
 function seven_preprocess_install_page(&$variables) {
-  $page_object = $variables['page']['#page'];
-  $attributes = $page_object->getHtmlAttributes();
-  $classes = $attributes['class'];
-  $classes[] = 'install-background';
-  $attributes['class'] = $classes;
-
-  // Normally we could attach libraries via hook_page_alter(), but when the
-  // database is inactive it's not called so we add them here.
-  $libraries = array(
-    '#attached' => array(
-      'library' => array(
-        'seven/maintenance-page',
-        'seven/install-page',
-      ),
-    ),
-  );
-  drupal_render($libraries);
+  // Seven has custom styling for the install page.
+  $variables['#attached']['library'][] = 'seven/install-page';
 }
 
 /**
  * Implements hook_preprocess_maintenance_page().
  */
 function seven_preprocess_maintenance_page(&$variables) {
-  $page_object = $variables['page']['#page'];
-  $attributes = $page_object->getHtmlAttributes();
-  $classes = $attributes['class'];
-  $classes[] = 'maintenance-background';
-  $attributes['class'] = $classes;
-
-  // // Normally we could attach libraries via hook_page_alter(), but when the
-  // // database is inactive it's not called so we add them here.
-  $libraries = array(
-    '#attached' => array(
-      'library' => array(
-        'seven/maintenance-page',
-      ),
-    ),
-  );
-  drupal_render($libraries);
+  // Seven has custom styling for the maintenance page.
+  $variables['#attached']['library'][] = 'seven/maintenance-page';
 }
 
 /**
@@ -203,7 +168,7 @@ function seven_form_node_form_alter(&$form, FormStateInterface $form_state) {
   $node = $form_state->getFormObject()->getEntity();
 
   $form['#theme'] = array('node_edit_form');
-  $form['#attached']['css'][] = drupal_get_path('module', 'node') . '/css/node.module.css';
+  $form['#attached']['library'][] = 'seven/node-form';
 
   $form['advanced']['#type'] = 'container';
   $is_new = !$node->isNew() ? format_date($node->getChangedTime(), 'short') : t('Not saved yet');

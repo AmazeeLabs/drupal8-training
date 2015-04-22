@@ -36,13 +36,23 @@ class PhpBackend implements CacheBackendInterface {
   protected $cache = array();
 
   /**
+   * The cache tags checksum provider.
+   *
+   * @var \Drupal\Core\Cache\CacheTagsChecksumInterface
+   */
+  protected $checksumProvider;
+
+  /**
    * Constructs a PhpBackend object.
    *
    * @param string $bin
    *   The cache bin for which the object is created.
+   * @param \Drupal\Core\Cache\CacheTagsChecksumInterface $checksum_provider
+   *   The cache tags checksum provider.
    */
-  public function __construct($bin) {
+  public function __construct($bin, CacheTagsChecksumInterface $checksum_provider) {
     $this->bin = 'cache_' . $bin;
+    $this->checksumProvider = $checksum_provider;
   }
 
   /**
@@ -122,6 +132,11 @@ class PhpBackend implements CacheBackendInterface {
     // Check expire time.
     $cache->valid = $cache->expire == Cache::PERMANENT || $cache->expire >= REQUEST_TIME;
 
+    // Check if invalidateTags() has been called with any of the item's tags.
+    if (!$this->checksumProvider->isValid($cache->checksum, $cache->tags)) {
+      $cache->valid = FALSE;
+    }
+
     if (!$allow_invalid && !$cache->valid) {
       return FALSE;
     }
@@ -133,13 +148,15 @@ class PhpBackend implements CacheBackendInterface {
    * {@inheritdoc}
    */
   public function set($cid, $data, $expire = Cache::PERMANENT, array $tags = array()) {
+    Cache::validateTags($tags);
     $item = (object) array(
       'cid' => $cid,
       'data' => $data,
       'created' => round(microtime(TRUE), 3),
       'expire' => $expire,
+      'tags' => array_unique($tags),
+      'checksum' => $this->checksumProvider->getCurrentChecksum($tags),
     );
-    $item->tags = $this->flattenTags($tags);
     $this->writeItem($this->normalizeCid($cid), $item);
   }
 
@@ -156,19 +173,6 @@ class PhpBackend implements CacheBackendInterface {
   public function deleteMultiple(array $cids) {
     foreach ($cids as $cid) {
       $this->delete($cid);
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function deleteTags(array $tags) {
-    $flat_tags = $this->flattenTags($tags);
-    foreach ($this->storage()->listAll() as $cidhash) {
-      $item = $this->getByHash($cidhash);
-      if (is_object($item) && array_intersect($flat_tags, $item->tags)) {
-        $this->delete($item->cid);
-      }
     }
   }
 
@@ -211,51 +215,10 @@ class PhpBackend implements CacheBackendInterface {
   /**
    * {@inheritdoc}
    */
-  public function invalidateTags(array $tags) {
-    $flat_tags = $this->flattenTags($tags);
-    foreach ($this->storage()->listAll() as $cidhash) {
-      $item = $this->getByHash($cidhash);
-      if ($item && array_intersect($flat_tags, $item->tags)) {
-        $this->invalidate($item->cid);
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function invalidateAll() {
     foreach($this->storage()->listAll() as $cidhash) {
       $this->invalidatebyHash($cidhash);
     }
-  }
-
-  /**
-   * 'Flattens' a tags array into an array of strings.
-   *
-   * @param array $tags
-   *   Associative array of tags to flatten.
-   *
-   * @return array
-   *   An indexed array of strings.
-   */
-  protected function flattenTags(array $tags) {
-    if (isset($tags[0])) {
-      return $tags;
-    }
-
-    $flat_tags = array();
-    foreach ($tags as $namespace => $values) {
-      if (is_array($values)) {
-        foreach ($values as $value) {
-          $flat_tags[] = "$namespace:$value";
-        }
-      }
-      else {
-        $flat_tags[] = "$namespace:$values";
-      }
-    }
-    return $flat_tags;
   }
 
   /**
@@ -269,7 +232,7 @@ class PhpBackend implements CacheBackendInterface {
    */
   public function removeBin() {
     $this->cache = array();
-    $this->storage()->delete($this->bin);
+    $this->storage()->deleteAll();
   }
 
   /**

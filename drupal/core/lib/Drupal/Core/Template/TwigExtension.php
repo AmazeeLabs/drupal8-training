@@ -13,6 +13,8 @@
 namespace Drupal\Core\Template;
 
 use Drupal\Core\Routing\UrlGeneratorInterface;
+use Drupal\Core\Url;
+use Drupal\Core\Utility\LinkGeneratorInterface;
 
 /**
  * A class providing Drupal Twig extensions.
@@ -31,6 +33,13 @@ class TwigExtension extends \Twig_Extension {
   protected $urlGenerator;
 
   /**
+   * The link generator.
+   *
+   * @var \Drupal\Core\Utility\LinkGeneratorInterface
+   */
+  protected $linkGenerator;
+
+  /**
    * Constructs \Drupal\Core\Template\TwigExtension.
    *
    * @param \Drupal\Core\Routing\UrlGeneratorInterface $url_generator
@@ -38,6 +47,19 @@ class TwigExtension extends \Twig_Extension {
    */
   public function setGenerators(UrlGeneratorInterface $url_generator) {
     $this->urlGenerator = $url_generator;
+    return $this;
+  }
+
+  /**
+   * Sets the link generator.
+   *
+   * @param \Drupal\Core\Utility\LinkGeneratorInterface $link_generator
+   *   The link generator.
+   *
+   * @return $this
+   */
+  public function setLinkGenerator(LinkGeneratorInterface $link_generator) {
+    $this->linkGenerator = $link_generator;
     return $this;
   }
 
@@ -53,6 +75,8 @@ class TwigExtension extends \Twig_Extension {
       new \Twig_SimpleFunction('url', array($this, 'getUrl'), array('is_safe_callback' => array($this, 'isUrlGenerationSafe'))),
       new \Twig_SimpleFunction('path', array($this, 'getPath'), array('is_safe_callback' => array($this, 'isUrlGenerationSafe'))),
       new \Twig_SimpleFunction('url_from_path', array($this, 'getUrlFromPath'), array('is_safe_callback' => array($this, 'isUrlGenerationSafe'))),
+      new \Twig_SimpleFunction('link', array($this, 'getLink')),
+      new \Twig_SimpleFunction('file_url', 'file_create_url'),
     );
   }
 
@@ -84,8 +108,10 @@ class TwigExtension extends \Twig_Extension {
       new \Twig_SimpleFilter('without', 'twig_without'),
 
       // CSS class and ID filters.
-      new \Twig_SimpleFilter('clean_class', 'drupal_html_class'),
-      new \Twig_SimpleFilter('clean_id', 'drupal_clean_id_identifier'),
+      new \Twig_SimpleFilter('clean_class', '\Drupal\Component\Utility\Html::getClass'),
+      new \Twig_SimpleFilter('clean_id', '\Drupal\Component\Utility\Html::getId'),
+      // This filter will render a renderable array to use the string results.
+      new \Twig_SimpleFilter('render', 'twig_render_var'),
     );
   }
 
@@ -172,6 +198,24 @@ class TwigExtension extends \Twig_Extension {
   public function getUrlFromPath($path, $options = array()) {
     $options['absolute'] = TRUE;
     return $this->urlGenerator->generateFromPath($path, $options);
+  }
+
+  /**
+   * Gets a rendered link from an url object.
+   *
+   * @param string $text
+   *   The link text for the anchor tag as a translated string.
+   * @param \Drupal\Core\Url|string $url
+   *   The URL object or string used for the link.
+   *
+   * @return string
+   *   An HTML string containing a link to the given url.
+   */
+  public function getLink($text, $url) {
+    if (!$url instanceof Url) {
+      $url = Url::fromUri($url);
+    }
+    return $this->linkGenerator->generate($text, $url);
   }
 
   /**

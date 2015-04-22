@@ -5,11 +5,12 @@
  * Contains \Drupal\Tests\Core\Session\AnonymousUserSessionTest.
  */
 
-namespace Drupal\Tests\Core\Session {
+namespace Drupal\Tests\Core\Session;
 
 use Drupal\Tests\UnitTestCase;
 use Drupal\Core\Session\AnonymousUserSession;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
+  use Drupal\user\RoleInterface;
+  use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Scope;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -23,7 +24,7 @@ class AnonymousUserSessionTest extends UnitTestCase {
   /**
    * Tests creating an AnonymousUserSession when the request is available.
    *
-   * @covers ::__construct()
+   * @covers ::__construct
    */
   public function testAnonymousUserSessionWithRequest() {
     $request = $this->getMock('Symfony\Component\HttpFoundation\Request');
@@ -44,7 +45,7 @@ class AnonymousUserSessionTest extends UnitTestCase {
   /**
    * Tests creating an AnonymousUserSession when the request is not available.
    *
-   * @covers ::__construct()
+   * @covers ::__construct
    */
   public function testAnonymousUserSessionWithNoRequest() {
     $container = new ContainerBuilder();
@@ -64,27 +65,8 @@ class AnonymousUserSessionTest extends UnitTestCase {
    */
   public function testUserGetRoles() {
     $anonymous_user = new AnonymousUserSession();
-    $this->assertEquals(array(DRUPAL_ANONYMOUS_RID), $anonymous_user->getRoles());
+    $this->assertEquals(array(RoleInterface::ANONYMOUS_ID), $anonymous_user->getRoles());
     $this->assertEquals(array(), $anonymous_user->getRoles(TRUE));
-  }
-
-}
-
-}
-
-namespace {
-
-  if (!defined('DRUPAL_ANONYMOUS_RID')) {
-    /**
-     * Stub Role ID for anonymous users since bootstrap.inc isn't available.
-     */
-    define('DRUPAL_ANONYMOUS_RID', 'anonymous');
-  }
-  if (!defined('DRUPAL_AUTHENTICATED_RID')) {
-    /**
-     * Stub Role ID for authenticated users since bootstrap.inc isn't available.
-     */
-    define('DRUPAL_AUTHENTICATED_RID', 'authenticated');
   }
 
 }

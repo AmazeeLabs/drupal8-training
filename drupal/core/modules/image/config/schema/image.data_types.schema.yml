@@ -13,12 +13,12 @@ image_size:
 field_default_image:
   type: mapping
   mapping:
-    fid:
-      type: integer
+    uuid:
+      type: string
       label: 'Image'
     alt:
       type: label
-      label: 'Alternate text'
+      label: 'Alternative text'
     title:
       type: label
       label: 'Title'

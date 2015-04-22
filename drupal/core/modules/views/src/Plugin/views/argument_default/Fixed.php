@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\argument_default;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 
 /**
  * The fixed argument default handler.
@@ -19,7 +20,7 @@ use Drupal\Core\Form\FormStateInterface;
  *   title = @Translation("Fixed")
  * )
  */
-class Fixed extends ArgumentDefaultPluginBase {
+class Fixed extends ArgumentDefaultPluginBase implements CacheablePluginInterface {
 
   protected function defineOptions() {
     $options = parent::defineOptions();
@@ -32,7 +33,7 @@ class Fixed extends ArgumentDefaultPluginBase {
     parent::buildOptionsForm($form, $form_state);
     $form['argument'] = array(
       '#type' => 'textfield',
-      '#title' => t('Fixed value'),
+      '#title' => $this->t('Fixed value'),
       '#default_value' => $this->options['argument'],
     );
   }
@@ -42,6 +43,20 @@ class Fixed extends ArgumentDefaultPluginBase {
    */
   public function getArgument() {
     return $this->options['argument'];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return [];
   }
 
 }

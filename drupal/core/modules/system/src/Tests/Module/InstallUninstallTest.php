@@ -7,6 +7,8 @@
 
 namespace Drupal\system\Tests\Module;
 
+use Drupal\Core\Logger\RfcLogLevel;
+
 /**
  * Install/uninstall core module and confirm table creation/deletion.
  *
@@ -14,7 +16,7 @@ namespace Drupal\system\Tests\Module;
  */
 class InstallUninstallTest extends ModuleTestBase {
 
-  public static $modules = array('system_test', 'dblog');
+  public static $modules = array('system_test', 'dblog', 'taxonomy');
 
   /**
    * Tests that a fixed set of modules can be installed and uninstalled.
@@ -26,9 +28,9 @@ class InstallUninstallTest extends ModuleTestBase {
 
     // Install and uninstall module_test to ensure hook_preinstall_module and
     // hook_preuninstall_module are fired as expected.
-    $this->container->get('module_handler')->install(array('module_test'));
+    $this->container->get('module_installer')->install(array('module_test'));
     $this->assertEqual($this->container->get('state')->get('system_test_preinstall_module'), 'module_test');
-    $this->container->get('module_handler')->uninstall(array('module_test'));
+    $this->container->get('module_installer')->uninstall(array('module_test'));
     $this->assertEqual($this->container->get('state')->get('system_test_preuninstall_module'), 'module_test');
     $this->resetAll();
 
@@ -93,7 +95,7 @@ class InstallUninstallTest extends ModuleTestBase {
         $this->assertModules(array($module_to_install), TRUE);
         $this->assertModuleTablesExist($module_to_install);
         $this->assertModuleConfig($module_to_install);
-        $this->assertLogMessage('system', "%module module installed.", array('%module' => $module_to_install), WATCHDOG_INFO);
+        $this->assertLogMessage('system', "%module module installed.", array('%module' => $module_to_install), RfcLogLevel::INFO);
       }
 
       // Uninstall the original module, and check appropriate
@@ -151,6 +153,15 @@ class InstallUninstallTest extends ModuleTestBase {
    */
   protected function assertSuccessfullUninstall($module, $package = 'Core') {
     $edit = array();
+    if ($module == 'forum') {
+      // Forum cannot be uninstalled until all of the content entities related
+      // to it have been deleted.
+      $vid = $this->config('forum.settings')->get('vocabulary');
+      $terms = entity_load_multiple_by_properties('taxonomy_term', ['vid' => $vid]);
+      foreach ($terms as $term) {
+        $term->delete();
+      }
+    }
     $edit['uninstall[' . $module . ']'] = TRUE;
     $this->drupalPostForm('admin/modules/uninstall', $edit, t('Uninstall'));
     $this->drupalPostForm(NULL, NULL, t('Uninstall'));
@@ -162,7 +173,7 @@ class InstallUninstallTest extends ModuleTestBase {
     // module was just uninstalled, since the {watchdog} table won't be there
     // anymore.)
     $this->assertText(t('hook_modules_uninstalled fired for @module', array('@module' => $module)));
-    $this->assertLogMessage('system', "%module module uninstalled.", array('%module' => $module), WATCHDOG_INFO);
+    $this->assertLogMessage('system', "%module module uninstalled.", array('%module' => $module), RfcLogLevel::INFO);
 
     // Check that the module's database tables no longer exist.
     $this->assertModuleTablesDoNotExist($module);

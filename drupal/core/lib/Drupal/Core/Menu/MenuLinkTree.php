@@ -12,6 +12,7 @@ use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Controller\ControllerResolverInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RouteProviderInterface;
+use Drupal\Core\Template\Attribute;
 
 /**
  * Implements the loading, transforming and rendering of menu link trees.
@@ -124,7 +125,7 @@ class MenuLinkTree implements MenuLinkTreeInterface {
           // expanded.
           ->addExpandedParents($this->treeStorage->getExpanded($menu_name, $active_trail));
 
-        $this->cache->set($cid, $parameters, CacheBackendInterface::CACHE_PERMANENT, array('menu' => $menu_name));
+        $this->cache->set($cid, $parameters, CacheBackendInterface::CACHE_PERMANENT, array('config:system.menu.' . $menu_name));
       }
       $this->cachedCurrentRouteParameters[$menu_name] = $parameters;
     }
@@ -197,11 +198,11 @@ class MenuLinkTree implements MenuLinkTreeInterface {
   /**
    * {@inheritdoc}
    */
-  public function build(array $tree) {
-    $build = array();
+  public function build(array $tree, $level = 0) {
+    $items = array();
 
     foreach ($tree as $data) {
-      $class = array();
+      $class = ['menu-item'];
       /** @var \Drupal\Core\Menu\MenuLinkInterface $link */
       $link = $data->link;
       // Generally we only deal with visible links, but just in case.
@@ -211,45 +212,52 @@ class MenuLinkTree implements MenuLinkTreeInterface {
       // Set a class for the <li>-tag. Only set 'expanded' class if the link
       // also has visible children within the current tree.
       if ($data->hasChildren && !empty($data->subtree)) {
-        $class[] = 'expanded';
+        $class[] = 'menu-item--expanded';
       }
       elseif ($data->hasChildren) {
-        $class[] = 'collapsed';
-      }
-      else {
-        $class[] = 'leaf';
+        $class[] = 'menu-item--collapsed';
       }
       // Set a class if the link is in the active trail.
       if ($data->inActiveTrail) {
-        $class[] = 'active-trail';
+        $class[] = 'menu-item--active-trail';
       }
 
       // Allow menu-specific theme overrides.
-      $element['#theme'] = 'menu_link__' . strtr($link->getMenuName(), '-', '_');
-      $element['#attributes']['class'] = $class;
-      $element['#title'] = $link->getTitle();
-      $element['#url'] = $link->getUrlObject();
-      $element['#below'] = $data->subtree ? $this->build($data->subtree) : array();
+      $element = array();
+      $element['attributes'] = new Attribute();
+      $element['attributes']['class'] = $class;
+      $element['title'] = $link->getTitle();
+      $element['url'] = $link->getUrlObject();
+      $element['url']->setOption('set_active_class', TRUE);
+      $element['below'] = $data->subtree ? $this->build($data->subtree, $level + 1) : array();
       if (isset($data->options)) {
-        $element['#url']->setOptions(NestedArray::mergeDeep($element['#url']->getOptions(), $data->options));
+        $element['url']->setOptions(NestedArray::mergeDeep($element['url']->getOptions(), $data->options));
       }
-      $element['#original_link'] = $link;
+      $element['original_link'] = $link;
       // Index using the link's unique ID.
-      $build[$link->getPluginId()] = $element;
+      $items[$link->getPluginId()] = $element;
     }
-    if ($build) {
+
+    if (!$items) {
+      return array();
+    }
+    elseif ($level == 0) {
+      $build = array();
       // Make sure drupal_render() does not re-order the links.
       $build['#sorted'] = TRUE;
       // Get the menu name from the last link.
       $menu_name = $link->getMenuName();
       // Add the theme wrapper for outer markup.
       // Allow menu-specific theme overrides.
-      $build['#theme_wrappers'][] = 'menu_tree__' . strtr($menu_name, '-', '_');
+      $build['#theme'] = 'menu__' . strtr($menu_name, '-', '_');
+      $build['#items'] = $items;
       // Set cache tag.
-      $build['#cache']['tags']['menu'][$menu_name] = $menu_name;
+      $build['#cache']['tags'][] = 'config:system.menu.' . $menu_name;
+      return $build;
     }
-
-    return $build;
+    else {
+      return $items;
+    }
   }
 
   /**

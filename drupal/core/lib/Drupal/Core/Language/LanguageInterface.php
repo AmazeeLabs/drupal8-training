@@ -52,6 +52,11 @@ interface LanguageInterface {
   const LANGCODE_DEFAULT = 'x-default';
 
   /**
+   * Language code referring to site's default language.
+   */
+  const LANGCODE_SITE_DEFAULT = 'site_default';
+
+  /**
    * The language state when referring to configurable languages.
    */
   const STATE_CONFIGURABLE = 1;
@@ -89,18 +94,19 @@ interface LanguageInterface {
   /**
    * Language written left to right. Possible value of $language->direction.
    */
-  const DIRECTION_LTR = 0;
+  const DIRECTION_LTR = 'ltr';
 
   /**
    * Language written right to left. Possible value of $language->direction.
    */
-  const DIRECTION_RTL = 1;
+  const DIRECTION_RTL = 'rtl';
 
   /**
    * Gets the name of the language.
    *
    * @return string
-   *   The human-readable English name of the language.
+   *   The human-readable name of the language (in the language that was
+   *   used to construct this object).
    */
   public function getName();
 
@@ -115,7 +121,7 @@ interface LanguageInterface {
   /**
    * Gets the text direction (left-to-right or right-to-left).
    *
-   * @return int
+   * @return string
    *   Either self::DIRECTION_LTR or self::DIRECTION_RTL.
    */
   public function getDirection();
@@ -136,5 +142,13 @@ interface LanguageInterface {
    *   Whether the language is the default language.
    */
   public function isDefault();
+
+  /**
+   * Returns whether this language is locked.
+   *
+   * @return bool
+   *   Whether the language is locked or not.
+   */
+  public function isLocked();
 
 }

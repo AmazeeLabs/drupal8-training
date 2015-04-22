@@ -35,13 +35,6 @@ class RoutePreloaderTest extends UnitTestCase {
   protected $state;
 
   /**
-   * The mocked content negotiator.
-   *
-   * @var \Drupal\Core\ContentNegotiation|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $negotiation;
-
-  /**
    * The tested preloader.
    *
    * @var \Drupal\Core\Routing\RoutePreloader
@@ -54,10 +47,7 @@ class RoutePreloaderTest extends UnitTestCase {
   protected function setUp() {
     $this->routeProvider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
     $this->state = $this->getMock('\Drupal\Core\State\StateInterface');
-    $this->negotiation = $this->getMockBuilder('\Drupal\Core\ContentNegotiation')
-      ->disableOriginalConstructor()
-      ->getMock();
-    $this->preloader = new RoutePreloader($this->routeProvider, $this->state, $this->negotiation);
+    $this->preloader = new RoutePreloader($this->routeProvider, $this->state);
   }
 
   /**
@@ -68,8 +58,8 @@ class RoutePreloaderTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $route_collection = new RouteCollection();
-    $route_collection->add('test', new Route('/admin/foo', array('_content' => 'Drupal\ExampleController')));
-    $route_collection->add('test2', new Route('/admin/bar', array('_content' => 'Drupal\ExampleController')));
+    $route_collection->add('test', new Route('/admin/foo', array('_controller' => 'Drupal\ExampleController')));
+    $route_collection->add('test2', new Route('/admin/bar', array('_controller' => 'Drupal\ExampleController')));
     $event->expects($this->once())
       ->method('getRouteCollection')
       ->will($this->returnValue($route_collection));
@@ -89,10 +79,10 @@ class RoutePreloaderTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $route_collection = new RouteCollection();
-    $route_collection->add('test', new Route('/foo/admin/foo', array('_content' => 'Drupal\ExampleController')));
-    $route_collection->add('test2', new Route('/bar/admin/bar', array('_content' => 'Drupal\ExampleController')));
-    $route_collection->add('test3', new Route('/administrator/a', array('_content' => 'Drupal\ExampleController')));
-    $route_collection->add('test4', new Route('/admin', array('_content' => 'Drupal\ExampleController')));
+    $route_collection->add('test', new Route('/foo/admin/foo', array('_controller' => 'Drupal\ExampleController')));
+    $route_collection->add('test2', new Route('/bar/admin/bar', array('_controller' => 'Drupal\ExampleController')));
+    $route_collection->add('test3', new Route('/administrator/a', array('_controller' => 'Drupal\ExampleController')));
+    $route_collection->add('test4', new Route('/admin', array('_controller' => 'Drupal\ExampleController')));
     $event->expects($this->once())
       ->method('getRouteCollection')
       ->will($this->returnValue($route_collection));
@@ -113,8 +103,8 @@ class RoutePreloaderTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $route_collection = new RouteCollection();
-    $route_collection->add('test', new Route('/admin/foo', array('_content' => 'Drupal\ExampleController')));
-    $route_collection->add('test2', new Route('/bar', array('_content' => 'Drupal\ExampleController')));
+    $route_collection->add('test', new Route('/admin/foo', array('_controller' => 'Drupal\ExampleController')));
+    $route_collection->add('test2', new Route('/bar', array('_controller' => 'Drupal\ExampleController')));
     // Non content routes, like ajax callbacks should be ignored.
     $route_collection->add('test3', new Route('/bar', array('_controller' => 'Drupal\ExampleController')));
     $event->expects($this->once())
@@ -136,12 +126,10 @@ class RoutePreloaderTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $request = new Request();
+    $request->setRequestFormat('non-html');
     $event->expects($this->any())
       ->method('getRequest')
       ->will($this->returnValue($request));
-    $this->negotiation->expects($this->once())
-      ->method('getContentType')
-      ->will($this->returnValue('non-html'));
 
     $this->routeProvider->expects($this->never())
       ->method('getRoutesByNames');
@@ -159,12 +147,10 @@ class RoutePreloaderTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $request = new Request();
+    $request->setRequestFormat('html');
     $event->expects($this->any())
       ->method('getRequest')
       ->will($this->returnValue($request));
-    $this->negotiation->expects($this->once())
-      ->method('getContentType')
-      ->will($this->returnValue('html'));
 
     $this->routeProvider->expects($this->once())
       ->method('getRoutesByNames')

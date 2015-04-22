@@ -36,7 +36,7 @@ class LocaleUpdateCronTest extends LocaleUpdateBase {
 
     // Setup local and remote translations files.
     $this->setTranslationFiles();
-    \Drupal::config('locale.settings')->set('translation.default_filename', '%project-%version.%language._po')->save();
+    $this->config('locale.settings')->set('translation.default_filename', '%project-%version.%language._po')->save();
 
     // Update translations using batch to ensure a clean test starting point.
     $this->drupalGet('admin/reports/translations/check');
@@ -102,7 +102,7 @@ class LocaleUpdateCronTest extends LocaleUpdateBase {
     sleep(1);
     // Test: Execute cron and check if tasks are executed correctly.
     // Run cron to process the tasks in the queue.
-    $this->drupalGet('admin/reports/status/run-cron');
+    $this->cronRun();
 
     drupal_static_reset('locale_translation_get_file_history');
     $history = locale_translation_get_file_history();

@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\Block;
 
-use Drupal\Component\Plugin\Context\ContextInterface;
 use Drupal\Component\Plugin\DerivativeInspectionInterface;
 use Drupal\Core\Cache\CacheableInterface;
 use Drupal\Component\Plugin\PluginInspectionInterface;
@@ -47,13 +46,19 @@ interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormIn
    *
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The user session for which to check access.
+   * @param bool $return_as_object
+   *   (optional) Defaults to FALSE.
    *
-   * @return bool
-   *   TRUE if the block should be shown, or FALSE otherwise.
+   * @return bool|\Drupal\Core\Access\AccessResultInterface
+   *   The access result. Returns a boolean if $return_as_object is FALSE (this
+   *   is the default) and otherwise an AccessResultInterface object.
+   *   When a boolean is returned, the result of AccessInterface::isAllowed() is
+   *   returned, i.e. TRUE means access is explicitly allowed, FALSE means
+   *   access is either explicitly forbidden or "no opinion".
    *
    * @see \Drupal\block\BlockAccessControlHandler
    */
-  public function access(AccountInterface $account);
+  public function access(AccountInterface $account, $return_as_object = FALSE);
 
   /**
    * Builds and returns the renderable array for this block plugin.
@@ -142,36 +147,5 @@ interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormIn
    *   The suggested machine name.
    */
   public function getMachineNameSuggestion();
-
-  /**
-   * Gets conditions for this block.
-   *
-   * @return \Drupal\Core\Condition\ConditionInterface[]|\Drupal\Core\Condition\ConditionPluginBag
-   *   An array or bag of configured condition plugins.
-   */
-  public function getVisibilityConditions();
-
-  /**
-   * Gets a visibility condition plugin instance.
-   *
-   * @param string $instance_id
-   *   The condition plugin instance ID.
-   *
-   * @return \Drupal\Core\Condition\ConditionInterface
-   *   A condition plugin.
-   */
-  public function getVisibilityCondition($instance_id);
-
-  /**
-   * Sets the visibility condition configuration.
-   *
-   * @param string $instance_id
-   *   The condition instance ID.
-   * @param array $configuration
-   *   The condition configuration.
-   *
-   * @return $this
-   */
-  public function setVisibilityConfig($instance_id, array $configuration);
 
 }

@@ -42,8 +42,8 @@ class TestRunnerKernel extends DrupalKernel {
       'simpletest' => 0,
     );
     $this->moduleData = array(
-      'system' => new Extension('module', 'core/modules/system/system.info.yml', 'system.module'),
-      'simpletest' => new Extension('module', 'core/modules/simpletest/simpletest.info.yml', 'simpletest.module'),
+      'system' => new Extension(DRUPAL_ROOT, 'module', 'core/modules/system/system.info.yml', 'system.module'),
+      'simpletest' => new Extension(DRUPAL_ROOT, 'module', 'core/modules/simpletest/simpletest.info.yml', 'simpletest.module'),
     );
   }
 
@@ -55,6 +55,7 @@ class TestRunnerKernel extends DrupalKernel {
     if (!Settings::getAll()) {
       new Settings(array(
         'hash_salt' => 'run-tests',
+        'container_yamls' => [],
         // If there is no settings.php, then there is no parent site. In turn,
         // there is no public files directory; use a custom public files path.
         'file_public_path' => 'sites/default/files',
@@ -75,9 +76,11 @@ class TestRunnerKernel extends DrupalKernel {
 
     simpletest_classloader_register();
 
-    // Register System module stream wrappers and create the build/artifacts
-    // directory if necessary.
-    file_get_stream_wrappers();
+    // Register stream wrappers.
+    $this->getContainer()->get('stream_wrapper_manager')->register();
+
+    // Create the build/artifacts directory if necessary.
+    include_once DRUPAL_ROOT . '/core/includes/file.inc';
     if (!is_dir('public://simpletest')) {
       mkdir('public://simpletest', 0777, TRUE);
     }

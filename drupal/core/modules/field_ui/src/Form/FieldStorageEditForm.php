@@ -98,6 +98,20 @@ class FieldStorageEditForm extends FormBase {
       $form['field_storage']['#prefix'] = '<div class="messages messages--error">' . $this->t('There is data for this field in the database. The field settings can no longer be changed.') . '</div>' . $form['field_storage']['#prefix'];
     }
 
+    // Add settings provided by the field module. The field module is
+    // responsible for not returning settings that cannot be changed if
+    // the field already has data.
+    $form['field_storage']['settings'] = array(
+      '#weight' => -10,
+    );
+    // Create an arbitrary entity object, so that we can have an instantiated
+    // FieldItem.
+    $ids = (object) array('entity_type' => $this->field->entity_type, 'bundle' => $this->field->bundle, 'entity_id' => NULL);
+    $entity = _field_create_entity_from_ids($ids);
+    $items = $entity->get($field_storage->getName());
+    $item = $items->first() ?: $items->appendItem();
+    $form['field_storage']['settings'] += $item->storageSettingsForm($form, $form_state, $field_storage->hasData());
+
     // Build the configurable field values.
     $cardinality = $field_storage->getCardinality();
     $form['field_storage']['cardinality_container'] = array(
@@ -132,29 +146,24 @@ class FieldStorageEditForm extends FormBase {
         'visible' => array(
          ':input[name="field_storage[cardinality]"]' => array('value' => 'number'),
         ),
+        'disabled' => array(
+         ':input[name="field_storage[cardinality]"]' => array('value' => -1),
+        ),
       ),
     );
 
     // Build the non-configurable field values.
     $form['field_storage']['field_name'] = array('#type' => 'value', '#value' => $field_storage->getName());
     $form['field_storage']['type'] = array('#type' => 'value', '#value' => $field_storage->getType());
-    $form['field_storage']['module'] = array('#type' => 'value', '#value' => $field_storage->module);
+    $form['field_storage']['module'] = array('#type' => 'value', '#value' => $field_storage->getTypeProvider());
     $form['field_storage']['translatable'] = array('#type' => 'value', '#value' => $field_storage->isTranslatable());
 
-    // Add settings provided by the field module. The field module is
-    // responsible for not returning settings that cannot be changed if
-    // the field already has data.
-    $form['field_storage']['settings'] = array(
-      '#weight' => 10,
-    );
-    // Create an arbitrary entity object, so that we can have an instantiated
-    // FieldItem.
-    $ids = (object) array('entity_type' => $this->field->entity_type, 'bundle' => $this->field->bundle, 'entity_id' => NULL);
-    $entity = _field_create_entity_from_ids($ids);
-    $form['field_storage']['settings'] += $entity->get($field_storage->getName())->first()->storageSettingsForm($form, $form_state, $field_storage->hasData());
-
     $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array('#type' => 'submit', '#value' => $this->t('Save field settings'));
+    $form['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#value' => $this->t('Save field settings'),
+      '#button_type' => 'primary',
+    );
     return $form;
   }
 
@@ -190,7 +199,7 @@ class FieldStorageEditForm extends FormBase {
     // Merge incoming form values into the existing field.
     $field_storage = $this->field->getFieldStorageDefinition();
     foreach ($field_values as $key => $value) {
-      $field_storage->{$key} = $value;
+      $field_storage->set($key, $value);
     }
 
     // Update the field.

@@ -7,9 +7,13 @@
 
 namespace Drupal\taxonomy\Plugin\views\argument;
 
+use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\views\Plugin\views\argument\ArgumentPluginBase;
 use Drupal\Component\Utility\String;
+use Drupal\taxonomy\Entity\Term;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Argument handler for taxonomy terms with depth.
@@ -21,14 +25,35 @@ use Drupal\Component\Utility\String;
  *
  * @ViewsArgument("taxonomy_index_tid_depth")
  */
-class IndexTidDepth extends ArgumentPluginBase {
+class IndexTidDepth extends ArgumentPluginBase implements ContainerFactoryPluginInterface {
+
+  /**
+   * @var EntityStorageInterface
+   */
+  protected $termStorage;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityStorageInterface $termStorage) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+
+    $this->termStorage = $termStorage;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static($configuration, $plugin_id, $plugin_definition, $container->get('entity.manager')->getStorage('taxonomy_term'));
+  }
 
   protected function defineOptions() {
     $options = parent::defineOptions();
 
     $options['depth'] = array('default' => 0);
-    $options['break_phrase'] = array('default' => FALSE, 'bool' => TRUE);
-    $options['use_taxonomy_term_path'] = array('default' => FALSE, 'bool' => TRUE);
+    $options['break_phrase'] = array('default' => FALSE);
+    $options['use_taxonomy_term_path'] = array('default' => FALSE);
 
     return $options;
   }
@@ -36,15 +61,15 @@ class IndexTidDepth extends ArgumentPluginBase {
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     $form['depth'] = array(
       '#type' => 'weight',
-      '#title' => t('Depth'),
+      '#title' => $this->t('Depth'),
       '#default_value' => $this->options['depth'],
-      '#description' => t('The depth will match nodes tagged with terms in the hierarchy. For example, if you have the term "fruit" and a child term "apple", with a depth of 1 (or higher) then filtering for the term "fruit" will get nodes that are tagged with "apple" as well as "fruit". If negative, the reverse is true; searching for "apple" will also pick up nodes tagged with "fruit" if depth is -1 (or lower).'),
+      '#description' => $this->t('The depth will match nodes tagged with terms in the hierarchy. For example, if you have the term "fruit" and a child term "apple", with a depth of 1 (or higher) then filtering for the term "fruit" will get nodes that are tagged with "apple" as well as "fruit". If negative, the reverse is true; searching for "apple" will also pick up nodes tagged with "fruit" if depth is -1 (or lower).'),
     );
 
     $form['break_phrase'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Allow multiple values'),
-      '#description' => t('If selected, users can enter multiple values in the form of 1+2+3. Due to the number of JOINs it would require, AND will be treated as OR with this filter.'),
+      '#title' => $this->t('Allow multiple values'),
+      '#description' => $this->t('If selected, users can enter multiple values in the form of 1+2+3. Due to the number of JOINs it would require, AND will be treated as OR with this filter.'),
       '#default_value' => !empty($this->options['break_phrase']),
     );
 
@@ -113,12 +138,12 @@ class IndexTidDepth extends ArgumentPluginBase {
   }
 
   function title() {
-    $term = entity_load('taxonomy_term', $this->argument);
+    $term = $this->termStorage->load($this->argument);
     if (!empty($term)) {
       return String::checkPlain($term->getName());
     }
     // TODO review text
-    return t('No name');
+    return $this->t('No name');
   }
 
 }

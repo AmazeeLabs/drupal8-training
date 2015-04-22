@@ -7,7 +7,6 @@
 
 namespace Drupal\block;
 
-use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityViewBuilder;
@@ -37,6 +36,12 @@ class BlockViewBuilder extends EntityViewBuilder {
    * {@inheritdoc}
    */
   public function viewMultiple(array $entities = array(), $view_mode = 'full', $langcode = NULL) {
+    // @todo Remove when https://www.drupal.org/node/2453059 lands.
+    $default_cache_contexts = [
+      'languages',
+      'theme',
+    ];
+
     /** @var \Drupal\block\BlockInterface[] $entities */
     $build = array();
     foreach ($entities as  $entity) {
@@ -58,44 +63,35 @@ class BlockViewBuilder extends EntityViewBuilder {
             'route_parameters' => array('block' => $entity->id()),
           ),
         ),
-        '#weight' => $entity->get('weight'),
+        '#weight' => $entity->getWeight(),
         '#configuration' => $configuration,
         '#plugin_id' => $plugin_id,
         '#base_plugin_id' => $base_id,
         '#derivative_plugin_id' => $derivative_id,
         '#id' => $entity->id(),
+        '#cache' => [
+          'contexts' => Cache::mergeContexts($default_cache_contexts, $plugin->getCacheContexts()),
+          'tags' => Cache::mergeTags(
+            $this->getCacheTags(), // Block view builder cache tag.
+            $entity->getCacheTags(), // Block entity cache tag.
+            $plugin->getCacheTags() // Block plugin cache tags.
+          ),
+          'max-age' => $plugin->getCacheMaxAge(),
+        ],
         // Add the entity so that it can be used in the #pre_render method.
         '#block' => $entity,
       );
       $build[$entity_id]['#configuration']['label'] = String::checkPlain($configuration['label']);
 
-      // Set cache tags; these always need to be set, whether the block is
-      // cacheable or not, so that the page cache is correctly informed.
-      $build[$entity_id]['#cache']['tags'] = NestedArray::mergeDeepArray(array(
-        $this->getCacheTag(), // Block view builder cache tag.
-        $entity->getCacheTag(), // Block entity cache tag.
-        $entity->getListCacheTags(), // Block entity list cache tags.
-        $plugin->getCacheTags(), // Block plugin cache tags.
-      ));
-
       if ($plugin->isCacheable()) {
         $build[$entity_id]['#pre_render'][] = array($this, 'buildBlock');
-        // Generic cache keys, with the block plugin's custom keys appended
-        // (usually cache context keys like 'cache_context.user.roles').
+        // Generic cache keys, with the block plugin's custom keys appended.
         $default_cache_keys = array(
           'entity_view',
           'block',
           $entity->id(),
-          $this->languageManager->getCurrentLanguage()->getId(),
-          // Blocks are always rendered in a "per theme" cache context.
-          'cache_context.theme',
         );
-        $max_age = $plugin->getCacheMaxAge();
-        $build[$entity_id]['#cache'] += array(
-          'keys' => array_merge($default_cache_keys, $plugin->getCacheKeys()),
-          'bin' => $plugin->getCacheBin(),
-          'expire' => ($max_age === Cache::PERMANENT) ? Cache::PERMANENT : REQUEST_TIME + $max_age,
-        );
+        $build[$entity_id]['#cache']['keys'] = array_merge($default_cache_keys, $plugin->getCacheKeys());
       }
       else {
         $build[$entity_id] = $this->buildBlock($build[$entity_id]);

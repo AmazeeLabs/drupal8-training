@@ -36,23 +36,13 @@ class SwitchShortcutSet extends FormBase {
   protected $shortcutSetStorage;
 
   /**
-   * The current route match.
-   *
-   * @var \Drupal\Core\Routing\RouteMatchInterface
-   */
-  protected $routeMatch;
-
-  /**
    * Constructs a SwitchShortcutSet object.
    *
    * @param \Drupal\shortcut\ShortcutSetStorageInterface $shortcut_set_storage
    *   The shortcut set storage.
-   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
-   *   The current route match.
    */
-  public function __construct(ShortcutSetStorageInterface $shortcut_set_storage, RouteMatchInterface $route_match) {
+  public function __construct(ShortcutSetStorageInterface $shortcut_set_storage) {
     $this->shortcutSetStorage = $shortcut_set_storage;
-    $this->routeMatch = $route_match;
   }
 
   /**
@@ -60,8 +50,7 @@ class SwitchShortcutSet extends FormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity.manager')->getStorage('shortcut_set'),
-      $container->get('current_route_match')
+      $container->get('entity.manager')->getStorage('shortcut_set')
     );
   }
 
@@ -105,9 +94,13 @@ class SwitchShortcutSet extends FormBase {
       $form['label'] = array(
         '#type' => 'textfield',
         '#title' => $this->t('Label'),
-        '#title_display' => 'invisible',
         '#description' => $this->t('The new set is created by copying items from your default shortcut set.'),
         '#access' => $add_access,
+        '#states' => array(
+          'visible' => array(
+            ':input[name="set"]' => array('value' => 'new'),
+          ),
+        ),
       );
       $form['id'] = array(
         '#type' => 'machine_name',
@@ -130,10 +123,6 @@ class SwitchShortcutSet extends FormBase {
         $default_set = $this->shortcutSetStorage->getDefaultSet($this->user);
         $form['new']['#description'] = $this->t('The new set is created by copying items from the %default set.', array('%default' => $default_set->label()));
       }
-
-      $form['#attached'] = array(
-        'library' => array('shortcut/drupal.shortcut.admin'),
-      );
 
       $form['actions'] = array('#type' => 'actions');
       $form['actions']['submit'] = array(
@@ -175,10 +164,6 @@ class SwitchShortcutSet extends FormBase {
       if (trim($form_state->getValue('label')) == '') {
         $form_state->setErrorByName('new', $this->t('The new set label is required.'));
       }
-      // Check to prevent a duplicate title.
-      if (shortcut_set_title_exists($form_state->getValue('label'))) {
-        $form_state->setErrorByName('label', $this->t('The shortcut set %name already exists. Choose another name.', array('%name' => $form_state->getValue('label'))));
-      }
     }
   }
 
@@ -200,7 +185,7 @@ class SwitchShortcutSet extends FormBase {
       $replacements = array(
         '%user' => $this->user->label(),
         '%set_name' => $set->label(),
-        '@switch-url' => $this->url($this->routeMatch->getRouteName(), array('user' => $this->user->id())),
+        '@switch-url' => $this->url('<current>'),
       );
       if ($account_is_user) {
         // Only administrators can create new shortcut sets, so we know they have

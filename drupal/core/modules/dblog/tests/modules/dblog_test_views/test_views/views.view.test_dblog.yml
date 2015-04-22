@@ -1,8 +1,16 @@
-base_field: wid
-base_table: watchdog
-core: 8.x
-description: ''
+langcode: en
 status: true
+dependencies:
+  module:
+    - dblog
+id: test_dblog
+label: test_dblog
+module: views
+description: ''
+tag: ''
+base_table: watchdog
+base_field: wid
+core: 8.x
 display:
   default:
     display_plugin: default
@@ -55,7 +63,3 @@ display:
     position: null
     display_options:
       path: test-dblog
-label: test_dblog
-module: views
-id: test_dblog
-tag: ''

@@ -8,14 +8,14 @@
 namespace Drupal\migrate_drupal\Tests\d6;
 
 use Drupal\migrate\MigrateExecutable;
-use Drupal\migrate_drupal\Tests\MigrateDrupalTestBase;
+use Drupal\migrate_drupal\Tests\d6\MigrateDrupal6TestBase;
 
 /**
  * Upload form entity display.
  *
  * @group migrate_drupal
  */
-class MigrateUploadEntityFormDisplayTest extends MigrateDrupalTestBase {
+class MigrateUploadEntityFormDisplayTest extends MigrateDrupal6TestBase {
 
   /**
    * The modules to be enabled during the test.
@@ -43,7 +43,8 @@ class MigrateUploadEntityFormDisplayTest extends MigrateDrupalTestBase {
 
     $migration = entity_load('migration', 'd6_upload_entity_form_display');
     $dumps = array(
-      $this->getDumpDirectory() . '/Drupal6UploadInstance.php',
+      $this->getDumpDirectory() . '/NodeType.php',
+      $this->getDumpDirectory() . '/Variable.php',
     );
     $this->prepare($migration, $dumps);
     $executable = new MigrateExecutable($migration, $this);
@@ -57,18 +58,18 @@ class MigrateUploadEntityFormDisplayTest extends MigrateDrupalTestBase {
   public function testUploadEntityFormDisplay() {
     $display = entity_get_form_display('node', 'page', 'default');
     $component = $display->getComponent('upload');
-    $this->assertEqual($component['type'], 'file_generic');
+    $this->assertIdentical('file_generic', $component['type']);
 
     $display = entity_get_form_display('node', 'story', 'default');
     $component = $display->getComponent('upload');
-    $this->assertEqual($component['type'], 'file_generic');
+    $this->assertIdentical('file_generic', $component['type']);
 
     // Assure this doesn't exist.
     $display = entity_get_form_display('node', 'article', 'default');
     $component = $display->getComponent('upload');
     $this->assertTrue(is_null($component));
 
-    $this->assertEqual(array('node', 'page', 'default', 'upload'), entity_load('migration', 'd6_upload_entity_form_display')->getIdMap()->lookupDestinationID(array('page')));
+    $this->assertIdentical(array('node', 'page', 'default', 'upload'), entity_load('migration', 'd6_upload_entity_form_display')->getIdMap()->lookupDestinationID(array('page')));
   }
 
 }

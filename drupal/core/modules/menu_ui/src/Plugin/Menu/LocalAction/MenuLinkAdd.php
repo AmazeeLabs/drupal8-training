@@ -8,8 +8,10 @@
 namespace Drupal\menu_ui\Plugin\Menu\LocalAction;
 
 use Drupal\Core\Menu\LocalActionDefault;
-use Symfony\Cmf\Component\Routing\RouteObjectInterface;
-use Symfony\Component\HttpFoundation\Request;
+use Drupal\Core\Routing\RedirectDestination;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Routing\RouteProviderInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Modifies the 'Add link' local action to add a destination.
@@ -17,21 +19,52 @@ use Symfony\Component\HttpFoundation\Request;
 class MenuLinkAdd extends LocalActionDefault {
 
   /**
+   * The redirect destination.
+   *
+   * @var \Drupal\Core\Routing\RedirectDestination
+   */
+  private $redirectDestination;
+
+  /**
+   * Constructs a MenuLinkAdd object.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param mixed $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
+   *   The route provider to load routes by name.
+   * @param \Drupal\Core\Routing\RedirectDestination $redirect_destination
+   *   The redirect destination.
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RouteProviderInterface $route_provider, RedirectDestination $redirect_destination) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $route_provider);
+
+    $this->redirectDestination = $redirect_destination;
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public function getOptions(Request $request) {
-    $options = parent::getOptions($request);
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('router.route_provider'),
+      $container->get('redirect.destination')
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getOptions(RouteMatchInterface $route_match) {
+    $options = parent::getOptions($route_match);
     // Append the current path as destination to the query string.
-    if ($request->attributes->has(RouteObjectInterface::ROUTE_NAME)) {
-      $route_name = $request->attributes->get(RouteObjectInterface::ROUTE_NAME);
-      $raw_variables = array();
-      if ($request->attributes->has('_raw_variables')) {
-        $raw_variables = $request->attributes->get('_raw_variables')->all();
-      }
-      // @todo Use RouteMatch instead of Request.
-      //   https://www.drupal.org/node/2294157
-      $options['query']['destination'] = \Drupal::urlGenerator()->generateFromRoute($route_name, $raw_variables);
-    }
+    $options['query']['destination'] = $this->redirectDestination->get();
     return $options;
   }
 

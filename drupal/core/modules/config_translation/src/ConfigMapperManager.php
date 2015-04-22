@@ -10,7 +10,6 @@ namespace Drupal\config_translation;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Core\Cache\CacheBackendInterface;
-use Drupal\Core\Config\Schema\ArrayElement;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
@@ -20,6 +19,7 @@ use Drupal\Core\Plugin\Discovery\InfoHookDecorator;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\Plugin\Discovery\ContainerDerivativeDiscoveryDecorator;
 use Drupal\Core\Plugin\Factory\ContainerFactory;
+use Drupal\Core\TypedData\TraversableTypedDataInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Symfony\Component\Routing\RouteCollection;
 
@@ -99,7 +99,7 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
     $this->alterInfo('config_translation_info');
     // Config translation only uses an info hook discovery, cache by language.
     $cache_key = 'config_translation_info_plugins' . ':' . $language_manager->getCurrentLanguage()->getId();
-    $this->setCacheBackend($cache_backend, $cache_key, array('config_translation_info_plugins' => TRUE));
+    $this->setCacheBackend($cache_backend, $cache_key, array('config_translation_info_plugins'));
   }
 
   /**
@@ -176,7 +176,7 @@ class ConfigMapperManager extends DefaultPluginManager implements ConfigMapperMa
   protected function findTranslatable(TypedDataInterface $element) {
     // In case this is a sequence or a mapping check whether any child element
     // is translatable.
-    if ($element instanceof ArrayElement) {
+    if ($element instanceof TraversableTypedDataInterface) {
       foreach ($element as $child_element) {
         if ($this->findTranslatable($child_element)) {
           return TRUE;

@@ -52,7 +52,8 @@ interface DrupalKernelInterface extends HttpKernelInterface {
   /**
    * Gets the current container.
    *
-   * @return ContainerInterface A ContainerInterface instance
+   * @return \Symfony\Component\DependencyInjection\ContainerInterface
+   *   A ContainerInterface instance.
    */
   public function getContainer();
 
@@ -73,6 +74,13 @@ interface DrupalKernelInterface extends HttpKernelInterface {
   public function getSitePath();
 
   /**
+   * Gets the app root.
+   *
+   * @return string
+   */
+  public function getAppRoot();
+
+  /**
    * Updates the kernel's list of modules to the new list.
    *
    * The kernel needs to update its bundle list and container to match the new
@@ -84,16 +92,6 @@ interface DrupalKernelInterface extends HttpKernelInterface {
    *   List of module filenames, keyed by module name.
    */
   public function updateModules(array $module_list, array $module_filenames = array());
-
-  /**
-   * Attempts to serve a page from the cache.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request.
-   *
-   * @return $this
-   */
-  public function handlePageCache(Request $request);
 
   /**
    * Prepare the kernel for handling a request without handling the request.
@@ -115,5 +113,10 @@ interface DrupalKernelInterface extends HttpKernelInterface {
    *   The current request.
    */
   public function preHandle(Request $request);
+
+  /**
+   * Helper method that loads legacy Drupal include files.
+   */
+  public function loadLegacyIncludes();
 
 }

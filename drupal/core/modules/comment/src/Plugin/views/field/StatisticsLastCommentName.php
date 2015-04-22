@@ -19,6 +19,9 @@ use Drupal\views\ResultRow;
  */
 class StatisticsLastCommentName extends FieldPluginBase {
 
+  /**
+   * {@inheritdoc}
+   */
   public function query() {
     // last_comment_name only contains data if the user is anonymous. So we
     // have to join in a specially related user table.
@@ -48,10 +51,13 @@ class StatisticsLastCommentName extends FieldPluginBase {
     $this->uid = $this->query->addField($this->tableAlias, 'last_comment_uid');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
 
-    $options['link_to_user'] = array('default' => TRUE, 'bool' => TRUE);
+    $options['link_to_user'] = array('default' => TRUE);
 
     return $options;
   }

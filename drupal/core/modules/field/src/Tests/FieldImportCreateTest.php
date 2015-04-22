@@ -7,6 +7,10 @@
 
 namespace Drupal\field\Tests;
 
+use Drupal\field\Entity\FieldConfig;
+
+use Drupal\field\Entity\FieldStorageConfig;
+
 /**
  * Create field storages and fields during config create method invocation.
  *
@@ -27,27 +31,27 @@ class FieldImportCreateTest extends FieldUnitTestBase {
     $field_id_2b = "entity_test.test_bundle.$field_name_2";
 
     // Check that the field storages and fields do not exist yet.
-    $this->assertFalse(entity_load('field_storage_config', $field_storage_id));
-    $this->assertFalse(entity_load('field_config', $field_id));
-    $this->assertFalse(entity_load('field_storage_config', $field_storage_id_2));
-    $this->assertFalse(entity_load('field_config', $field_id_2a));
-    $this->assertFalse(entity_load('field_config', $field_id_2b));
+    $this->assertFalse(FieldStorageConfig::load($field_storage_id));
+    $this->assertFalse(FieldConfig::load($field_id));
+    $this->assertFalse(FieldStorageConfig::load($field_storage_id_2));
+    $this->assertFalse(FieldConfig::load($field_id_2a));
+    $this->assertFalse(FieldConfig::load($field_id_2b));
 
     // Create a second bundle for the 'Entity test' entity type.
     entity_test_create_bundle('test_bundle');
 
     // Enable field_test_config module and check that the field and storage
     // shipped in the module's default config were created.
-    \Drupal::moduleHandler()->install(array('field_test_config'));
+    \Drupal::service('module_installer')->install(array('field_test_config'));
 
     // A field storage with one single field.
-    $field_storage = entity_load('field_storage_config', $field_storage_id);
+    $field_storage = FieldStorageConfig::load($field_storage_id);
     $this->assertTrue($field_storage, 'The field was created.');
-    $field = entity_load('field_config', $field_id);
+    $field = FieldConfig::load($field_id);
     $this->assertTrue($field, 'The field was deleted.');
 
     // A field storage with two fields.
-    $field_storage_2 = entity_load('field_storage_config', $field_storage_id_2);
+    $field_storage_2 = FieldStorageConfig::load($field_storage_id_2);
     $this->assertTrue($field_storage_2, 'The second field was created.');
     $this->assertTrue($field->bundle, 'test_bundle', 'The second field was created on bundle test_bundle.');
     $this->assertTrue($field->bundle, 'test_bundle_2', 'The second field was created on bundle test_bundle_2.');
@@ -105,15 +109,15 @@ class FieldImportCreateTest extends FieldUnitTestBase {
     $this->configImporter()->import();
 
     // Check that the field and storage were created.
-    $field_storage = entity_load('field_storage_config', $field_storage_id);
+    $field_storage = FieldStorageConfig::load($field_storage_id);
     $this->assertTrue($field_storage, 'Test import storage field from staging exists');
-    $field = entity_load('field_config', $field_id);
+    $field = FieldConfig::load($field_id);
     $this->assertTrue($field, 'Test import field  from staging exists');
-    $field_storage = entity_load('field_storage_config', $field_storage_id_2);
+    $field_storage = FieldStorageConfig::load($field_storage_id_2);
     $this->assertTrue($field_storage, 'Test import storage field 2 from staging exists');
-    $field = entity_load('field_config', $field_id_2a);
+    $field = FieldConfig::load($field_id_2a);
     $this->assertTrue($field, 'Test import field 2a from staging exists');
-    $field = entity_load('field_config', $field_id_2b);
+    $field = FieldConfig::load($field_id_2b);
     $this->assertTrue($field, 'Test import field 2b from staging exists');
   }
 }

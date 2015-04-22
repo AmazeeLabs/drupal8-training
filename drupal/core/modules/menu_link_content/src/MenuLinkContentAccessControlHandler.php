@@ -55,23 +55,22 @@ class MenuLinkContentAccessControlHandler extends EntityAccessControlHandler imp
     switch ($operation) {
       case 'view':
         // There is no direct view.
-        return AccessResult::create();
+        return AccessResult::neutral();
 
       case 'update':
         if (!$account->hasPermission('administer menu')) {
-          return AccessResult::create()->cachePerRole();
+          return AccessResult::neutral()->cachePerRole();
         }
         else {
-          $access = AccessResult::create()->cachePerRole()->cacheUntilEntityChanges($entity);
           // If there is a URL, this is an external link so always accessible.
-          if ($entity->getUrl()) {
-            return $access->allow();
+          $access = AccessResult::allowed()->cachePerRole()->cacheUntilEntityChanges($entity);
+          /** @var \Drupal\menu_link_content\MenuLinkContentInterface $entity */
+          // We allow access, but only if the link is accessible as well.
+          if (($url_object = $entity->getUrlObject()) && $url_object->isRouted()) {
+            $link_access = $this->accessManager->checkNamedRoute($url_object->getRouteName(), $url_object->getRouteParameters(), $account, TRUE);
+            $access = $access->andIf($link_access);
           }
-          else {
-            // We allow access, but only if the link is accessible as well.
-            $link_access = $this->accessManager->checkNamedRoute($entity->getRouteName(), $entity->getRouteParameters(), $account, TRUE);
-            return $access->allow()->andIf($link_access);
-          }
+          return $access;
         }
 
       case 'delete':

@@ -101,14 +101,6 @@ class EntityType implements EntityTypeInterface {
    * @var string
    */
   protected $permission_granularity = 'entity_type';
-
-  /**
-   * Indicates whether fields can be attached to entities of this type.
-   *
-   * @var bool
-   */
-  protected $fieldable = FALSE;
-
   /**
    * Link templates using the URI template syntax.
    *
@@ -211,6 +203,30 @@ class EntityType implements EntityTypeInterface {
   protected $field_ui_base_route;
 
   /**
+   * Indicates whether this entity type is commonly used as a reference target.
+   *
+   * This is used by the Entity reference field to promote an entity type in the
+   * add new field select list in Field UI.
+   *
+   * @var bool
+   */
+  protected $common_reference_target = FALSE;
+
+  /**
+   * The list cache contexts for this entity type.
+   *
+   * @var string[]
+   */
+  protected $list_cache_contexts = [];
+
+  /**
+   * The list cache tags for this entity type.
+   *
+   * @var string[]
+   */
+  protected $list_cache_tags = [];
+
+  /**
    * Constructs a new EntityType.
    *
    * @param array $definition
@@ -237,11 +253,19 @@ class EntityType implements EntityTypeInterface {
     // Ensure defaults.
     $this->entity_keys += array(
       'revision' => '',
-      'bundle' => ''
+      'bundle' => '',
+      'langcode' => '',
+      'default_langcode' => 'default_langcode',
     );
     $this->handlers += array(
       'access' => 'Drupal\Core\Entity\EntityAccessControlHandler',
     );
+
+    // Ensure a default list cache tag is set.
+    if (empty($this->list_cache_tags)) {
+      $this->list_cache_tags = [$definition['id'] . '_list'];
+    }
+
   }
 
   /**
@@ -430,6 +454,13 @@ class EntityType implements EntityTypeInterface {
   /**
    * {@inheritdoc}
    */
+  public function hasRouteProviders() {
+    return !empty($this->handlers['route_provider']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getListBuilderClass() {
     return $this->getHandlerClass('list_builder');
   }
@@ -474,6 +505,13 @@ class EntityType implements EntityTypeInterface {
   /**
    * {@inheritdoc}
    */
+  public function getRouteProviderClasses() {
+    return !empty($this->handlers['route_provider']) ? $this->handlers['route_provider'] : [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getAccessControlClass() {
     return $this->getHandlerClass('access');
   }
@@ -503,13 +541,6 @@ class EntityType implements EntityTypeInterface {
   /**
    * {@inheritdoc}
    */
-  public function isFieldable() {
-    return $this->fieldable;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getLinkTemplates() {
     return $this->links;
   }
@@ -533,8 +564,12 @@ class EntityType implements EntityTypeInterface {
   /**
    * {@inheritdoc}
    */
-  public function setLinkTemplate($key, $route_name) {
-    $this->links[$key] = $route_name;
+  public function setLinkTemplate($key, $path) {
+    if ($path[0] !== '/') {
+      throw new \InvalidArgumentException('Link templates accepts paths, which have to start with a leading slash.');
+    }
+
+    $this->links[$key] = $path;
     return $this;
   }
 
@@ -673,6 +708,37 @@ class EntityType implements EntityTypeInterface {
    */
   public function getGroupLabel() {
     return !empty($this->group_label) ? (string) $this->group_label : $this->t('Other', array(), array('context' => 'Entity type group'));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getListCacheContexts() {
+    return $this->list_cache_contexts;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getListCacheTags() {
+    return $this->list_cache_tags;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getConfigDependencyKey() {
+    // Return 'content' for the default implementation as important distinction
+    // is that dependencies on other configuration entities are hard
+    // dependencies and have to exist before creating the dependent entity.
+    return 'content';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isCommonReferenceTarget() {
+    return $this->common_reference_target;
   }
 
 }

@@ -19,19 +19,20 @@ use Drupal\Core\Field\BaseFieldDefinition;
  *   id = "contact_message",
  *   label = @Translation("Contact message"),
  *   handlers = {
+ *     "access" = "Drupal\contact\ContactMessageAccessControlHandler",
  *     "storage" = "Drupal\Core\Entity\ContentEntityNullStorage",
  *     "view_builder" = "Drupal\contact\MessageViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\contact\MessageForm"
  *     }
  *   },
+ *   admin_permission = "administer contact forms",
  *   entity_keys = {
  *     "bundle" = "contact_form",
  *     "uuid" = "uuid"
  *   },
  *   bundle_entity_type = "contact_form",
  *   field_ui_base_route = "entity.contact_form.edit_form",
- *   fieldable = TRUE,
  * )
  */
 class Message extends ContentEntityBase implements MessageInterface {
@@ -145,8 +146,12 @@ class Message extends ContentEntityBase implements MessageInterface {
       ->setReadOnly(TRUE);
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
-      ->setLabel(t('Language code'))
-      ->setDescription(t('The comment language code.'));
+      ->setLabel(t('Language'))
+      ->setDescription(t('The message language code.'))
+      ->setDisplayOptions('form', array(
+        'type' => 'language_select',
+        'weight' => 2,
+      ));
 
     $fields['name'] = BaseFieldDefinition::create('string')
       ->setLabel(t("The sender's name"))

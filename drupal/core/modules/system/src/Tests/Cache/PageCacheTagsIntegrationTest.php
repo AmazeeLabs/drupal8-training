@@ -8,7 +8,6 @@
 namespace Drupal\system\Tests\Cache;
 
 use Drupal\simpletest\WebTestBase;
-use Drupal\Core\Cache\Cache;
 
 /**
  * Enables the page cache and tests its cache tags in various scenarios.
@@ -20,17 +19,19 @@ use Drupal\Core\Cache\Cache;
  */
 class PageCacheTagsIntegrationTest extends WebTestBase {
 
+  use AssertPageCacheContextsAndTagsTrait;
+
   protected $profile = 'standard';
 
   protected $dumpHeaders = TRUE;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
     parent::setUp();
 
-    $config = \Drupal::config('system.performance');
-    $config->set('cache.page.use_internal', 1);
-    $config->set('cache.page.max_age', 300);
-    $config->save();
+    $this->enablePageCaching();
   }
 
   /**
@@ -63,87 +64,73 @@ class PageCacheTagsIntegrationTest extends WebTestBase {
         'request_path' => array(
           'pages' => 'node/' . $node_2->id(),
         ),
-      )
+      ),
     ));
 
+    $cache_contexts = [
+      'languages',
+      'route.menu_active_trails:account',
+      'route.menu_active_trails:footer',
+      'route.menu_active_trails:main',
+      'route.menu_active_trails:tools',
+      'theme',
+      'timezone',
+      'user.roles',
+    ];
+
     // Full node page 1.
-    $this->verifyPageCacheTags('node/' . $node_1->id(), array(
-      'rendered:1',
-      'theme:bartik',
-      'theme_global_settings:1',
-      'block_view:1',
-      'block:bartik_content',
-      'block:bartik_tools',
-      'block:bartik_login',
-      'block:bartik_footer',
-      'block:bartik_powered',
-      'block_plugin:system_main_block',
-      'block_plugin:system_menu_block__tools',
-      'block_plugin:user_login_block',
-      'block_plugin:system_menu_block__footer',
-      'block_plugin:system_powered_by_block',
-      'node_view:1',
+    $this->assertPageCacheContextsAndTags($node_1->urlInfo(), $cache_contexts, array(
+      'rendered',
+      'block_view',
+      'config:block_list',
+      'config:block.block.bartik_breadcrumbs',
+      'config:block.block.bartik_content',
+      'config:block.block.bartik_tools',
+      'config:block.block.bartik_login',
+      'config:block.block.bartik_footer',
+      'config:block.block.bartik_powered',
+      'config:block.block.bartik_main_menu',
+      'config:block.block.bartik_account_menu',
+      'config:block.block.bartik_messages',
+      'node_view',
       'node:' . $node_1->id(),
       'user:' . $author_1->id(),
-      'filter_format:basic_html',
-      'menu:tools',
-      'menu:footer',
-      'menu:main',
+      'config:filter.format.basic_html',
+      'config:system.menu.account',
+      'config:system.menu.tools',
+      'config:system.menu.footer',
+      'config:system.menu.main',
+      'config:system.site',
     ));
 
     // Full node page 2.
-    $this->verifyPageCacheTags('node/' . $node_2->id(), array(
-      'rendered:1',
-      'theme:bartik',
-      'theme_global_settings:1',
-      'block_view:1',
-      'block:bartik_content',
-      'block:bartik_tools',
-      'block:bartik_login',
-      'block:' . $block->id(),
-      'block:bartik_footer',
-      'block:bartik_powered',
-      'block_plugin:system_main_block',
-      'block_plugin:system_menu_block__tools',
-      'block_plugin:user_login_block',
-      'block_plugin:views_block__comments_recent-block_1',
-      'block_plugin:system_menu_block__footer',
-      'block_plugin:system_powered_by_block',
-      'node_view:1',
+    $this->assertPageCacheContextsAndTags($node_2->urlInfo(), $cache_contexts, array(
+      'rendered',
+      'block_view',
+      'config:block_list',
+      'config:block.block.bartik_breadcrumbs',
+      'config:block.block.bartik_content',
+      'config:block.block.bartik_tools',
+      'config:block.block.bartik_login',
+      'config:block.block.' . $block->id(),
+      'config:block.block.bartik_footer',
+      'config:block.block.bartik_powered',
+      'config:block.block.bartik_main_menu',
+      'config:block.block.bartik_account_menu',
+      'config:block.block.bartik_messages',
+      'node_view',
       'node:' . $node_2->id(),
       'user:' . $author_2->id(),
-      'filter_format:full_html',
-      'menu:tools',
-      'menu:footer',
-      'menu:main',
+      'config:filter.format.full_html',
+      'config:system.menu.account',
+      'config:system.menu.tools',
+      'config:system.menu.footer',
+      'config:system.menu.main',
+      'config:system.site',
+      'comment_list',
+      'node_list',
+      'config:views.view.comments_recent',
     ));
-  }
-
-  /**
-   * Fills page cache for the given path, verify cache tags on page cache hit.
-   *
-   * @param $path
-   *   The Drupal page path to test.
-   * @param $expected_tags
-   *   The expected cache tags for the page cache entry of the given $path.
-   */
-  protected function verifyPageCacheTags($path, $expected_tags) {
-    sort($expected_tags);
-    $this->drupalGet($path);
-    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'MISS');
-    $actual_tags = explode(' ', $this->drupalGetHeader('X-Drupal-Cache-Tags'));
-    sort($actual_tags);
-    $this->assertIdentical($actual_tags, $expected_tags);
-    $this->drupalGet($path);
-    $actual_tags = explode(' ', $this->drupalGetHeader('X-Drupal-Cache-Tags'));
-    sort($actual_tags);
-    $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT');
-    $this->assertIdentical($actual_tags, $expected_tags);
-    $cid_parts = array(url($path, array('absolute' => TRUE)), 'html');
-    $cid = sha1(implode(':', $cid_parts));
-    $cache_entry = \Drupal::cache('render')->get($cid);
-    sort($cache_entry->tags);
-    $this->assertEqual($cache_entry->tags, $expected_tags);
   }
 
 }

@@ -38,7 +38,7 @@ class RoleForm extends EntityForm {
       '#size' => 30,
       '#maxlength' => 64,
       '#machine_name' => array(
-        'exists' => 'user_role_load',
+        'exists' => ['\Drupal\user\Entity\Role', 'load'],
       ),
     );
     $form['weight'] = array(
@@ -59,7 +59,7 @@ class RoleForm extends EntityForm {
     $entity->set('label', trim($entity->label()));
     $status = $entity->save();
 
-    $edit_link = \Drupal::linkGenerator()->generateFromUrl($this->t('Edit'), $this->entity->urlInfo());
+    $edit_link = $this->entity->link($this->t('Edit'));
     if ($status == SAVED_UPDATED) {
       drupal_set_message($this->t('Role %label has been updated.', array('%label' => $entity->label())));
       $this->logger('user')->notice('Role %label has been updated.', array('%label' => $entity->label(), 'link' => $edit_link));
@@ -68,7 +68,7 @@ class RoleForm extends EntityForm {
       drupal_set_message($this->t('Role %label has been added.', array('%label' => $entity->label())));
       $this->logger('user')->notice('Role %label has been added.', array('%label' => $entity->label(), 'link' => $edit_link));
     }
-    $form_state->setRedirect('user.role_list');
+    $form_state->setRedirect('entity.user_role.collection');
   }
 
 }

@@ -7,13 +7,15 @@
 
 namespace Drupal\system\Form;
 
+use Drupal\Core\Config\PreExistingConfigException;
+use Drupal\Core\Config\UnmetDependenciesException;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Form\ConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface;
 use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
  * Builds a confirmation form for enabling modules with dependencies.
@@ -42,15 +44,25 @@ class ModulesListConfirmForm extends ConfirmFormBase {
   protected $modules = array();
 
   /**
+   * The module installer.
+   *
+   * @var \Drupal\Core\Extension\ModuleInstallerInterface
+   */
+  protected $moduleInstaller;
+
+  /**
    * Constructs a ModulesListConfirmForm object.
    *
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
+   * @param \Drupal\Core\Extension\ModuleInstallerInterface $module_installer
+   *   The module installer.
    * @param \Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface $key_value_expirable
    *   The key value expirable factory.
    */
-  public function __construct(ModuleHandlerInterface $module_handler, KeyValueStoreExpirableInterface $key_value_expirable) {
+  public function __construct(ModuleHandlerInterface $module_handler, ModuleInstallerInterface $module_installer, KeyValueStoreExpirableInterface $key_value_expirable) {
     $this->moduleHandler = $module_handler;
+    $this->moduleInstaller = $module_installer;
     $this->keyValueExpirable = $key_value_expirable;
   }
 
@@ -60,6 +72,7 @@ class ModulesListConfirmForm extends ConfirmFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('module_handler'),
+      $container->get('module_installer'),
       $container->get('keyvalue.expirable')->get('module_list')
     );
   }
@@ -108,14 +121,14 @@ class ModulesListConfirmForm extends ConfirmFormBase {
 
     // Redirect to the modules list page if the key value store is empty.
     if (!$this->modules) {
-      return new RedirectResponse($this->url('system.modules_list', [], ['absolute' => TRUE]));
+      return $this->redirect('system.modules_list');
     }
 
     $items = array();
     // Display a list of required modules that have to be installed as well but
     // were not manually selected.
     foreach ($this->modules['dependencies'] as $module => $dependencies) {
-      $items[] = format_plural(count($dependencies), 'You must enable the @required module to install @module.', 'You must enable the @required modules to install @module.', array(
+      $items[] = $this->formatPlural(count($dependencies), 'You must enable the @required module to install @module.', 'You must enable the @required modules to install @module.', array(
         '@module' => $this->modules['install'][$module],
         '@required' => implode(', ', $dependencies),
       ));
@@ -142,13 +155,40 @@ class ModulesListConfirmForm extends ConfirmFormBase {
 
     // Install the given modules.
     if (!empty($this->modules['install'])) {
-      $this->moduleHandler->install(array_keys($this->modules['install']));
+      // Don't catch the exception that this can throw for missing dependencies:
+      // the form doesn't allow modules with unmet dependencies, so the only way
+      // this can happen is if the filesystem changed between form display and
+      // submit, in which case the user has bigger problems.
+      try {
+        $this->moduleInstaller->install(array_keys($this->modules['install']));
+      }
+      catch (PreExistingConfigException $e) {
+        $config_objects = $e->flattenConfigObjects($e->getConfigObjects());
+        drupal_set_message(
+          $this->formatPlural(
+            count($config_objects),
+            'Unable to install @extension, %config_names already exists in active configuration.',
+            'Unable to install @extension, %config_names already exist in active configuration.',
+            array(
+              '%config_names' => implode(', ', $config_objects),
+              '@extension' => $this->modules['install'][$e->getExtension()]
+            )),
+          'error'
+        );
+        return;
+      }
+      catch (UnmetDependenciesException $e) {
+        drupal_set_message(
+          $e->getTranslatedMessage($this->getStringTranslation(), $this->modules['install'][$e->getExtension()]),
+          'error'
+        );
+        return;
+      }
     }
 
     // Gets module list after install process, flushes caches and displays a
     // message if there are changes.
     if ($before != $this->moduleHandler->getModuleList()) {
-      drupal_flush_all_caches();
       drupal_set_message($this->t('The configuration options have been saved.'));
     }
 

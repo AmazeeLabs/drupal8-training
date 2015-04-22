@@ -57,6 +57,12 @@ interface BookManagerInterface {
   /**
    * Loads a single book entry.
    *
+   * The entries of a book entry is documented in
+   * \Drupal\book\BookOutlineStorageInterface::loadMultiple.
+   *
+   * If $translate is TRUE, it also checks access ('access' key) and
+   * loads the title from the node itself.
+   *
    * @param int $nid
    *   The node ID of the book.
    * @param bool $translate
@@ -64,11 +70,19 @@ interface BookManagerInterface {
    *
    * @return array
    *   The book data of that node.
+   *
+   * @see \Drupal\book\BookOutlineStorageInterface::loadMultiple
    */
   public function loadBookLink($nid, $translate = TRUE);
 
   /**
    * Loads multiple book entries.
+   *
+   * The entries of a book entry is documented in
+   * \Drupal\book\BookOutlineStorageInterface::loadMultiple.
+   *
+   * If $translate is TRUE, it also checks access ('access' key) and
+   * loads the title from the node itself.
    *
    * @param int[] $nids
    *   An array of nids to load.
@@ -78,6 +92,8 @@ interface BookManagerInterface {
    *
    * @return array[]
    *   The book data of each node keyed by NID.
+   *
+   * @see \Drupal\book\BookOutlineStorageInterface::loadMultiple
    */
   public function loadBookLinks($nids, $translate = TRUE);
 
@@ -232,7 +248,6 @@ interface BookManagerInterface {
    * The menu item's LI element is given one of the following classes:
    * - expanded: The menu item is showing its submenu.
    * - collapsed: The menu item has a submenu which is not shown.
-   * - leaf: The menu item has no submenu.
    *
    * @param array $tree
    *   A data structure representing the tree as returned from buildBookOutlineData.

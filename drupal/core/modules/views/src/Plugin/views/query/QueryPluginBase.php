@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\query;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
@@ -35,7 +36,7 @@ use Drupal\views\Views;
 /**
  * Base plugin class for Views queries.
  */
-abstract class QueryPluginBase extends PluginBase {
+abstract class QueryPluginBase extends PluginBase implements CacheablePluginInterface {
 
   /**
    * A pager plugin that should be provided by the display.
@@ -114,7 +115,22 @@ abstract class QueryPluginBase extends PluginBase {
   public function submitOptionsForm(&$form, FormStateInterface $form_state) { }
 
   public function summaryTitle() {
-    return t('Settings');
+    return $this->t('Settings');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    $dependencies = [];
+
+    foreach ($this->getEntityTableInfo() as $entity_type => $info) {
+      if (!empty($info['provider'])) {
+        $dependencies['module'][] = $info['provider'];
+      }
+    }
+
+    return $dependencies;
   }
 
   /**
@@ -258,20 +274,31 @@ abstract class QueryPluginBase extends PluginBase {
         'alias' => $base_table,
         'relationship_id' => 'none',
         'entity_type' => $base_table_data['table']['entity type'],
-        'revision' => FALSE,
+        'revision' => $base_table_data['table']['entity revision'],
       );
+
+      // Include the entity provider.
+      if (!empty($base_table_data['table']['provider'])) {
+        $entity_tables[$base_table_data['table']['entity type']]['provider'] = $base_table_data['table']['provider'];
+      }
     }
+
     // Include all relationships.
-    foreach ($this->view->relationship as $relationship_id => $relationship) {
+    foreach ((array) $this->view->relationship as $relationship_id => $relationship) {
       $table_data = $views_data->get($relationship->definition['base']);
       if (isset($table_data['table']['entity type'])) {
-        $entity_tables[$table_data['table']['entity type']] = array(
+        $entity_tables[$relationship_id . '__' . $relationship->tableAlias] = array(
           'base' => $relationship->definition['base'],
           'relationship_id' => $relationship_id,
           'alias' => $relationship->alias,
           'entity_type' => $table_data['table']['entity type'],
-          'revision' => FALSE,
+          'revision' => $table_data['table']['entity revision'],
         );
+
+        // Include the entity provider.
+        if (!empty($table_data['table']['provider'])) {
+          $entity_tables[$relationship_id . '__' . $relationship->tableAlias]['provider'] = $table_data['table']['provider'];
+        }
       }
     }
 
@@ -284,6 +311,34 @@ abstract class QueryPluginBase extends PluginBase {
     }
 
     return $entity_tables;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    // This plugin can't really determine that.
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    $contexts = [];
+    if (($views_data = Views::viewsData()->get($this->view->storage->get('base_table'))) && !empty($views_data['table']['entity type'])) {
+      $entity_type_id = $views_data['table']['entity type'];
+      $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
+      $contexts = $entity_type->getListCacheContexts();
+    }
+    return $contexts;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+    return [];
   }
 
 }

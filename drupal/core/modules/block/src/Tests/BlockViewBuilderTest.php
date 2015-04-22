@@ -8,9 +8,9 @@
 namespace Drupal\block\Tests;
 
 use Drupal\Component\Utility\Html;
-use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\UrlCacheContext;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\simpletest\KernelTestBase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Drupal\block\Entity\Block;
@@ -20,10 +20,10 @@ use Drupal\block\Entity\Block;
  *
  * @group block
  */
-class BlockViewBuilderTest extends DrupalUnitTestBase {
+class BlockViewBuilderTest extends KernelTestBase {
 
   /**
-   * Modules to enable.
+   * Modules to install.
    *
    * @var array
    */
@@ -83,14 +83,11 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $entity = Block::load('test_block1');
     $output = entity_view($entity, 'block');
     $expected = array();
-    $expected[] = '<div id="block-test-block1" class="block block-block-test">';
+    $expected[] = '<div id="block-test-block1">';
     $expected[] = '  ';
     $expected[] = '    ';
-    $expected[] = '';
-    $expected[] = '  <div class="content">';
-    $expected[] = '          ';
-    $expected[] = '      </div>';
-    $expected[] = '</div>';
+    $expected[] = '      ';
+    $expected[] = '  </div>';
     $expected[] = '';
     $expected_output = implode("\n", $expected);
     $this->assertEqual(drupal_render($output), $expected_output);
@@ -110,15 +107,12 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $entity->save();
     $output = entity_view($entity, 'block');
     $expected = array();
-    $expected[] = '<div id="block-test-block2" class="block block-block-test">';
+    $expected[] = '<div id="block-test-block2">';
     $expected[] = '  ';
     $expected[] = '      <h2>Powered by Bananas</h2>';
     $expected[] = '    ';
-    $expected[] = '';
-    $expected[] = '  <div class="content">';
-    $expected[] = '          ';
-    $expected[] = '      </div>';
-    $expected[] = '</div>';
+    $expected[] = '      ';
+    $expected[] = '  </div>';
     $expected[] = '';
     $expected_output = implode("\n", $expected);
     $this->assertEqual(drupal_render($output), $expected_output);
@@ -157,7 +151,7 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
 
     // Test that entities with caching disabled do not generate a cache entry.
     $build = $this->getBlockRenderArray();
-    $this->assertTrue(isset($build['#cache']) && array_keys($build['#cache']) == array('tags'), 'The render array element of uncacheable blocks is not cached, but does have cache tags set.');
+    $this->assertTrue(isset($build['#cache']) && array_keys($build['#cache']) == array('contexts', 'tags', 'max-age'), 'The render array element of uncacheable blocks is not cached, but does have cache contexts, tags & max-age set.');
 
     // Enable block caching.
     $this->setBlockCacheConfig(array(
@@ -166,7 +160,7 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
 
     // Test that a cache entry is created.
     $build = $this->getBlockRenderArray();
-    $cid = drupal_render_cid_create($build);
+    $cid = 'entity_view:block:test_block:en:core';
     drupal_render($build);
     $this->assertTrue($this->container->get('cache.render')->get($cid), 'The block render element has been cached.');
 
@@ -220,8 +214,8 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $request_method = $request->server->get('REQUEST_METHOD');
     $request->setMethod('GET');
 
-    $default_keys = array('entity_view', 'block', 'test_block', 'en', 'cache_context.theme');
-    $default_tags = array('block_view' => TRUE, 'block' => array('test_block'), 'theme' => 'stark', 'block_plugin' => array('test_cache'));
+    $default_keys = array('entity_view', 'block', 'test_block');
+    $default_tags = array('block_view', 'config:block.block.test_block');
 
     // Advanced: cached block, but an alter hook adds an additional cache key.
     $this->setBlockCacheConfig(array(
@@ -229,29 +223,31 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     ));
     $alter_add_key = $this->randomMachineName();
     \Drupal::state()->set('block_test_view_alter_cache_key', $alter_add_key);
+    $cid = 'entity_view:block:test_block:' . $alter_add_key . ':en:core';
     $expected_keys = array_merge($default_keys, array($alter_add_key));
     $build = $this->getBlockRenderArray();
     $this->assertIdentical($expected_keys, $build['#cache']['keys'], 'An altered cacheable block has the expected cache keys.');
-    $cid = drupal_render_cid_create(array('#cache' => array('keys' => $expected_keys)));
     $this->assertIdentical(drupal_render($build), '');
     $cache_entry = $this->container->get('cache.render')->get($cid);
     $this->assertTrue($cache_entry, 'The block render element has been cached with the expected cache ID.');
-    $expected_flattened_tags = array('block_view:1', 'block:test_block', 'theme:stark', 'block_plugin:test_cache', 'rendered:1');
-    $this->assertIdentical($cache_entry->tags, $expected_flattened_tags, 'The block render element has been cached with the expected cache tags.');
+    $expected_tags = array_merge($default_tags, ['rendered']);
+    sort($expected_tags);
+    $this->assertIdentical($cache_entry->tags, $expected_tags, 'The block render element has been cached with the expected cache tags.');
     $this->container->get('cache.render')->delete($cid);
 
     // Advanced: cached block, but an alter hook adds an additional cache tag.
     $alter_add_tag = $this->randomMachineName();
     \Drupal::state()->set('block_test_view_alter_cache_tag', $alter_add_tag);
-    $expected_tags = NestedArray::mergeDeep($default_tags, array($alter_add_tag => TRUE));
+    $expected_tags = Cache::mergeTags($default_tags, array($alter_add_tag));
     $build = $this->getBlockRenderArray();
+    sort($build['#cache']['tags']);
     $this->assertIdentical($expected_tags, $build['#cache']['tags'], 'An altered cacheable block has the expected cache tags.');
-    $cid = drupal_render_cid_create(array('#cache' => array('keys' => $expected_keys)));
     $this->assertIdentical(drupal_render($build), '');
     $cache_entry = $this->container->get('cache.render')->get($cid);
     $this->assertTrue($cache_entry, 'The block render element has been cached with the expected cache ID.');
-    $expected_flattened_tags = array('block_view:1', 'block:test_block', 'theme:stark', 'block_plugin:test_cache', $alter_add_tag . ':1', 'rendered:1');
-    $this->assertIdentical($cache_entry->tags, $expected_flattened_tags, 'The block render element has been cached with the expected cache tags.');
+    $expected_tags = array_merge($default_tags, [$alter_add_tag, 'rendered']);
+    sort($expected_tags);
+    $this->assertIdentical($cache_entry->tags, $expected_tags, 'The block render element has been cached with the expected cache tags.');
     $this->container->get('cache.render')->delete($cid);
 
     // Advanced: cached block, but an alter hook adds a #pre_render callback to
@@ -275,6 +271,8 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
    * @see \Drupal\block\Tests\BlockCacheTest
    */
   public function testBlockViewBuilderCacheContexts() {
+    $cache_contexts = \Drupal::service("cache_contexts");
+
     // Force a request via GET so we can get drupal_render() cache working.
     $request = \Drupal::request();
     $request_method = $request->server->get('REQUEST_METHOD');
@@ -285,18 +283,19 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
       'max_age' => 600,
     ));
     $build = $this->getBlockRenderArray();
-    $cid = drupal_render_cid_create($build);
+    $cid = implode(':', $build['#cache']['keys']);
     drupal_render($build);
     $this->assertTrue($this->container->get('cache.render', $cid), 'The block render element has been cached.');
 
     // Second: the "per URL" cache context.
     $this->setBlockCacheConfig(array(
       'max_age' => 600,
-      'contexts' => array('cache_context.url'),
+      'contexts' => array('url'),
     ));
     $old_cid = $cid;
     $build = $this->getBlockRenderArray();
-    $cid = drupal_render_cid_create($build);
+    $cid_parts = array_merge($build['#cache']['keys'], $cache_contexts->convertTokensToKeys($build['#cache']['contexts']));
+    $cid = implode(':', $cid_parts);
     drupal_render($build);
     $this->assertTrue($this->container->get('cache.render', $cid), 'The block render element has been cached.');
     $this->assertNotEqual($cid, $old_cid, 'The cache ID has changed.');
@@ -309,7 +308,8 @@ class BlockViewBuilderTest extends DrupalUnitTestBase {
     $this->container->set('cache_context.url', $temp_context);
     $old_cid = $cid;
     $build = $this->getBlockRenderArray();
-    $cid = drupal_render_cid_create($build);
+    $cid_parts = array_merge($build['#cache']['keys'], $cache_contexts->convertTokensToKeys($build['#cache']['contexts']));
+    $cid = implode(':', $cid_parts);
     drupal_render($build);
     $this->assertTrue($this->container->get('cache.render', $cid), 'The block render element has been cached.');
     $this->assertNotEqual($cid, $old_cid, 'The cache ID has changed.');

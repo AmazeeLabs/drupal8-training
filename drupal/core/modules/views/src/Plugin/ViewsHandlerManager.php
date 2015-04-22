@@ -59,7 +59,8 @@ class ViewsHandlerManager extends DefaultPluginManager implements FallbackPlugin
     }
     parent::__construct("Plugin/views/$handler_type", $namespaces, $module_handler, $plugin_interface, $plugin_definition_annotation_name);
 
-    $this->setCacheBackend($cache_backend, "views:$handler_type", array('extension' => array(TRUE, 'views')));
+    $this->setCacheBackend($cache_backend, "views:$handler_type");
+    $this->alterInfo('views_plugins_' . $handler_type);
 
     $this->viewsData = $views_data;
     $this->handlerType = $handler_type;
@@ -90,7 +91,7 @@ class ViewsHandlerManager extends DefaultPluginManager implements FallbackPlugin
 
     if (isset($data[$field][$this->handlerType])) {
       $definition = $data[$field][$this->handlerType];
-      foreach (array('group', 'title', 'title short', 'help', 'real field', 'real table') as $key) {
+      foreach (array('group', 'title', 'title short', 'help', 'real field', 'real table', 'entity type', 'entity field') as $key) {
         if (!isset($definition[$key])) {
           // First check the field level.
           if (!empty($data[$field][$key])) {
@@ -98,7 +99,8 @@ class ViewsHandlerManager extends DefaultPluginManager implements FallbackPlugin
           }
           // Then if that doesn't work, check the table level.
           elseif (!empty($data['table'][$key])) {
-            $definition[$key] = $data['table'][$key];
+            $definition_key = $key === 'entity type' ? 'entity_type' : $key;
+            $definition[$definition_key] = $data['table'][$key];
           }
         }
       }

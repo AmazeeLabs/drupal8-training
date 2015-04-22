@@ -9,16 +9,23 @@ namespace Drupal\config\Tests;
 
 use Drupal\Core\Config\StorageComparer;
 use Drupal\system\Tests\Module\ModuleTestBase;
+use Drupal\shortcut\Entity\Shortcut;
 
 /**
- * Tests the largest configuration import possible with the modules and profiles
- * provided by core.
+ * Tests the largest configuration import possible with all available modules.
  *
  * @group config
  */
 class ConfigImportAllTest extends ModuleTestBase {
 
   use SchemaCheckTestTrait;
+
+  /**
+   * A user with the 'synchronize configuration' permission.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $webUser;
 
   /**
    * The profile to install as a basis for testing.
@@ -32,8 +39,8 @@ class ConfigImportAllTest extends ModuleTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->web_user = $this->drupalCreateUser(array('synchronize configuration'));
-    $this->drupalLogin($this->web_user);
+    $this->webUser = $this->drupalCreateUser(array('synchronize configuration'));
+    $this->drupalLogin($this->webUser);
   }
 
   /**
@@ -44,16 +51,16 @@ class ConfigImportAllTest extends ModuleTestBase {
     // Get a list of modules to enable.
     $all_modules = system_rebuild_module_data();
     $all_modules = array_filter($all_modules, function ($module) {
-      // Filter hidden, already enabled modules and modules in the Testing
-      // package.
-      if (!empty($module->info['hidden']) || $module->status == TRUE || $module->info['package'] == 'Testing') {
+      // Filter contrib, hidden, already enabled modules and modules in the
+      // Testing package.
+      if ($module->origin !== 'core' || !empty($module->info['hidden']) || $module->status == TRUE || $module->info['package'] == 'Testing') {
         return FALSE;
       }
       return TRUE;
     });
 
     // Install every module possible.
-    \Drupal::moduleHandler()->install(array_keys($all_modules));
+    \Drupal::service('module_installer')->install(array_keys($all_modules));
 
     $this->assertModules(array_keys($all_modules), TRUE);
     foreach($all_modules as $module => $info) {
@@ -76,8 +83,20 @@ class ConfigImportAllTest extends ModuleTestBase {
     // Purge the data.
     field_purge_batch(1000);
 
+    // Delete any forum terms so it can be uninstalled.
+    $vid = $this->config('forum.settings')->get('vocabulary');
+    $terms = entity_load_multiple_by_properties('taxonomy_term', ['vid' => $vid]);
+    foreach ($terms as $term) {
+      $term->delete();
+    }
+
+    // Delete any shortcuts so the shortcut module can be uninstalled.
+    $shortcuts = Shortcut::loadMultiple();
+    entity_delete_multiple('shortcut', array_keys($shortcuts));
+
     system_list_reset();
     $all_modules = system_rebuild_module_data();
+
     $modules_to_uninstall = array_filter($all_modules, function ($module) {
       // Filter required and not enabled modules.
       if (!empty($module->info['required']) || $module->status == FALSE) {
@@ -92,7 +111,7 @@ class ConfigImportAllTest extends ModuleTestBase {
     $this->assertTrue(isset($modules_to_uninstall['comment']), 'The comment module will be disabled');
 
     // Uninstall all modules that can be uninstalled.
-    \Drupal::moduleHandler()->uninstall(array_keys($modules_to_uninstall));
+    \Drupal::service('module_installer')->uninstall(array_keys($modules_to_uninstall));
 
     $this->assertModules(array_keys($modules_to_uninstall), FALSE);
     foreach($modules_to_uninstall as $module => $info) {
@@ -102,6 +121,8 @@ class ConfigImportAllTest extends ModuleTestBase {
 
     // Import the configuration thereby re-installing all the modules.
     $this->drupalPostForm('admin/config/development/configuration', array(), t('Import all'));
+    // Modules have been installed that have services.
+    $this->rebuildContainer();
 
     // Check that there are no errors.
     $this->assertIdentical($this->configImporter()->getErrors(), array());
@@ -125,11 +146,10 @@ class ConfigImportAllTest extends ModuleTestBase {
     // conformance. Ensures all imported default configuration is valid when
     // all modules are enabled.
     $names = $this->container->get('config.storage')->listAll();
-    $factory = $this->container->get('config.factory');
     /** @var \Drupal\Core\Config\TypedConfigManagerInterface $typed_config */
     $typed_config = $this->container->get('config.typed');
     foreach ($names as $name) {
-      $config = $factory->get($name);
+      $config = $this->config($name);
       $this->assertConfigSchema($typed_config, $name, $config->get());
     }
   }

@@ -1,6 +1,6 @@
 /**
  * @file
- * A Backbone view for the toolbar element.
+ * A Backbone view for the toolbar element. Listens to mouse & touch.
  */
 
 (function ($, Drupal, drupalSettings, Backbone) {
@@ -8,13 +8,23 @@
   "use strict";
 
   /**
-   * Backbone view for the toolbar element.
+   * Backbone view for the toolbar element. Listens to mouse & touch.
    */
   Drupal.toolbar.ToolbarVisualView = Backbone.View.extend({
 
-    events: {
-      'click .toolbar-bar .toolbar-tab': 'onTabClick',
-      'click .toolbar-toggle-orientation button': 'onOrientationToggleClick'
+    events: function () {
+      // Prevents delay and simulated mouse events.
+      var touchEndToClick = function (event) {
+        event.preventDefault();
+        event.target.click();
+      };
+
+      return {
+        'click .toolbar-bar .toolbar-tab': 'onTabClick',
+        'click .toolbar-toggle-orientation button': 'onOrientationToggleClick',
+        'touchend .toolbar-bar .toolbar-tab': touchEndToClick,
+        'touchend .toolbar-toggle-orientation button': touchEndToClick
+      };
     },
 
     /**
@@ -246,7 +256,7 @@
       //   (2) The active tab is the administration menu tab, indicated by the
       //       presence of the data-drupal-subtrees attribute.
       //   (3) The orientation of the tray is vertical.
-      if (!this.model.get('areSubtreesLoaded') && $activeTab.data('drupal-subtrees') !== undefined && orientation === 'vertical') {
+      if (!this.model.get('areSubtreesLoaded') && typeof $activeTab.data('drupal-subtrees') !== 'undefined' && orientation === 'vertical') {
         var subtreesHash = drupalSettings.toolbar.subtreesHash;
         var langcode = drupalSettings.toolbar.langcode;
         var endpoint = Drupal.url('toolbar/subtrees/' + subtreesHash + '/' + langcode);

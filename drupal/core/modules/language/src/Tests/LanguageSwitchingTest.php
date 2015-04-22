@@ -7,6 +7,8 @@
 
 namespace Drupal\language\Tests;
 
+use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\simpletest\WebTestBase;
 
@@ -75,7 +77,7 @@ class LanguageSwitchingTest extends WebTestBase {
 
     // Assert that each list item and anchor element has the appropriate data-
     // attributes.
-    list($language_switcher) = $this->xpath('//div[@id=:id]/div[contains(@class, "content")]', array(':id' => 'block-test-language-block'));
+    list($language_switcher) = $this->xpath('//div[@id=:id]', array(':id' => 'block-test-language-block'));
     $list_items = array();
     $anchors = array();
     $labels = array();
@@ -102,7 +104,7 @@ class LanguageSwitchingTest extends WebTestBase {
       1 => array('hreflang' => 'fr', 'data-drupal-link-system-path' => 'user/2'),
     );
     $this->assertIdentical($anchors, $expected_anchors, 'The anchors have the correct attributes that will allow the drupal.active-link library to mark them as active.');
-    $settings = $this->drupalGetSettings();
+    $settings = $this->getDrupalSettings();
     $this->assertIdentical($settings['path']['currentPath'], 'user/2', 'drupalSettings.path.currentPath is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['isFront'], FALSE, 'drupalSettings.path.isFront is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['currentLanguage'], 'en', 'drupalSettings.path.currentLanguage is set correctly to allow drupal.active-link to mark the correct links as active.');
@@ -125,7 +127,7 @@ class LanguageSwitchingTest extends WebTestBase {
     $this->assertText($block_label, 'Language switcher block found.');
 
     // Assert that only the current language is marked as active.
-    list($language_switcher) = $this->xpath('//div[@id=:id]/div[contains(@class, "content")]', array(':id' => 'block-test-language-block'));
+    list($language_switcher) = $this->xpath('//div[@id=:id]', array(':id' => 'block-test-language-block'));
     $links = array(
       'active' => array(),
       'inactive' => array(),
@@ -159,6 +161,68 @@ class LanguageSwitchingTest extends WebTestBase {
   }
 
   /**
+   * Test language switcher links for domain based negotiation.
+   */
+  function testLanguageBlockWithDomain() {
+    // Add the Italian language.
+    ConfigurableLanguage::createFromLangcode('it')->save();
+
+    // Rebuild the container so that the new language is picked up by services
+    // that hold a list of languages.
+    $this->rebuildContainer();
+
+    $languages = $this->container->get('language_manager')->getLanguages();
+
+    // Enable browser and URL language detection.
+    $edit = array(
+      'language_interface[enabled][language-url]' => TRUE,
+      'language_interface[weight][language-url]' => -10,
+    );
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
+
+    // Do not allow blank domain.
+    $edit = array(
+      'language_negotiation_url_part' => LanguageNegotiationUrl::CONFIG_DOMAIN,
+      'domain[en]' => '',
+    );
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->assertText(t('The domain may not be left blank for English'), 'The form does not allow blank domains.');
+
+    // Change the domain for the Italian language.
+    $edit = array(
+      'language_negotiation_url_part' => LanguageNegotiationUrl::CONFIG_DOMAIN,
+      'domain[en]' => \Drupal::request()->getHost(),
+      'domain[it]' => 'it.example.com',
+    );
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved'), 'Domain configuration is saved.');
+
+    // Enable the language switcher block.
+    $this->drupalPlaceBlock('language_block:' . LanguageInterface::TYPE_INTERFACE, array('id' => 'test_language_block'));
+
+    $this->drupalGet('');
+
+    /** @var \Drupal\Core\Routing\UrlGenerator $generator */
+    $generator = $this->container->get('url_generator');
+
+    // Verfify the English URL is correct
+    list($english_link) = $this->xpath('//div[@id=:id]/ul/li/a[@hreflang=:hreflang]', array(
+      ':id' => 'block-test-language-block',
+      ':hreflang' => 'en',
+    ));
+    $english_url = $generator->generateFromPath('user/2', array('language' => $languages['en']));
+    $this->assertEqual($english_url, (string) $english_link['href']);
+
+    // Verfify the Italian URL is correct
+    list($italian_link) = $this->xpath('//div[@id=:id]/ul/li/a[@hreflang=:hreflang]', array(
+      ':id' => 'block-test-language-block',
+      ':hreflang' => 'it',
+    ));
+    $italian_url = $generator->generateFromPath('user/2', array('language' => $languages['it']));
+    $this->assertEqual($italian_url, (string) $italian_link['href']);
+  }
+
+  /**
    * Test active class on links when switching languages.
    */
   function testLanguageLinkActiveClass() {
@@ -177,6 +241,49 @@ class LanguageSwitchingTest extends WebTestBase {
   }
 
   /**
+   * Check the path-admin class, as same as on default language.
+   */
+  function testLanguageBodyClass() {
+    $searched_class = 'path-admin';
+
+    // Add language.
+    $edit = array(
+      'predefined_langcode' => 'fr',
+    );
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
+
+    // Enable URL language detection and selection.
+    $edit = array('language_interface[enabled][language-url]' => '1');
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
+
+    // Check if the default (English) admin/config page has the right class.
+    $this->drupalGet('admin/config');
+    $class = $this->xpath('//body[contains(@class, :class)]', array(':class' => $searched_class));
+    $this->assertTrue(isset($class[0]), t('The path-admin class appears on default language.'));
+
+    // Check if the French admin/config page has the right class.
+    $this->drupalGet('fr/admin/config');
+    $class = $this->xpath('//body[contains(@class, :class)]', array(':class' => $searched_class));
+    $this->assertTrue(isset($class[0]), t('The path-admin class same as on default language.'));
+
+    // The testing profile sets the user/login page as the frontpage. That
+    // redirects authenticated users to their profile page, so check with an
+    // anonymous user instead.
+    $this->drupalLogout();
+
+    // Check if the default (English) frontpage has the right class.
+    $this->drupalGet('<front>');
+    $class = $this->xpath('//body[contains(@class, :class)]', array(':class' => 'path-frontpage'));
+    $this->assertTrue(isset($class[0]), 'path-frontpage class found on the body tag');
+
+    // Check if the French frontpage has the right class.
+    $this->drupalGet('fr');
+    $class = $this->xpath('//body[contains(@class, :class)]', array(':class' => 'path-frontpage'));
+    $this->assertTrue(isset($class[0]), 'path-frontpage class found on the body tag with french as the active language');
+
+  }
+
+  /**
    * For authenticated users, the "active" class is set by JavaScript.
    *
    * @see testLanguageLinkActiveClass()
@@ -185,7 +292,7 @@ class LanguageSwitchingTest extends WebTestBase {
     $function_name = '#type link';
     $path = 'language_test/type-link-active-class';
 
-    // Test links generated by l() on an English page.
+    // Test links generated by _l() on an English page.
     $current_language = 'English';
     $this->drupalGet($path);
 
@@ -205,12 +312,12 @@ class LanguageSwitchingTest extends WebTestBase {
     $this->assertTrue(isset($links[0]), t('A link generated by :function to the current :language page with langcode :langcode has the correct attributes that will allow the drupal.active-link library to NOT mark it as active.', array(':function' => $function_name, ':language' => $current_language, ':langcode' => $langcode)));
 
     // Verify that drupalSettings contains the correct values.
-    $settings = $this->drupalGetSettings();
+    $settings = $this->getDrupalSettings();
     $this->assertIdentical($settings['path']['currentPath'], $path, 'drupalSettings.path.currentPath is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['isFront'], FALSE, 'drupalSettings.path.isFront is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['currentLanguage'], 'en', 'drupalSettings.path.currentLanguage is set correctly to allow drupal.active-link to mark the correct links as active.');
 
-    // Test links generated by l() on a French page.
+    // Test links generated by _l() on a French page.
     $current_language = 'French';
     $this->drupalGet('fr/language_test/type-link-active-class');
 
@@ -230,7 +337,7 @@ class LanguageSwitchingTest extends WebTestBase {
     $this->assertTrue(isset($links[0]), t('A link generated by :function to the current :language page with langcode :langcode has the correct attributes that will allow the drupal.active-link library to mark it as active.', array(':function' => $function_name, ':language' => $current_language, ':langcode' => $langcode)));
 
     // Verify that drupalSettings contains the correct values.
-    $settings = $this->drupalGetSettings();
+    $settings = $this->getDrupalSettings();
     $this->assertIdentical($settings['path']['currentPath'], $path, 'drupalSettings.path.currentPath is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['isFront'], FALSE, 'drupalSettings.path.isFront is set correctly to allow drupal.active-link to mark the correct links as active.');
     $this->assertIdentical($settings['path']['currentLanguage'], 'fr', 'drupalSettings.path.currentLanguage is set correctly to allow drupal.active-link to mark the correct links as active.');
@@ -246,7 +353,7 @@ class LanguageSwitchingTest extends WebTestBase {
 
     $this->drupalLogout();
 
-    // Test links generated by l() on an English page.
+    // Test links generated by _l() on an English page.
     $current_language = 'English';
     $this->drupalGet('language_test/type-link-active-class');
 
@@ -265,7 +372,7 @@ class LanguageSwitchingTest extends WebTestBase {
     $links = $this->xpath('//a[@id = :id and not(contains(@class, :class))]', array(':id' => 'fr_link', ':class' => 'active'));
     $this->assertTrue(isset($links[0]), t('A link generated by :function to the current :language page with langcode :langcode is NOT marked active.', array(':function' => $function_name, ':language' => $current_language, ':langcode' => $langcode)));
 
-    // Test links generated by l() on a French page.
+    // Test links generated by _l() on a French page.
     $current_language = 'French';
     $this->drupalGet('fr/language_test/type-link-active-class');
 

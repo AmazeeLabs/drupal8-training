@@ -1,15 +1,21 @@
-base_table: views_test_data
-core: '8'
+langcode: en
+status: true
+dependencies: {  }
+id: test_grid
+label: ''
+module: views
 description: ''
-status: '1'
+tag: ''
+base_table: views_test_data
+base_field: nid
+core: '8'
 display:
   default:
     display_options:
       defaults:
-        fields: '0'
-        pager: '0'
-        pager_options: '0'
-        sorts: '0'
+        fields: false
+        pager: false
+        sorts: false
       fields:
         age:
           field: age
@@ -31,9 +37,8 @@ display:
           plugin_id: string
       pager:
         options:
-          offset: '0'
+          offset: 0
         type: none
-      pager_options: {  }
       sorts:
         id:
           field: id
@@ -46,13 +51,13 @@ display:
         type: grid
         options:
           grouping: {  }
-          columns: '4'
-          automatic_width: '1'
+          columns: 4
+          automatic_width: true
           alignment: horizontal
-          col_class_default: '1'
-          col_class_custom: 'name-[name]'
-          row_class_default: '1'
-          row_class_custom: 'age-[age]'
+          col_class_default: true
+          col_class_custom: 'name-{{name}}'
+          row_class_default: true
+          row_class_custom: 'age-{{ age }}'
       row:
         type: fields
     display_plugin: default
@@ -66,6 +71,3 @@ display:
     display_title: 'Page display'
     id: page_1
     position: 1
-label: ''
-id: test_grid
-tag: ''

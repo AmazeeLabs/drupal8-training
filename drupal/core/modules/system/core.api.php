@@ -42,6 +42,7 @@
  *
  * - @link plugin_api Plugins @endlink
  * - @link container Services and the Dependency Injection Container @endlink
+ * - @link events Events @endlink
  * - @link i18n Internationalization @endlink
  * - @link cache Caching @endlink
  * - @link utility Utility classes and functions @endlink
@@ -96,9 +97,9 @@
  * data and other methods.
  *
  * REST requests can be authenticated. The Drupal Core Basic Auth module
- * provides authentication using the HTTP Basic protocol; contributed module
+ * provides authentication using the HTTP Basic protocol; the contributed module
  * OAuth (https://www.drupal.org/project/oauth) implements the OAuth
- * authenticaion protocol. You can also use cookie-based authentication, which
+ * authentication protocol. You can also use cookie-based authentication, which
  * would require users to be logged into the Drupal site while using the
  * application on the third-party site that is using the REST service.
  *
@@ -186,7 +187,7 @@
  * // Find out when cron was last run; the key is 'system.cron_last'.
  * $time = $state->get('system.cron_last');
  * // Set the cron run time to the current request time.
- * $state->set('system_cron_last', REQUEST_TIME);
+ * $state->set('system.cron_last', REQUEST_TIME);
  * @endcode
  *
  * For more on the State API, see https://drupal.org/developing/api/8/state
@@ -321,6 +322,36 @@
  *   Configuration entity classes expose dependencies by overriding the
  *   \Drupal\Core\Config\Entity\ConfigEntityInterface::calculateDependencies()
  *   method.
+ * - On routes for paths staring with '/admin' or otherwise designated as
+ *   administration paths (such as node editing when it is set as an admin
+ *   operation), if they have configuration entity placeholders, configuration
+ *   entities are normally loaded in their original language, without
+ *   translations or other overrides. This is usually desirable, because most
+ *   admin paths are for editing configuration, and you need that to be in the
+ *   source language and to lack possibly dynamic overrides. If for some reason
+ *   you need to have your configuration entity loaded in the currently-selected
+ *   language on an admin path (for instance, if you go to
+ *   example.com/es/admin/your_path and you need the entity to be in Spanish),
+ *   then you can add a 'with_config_overrides' parameter option to your route.
+ *   The same applies if you need to load the entity with overrides (or
+ *   translated) on an admin path like '/node/add/article' (when configured to
+ *   be an admin path). Here's an example using the configurable_language config
+ *   entity:
+ *   @code
+ *   mymodule.myroute:
+ *     path: '/admin/mypath/{configurable_language}'
+ *     defaults:
+ *       _controller: '\Drupal\mymodule\MyController::myMethod'
+ *     options:
+ *       parameters:
+ *         configurable_language:
+ *           type: entity:configurable_language
+ *           with_config_overrides: TRUE
+ *   @endcode
+ *   With the route defined this way, the $configurable_language parameter to
+ *   your controller method will come in translated to the current language.
+ *   Without the parameter options section, it would be in the original
+ *   language, untranslated.
  *
  * @see i18n
  *
@@ -356,7 +387,7 @@
  *
  * Example:
  * @code
- * $cid = 'mymodule_example:' . \Drupal::languageManager()->getCurrentLanguage()->id();
+ * $cid = 'mymodule_example:' . \Drupal::languageManager()->getCurrentLanguage()->getId();
  *
  * $data = NULL;
  * if ($cache = \Drupal::cache()->get($cid)) {
@@ -435,18 +466,19 @@
  *
  * @section tags Cache Tags
  *
- * The fourth argument of the set() method can be used to specify cache tags,
- * which are used to identify what type of data is included in each cache item.
- * Each cache item can have multiple cache tags, and each cache tag has a string
- * key and a value. The value can be:
- * - TRUE, to indicate that this type of data is present in the cache item.
- * - An array of values. For example, the "node" tag indicates that particular
- *   node's data is present in the cache item, so its value is an array of node
- *   IDs.
- * Data that has been tagged can be deleted or invalidated as a group: no matter
+ * The fourth argument of the @code set() @endcode method can be used to specify
+ * cache tags, which are used to identify which data is included in each cache
+ * item. A cache item can have multiple cache tags (an array of cache tags), and
+ * each cache tag is a string. The convention is to generate cache tags of the
+ * form @code <prefix>:<suffix> @endcode. Usually, you'll want to associate the
+ * cache tags of entities, or entity listings. You won't have to manually
+ * construct cache tags for them — just get their cache tags via
+ * \Drupal\Core\Entity\EntityInterface::getCacheTags() and
+ * \Drupal\Core\Entity\EntityTypeInterface::getListCacheTags().
+ * Data that has been tagged can be invalidated as a group: no matter
  * the Cache ID (cid) of the cache item, no matter in which cache bin a cache
  * item lives; as long as it is tagged with a certain cache tag, it will be
- * deleted or invalidated.
+ * invalidated.
  *
  * Because of that, cache tags are a solution to the cache invalidation problem:
  * - For caching to be effective, each cache item must only be invalidated when
@@ -464,15 +496,15 @@
  * @code
  * // A cache item with nodes, users, and some custom module data.
  * $tags = array(
- *   'my_custom_tag' => TRUE,
- *   'node' => array(1, 3),
- *   'user' => array(7),
+ *   'my_custom_tag',
+ *   'node:1',
+ *   'node:3',
+ *   'user:7',
  * );
  * \Drupal::cache()->set($cid, $data, CacheBackendInterface::CACHE_PERMANENT, $tags);
  *
- * // Delete or invalidate all cache items with certain tags.
- * \Drupal\Core\Cache\Cache::deleteTags(array('node' => array(1)));
- * \Drupal\Core\Cache\Cache::invalidateTags(array('user' => array(1)));
+ * // Invalidate all cache items with certain tags.
+ * \Drupal\Core\Cache\Cache::invalidateTags(array('user:1'));
  * @endcode
  *
  * Drupal is a content management system, so naturally you want changes to your
@@ -483,12 +515,10 @@
  * This also is the case when you define your own entity types: you'll get the
  * exact same cache tag invalidation as any of the built-in entity types, with
  * the ability to override any of the default behavior if needed.
- * See \Drupal\Core\Entity\EntityInterface::getCacheTag(),
- * \Drupal\Core\Entity\EntityInterface::getListCacheTags(),
+ * See \Drupal\Core\Entity\EntityInterface::getCacheTags(),
+ * \Drupal\Core\Entity\EntityTypeInterface::getListCacheTags(),
  * \Drupal\Core\Entity\Entity::invalidateTagsOnSave() and
  * \Drupal\Core\Entity\Entity::invalidateTagsOnDelete().
- *
- * @todo Update cache tag deletion in https://drupal.org/node/918538
  *
  * @section configuration Configuration
  *
@@ -519,7 +549,7 @@
  * @{
  * API for user accounts, access checking, roles, and permissions.
  *
- * @sec sec_overview Overview and terminology
+ * @section sec_overview Overview and terminology
  * Drupal's permission system is based on the concepts of accounts, roles,
  * and permissions.
  *
@@ -550,10 +580,8 @@
  * appropriately for their particular sites.
  *
  * @section sec_define Defining permissions
- * Modules define permissions via a $module.permissions.yml file. The return
- * value defines machine names, human-readable names, and optionally
- * descriptions for each permission type. The machine names are the canonical
- * way to refer to permissions for access checking.
+ * Modules define permissions via a $module.permissions.yml file. See
+ * \Drupal\user\PermissionHandler for documentation of permissions.yml files.
  *
  * @section sec_access Access permission checking
  * Depending on the situation, there are several methods for ensuring that
@@ -734,28 +762,8 @@
  * \Drupal\Core\CoreServiceProvider class, but this is less common for modules.
  *
  * @section sec_tags Service tags
- * Some services have tags, which are defined in the service definition. Tags
- * are used to define a group of related services, or to specify some aspect of
- * how the service behaves. Typically, if you tag a service, your service class
- * must also implement a corresponding interface. Some common examples:
- * - access_check: Indicates a route access checking service; see the
- *   @link menu Menu and routing system topic @endlink for more information.
- * - cache.bin: Indicates a cache bin service; see the
- *   @link cache Cache topic @endlink for more information.
- * - event_subscriber: Indicates an event subscriber service. Event subscribers
- *   can be used for dynamic routing and route altering; see the
- *   @link menu Menu and routing system topic @endlink for more information.
- *   They can also be used for other purposes; see
- *   http://symfony.com/doc/current/cookbook/doctrine/event_listeners_subscribers.html
- *   for more information.
- * - needs_destruction: Indicates that a destruct() method needs to be called
- *   at the end of a request to finalize operations, if this service was
- *   instantiated.
- *
- * Creating a tag for a service does not do anything on its own, but tags
- * can be discovered or queried in a compiler pass when the container is built,
- * and a corresponding action can be taken. See
- * \Drupal\Core\CoreServiceProvider::register() for an example.
+ * Some services have tags, which are defined in the service definition. See
+ * @link service_tag Service Tags @endlink for usage.
  *
  * @section sec_injection Overriding the default service class
  * Modules can override the default classes used for services. Here are the
@@ -887,8 +895,8 @@
  *   where yourmodule is your module's machine name.
  * - The test class file must be named and placed under the yourmodule/tests/src
  *   directory, according to the PSR-4 standard.
- * - Your test class needs a getInfo() method, which gives information about
- *   the test.
+ * - Your test class needs a phpDoc comment block with a description and
+ *   a @group annotation, which gives information about the test.
  * - Methods in your test class whose names start with 'test' are the actual
  *   test cases. Each one should test a logical subset of the functionality.
  * For more details, see:
@@ -920,8 +928,8 @@
  *   where yourmodule is your module's machine name.
  * - The test class file must be named and placed under the yourmodule/src/Tests
  *   directory, according to the PSR-4 standard.
- * - Your test class needs a getInfo() method, which gives information about
- *   the test.
+ * - Your test class needs a phpDoc comment block with a description and
+ *   a @group annotation, which gives information about the test.
  * - You may also override the default setUp() method, which can set be used to
  *   set up content types and similar procedures.
  * - In some cases, you may need to write a test module to support your test;
@@ -984,10 +992,11 @@
 /**
  * @defgroup extending Extending and altering Drupal
  * @{
- * Overview of add-ons and alteration methods for Drupal.
+ * Overview of extensions and alteration methods for Drupal.
  *
+ * @section sec_types Types of extensions
  * Drupal's core behavior can be extended and altered via these three basic
- * types of add-ons:
+ * types of extensions:
  * - Themes: Themes alter the appearance of Drupal sites. They can include
  *   template files, which alter the HTML markup and other raw output of the
  *   site; CSS files, which alter the styling applied to the HTML; and
@@ -1000,8 +1009,9 @@
  * - Installation profiles: Installation profiles can be used to
  *   create distributions, which are complete specific-purpose packages of
  *   Drupal including additional modules, themes, and data. For more
- *   information, see https://drupal.org/documentation/build/distributions.
+ *   information, see https://www.drupal.org/developing/distributions.
  *
+ * @section sec_alter Alteration methods for modules
  * Here is a list of the ways that modules can alter or extend Drupal's core
  * behavior, or the behavior of other modules:
  * - Hooks: Specially-named functions that a module defines, which are
@@ -1020,6 +1030,17 @@
  * - Routing: Providing or altering "routes", which are URLs that Drupal
  *   responds to, or altering routing behavior with event listener classes.
  *   See the @link menu Routing and menu topic @endlink for more information.
+ * - Events: Modules can register as event subscribers; when an event is
+ *   dispatched, a method is called on each registered subscriber, allowing each
+ *   one to react. See the @link events Events topic @endlink for more
+ *   information.
+ *
+ * @section sec_sample *.info.yml files
+ * Extensions must each be located in a directory whose name matches the short
+ * name (or machine name) of the extension, and this directory must contain a
+ * file named machine_name.info.yml (where machine_name is the machine name of
+ * the extension). See \Drupal\Core\Extension\InfoParserInterface::parse() for
+ * documentation of the format of .info.yml files.
  * @}
  */
 
@@ -1029,7 +1050,7 @@
  * Using the Plugin API
  *
  * @section sec_overview Overview and terminology
-
+ *
  * The basic idea of plugins is to allow a particular module or subsystem of
  * Drupal to provide functionality in an extensible, object-oriented way. The
  * controlling module or subsystem defines the basic framework (interface) for
@@ -1054,7 +1075,7 @@
  * - Plugin mapping: Allows a plugin class to map a configuration string to an
  *   instance, and have the plugin automatically instantiated without writing
  *   additional code.
- * - Plugin bags: Provide a way to lazily instantiate a set of plugin
+ * - Plugin collections: Provide a way to lazily instantiate a set of plugin
  *   instances from a single plugin definition.
  *
  * There are several things a module developer may need to do with plugins:
@@ -1094,8 +1115,8 @@
  *   instantiate plugins. See @ref sub_manager below.
  * - Use the plugin manager to instantiate plugins. Call methods on your plugin
  *   interface to perform the tasks of your plugin type.
- * - (optional) If appropriate, define a plugin bag. See @ref sub_bag below
- *   for more information.
+ * - (optional) If appropriate, define a plugin collection. See @ref
+ *    sub_collection below for more information.
  *
  * @subsection sub_discovery Plugin discovery
  * Plugin discovery is the process your plugin manager uses to discover the
@@ -1155,22 +1176,22 @@
  *   configuration schema and possibly a configuration entity type. See the
  *   @link config_api Configuration API topic @endlink for more information.
  *
- * @subsection sub_bag Defining a plugin bag
+ * @subsection sub_collection Defining a plugin collection
  * Some configurable plugin types allow administrators to create zero or more
  * instances of each plugin, each with its own configuration. For example,
  * a single block plugin can be configured several times, to display in
  * different regions of a theme, with different visibility settings, a
  * different title, or other plugin-specific settings. To make this possible,
- * a plugin type can make use of what's known as a plugin bag.
+ * a plugin type can make use of what's known as a plugin collection.
  *
- * A plugin bag is a class that extends \Drupal\Component\Plugin\PluginBag or
- * one of its subclasses; there are several examples in Drupal Core. If your
- * plugin type uses a plugin bag, it will usually also have a configuration
- * entity, and the entity class should implement
- * \Drupal\Core\Entity\EntityWithPluginBagsInterface. Again,
- * there are several examples in Drupal Core; see also the
- * @link config_api Configuration API topic @endlink for more information about
- * configuration entities.
+ * A plugin collection is a class that extends
+ * \Drupal\Component\Plugin\LazyPluginCollection or one of its subclasses; there
+ * are several examples in Drupal Core. If your plugin type uses a plugin
+ * collection, it will usually also have a configuration entity, and the entity
+ * class should implement
+ * \Drupal\Core\Entity\EntityWithPluginCollectionInterface. Again, there are
+ * several examples in Drupal Core; see also the @link config_api Configuration
+ * API topic @endlink for more information about configuration entities.
  *
  * @section sec_create Creating a plugin of an existing type
  * Assuming the plugin type uses annotation-based discovery, in order to create
@@ -1285,7 +1306,6 @@
  * @see common.inc
  * @see file
  * @see format
- * @see mail.inc
  * @see php_wrappers
  * @see sanitization
  * @see transliteration
@@ -1535,13 +1555,13 @@
  * would be an in-memory queue backend which might lose items if it crashes.
  * However, such a backend would be able to deal with significantly more writes
  * than a reliable queue and for many tasks this is more important. See
- * aggregator_cron() for an example of how to effectively utilize a
- * non-reliable queue. Another example is doing Twitter statistics -- the small
- * possibility of losing a few items is insignificant next to power of the
- * queue being able to keep up with writes. As described in the processing
- * section, regardless of the queue being reliable or not, the processing code
- * should be aware that an item might be handed over for processing more than
- * once (because the processing code might time out before it finishes).
+ * aggregator_cron() for an example of how to effectively use a non-reliable
+ * queue. Another example is doing Twitter statistics -- the small possibility
+ * of losing a few items is insignificant next to power of the queue being able
+ * to keep up with writes. As described in the processing section, regardless
+ * of the queue being reliable or not, the processing code should be aware that
+ * an item might be handed over for processing more than once (because the
+ * processing code might time out before it finishes).
  * @}
  */
 
@@ -1600,6 +1620,233 @@
  * @addtogroup hooks
  * @{
  */
+
+/**
+ * Perform periodic actions.
+ *
+ * Modules that require some commands to be executed periodically can
+ * implement hook_cron(). The engine will then call the hook whenever a cron
+ * run happens, as defined by the administrator. Typical tasks managed by
+ * hook_cron() are database maintenance, backups, recalculation of settings
+ * or parameters, automated mailing, and retrieving remote data.
+ *
+ * Short-running or non-resource-intensive tasks can be executed directly in
+ * the hook_cron() implementation.
+ *
+ * Long-running tasks and tasks that could time out, such as retrieving remote
+ * data, sending email, and intensive file tasks, should use the queue API
+ * instead of executing the tasks directly. To do this, first define one or
+ * more queues via a \Drupal\Core\Annotation\QueueWorker plugin. Then, add items
+ * that need to be processed to the defined queues.
+ */
+function hook_cron() {
+  // Short-running operation example, not using a queue:
+  // Delete all expired records since the last cron run.
+  $expires = \Drupal::state()->get('mymodule.cron_last_run', REQUEST_TIME);
+  db_delete('mymodule_table')
+    ->condition('expires', $expires, '>=')
+    ->execute();
+  \Drupal::state()->set('mymodule.cron_last_run', REQUEST_TIME);
+
+  // Long-running operation example, leveraging a queue:
+  // Fetch feeds from other sites.
+  $result = db_query('SELECT * FROM {aggregator_feed} WHERE checked + refresh < :time AND refresh <> :never', array(
+    ':time' => REQUEST_TIME,
+    ':never' => AGGREGATOR_CLEAR_NEVER,
+  ));
+  $queue = \Drupal::queue('aggregator_feeds');
+  foreach ($result as $feed) {
+    $queue->createItem($feed);
+  }
+}
+
+/**
+ * Alter available data types for typed data wrappers.
+ *
+ * @param array $data_types
+ *   An array of data type information.
+ *
+ * @see hook_data_type_info()
+ */
+function hook_data_type_info_alter(&$data_types) {
+  $data_types['email']['class'] = '\Drupal\mymodule\Type\Email';
+}
+
+/**
+ * Alter cron queue information before cron runs.
+ *
+ * Called by \Drupal\Core\Cron to allow modules to alter cron queue settings
+ * before any jobs are processesed.
+ *
+ * @param array $queues
+ *   An array of cron queue information.
+ *
+ * @see \Drupal\Core\QueueWorker\QueueWorkerInterface
+ * @see \Drupal\Core\Annotation\QueueWorker
+ * @see \Drupal\Core\Cron
+ */
+function hook_queue_info_alter(&$queues) {
+  // This site has many feeds so let's spend 90 seconds on each cron run
+  // updating feeds instead of the default 60.
+  $queues['aggregator_feeds']['cron']['time'] = 90;
+}
+
+/**
+ * Alter an email message created with MailManagerInterface->mail().
+ *
+ * hook_mail_alter() allows modification of email messages created and sent
+ * with MailManagerInterface->mail(). Usage examples include adding and/or
+ * changing message text, message fields, and message headers.
+ *
+ * Email messages sent using functions other than MailManagerInterface->mail()
+ * will not invoke hook_mail_alter(). For example, a contributed module directly
+ * calling the MailInterface->mail() or PHP mail() function will not invoke
+ * this hook. All core modules use MailManagerInterface->mail() for messaging,
+ * it is best practice but not mandatory in contributed modules.
+ *
+ * @param $message
+ *   An array containing the message data. Keys in this array include:
+ *  - 'id':
+ *     The MailManagerInterface->mail() id of the message. Look at module source
+ *     code or MailManagerInterface->mail() for possible id values.
+ *  - 'to':
+ *     The address or addresses the message will be sent to. The
+ *     formatting of this string must comply with RFC 2822.
+ *  - 'from':
+ *     The address the message will be marked as being from, which is
+ *     either a custom address or the site-wide default email address.
+ *  - 'subject':
+ *     Subject of the email to be sent. This must not contain any newline
+ *     characters, or the email may not be sent properly.
+ *  - 'body':
+ *     An array of strings containing the message text. The message body is
+ *     created by concatenating the individual array strings into a single text
+ *     string using "\n\n" as a separator.
+ *  - 'headers':
+ *     Associative array containing mail headers, such as From, Sender,
+ *     MIME-Version, Content-Type, etc.
+ *  - 'params':
+ *     An array of optional parameters supplied by the caller of
+ *     MailManagerInterface->mail() that is used to build the message before
+ *     hook_mail_alter() is invoked.
+ *  - 'language':
+ *     The language object used to build the message before hook_mail_alter()
+ *     is invoked.
+ *  - 'send':
+ *     Set to FALSE to abort sending this email message.
+ *
+ * @see \Drupal\Core\Mail\MailManagerInterface::mail()
+ */
+function hook_mail_alter(&$message) {
+  if ($message['id'] == 'modulename_messagekey') {
+    if (!example_notifications_optin($message['to'], $message['id'])) {
+      // If the recipient has opted to not receive such messages, cancel
+      // sending.
+      $message['send'] = FALSE;
+      return;
+    }
+    $message['body'][] = "--\nMail sent out from " . \Drupal::config('system.site')->get('name');
+  }
+}
+
+/**
+ * Prepares a message based on parameters;
+ *
+ * This hook is called from MailManagerInterface->mail(). Note that hook_mail(),
+ * unlike hook_mail_alter(), is only called on the $module argument to
+ * MailManagerInterface->mail(), not all modules.
+ *
+ * @param $key
+ *   An identifier of the mail.
+ * @param $message
+ *   An array to be filled in. Elements in this array include:
+ *   - id: An ID to identify the mail sent. Look at module source code or
+ *     MailManagerInterface->mail() for possible id values.
+ *   - to: The address or addresses the message will be sent to. The
+ *     formatting of this string must comply with RFC 2822.
+ *   - subject: Subject of the email to be sent. This must not contain any
+ *     newline characters, or the mail may not be sent properly.
+ *     MailManagerInterface->mail() sets this to an empty
+ *     string when the hook is invoked.
+ *   - body: An array of lines containing the message to be sent. Drupal will
+ *     format the correct line endings for you. MailManagerInterface->mail()
+ *     sets this to an empty array when the hook is invoked.
+ *   - from: The address the message will be marked as being from, which is
+ *     set by MailManagerInterface->mail() to either a custom address or the
+ *     site-wide default email address when the hook is invoked.
+ *   - headers: Associative array containing mail headers, such as From,
+ *     Sender, MIME-Version, Content-Type, etc.
+ *     MailManagerInterface->mail() pre-fills several headers in this array.
+ * @param $params
+ *   An array of parameters supplied by the caller of
+ *   MailManagerInterface->mail().
+ *
+ * @see \Drupal\Core\Mail\MailManagerInterface->mail()
+ */
+function hook_mail($key, &$message, $params) {
+  $account = $params['account'];
+  $context = $params['context'];
+  $variables = array(
+    '%site_name' => \Drupal::config('system.site')->get('name'),
+    '%username' => user_format_name($account),
+  );
+  if ($context['hook'] == 'taxonomy') {
+    $entity = $params['entity'];
+    $vocabulary = Vocabulary::load($entity->id());
+    $variables += array(
+      '%term_name' => $entity->name,
+      '%term_description' => $entity->description,
+      '%term_id' => $entity->id(),
+      '%vocabulary_name' => $vocabulary->label(),
+      '%vocabulary_description' => $vocabulary->getDescription(),
+      '%vocabulary_id' => $vocabulary->id(),
+    );
+  }
+
+  // Node-based variable translation is only available if we have a node.
+  if (isset($params['node'])) {
+    /** @var \Drupal\node\NodeInterface $node */
+    $node = $params['node'];
+    $variables += array(
+      '%uid' => $node->getOwnerId(),
+      '%url' => $node->url('canonical', array('absolute' => TRUE)),
+      '%node_type' => node_get_type_label($node),
+      '%title' => $node->getTitle(),
+      '%teaser' => $node->teaser,
+      '%body' => $node->body,
+    );
+  }
+  $subject = strtr($context['subject'], $variables);
+  $body = strtr($context['message'], $variables);
+  $message['subject'] .= str_replace(array("\r", "\n"), '', $subject);
+  $message['body'][] = MailFormatHelper::htmlToText($body);
+}
+
+/**
+ * Alter the list of mail backend plugin definitions.
+ *
+ * @param array $info
+ *   The mail backend plugin definitions to be altered.
+ *
+ * @see \Drupal\Core\Annotation\Mail
+ * @see \Drupal\Core\Mail\MailManager
+ */
+function hook_mail_backend_info_alter(&$info) {
+  unset($info['test_mail_collector']);
+}
+
+/**
+ * Alter the default country list.
+ *
+ * @param $countries
+ *   The associative array of countries keyed by two-letter country code.
+ *
+ * @see \Drupal\Core\Locale\CountryManager::getList().
+ */
+function hook_countries_alter(&$countries) {
+  // Elbonia is now independent, so add it to the country list.
+  $countries['EB'] = 'Elbonia';
+}
 
 /**
  * Alter display variant plugin definitions.
@@ -1744,7 +1991,7 @@ function hook_display_variant_plugin_alter(array &$definitions) {
  * 'wrapper' method and return HTML markup. This is not the case if you return
  * commands, but if you would like to show status messages, you can add
  * @code
- * array('#theme' => 'status_messages')
+ * array('#type' => 'status_messages')
  * @endcode
  * to a render array, use drupal_render() to render it, and add a command to
  * place the messages in an appropriate location.
@@ -1772,4 +2019,102 @@ function hook_display_variant_plugin_alter(array &$definitions) {
 
 /**
  * @} End of "defgroup ajax".
+ */
+
+/**
+ * @defgroup service_tag Service Tags
+ * @{
+ * Service tags overview
+ *
+ * Some services have tags, which are defined in the service definition. Tags
+ * are used to define a group of related services, or to specify some aspect of
+ * how the service behaves. Typically, if you tag a service, your service class
+ * must also implement a corresponding interface. Some common examples:
+ * - access_check: Indicates a route access checking service; see the
+ *   @link menu Menu and routing system topic @endlink for more information.
+ * - cache.bin: Indicates a cache bin service; see the
+ *   @link cache Cache topic @endlink for more information.
+ * - event_subscriber: Indicates an event subscriber service. Event subscribers
+ *   can be used for dynamic routing and route altering; see the
+ *   @link menu Menu and routing system topic @endlink for more information.
+ *   They can also be used for other purposes; see
+ *   http://symfony.com/doc/current/cookbook/doctrine/event_listeners_subscribers.html
+ *   for more information.
+ * - needs_destruction: Indicates that a destruct() method needs to be called
+ *   at the end of a request to finalize operations, if this service was
+ *   instantiated.
+ *
+ * Creating a tag for a service does not do anything on its own, but tags
+ * can be discovered or queried in a compiler pass when the container is built,
+ * and a corresponding action can be taken. See
+ * \Drupal\Core\Render\MainContent\MainContentRenderersPass for an example of
+ * finding tagged services.
+ *
+ * See @link container Services and Dependency Injection Container @endlink for
+ * information on services and the dependency injection container.
+ *
+ * @}
+ */
+
+/**
+ * @defgroup events Events
+ * @{
+ * Overview of event dispatch and subscribing
+ *
+ * @section sec_intro Introduction and terminology
+ * Events are part of the Symfony framework: they allow for different components
+ * of the system to interact and communicate with each other. Each event has a
+ * unique string name. One system component dispatches the event at an
+ * appropriate time; many events are dispatched by Drupal core and the Symfony
+ * framework in every request. Other system components can register as event
+ * subscribers; when an event is dispatched, a method is called on each
+ * registered subscriber, allowing each one to react. For more on the general
+ * concept of events, see
+ * http://symfony.com/doc/current/components/event_dispatcher/introduction.html
+ *
+ * @section sec_dispatch Dispatching events
+ * To dispatch an event, call the
+ * \Symfony\Component\EventDispatcher\EventDispatchInterface::dispatch() method
+ * on the 'event_dispatcher' service (see the
+ * @link container Services topic @endlink for more information about how to
+ * interact with services). The first argument is the unique event name, which
+ * you should normally define as a constant in a separate static class (see
+ * \Symfony\Component\HttpKernel\KernelEvents and
+ * \Drupal\Core\Config\ConfigEvents for examples). The second argument is a
+ * \Symfony\Component\EventDispatcher\Event object; normally you will need to
+ * extend this class, so that your event class can provide data to the event
+ * subscribers.
+ *
+ * @section sec_subscribe Registering event subscribers
+ * Here are the steps to register an event subscriber:
+ * - Define a service in your module, tagged with 'event_subscriber' (see the
+ *   @link container Services topic @endlink for instructions).
+ * - Define a class for your subscriber service that implements
+ *   \Symfony\Component\EventDispatcher\EventSubscriberInterface
+ * - In your class, the getSubscribedEvents method returns a list of the events
+ *   this class is subscribed to, and which methods on the class should be
+ *   called for each one. Example:
+ *   @code
+ *   public function getSubscribedEvents() {
+ *     // Subscribe to kernel terminate with priority 100.
+ *     $events[KernelEvents::TERMINATE][] = array('onTerminate', 100);
+ *     // Subscribe to kernel request with default priority of 0.
+ *     $events[KernelEvents::REQUEST][] = array('onRequest');
+ *     return $events;
+ *   }
+ *   @endcode
+ * - Write the methods that respond to the events; each one receives the
+ *   event object provided in the dispatch as its one argument. In the above
+ *   example, you would need to write onTerminate() and onRequest() methods.
+ *
+ * Note that in your getSubscribedEvents() method, you can optionally set the
+ * priority of your event subscriber (see terminate example above). Event
+ * subscribers with higher priority numbers get executed first; the default
+ * priority is zero. If two event subscribers for the same event have the same
+ * priority, the one defined in a module with a lower module weight will fire
+ * first. Subscribers defined in the same services file are fired in
+ * definition order. If order matters defining a priority is strongly advised
+ * instead of relying on these two tie breaker rules as they might change in a
+ * minor release.
+ * @}
  */

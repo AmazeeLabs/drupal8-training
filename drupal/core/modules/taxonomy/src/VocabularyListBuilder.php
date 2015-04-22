@@ -43,11 +43,13 @@ class VocabularyListBuilder extends DraggableListBuilder {
     $operations['list'] = array(
       'title' => t('List terms'),
       'weight' => 0,
-    ) + $entity->urlInfo('overview-form')->toArray();
+      'url' => $entity->urlInfo('overview-form'),
+    );
     $operations['add'] = array(
       'title' => t('Add terms'),
       'weight' => 10,
-    ) + $entity->urlInfo('add-form')->toArray();
+      'url' => $entity->urlInfo('add-form'),
+    );
     unset($operations['delete']);
 
     return $operations;
@@ -80,7 +82,7 @@ class VocabularyListBuilder extends DraggableListBuilder {
       unset($this->weightKey);
     }
     $build = parent::render();
-    $build['#empty'] = t('No vocabularies available. <a href="@link">Add vocabulary</a>.', array('@link' => url('admin/structure/taxonomy/add')));
+    $build['table']['#empty'] = t('No vocabularies available. <a href="@link">Add vocabulary</a>.', array('@link' => \Drupal::url('entity.taxonomy_vocabulary.add_form')));
     return $build;
   }
 

@@ -7,7 +7,8 @@
 
 namespace Drupal\Core\Entity\Entity;
 
-use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityDisplayPluginCollection;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityDisplayBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -50,7 +51,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
    * party code to alter the display options held in the display before they are
    * used to generate render arrays.
    *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The entity for which the form is being built.
    * @param string $form_mode
    *   The form mode.
@@ -61,7 +62,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
    * @see entity_get_form_display()
    * @see hook_entity_form_display_alter()
    */
-  public static function collectRenderDisplay(ContentEntityInterface $entity, $form_mode) {
+  public static function collectRenderDisplay(FieldableEntityInterface $entity, $form_mode) {
     $entity_type = $entity->getEntityTypeId();
     $bundle = $entity->bundle();
 
@@ -148,13 +149,14 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
   /**
    * {@inheritdoc}
    */
-  public function buildForm(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state) {
+  public function buildForm(FieldableEntityInterface $entity, array &$form, FormStateInterface $form_state) {
     // Set #parents to 'top-level' by default.
     $form += array('#parents' => array());
 
     // Let each widget generate the form elements.
-    foreach ($entity as $name => $items) {
+    foreach ($this->getComponents() as $name => $options) {
       if ($widget = $this->getRenderer($name)) {
+        $items = $entity->get($name);
         $items->filterEmptyItems();
         $form[$name] = $widget->form($items, $form, $form_state);
         $form[$name]['#access'] = $items->access('edit');
@@ -162,7 +164,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
         // Assign the correct weight. This duplicates the reordering done in
         // processForm(), but is needed for other forms calling this method
         // directly.
-        $form[$name]['#weight'] = $this->getComponent($name)['weight'];
+        $form[$name]['#weight'] = $options['weight'];
       }
     }
 
@@ -197,7 +199,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
   /**
    * {@inheritdoc}
    */
-  public function extractFormValues(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state) {
+  public function extractFormValues(FieldableEntityInterface $entity, array &$form, FormStateInterface $form_state) {
     $extracted = array();
     foreach ($entity as $name => $items) {
       if ($widget = $this->getRenderer($name)) {
@@ -211,7 +213,7 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
   /**
    * {@inheritdoc}
    */
-  public function validateFormValues(ContentEntityInterface $entity, array &$form, FormStateInterface $form_state) {
+  public function validateFormValues(FieldableEntityInterface $entity, array &$form, FormStateInterface $form_state) {
     foreach ($entity as $field_name => $items) {
       // Only validate the fields that actually appear in the form, and let the
       // widget assign the violations to the right form elements.
@@ -227,20 +229,20 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
   /**
    * {@inheritdoc}
    */
-  public function __sleep() {
-    // Only store the definition, not external objects or derived data.
-    $keys = array_keys($this->toArray());
-    $keys[] = 'entityTypeId';
-    return $keys;
-  }
+  public function getPluginCollections() {
+    $configurations = array();
+    foreach ($this->getComponents() as $field_name => $configuration) {
+      if (!empty($configuration['type']) && ($field_definition = $this->getFieldDefinition($field_name))) {
+        $configurations[$configuration['type']] = $configuration + array(
+          'field_definition' => $field_definition,
+          'form_mode' => $this->mode,
+        );
+      }
+    }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function __wakeup() {
-    // Run the values from self::toArray() through __construct().
-    $values = array_intersect_key($this->toArray(), get_object_vars($this));
-    $this->__construct($values, $this->entityTypeId);
+    return array(
+      'widgets' => new EntityDisplayPluginCollection($this->pluginManager, $configurations)
+    );
   }
 
 }

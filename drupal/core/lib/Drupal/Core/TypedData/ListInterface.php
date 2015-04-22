@@ -20,7 +20,7 @@ namespace Drupal\Core\TypedData;
  *
  * @ingroup typed_data
  */
-interface ListInterface extends TypedDataInterface, \ArrayAccess, \Countable, \Traversable {
+interface ListInterface extends TraversableTypedDataInterface, \ArrayAccess, \Countable {
 
   /**
    * Determines whether the list contains any non-empty items.
@@ -39,46 +39,86 @@ interface ListInterface extends TypedDataInterface, \ArrayAccess, \Countable, \T
   public function getItemDefinition();
 
   /**
-   * React to changes to a child item.
-   *
-   * Note that this is invoked after any changes have been applied.
-   *
-   * @param $delta
-   *   The delta of the item which is changed.
-   */
-  public function onChange($delta);
-
-  /**
    * Returns the item at the specified position in this list.
    *
    * @param int $index
    *   Index of the item to return.
    *
-   * @return \Drupal\Core\TypedData\TypedDataInterface
-   *   The item at the specified position in this list. An empty item is created
-   *   if it does not exist yet.
+   * @return \Drupal\Core\TypedData\TypedDataInterface|null
+   *   The item at the specified position in this list, or NULL if no item
+   *   exists at that position.
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   *   If the complex data structure is unset and no item can be created.
    */
   public function get($index);
 
   /**
-   * Replaces the item at the specified position in this list.
+   * Sets the value of the item at a given position in the list.
    *
    * @param int $index
-   *   Index of the item to replace.
-   * @param mixed
-   *   Item to be stored at the specified position.
+   *   The position of the item in the list. Since a List only contains
+   *   sequential, 0-based indexes, $index has to be:
+   * - Either the position of an existing item in the list. This updates the
+   *   item value.
+   * - Or the next available position in the sequence of the current list
+   *   indexes. This appends a new item with the provided value at the end of
+   *   the list.
+   * @param mixed $value
+   *   The value of the item to be stored at the specified position.
    *
-   * @return static
-   *   Returns the list.
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   *   If the $index is invalid (non-numeric, or pointing to an invalid
+   *   position in the list).
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   *   If the complex data structure is unset and no item can be set.
    */
-  public function set($index, $item);
+  public function set($index, $value);
 
   /**
    * Returns the first item in this list.
    *
    * @return \Drupal\Core\TypedData\TypedDataInterface
    *   The first item in this list.
+   *
+   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+   *   If the complex data structure is unset and no item can be created.
    */
   public function first();
+
+  /**
+   * Appends a new item to the list.
+   *
+   * @param mixed $value
+   *   The value of the new item.
+   *
+   * @return \Drupal\Core\TypedData\TypedDataInterface
+   *   The item that was appended.
+   */
+  public function appendItem($value = NULL);
+
+  /**
+   * Removes the item at the specified position.
+   *
+   * @param int $index
+   *   Index of the item to remove.
+   *
+   * @return $this
+   */
+  public function removeItem($index);
+
+  /**
+   * Filters the items in the list using a custom callback.
+   *
+   * @param callable $callback
+   *   The callback to use for filtering. Like with array_filter(), the
+   *   callback is called for each item in the list. Only items for which the
+   *   callback returns TRUE are preserved.
+   *
+   * @return $this
+   */
+  public function filter($callback);
 
 }

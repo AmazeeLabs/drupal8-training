@@ -39,7 +39,7 @@ class MenuListBuilder extends ConfigEntityListBuilder {
       'data' => $this->getLabel($entity),
       'class' => array('menu-label'),
     );
-    $row['description'] = Xss::filterAdmin($entity->description);
+    $row['description'] = Xss::filterAdmin($entity->getDescription());
     return $row + parent::buildRow($entity);
   }
 
@@ -54,7 +54,8 @@ class MenuListBuilder extends ConfigEntityListBuilder {
       $operations['add'] = array(
         'title' => t('Add link'),
         'weight' => 20,
-      ) + $entity->urlInfo('add-link-form')->toArray();
+        'url' => $entity->urlInfo('add-link-form'),
+      );
     }
     if (isset($operations['delete'])) {
       $operations['delete']['title'] = t('Delete menu');
@@ -67,7 +68,7 @@ class MenuListBuilder extends ConfigEntityListBuilder {
    */
   public function render() {
     $build = parent::render();
-    $build['#attached']['css'][] = drupal_get_path('module', 'menu') . '/css/menu.admin.css';
+    $build['#attached']['library'][] = "menu_ui/drupal.menu_ui.adminforms";
     return $build;
   }
 

@@ -5,94 +5,31 @@
  * API for handling file uploads and server file management.
  */
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Component\PhpStorage\FileStorage;
 use Drupal\Component\Utility\Bytes;
 use Drupal\Component\Utility\String;
-use Drupal\Core\Site\Settings;
+use Drupal\Core\File\FileSystem;
 use Drupal\Core\StreamWrapper\PublicStream;
-
-/**
- * Stream wrapper bit flags that are the basis for composite types.
- *
- * Note that 0x0002 is skipped, because it was the value of a constant that has
- * since been removed.
- */
-
-/**
- * Stream wrapper bit flag -- a filter that matches all wrappers.
- */
-const STREAM_WRAPPERS_ALL = 0x0000;
-
-/**
- * Stream wrapper bit flag -- refers to a local file system location.
- */
-const STREAM_WRAPPERS_LOCAL = 0x0001;
-
-/**
- * Stream wrapper bit flag -- wrapper is readable (almost always true).
- */
-const STREAM_WRAPPERS_READ = 0x0004;
-
-/**
- * Stream wrapper bit flag -- wrapper is writeable.
- */
-const STREAM_WRAPPERS_WRITE = 0x0008;
-
-/**
- * Stream wrapper bit flag -- exposed in the UI and potentially web accessible.
- */
-const STREAM_WRAPPERS_VISIBLE = 0x0010;
-
+use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+use Drupal\Core\StreamWrapper\PrivateStream;
 
 /**
  * Default mode for new directories. See drupal_chmod().
+ *
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::CHMOD_DIRECTORY.
  */
-const FILE_CHMOD_DIRECTORY = 0775;
+const FILE_CHMOD_DIRECTORY = FileSystem::CHMOD_DIRECTORY;
 
 /**
  * Default mode for new files. See drupal_chmod().
+ *
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::CHMOD_FILE.
  */
-const FILE_CHMOD_FILE = 0664;
-
-/**
- * Composite stream wrapper bit flags that are usually used as the types.
- */
-
-/**
- * Stream wrapper type flag -- not visible in the UI or accessible via web,
- * but readable and writable. E.g. the temporary directory for uploads.
- */
-define('STREAM_WRAPPERS_HIDDEN', STREAM_WRAPPERS_READ | STREAM_WRAPPERS_WRITE);
-
-/**
- * Stream wrapper type flag -- hidden, readable and writeable using local files.
- */
-define('STREAM_WRAPPERS_LOCAL_HIDDEN', STREAM_WRAPPERS_LOCAL | STREAM_WRAPPERS_HIDDEN);
-
-/**
- * Stream wrapper type flag -- visible, readable and writeable.
- */
-define('STREAM_WRAPPERS_WRITE_VISIBLE', STREAM_WRAPPERS_READ | STREAM_WRAPPERS_WRITE | STREAM_WRAPPERS_VISIBLE);
-
-/**
- * Stream wrapper type flag -- visible and read-only.
- */
-define('STREAM_WRAPPERS_READ_VISIBLE', STREAM_WRAPPERS_READ | STREAM_WRAPPERS_VISIBLE);
-
-/**
- * Stream wrapper type flag -- the default when 'type' is omitted from
- * hook_stream_wrappers(). This does not include STREAM_WRAPPERS_LOCAL,
- * because PHP grants a greater trust level to local files (for example, they
- * can be used in an "include" statement, regardless of the "allow_url_include"
- * setting), so stream wrappers need to explicitly opt-in to this.
- */
-define('STREAM_WRAPPERS_NORMAL', STREAM_WRAPPERS_WRITE_VISIBLE);
-
-/**
- * Stream wrapper type flag -- visible, readable and writeable using local files.
- */
-define('STREAM_WRAPPERS_LOCAL_NORMAL', STREAM_WRAPPERS_LOCAL | STREAM_WRAPPERS_NORMAL);
+const FILE_CHMOD_FILE = FileSystem::CHMOD_FILE;
 
 /**
  * @defgroup file File interface
@@ -155,161 +92,64 @@ const FILE_STATUS_PERMANENT = 1;
 /**
  * Provides Drupal stream wrapper registry.
  *
- * A stream wrapper is an abstraction of a file system that allows Drupal to
- * use the same set of methods to access both local files and remote resources.
- *
- * Provide a facility for managing and querying user-defined stream wrappers
- * in PHP. PHP's internal stream_get_wrappers() doesn't return the class
- * registered to handle a stream, which we need to be able to find the handler
- * for class instantiation.
- *
- * If a module registers a scheme that is already registered with PHP, the
- * existing scheme will be unregistered and replaced with the specified class.
- *
- * A stream is referenced as "scheme://target".
- *
- * The optional $filter parameter can be used to retrieve only the stream
- * wrappers that are appropriate for particular usage. For example, this returns
- * only stream wrappers that use local file storage:
- * @code
- *   $local_stream_wrappers = file_get_stream_wrappers(STREAM_WRAPPERS_LOCAL);
- * @endcode
- *
- * The $filter parameter can only filter to types containing a particular flag.
- * In some cases, you may want to filter to types that do not contain a
- * particular flag. For example, you may want to retrieve all stream wrappers
- * that are not writable, or all stream wrappers that are not local. PHP's
- * array_diff_key() function can be used to help with this. For example, this
- * returns only stream wrappers that do not use local file storage:
- * @code
- *   $remote_stream_wrappers = array_diff_key(file_get_stream_wrappers(STREAM_WRAPPERS_ALL), file_get_stream_wrappers(STREAM_WRAPPERS_LOCAL));
- * @endcode
- *
- * @param $filter
+ * @param int $filter
  *   (Optional) Filters out all types except those with an on bit for each on
- *   bit in $filter. For example, if $filter is STREAM_WRAPPERS_WRITE_VISIBLE,
- *   which is equal to (STREAM_WRAPPERS_READ | STREAM_WRAPPERS_WRITE |
- *   STREAM_WRAPPERS_VISIBLE), then only stream wrappers with all three of these
- *   bits set are returned. Defaults to STREAM_WRAPPERS_ALL, which returns all
- *   registered stream wrappers.
+ *   bit in $filter. For example, if $filter is
+ *   StreamWrapperInterface::WRITE_VISIBLE, which is equal to
+ *   (StreamWrapperInterface::READ | StreamWrapperInterface::WRITE |
+ *   StreamWrapperInterface::VISIBLE), then only stream wrappers with all three
+ *   of these bits set are returned. Defaults to StreamWrapperInterface::ALL,
+ *   which returns all registered stream wrappers.
  *
- * @return
+ * @return array
  *   An array keyed by scheme, with values containing an array of information
  *   about the stream wrapper, as returned by hook_stream_wrappers(). If $filter
- *   is omitted or set to STREAM_WRAPPERS_ALL, the entire Drupal stream wrapper
- *   registry is returned. Otherwise only the stream wrappers whose 'type'
- *   bitmask has an on bit for each bit specified in $filter are returned.
+ *   is omitted or set to StreamWrapperInterface::ALL, the entire Drupal stream
+ *   wrapper registry is returned. Otherwise only the stream wrappers whose
+ *   'type' bitmask has an on bit for each bit specified in $filter are
+ *   returned.
  *
- * @see hook_stream_wrappers()
- * @see hook_stream_wrappers_alter()
+ * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
+ *   Use \Drupal::service('stream_wrapper_manager')->getWrappers().
  */
-function file_get_stream_wrappers($filter = STREAM_WRAPPERS_ALL) {
-  $wrappers_storage = &drupal_static(__FUNCTION__, array());
-
-  if (empty($wrappers_storage)) {
-    // Initialize $wrappers_storage, so that we are not calling this method
-    // repeatedly if no stream wrappers exist.
-    $wrappers_storage[STREAM_WRAPPERS_ALL] = array();
-    $wrappers = array();
-    if (\Drupal::hasService('module_handler')) {
-      $wrappers = \Drupal::moduleHandler()->invokeAll('stream_wrappers');
-      foreach ($wrappers as $scheme => $info) {
-        // Add defaults.
-        $wrappers[$scheme] += array('type' => STREAM_WRAPPERS_NORMAL);
-      }
-      \Drupal::moduleHandler()->alter('stream_wrappers', $wrappers);
-    }
-    $existing = stream_get_wrappers();
-    foreach ($wrappers as $scheme => $info) {
-      // We only register classes that implement our interface.
-      if (in_array('Drupal\Core\StreamWrapper\StreamWrapperInterface', class_implements($info['class']), TRUE)) {
-        // Record whether we are overriding an existing scheme.
-        if (in_array($scheme, $existing, TRUE)) {
-          $wrappers[$scheme]['override'] = TRUE;
-          stream_wrapper_unregister($scheme);
-        }
-        else {
-          $wrappers[$scheme]['override'] = FALSE;
-        }
-        if (($info['type'] & STREAM_WRAPPERS_LOCAL) == STREAM_WRAPPERS_LOCAL) {
-          stream_wrapper_register($scheme, $info['class']);
-        }
-        else {
-          stream_wrapper_register($scheme, $info['class'], STREAM_IS_URL);
-        }
-      }
-      // Pre-populate the static cache with the filters most typically used.
-      $wrappers_storage[STREAM_WRAPPERS_ALL][$scheme] = $wrappers[$scheme];
-      if (($info['type'] & STREAM_WRAPPERS_WRITE_VISIBLE) == STREAM_WRAPPERS_WRITE_VISIBLE) {
-        $wrappers_storage[STREAM_WRAPPERS_WRITE_VISIBLE][$scheme] = $wrappers[$scheme];
-      }
-    }
-  }
-
-  if (!isset($wrappers_storage[$filter])) {
-    $wrappers_storage[$filter] = array();
-    foreach ($wrappers_storage[STREAM_WRAPPERS_ALL] as $scheme => $info) {
-      // Bit-wise filter.
-      if (($info['type'] & $filter) == $filter) {
-        $wrappers_storage[$filter][$scheme] = $info;
-      }
-    }
-  }
-
-  return $wrappers_storage[$filter];
+function file_get_stream_wrappers($filter = StreamWrapperInterface::ALL) {
+  return \Drupal::service('stream_wrapper_manager')->getWrappers($filter);
 }
 
 /**
  * Returns the stream wrapper class name for a given scheme.
  *
- * @param $scheme
+ * @param string $scheme
  *   Stream scheme.
  *
- * @return
+ * @return string|bool
  *   Return string if a scheme has a registered handler, or FALSE.
+ *
+ * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
+ *   Use \Drupal::service('stream_wrapper_manager')->getClass().
  */
 function file_stream_wrapper_get_class($scheme) {
-  $wrappers = file_get_stream_wrappers();
-  return empty($wrappers[$scheme]) ? FALSE : $wrappers[$scheme]['class'];
+  return \Drupal::service('stream_wrapper_manager')->getClass($scheme);
 }
 
 /**
  * Returns the scheme of a URI (e.g. a stream).
  *
- * @param string $uri
- *   A stream, referenced as "scheme://target"  or "data:target".
- *
- * @return string
- *   A string containing the name of the scheme, or FALSE if none. For example,
- *   the URI "public://example.txt" would return "public".
- *
- * @see file_uri_target()
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::uriScheme().
  */
 function file_uri_scheme($uri) {
-  if (preg_match('/^([\w\-]+):\/\/|^(data):/', $uri, $matches)) {
-    // The scheme will always be the last element in the matches array.
-    return array_pop($matches);
-  }
-
-  return FALSE;
+  return \Drupal::service('file_system')->uriScheme($uri);
 }
 
 /**
  * Checks that the scheme of a stream URI is valid.
  *
- * Confirms that there is a registered stream handler for the provided scheme
- * and that it is callable. This is useful if you want to confirm a valid
- * scheme without creating a new instance of the registered handler.
- *
- * @param $scheme
- *   A URI scheme, a stream is referenced as "scheme://target".
- *
- * @return
- *   Returns TRUE if the string is the name of a validated stream,
- *   or FALSE if the scheme does not have a registered handler.
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::validScheme().
  */
 function file_stream_wrapper_valid_scheme($scheme) {
-  return $scheme && class_exists(file_stream_wrapper_get_class($scheme));
+  return \Drupal::service('file_system')->validScheme($scheme);
 }
 
 
@@ -338,7 +178,7 @@ function file_uri_target($uri) {
 /**
  * Gets the default file stream implementation.
  *
- * @return
+ * @return string
  *   'public', 'private' or any other file scheme defined as the default.
  */
 function file_default_scheme() {
@@ -354,10 +194,10 @@ function file_default_scheme() {
  * - Remove trailing slashes from target
  * - Trim erroneous leading slashes from target. e.g. ":///" becomes "://".
  *
- * @param $uri
+ * @param string $uri
  *   String reference containing the URI to normalize.
  *
- * @return
+ * @return string
  *   The normalized URI.
  */
 function file_stream_wrapper_uri_normalize($uri) {
@@ -380,25 +220,20 @@ function file_stream_wrapper_uri_normalize($uri) {
  * The scheme determines the stream wrapper class that should be
  * used by consulting the stream wrapper registry.
  *
- * @param $uri
+ * @param string $uri
  *   A stream, referenced as "scheme://target".
  *
- * @return
+ * @return \Drupal\Core\StreamWrapper\StreamWrapperInterface|bool
  *   Returns a new stream wrapper object appropriate for the given URI or FALSE
  *   if no registered handler could be found. For example, a URI of
  *   "private://example.txt" would return a new private stream wrapper object
  *   (Drupal\Core\StreamWrapper\PrivateStream).
+ *
+ * * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
+ *   Use \Drupal::service('stream_wrapper_manager')->getViaUri().
  */
 function file_stream_wrapper_get_instance_by_uri($uri) {
-  if ($scheme = file_uri_scheme($uri)) {
-    $class = file_stream_wrapper_get_class($scheme);
-    if (class_exists($class)) {
-      $instance = new $class();
-      $instance->setUri($uri);
-      return $instance;
-    }
-  }
-  return FALSE;
+  return \Drupal::service('stream_wrapper_manager')->getViaUri($uri);
 }
 
 /**
@@ -412,25 +247,20 @@ function file_stream_wrapper_get_instance_by_uri($uri) {
  * Note: the instance URI will be initialized to "scheme://" so that you can
  * make the customary method calls as if you had retrieved an instance by URI.
  *
- * @param $scheme
+ * @param string $scheme
  *   If the stream was "public://target", "public" would be the scheme.
  *
- * @return \Drupal\Core\StreamWrapper\StreamWrapperInterface
+ * @return \Drupal\Core\StreamWrapper\StreamWrapperInterface|bool
  *   Returns a new stream wrapper object appropriate for the given $scheme.
  *   For example, for the public scheme a stream wrapper object
  *   (Drupal\Core\StreamWrapper\PublicStream).
  *   FALSE is returned if no registered handler could be found.
+ *
+ * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
+ *   Use \Drupal::service('stream_wrapper_manager')->getViaScheme().
  */
 function file_stream_wrapper_get_instance_by_scheme($scheme) {
-  $class = file_stream_wrapper_get_class($scheme);
-  if (class_exists($class)) {
-    $instance = new $class();
-    $instance->setUri($scheme . '://');
-    return $instance;
-  }
-  else {
-    return FALSE;
-  }
+  return \Drupal::service('stream_wrapper_manager')->getViaScheme($scheme);
 }
 
 /**
@@ -473,13 +303,25 @@ function file_create_url($uri) {
     //   HTTP and to https://example.com/bar.jpg when viewing a HTTPS page)
     // Both types of relative URIs are characterized by a leading slash, hence
     // we can use a single check.
-    if (drupal_substr($uri, 0, 1) == '/') {
+    if (Unicode::substr($uri, 0, 1) == '/') {
       return $uri;
     }
     else {
       // If this is not a properly formatted stream, then it is a shipped file.
       // Therefore, return the urlencoded URI with the base URL prepended.
-      return $GLOBALS['base_url'] . '/' . UrlHelper::encodePath($uri);
+      $options = UrlHelper::parse($uri);
+      $path = $GLOBALS['base_url'] . '/' . UrlHelper::encodePath($options['path']);
+      // Append the query.
+      if ($options['query']) {
+        $path .= '?' . UrlHelper::buildQuery($options['query']);
+      }
+
+      // Append fragment.
+      if ($options['fragment']) {
+        $path .= '#' . $options['fragment'];
+      }
+
+      return $path;
     }
   }
   elseif ($scheme == 'http' || $scheme == 'https' || $scheme == 'data') {
@@ -580,7 +422,7 @@ function file_prepare_directory(&$directory, $options = FILE_MODIFY_PERMISSIONS)
  */
 function file_ensure_htaccess() {
   file_save_htaccess('public://', FALSE);
-  $private_path = \Drupal::config('system.file')->get('path.private');
+  $private_path = PrivateStream::basePath();
   if (!empty($private_path)) {
     file_save_htaccess('private://', TRUE);
   }
@@ -614,7 +456,7 @@ function file_save_htaccess($directory, $private = TRUE, $force_overwrite = FALS
     // Short circuit if the .htaccess file already exists.
     return TRUE;
   }
-  $htaccess_lines = file_htaccess_lines($private);
+  $htaccess_lines = FileStorage::htaccessLines($private);
 
   // Write the .htaccess file.
   if (file_exists($directory) && is_writable($directory) && file_put_contents($htaccess_path, $htaccess_lines)) {
@@ -638,7 +480,8 @@ function file_save_htaccess($directory, $private = TRUE, $force_overwrite = FALS
  * @return string
  *   The desired contents of the .htaccess file.
  *
- * @see file_create_htaccess()
+ * @deprecated in Drupal 8.0.x-dev and will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Component\PhpStorage\FileStorage::htaccessLines().
  */
 function file_htaccess_lines($private = TRUE) {
   return FileStorage::htaccessLines($private);
@@ -762,7 +605,7 @@ function file_unmanaged_copy($source, $destination = NULL, $replace = FILE_EXIST
     // If the copy failed and realpaths exist, retry the operation using them
     // instead.
     if ($real_source === FALSE || $real_destination === FALSE || !@copy($real_source, $real_destination)) {
-      $logger->error('file', 'The specified file %file could not be copied to %destination.', array('%file' => $source, '%destination' => $destination));
+      $logger->error('The specified file %file could not be copied to %destination.', array('%file' => $source, '%destination' => $destination));
       return FALSE;
     }
   }
@@ -1032,13 +875,13 @@ function file_delete_multiple(array $fids) {
  * @see file_unmanaged_delete_recursive()
  */
 function file_unmanaged_delete($path) {
+  if (is_file($path)) {
+    return drupal_unlink($path);
+  }
   $logger = \Drupal::logger('file');
   if (is_dir($path)) {
     $logger->error('%path is a directory and cannot be removed using file_unmanaged_delete().', array('%path' => $path));
     return FALSE;
-  }
-  if (is_file($path)) {
-    return drupal_unlink($path);
   }
   // Return TRUE for non-existent file, but log that nothing was actually
   // deleted, as the current state is the intended result.
@@ -1102,38 +945,11 @@ function file_unmanaged_delete_recursive($path, $callback = NULL) {
 /**
  * Moves an uploaded file to a new location.
  *
- * PHP's move_uploaded_file() does not properly support streams if open_basedir
- * is enabled, so this function fills that gap.
- *
- * Compatibility: normal paths and stream wrappers.
- *
- * @param $filename
- *   The filename of the uploaded file.
- * @param $uri
- *   A string containing the destination URI of the file.
- *
- * @return
- *   TRUE on success, or FALSE on failure.
- *
- * @see move_uploaded_file()
- * @see http://drupal.org/node/515192
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::moveUploadedFile().
  */
 function drupal_move_uploaded_file($filename, $uri) {
-  $result = @move_uploaded_file($filename, $uri);
-  // PHP's move_uploaded_file() does not properly support streams if
-  // open_basedir is enabled so if the move failed, try finding a real path and
-  // retry the move operation.
-  if (!$result) {
-    if ($realpath = drupal_realpath($uri)) {
-      $result = move_uploaded_file($filename, $realpath);
-    }
-    else {
-      $result = move_uploaded_file($filename, $uri);
-    }
-  }
-
-  return $result;
+  return \Drupal::service('file_system')->moveUploadedFile($filename, $uri);
 }
 
 /**
@@ -1296,366 +1112,84 @@ function file_upload_max_size() {
 }
 
 /**
- * Determines an Internet Media Type or MIME type from a filename.
- *
- * @param $uri
- *   A string containing the URI, path, or filename.
- * @param $mapping
- *   An optional map of extensions to their mimetypes, in the form:
- *    - 'mimetypes': a list of mimetypes, keyed by an identifier,
- *    - 'extensions': the mapping itself, an associative array in which the key
- *      is the extension (lowercase) and the value is the mimetype identifier.
- *
- * @return
- *   The internet media type registered for the extension or
- *   application/octet-stream for unknown extensions.
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0. Calls are
- *   passed on to a new file.mime_type.guesser service, and the $mapping
- *   parameter is ignored. Use
- *   \Drupal::service('file.mime_type.guesser')->guess($uri).
- *
- * @see \Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser::guess()
- */
-function file_get_mimetype($uri, $mapping = NULL) {
-  return \Drupal::service('file.mime_type.guesser')->guess($uri);
-}
-
-/**
  * Sets the permissions on a file or directory.
  *
- * This function will use the file_chmod_directory and
- * file_chmod_file settings for the default modes for directories
- * and uploaded/generated files. By default these will give everyone read access
- * so that users accessing the files with a user account without the webserver
- * group (e.g. via FTP) can read these files, and give group write permissions
- * so webserver group members (e.g. a vhost account) can alter files uploaded
- * and owned by the webserver.
- *
- * PHP's chmod does not support stream wrappers so we use our wrapper
- * implementation which interfaces with chmod() by default. Contrib wrappers
- * may override this behavior in their implementations as needed.
- *
- * @param $uri
- *   A string containing a URI file, or directory path.
- * @param $mode
- *   Integer value for the permissions. Consult PHP chmod() documentation for
- *   more information.
- *
- * @return bool
- *   TRUE for success, FALSE in the event of an error.
- *
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::chmod().
  */
 function drupal_chmod($uri, $mode = NULL) {
-  if (!isset($mode)) {
-    if (is_dir($uri)) {
-      $mode = Settings::get('file_chmod_directory', FILE_CHMOD_DIRECTORY);
-    }
-    else {
-      $mode = Settings::get('file_chmod_file', FILE_CHMOD_FILE);
-    }
-  }
-
-  if (@chmod($uri, $mode)) {
-    return TRUE;
-  }
-
-  \Drupal::logger('file')->error('The file permissions could not be set on %uri.', array('%uri' => $uri));
-  return FALSE;
+  return \Drupal::service('file_system')->chmod($uri, $mode);
 }
 
 /**
  * Deletes a file.
  *
- * PHP's unlink() is broken on Windows, as it can fail to remove a file
- * when it has a read-only flag set.
- *
- * @param $uri
- *   A URI or pathname.
- * @param $context
- *   Refer to http://php.net/manual/ref.stream.php
- *
- * @return
- *   Boolean TRUE on success, or FALSE on failure.
- *
- * @see unlink()
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::unlink().
  */
 function drupal_unlink($uri, $context = NULL) {
-  $scheme = file_uri_scheme($uri);
-  if (!file_stream_wrapper_valid_scheme($scheme) && (substr(PHP_OS, 0, 3) == 'WIN')) {
-    chmod($uri, 0600);
-  }
-  if ($context) {
-    return unlink($uri, $context);
-  }
-  else {
-    return unlink($uri);
-  }
+  return \Drupal::service('file_system')->unlink($uri, $context);
 }
 
 /**
  * Resolves the absolute filepath of a local URI or filepath.
  *
- * The use of drupal_realpath() is discouraged, because it does not work for
- * remote URIs. Except in rare cases, URIs should not be manually resolved.
- *
- * Only use this function if you know that the stream wrapper in the URI uses
- * the local file system, and you need to pass an absolute path to a function
- * that is incompatible with stream URIs.
- *
- * @param string $uri
- *   A stream wrapper URI or a filepath, possibly including one or more symbolic
- *   links.
- *
- * @return string|false
- *   The absolute local filepath (with no symbolic links), or FALSE on failure.
- *
- * @see \Drupal\Core\StreamWrapper\StreamWrapperInterface::realpath()
- * @see http://php.net/manual/function.realpath.php
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::realpath().
  */
 function drupal_realpath($uri) {
-  // If this URI is a stream, pass it off to the appropriate stream wrapper.
-  // Otherwise, attempt PHP's realpath. This allows use of drupal_realpath even
-  // for unmanaged files outside of the stream wrapper interface.
-  if ($wrapper = file_stream_wrapper_get_instance_by_uri($uri)) {
-    return $wrapper->realpath();
-  }
-
-  return realpath($uri);
+  return \Drupal::service('file_system')->realpath($uri);
 }
 
 /**
  * Gets the name of the directory from a given path.
  *
- * PHP's dirname() does not properly pass streams, so this function fills
- * that gap. It is backwards compatible with normal paths and will use
- * PHP's dirname() as a fallback.
- *
- * Compatibility: normal paths and stream wrappers.
- *
- * @param $uri
- *   A URI or path.
- *
- * @return
- *   A string containing the directory name.
- *
- * @see dirname()
- * @see http://drupal.org/node/515192
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::dirname().
  */
 function drupal_dirname($uri) {
-  $scheme = file_uri_scheme($uri);
-
-  if (file_stream_wrapper_valid_scheme($scheme)) {
-    return file_stream_wrapper_get_instance_by_scheme($scheme)->dirname($uri);
-  }
-  else {
-    return dirname($uri);
-  }
+  return \Drupal::service('file_system')->dirname($uri);
 }
 
 /**
  * Gets the filename from a given path.
  *
- * PHP's basename() does not properly support streams or filenames beginning
- * with a non-US-ASCII character.
- *
- * @see http://bugs.php.net/bug.php?id=37738
- * @see basename()
- *
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::basename().
  */
 function drupal_basename($uri, $suffix = NULL) {
-  $separators = '/';
-  if (DIRECTORY_SEPARATOR != '/') {
-    // For Windows OS add special separator.
-    $separators .= DIRECTORY_SEPARATOR;
-  }
-  // Remove right-most slashes when $uri points to directory.
-  $uri = rtrim($uri, $separators);
-  // Returns the trailing part of the $uri starting after one of the directory
-  // separators.
-  $filename = preg_match('@[^' . preg_quote($separators, '@') . ']+$@', $uri, $matches) ? $matches[0] : '';
-  // Cuts off a suffix from the filename.
-  if ($suffix) {
-    $filename = preg_replace('@' . preg_quote($suffix, '@') . '$@', '', $filename);
-  }
-  return $filename;
+  return \Drupal::service('file_system')->basename($uri, $suffix);
 }
 
 /**
  * Creates a directory, optionally creating missing components in the path to
  * the directory.
  *
- * When PHP's mkdir() creates a directory, the requested mode is affected by the
- * process's umask. This function overrides the umask and sets the mode
- * explicitly for all directory components created.
- *
- * @param $uri
- *   A URI or pathname.
- * @param $mode
- *   Mode given to created directories. Defaults to the directory mode
- *   configured in the Drupal installation. It must have a leading zero.
- * @param $recursive
- *   Create directories recursively, defaults to FALSE. Cannot work with a mode
- *   which denies writing or execution to the owner of the process.
- * @param $context
- *   Refer to http://php.net/manual/ref.stream.php
- *
- * @return
- *   Boolean TRUE on success, or FALSE on failure.
- *
- * @see mkdir()
- * @see http://drupal.org/node/515192
- * @ingroup php_wrappers
- *
- * @todo Update with open_basedir compatible recursion logic from
- *   \Drupal\Component\PhpStorage\FileStorage::ensureDirectory().
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::mkdir().
  */
 function drupal_mkdir($uri, $mode = NULL, $recursive = FALSE, $context = NULL) {
-  if (!isset($mode)) {
-    $mode = Settings::get('file_chmod_directory', FILE_CHMOD_DIRECTORY);
-  }
-
-  // If the URI has a scheme, don't override the umask - schemes can handle this
-  // issue in their own implementation.
-  if (file_uri_scheme($uri)) {
-    return _drupal_mkdir_call($uri, $mode, $recursive, $context);
-  }
-
-  // If recursive, create each missing component of the parent directory
-  // individually and set the mode explicitly to override the umask.
-  if ($recursive) {
-    // Ensure the path is using DIRECTORY_SEPARATOR.
-    $uri = str_replace('/', DIRECTORY_SEPARATOR, $uri);
-    // Determine the components of the path.
-    $components = explode(DIRECTORY_SEPARATOR, $uri);
-    // If the filepath is absolute the first component will be empty as there
-    // will be nothing before the first slash.
-    if ($components[0] == '') {
-      $recursive_path = DIRECTORY_SEPARATOR;
-      // Get rid of the empty first component.
-      array_shift($components);
-    }
-    else {
-      $recursive_path = '';
-    }
-    // Don't handle the top-level directory in this loop.
-    array_pop($components);
-    // Create each component if necessary.
-    foreach ($components as $component) {
-      $recursive_path .= $component;
-
-      if (!file_exists($recursive_path)) {
-        if (!_drupal_mkdir_call($recursive_path, $mode, FALSE, $context)) {
-          return FALSE;
-        }
-        // Not necessary to use drupal_chmod() as there is no scheme.
-        if (!chmod($recursive_path, $mode)) {
-          return FALSE;
-        }
-      }
-
-      $recursive_path .= DIRECTORY_SEPARATOR;
-    }
-  }
-
-  // Do not check if the top-level directory already exists, as this condition
-  // must cause this function to fail.
-  if (!_drupal_mkdir_call($uri, $mode, FALSE, $context)) {
-    return FALSE;
-  }
-  // Not necessary to use drupal_chmod() as there is no scheme.
-  return chmod($uri, $mode);
-}
-
-/**
- * Helper function. Ensures we don't pass a NULL as a context resource to
- * mkdir().
- *
- * @see drupal_mkdir()
- */
-function _drupal_mkdir_call($uri, $mode, $recursive, $context) {
-  if (is_null($context)) {
-    return mkdir($uri, $mode, $recursive);
-  }
-  else {
-    return mkdir($uri, $mode, $recursive, $context);
-  }
+  return \Drupal::service('file_system')->mkdir($uri, $mode, $recursive, $context);
 }
 
 /**
  * Removes a directory.
  *
- * PHP's rmdir() is broken on Windows, as it can fail to remove a directory
- * when it has a read-only flag set.
- *
- * @param $uri
- *   A URI or pathname.
- * @param $context
- *   Refer to http://php.net/manual/ref.stream.php
- *
- * @return
- *   Boolean TRUE on success, or FALSE on failure.
- *
- * @see rmdir()
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::rmdir().
  */
 function drupal_rmdir($uri, $context = NULL) {
-  $scheme = file_uri_scheme($uri);
-  if (!file_stream_wrapper_valid_scheme($scheme) && (substr(PHP_OS, 0, 3) == 'WIN')) {
-    chmod($uri, 0700);
-  }
-  if ($context) {
-    return rmdir($uri, $context);
-  }
-  else {
-    return rmdir($uri);
-  }
+  return \Drupal::service('file_system')->rmdir($uri, $context);
 }
 
 /**
  * Creates a file with a unique filename in the specified directory.
  *
- * PHP's tempnam() does not return a URI like we want. This function
- * will return a URI if given a URI, or it will return a filepath if
- * given a filepath.
- *
- * Compatibility: normal paths and stream wrappers.
- *
- * @param $directory
- *   The directory where the temporary filename will be created.
- * @param $prefix
- *   The prefix of the generated temporary filename.
- *   Note: Windows uses only the first three characters of prefix.
- *
- * @return
- *   The new temporary filename, or FALSE on failure.
- *
- * @see tempnam()
- * @see http://drupal.org/node/515192
- * @ingroup php_wrappers
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal\Core\File\FileSystem::tempnam().
  */
 function drupal_tempnam($directory, $prefix) {
-  $scheme = file_uri_scheme($directory);
-
-  if (file_stream_wrapper_valid_scheme($scheme)) {
-    $wrapper = file_stream_wrapper_get_instance_by_scheme($scheme);
-
-    if ($filename = tempnam($wrapper->getDirectoryPath(), $prefix)) {
-      return $scheme . '://' . drupal_basename($filename);
-    }
-    else {
-      return FALSE;
-    }
-  }
-  else {
-    // Handle as a normal tempnam() call.
-    return tempnam($directory, $prefix);
-  }
+  return \Drupal::service('file_system')->tempnam($directory, $prefix);
 }
 
 /**
@@ -1665,9 +1199,10 @@ function drupal_tempnam($directory, $prefix) {
  *   A string containing the path to the temporary directory.
  */
 function file_directory_temp() {
-  $config = \Drupal::config('system.file');
-  $temporary_directory = $config->get('path.temporary');
+  $temporary_directory = \Drupal::config('system.file')->get('path.temporary');
   if (empty($temporary_directory)) {
+    // Needs set up.
+    $config = \Drupal::configFactory()->getEditable('system.file');
     $temporary_directory = file_directory_os_temp();
 
     if (empty($temporary_directory)) {

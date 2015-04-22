@@ -6,3 +6,9 @@ drupal.book:
     - core/jquery
     - core/drupal
     - core/drupal.form
+
+navigation:
+  version: VERSION
+  css:
+    theme:
+      css/book.theme.css: {}

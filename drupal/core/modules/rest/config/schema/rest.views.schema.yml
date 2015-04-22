@@ -4,10 +4,6 @@ views.display.rest_export:
   type: views_display_path
   label: 'REST display options'
 
-views.row.data_entity:
-  type: views_row
-  label: 'Entity row'
-
 views.row.data_field:
   type: views_row
   label: 'Field row'
@@ -16,23 +12,23 @@ views.row.data_field:
       type: sequence
       label: 'Options'
       sequence:
-        - type: mapping
-          label: 'Row'
-          mapping:
-            alias:
-              type: string
-              label: 'Alias for ID'
-            raw_output:
-              type: boolean
-              label: 'Raw output for ID'
+        type: mapping
+        label: 'Row'
+        mapping:
+          alias:
+            type: string
+            label: 'Alias for ID'
+          raw_output:
+            type: boolean
+            label: 'Raw output for ID'
 
 views.style.serializer:
-  type: viwes_style
+  type: views_style
   label: 'Serialized output format'
   mapping:
     formats:
       type: sequence
       label: 'Formats'
       sequence:
-        - type: string
-          label: 'Format'
+        type: string
+        label: 'Format'

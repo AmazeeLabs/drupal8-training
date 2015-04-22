@@ -8,11 +8,12 @@
 namespace Drupal\block\Entity;
 
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Condition\ConditionPluginCollection;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\block\BlockPluginBag;
+use Drupal\block\BlockPluginCollection;
 use Drupal\block\BlockInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Entity\EntityWithPluginBagsInterface;
+use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 
 /**
@@ -31,24 +32,23 @@ use Drupal\Core\Entity\EntityStorageInterface;
  *     }
  *   },
  *   admin_permission = "administer blocks",
- *   fieldable = FALSE,
  *   entity_keys = {
  *     "id" = "id"
  *   },
  *   links = {
- *     "delete-form" = "entity.block.delete_form",
- *     "edit-form" = "entity.block.edit_form"
+ *     "delete-form" = "/admin/structure/block/manage/{block}/delete",
+ *     "edit-form" = "/admin/structure/block/manage/{block}"
  *   }
  * )
  */
-class Block extends ConfigEntityBase implements BlockInterface, EntityWithPluginBagsInterface {
+class Block extends ConfigEntityBase implements BlockInterface, EntityWithPluginCollectionInterface {
 
   /**
    * The ID of the block.
    *
    * @var string
    */
-  public $id;
+  protected $id;
 
   /**
    * The plugin instance settings.
@@ -69,7 +69,7 @@ class Block extends ConfigEntityBase implements BlockInterface, EntityWithPlugin
    *
    * @var int
    */
-  public $weight;
+  protected $weight;
 
   /**
    * The plugin instance ID.
@@ -79,41 +79,107 @@ class Block extends ConfigEntityBase implements BlockInterface, EntityWithPlugin
   protected $plugin;
 
   /**
-   * The plugin bag that holds the block plugin for this entity.
+   * The visibility settings for this block.
    *
-   * @var \Drupal\block\BlockPluginBag
+   * @var array
    */
-  protected $pluginBag;
+  protected $visibility = [];
+
+  /**
+   * The plugin collection that holds the block plugin for this entity.
+   *
+   * @var \Drupal\block\BlockPluginCollection
+   */
+  protected $pluginCollection;
+
+  /**
+   * The available contexts for this block and its visibility conditions.
+   *
+   * @var array
+   */
+  protected $contexts = [];
+
+  /**
+   * The visibility collection.
+   *
+   * @var \Drupal\Core\Condition\ConditionPluginCollection
+   */
+  protected $visibilityCollection;
+
+  /**
+   * The condition plugin manager.
+   *
+   * @var \Drupal\Core\Executable\ExecutableManagerInterface
+   */
+  protected $conditionPluginManager;
+
+  /**
+   * The theme that includes the block plugin for this entity.
+   *
+   * @var string
+   */
+  protected $theme;
 
   /**
    * {@inheritdoc}
    */
   public function getPlugin() {
-    return $this->getPluginBag()->get($this->plugin);
+    return $this->getPluginCollection()->get($this->plugin);
   }
 
   /**
-   * Encapsulates the creation of the block's PluginBag.
+   * Encapsulates the creation of the block's LazyPluginCollection.
    *
-   * @return \Drupal\Component\Plugin\PluginBag
-   *   The block's plugin bag.
+   * @return \Drupal\Component\Plugin\LazyPluginCollection
+   *   The block's plugin collection.
    */
-  protected function getPluginBag() {
-    if (!$this->pluginBag) {
-      $this->pluginBag = new BlockPluginBag(\Drupal::service('plugin.manager.block'), $this->plugin, $this->get('settings'), $this->id());
+  protected function getPluginCollection() {
+    if (!$this->pluginCollection) {
+      $this->pluginCollection = new BlockPluginCollection(\Drupal::service('plugin.manager.block'), $this->plugin, $this->get('settings'), $this->id());
     }
-    return $this->pluginBag;
+    return $this->pluginCollection;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getPluginBags() {
-    return array('settings' => $this->getPluginBag());
+  public function getPluginCollections() {
+    return [
+      'settings' => $this->getPluginCollection(),
+      'visibility' => $this->getVisibilityConditions(),
+    ];
   }
 
   /**
-   * Overrides \Drupal\Core\Entity\Entity::label();
+   * {@inheritdoc}
+   */
+  public function getPluginId() {
+    return $this->plugin;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRegion() {
+    return $this->region;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTheme() {
+    return $this->theme;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getWeight() {
+    return $this->weight;
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function label() {
     $settings = $this->get('settings');
@@ -131,13 +197,13 @@ class Block extends ConfigEntityBase implements BlockInterface, EntityWithPlugin
    */
   public static function sort(ConfigEntityInterface $a, ConfigEntityInterface $b) {
     // Separate enabled from disabled.
-    $status = $b->get('status') - $a->get('status');
-    if ($status) {
+    $status = (int) $b->status() - (int) $a->status();
+    if ($status !== 0) {
       return $status;
     }
     // Sort by weight, unless disabled.
-    if ($a->get('region') != static::BLOCK_REGION_NONE) {
-      $weight = $a->get('weight') - $b->get('weight');
+    if ($a->getRegion() != static::BLOCK_REGION_NONE) {
+      $weight = $a->getWeight() - $b->getWeight();
       if ($weight) {
         return $weight;
       }
@@ -157,21 +223,116 @@ class Block extends ConfigEntityBase implements BlockInterface, EntityWithPlugin
 
   /**
    * {@inheritdoc}
-   *
-   * Block configuration entities are a special case: one block entity stores
-   * the placement of one block in one theme. Instead of using an entity type-
-   * specific list cache tag like most entities, use the cache tag of the theme
-   * this block is placed in instead.
    */
-  public function getListCacheTags() {
-    return array('theme' => $this->theme);
+  public function postSave(EntityStorageInterface $storage, $update = TRUE) {
+    parent::postSave($storage, $update);
+
+    // Entity::postSave() calls Entity::invalidateTagsOnSave(), which only
+    // handles the regular cases. The Block entity has one special case: a
+    // newly created block may *also* appear on any page in the current theme,
+    // so we must invalidate the associated block's cache tag (which includes
+    // the theme cache tag).
+    if (!$update) {
+      Cache::invalidateTags($this->getCacheTags());
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setContexts(array $contexts) {
+    $this->contexts = $contexts;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getContexts() {
+    return $this->contexts;
   }
 
   /**
    * {@inheritdoc}
    */
   public function getVisibility() {
-    return $this->getPlugin()->getVisibilityConditions()->getConfiguration();
+    return $this->getVisibilityConditions()->getConfiguration();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setVisibilityConfig($instance_id, array $configuration) {
+    $conditions = $this->getVisibilityConditions();
+    if (!$conditions->has($instance_id)) {
+      $configuration['id'] = $instance_id;
+      $conditions->addInstanceId($instance_id, $configuration);
+    }
+    else {
+      $conditions->setInstanceConfiguration($instance_id, $configuration);
+    }
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getVisibilityConditions() {
+    if (!isset($this->visibilityCollection)) {
+      $this->visibilityCollection = new ConditionPluginCollection($this->conditionPluginManager(), $this->get('visibility'));
+    }
+    return $this->visibilityCollection;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getVisibilityCondition($instance_id) {
+    return $this->getVisibilityConditions()->get($instance_id);
+  }
+
+  /**
+   * Gets the condition plugin manager.
+   *
+   * @return \Drupal\Core\Executable\ExecutableManagerInterface
+   *   The condition plugin manager.
+   */
+  protected function conditionPluginManager() {
+    $this->conditionPluginManager;
+    if (!isset($this->conditionPluginManager)) {
+      $this->conditionPluginManager = \Drupal::service('plugin.manager.condition');
+    }
+    return $this->conditionPluginManager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setRegion($region) {
+    $this->region = $region;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setWeight($weight) {
+    $this->weight = $weight;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createDuplicateBlock($new_id = NULL, $new_theme = NULL) {
+    $duplicate = parent::createDuplicate();
+    if (!empty($new_id)) {
+      $duplicate->id = $new_id;
+    }
+    if (!empty($new_theme)) {
+      $duplicate->theme = $new_theme;
+    }
+    return $duplicate;
   }
 
 }

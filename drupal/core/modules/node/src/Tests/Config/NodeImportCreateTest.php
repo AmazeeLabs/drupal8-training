@@ -8,27 +8,29 @@
 namespace Drupal\node\Tests\Config;
 
 use Drupal\field\Entity\FieldConfig;
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\node\Entity\NodeType;
+use Drupal\simpletest\KernelTestBase;
 
 /**
  * Create content types during config create method invocation.
  *
  * @group node
  */
-class NodeImportCreateTest extends DrupalUnitTestBase {
+class NodeImportCreateTest extends KernelTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('node', 'entity', 'field', 'text', 'system', 'user');
+  public static $modules = array('node', 'field', 'text', 'system', 'user', 'entity_reference');
 
   /**
    * Set the default field storage backend for fields created during tests.
    */
   protected function setUp() {
     parent::setUp();
+    $this->installSchema('system', array('router'));
     $this->installEntitySchema('user');
 
     // Set default storage backend.
@@ -42,12 +44,12 @@ class NodeImportCreateTest extends DrupalUnitTestBase {
     $node_type_id = 'default';
 
     // Check that the content type does not exist yet.
-    $this->assertFalse(entity_load('node_type', $node_type_id));
+    $this->assertFalse(NodeType::load($node_type_id));
 
     // Enable node_test_config module and check that the content type
     // shipped in the module's default config is created.
-    $this->container->get('module_handler')->install(array('node_test_config'));
-    $node_type = entity_load('node_type', $node_type_id);
+    $this->container->get('module_installer')->install(array('node_test_config'));
+    $node_type = NodeType::load($node_type_id);
     $this->assertTrue($node_type, 'The default content type was created.');
   }
 
@@ -71,7 +73,7 @@ class NodeImportCreateTest extends DrupalUnitTestBase {
     $this->configImporter()->import();
 
     // Check that the content type was created.
-    $node_type = entity_load('node_type', $node_type_id);
+    $node_type = NodeType::load($node_type_id);
     $this->assertTrue($node_type, 'Import node type from staging was created.');
     $this->assertFalse(FieldConfig::loadByName('node', $node_type_id, 'body'));
   }

@@ -8,6 +8,7 @@
 namespace Drupal\node;
 
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
@@ -38,6 +39,17 @@ interface NodeStorageInterface extends EntityStorageInterface {
   public function userRevisionIds(AccountInterface $account);
 
   /**
+   * Counts the number of revisions in the default language.
+   *
+   * @param \Drupal\node\NodeInterface
+   *   The node entity.
+   *
+   * @return int
+   *   The number of revisions in the default language.
+   */
+  public function countDefaultLanguageRevisions(NodeInterface $node);
+
+  /**
    * Updates all nodes of one type to be of another type.
    *
    * @param string $old_type
@@ -53,8 +65,8 @@ interface NodeStorageInterface extends EntityStorageInterface {
   /**
    * Unsets the language for all nodes with the given language.
    *
-   * @param $language
+   * @param \Drupal\Core\Language\LanguageInterface $language
    *  The language object.
    */
-  public function clearRevisionsLanguage($language);
+  public function clearRevisionsLanguage(LanguageInterface $language);
 }
