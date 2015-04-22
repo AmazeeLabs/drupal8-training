@@ -2,7 +2,7 @@
 package "python-software-properties"
 
 # Add Ondrej's php5 repository
-execute "Add Ondrej's php5 repository" do
+execute "Add Ondrej's php5.5 repository" do
   command "add-apt-repository ppa:ondrej/php5"
   ignore_failure true
 end
