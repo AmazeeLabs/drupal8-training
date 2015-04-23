@@ -1,6 +1,6 @@
-training_upcoming_movies:
+training.content:
   path: 'upcoming-movies'
   defaults:
-    _content: '\Drupal\training\Controller\TrainingController::upcomingMovies'
+    _controller: '\Drupal\training\Controller\TrainingController::content'
   requirements:
-    _access: 'TRUE'
+    _permission: 'access content'

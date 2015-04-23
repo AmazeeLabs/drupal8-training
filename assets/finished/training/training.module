@@ -5,8 +5,9 @@
  *
  * Note: API key is ppznkqtt59k8kcmzratmjfk9
  */
-
 const ROTTENTOMATOES_API_KEY = 'ppznkqtt59k8kcmzratmjfk9';
+
+use Drupal\Core\Url;
 
 /**
  * Uses the Rotten Tomatoes API to get the top upcoming movies (US).
@@ -39,7 +40,8 @@ function training_upcoming_movies() {
       $movie->ratings->critics_score = '0';
     }
     // Create each item as a translatable link.
-    $list[] = t('!link: @score% @rating', array('!link' => l($movie->title, 'http://rottentomatoes.com/m/' . $movie->id), '@score' => $movie->ratings->critics_score, '@rating' => $movie->ratings->critics_rating));
+    $url = Url::fromUri('http://rottentomatoes.com/m/' . $movie->id);
+    $list[] = t('!link: @score% @rating', array('!link' => \Drupal::l($movie->title, $url), '@score' => $movie->ratings->critics_score, '@rating' => $movie->ratings->critics_rating));
   }
 
   return $list;
