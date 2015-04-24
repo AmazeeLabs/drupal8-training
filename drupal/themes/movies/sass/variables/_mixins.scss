@@ -1,0 +1,15 @@
+
+// Button styles
+// =============================================================================
+@mixin green-button {
+  background: $green;
+  border: 0 none;
+  color: #fff !important;
+  @include border-radius(3px);
+  padding: 4px 12px;
+  text-transform: uppercase;
+  @include transition(all 0.2s ease-in-out);
+  &:hover {
+    background: $bright-green;
+  }
+}

@@ -1,0 +1,47 @@
+
+body {
+  background: #f1f1f1 url(../images/site-bg.jpg);
+  padding: 0 0 170px;
+}
+.overlay-bg {
+  background: url(../images/panic.jpg);
+  background-size: cover;
+  background-repeat: no-repeat;
+  position: relative;
+  background-position: center bottom;
+  min-height: 100%;
+  display: none;
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  .overlay-content {
+    background: #fbfbfb;
+    border: 1px solid #000;
+    height: 300px;
+    left: 50%;
+    margin: -150px 0 0 -300px;
+    position: absolute;
+    text-align: center;
+    top: 50%;
+    width: 600px;
+    @include border-radius(3px);
+    img {
+      display: inline-block;
+      margin-top: 30px;
+    }
+  }
+  .close-btn {
+    cursor: pointer;
+    display: inline-block;
+    float: right;
+    @include green-button;
+    padding: 10px 20px;
+    position: absolute;
+    z-index: 1001;
+    bottom: 20px;
+    right: 20px;
+  }
+}
