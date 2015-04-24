@@ -1,5 +1,6 @@
-name: Training
-type: module
+name: Training Module
 description: 'Training code for Drupalistas'
 package: Training
+type: module
+version: 1.0
 core: 8.x
