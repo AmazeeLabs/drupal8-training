@@ -131,6 +131,11 @@ input[type="password"] {
   border: 1px solid #cacaca;
   padding: 10px; }
 
+/* line 2, ../sass/base/_media.scss */
+img {
+  height: auto;
+  max-width: 100%; }
+
 /* line 4, ../sass/base/_typography.scss */
 html {
   font-size: 62.5%; }
@@ -194,10 +199,9 @@ ul.inline {
     margin-left: 0.89286%;
     margin-right: 0.89286%;
     margin-left: 8.03571%;
-    padding: 0 30px 0 0;
-    text-transform: uppercase; } }
+    padding: 0 30px 0 0; } }
 
-/* line 12, ../sass/components/_header.scss */
+/* line 11, ../sass/components/_header.scss */
 .site-name {
   background: #000;
   font-size: 24px;
@@ -207,16 +211,16 @@ ul.inline {
   line-height: 3.0rem;
   font-weight: normal; }
   @media (min-width: 481px) {
-    /* line 12, ../sass/components/_header.scss */
+    /* line 11, ../sass/components/_header.scss */
     .site-name {
       text-align: right; } }
-  /* line 23, ../sass/components/_header.scss */
+  /* line 22, ../sass/components/_header.scss */
   .site-name a {
     background: #000;
     color: #fff;
     float: left;
     padding: 30px; }
-    /* line 28, ../sass/components/_header.scss */
+    /* line 27, ../sass/components/_header.scss */
     .site-name a:hover {
       color: #fff; }
 
@@ -242,17 +246,19 @@ ul.inline {
   background-image: url(../images/star-dark-retina.png); }
 
 /* line 21, ../sass/components/_movies.scss */
-.view-mode-teaser.node-movie-review {
+.node--view-mode-teaser.node--type-movie-review {
   background-color: #f9f9f6;
+  float: left;
   margin: 0 0 30px;
   padding: 20px;
-  position: relative; }
+  position: relative;
+  width: 100%; }
   @media (min-width: 769px) {
     /* line 21, ../sass/components/_movies.scss */
-    .view-mode-teaser.node-movie-review {
+    .node--view-mode-teaser.node--type-movie-review {
       padding: 0; } }
-  /* line 29, ../sass/components/_movies.scss */
-  .view-mode-teaser.node-movie-review .image {
+  /* line 31, ../sass/components/_movies.scss */
+  .node--view-mode-teaser.node--type-movie-review .image {
     -moz-transition: all 0.4s ease-in-out;
     -o-transition: all 0.4s ease-in-out;
     -webkit-transition: all 0.4s ease-in-out;
@@ -260,39 +266,37 @@ ul.inline {
     -webkit-backface-visibility: hidden;
     -webkit-transform: translateZ(0) scale(1, 1); }
     @media (min-width: 769px) {
-      /* line 29, ../sass/components/_movies.scss */
-      .view-mode-teaser.node-movie-review .image {
+      /* line 31, ../sass/components/_movies.scss */
+      .node--view-mode-teaser.node--type-movie-review .image {
         float: left; } }
-    /* line 36, ../sass/components/_movies.scss */
-    .view-mode-teaser.node-movie-review .image img {
+    /* line 38, ../sass/components/_movies.scss */
+    .node--view-mode-teaser.node--type-movie-review .image img {
       display: block; }
-    /* line 39, ../sass/components/_movies.scss */
-    .view-mode-teaser.node-movie-review .image:hover {
+    /* line 41, ../sass/components/_movies.scss */
+    .node--view-mode-teaser.node--type-movie-review .image:hover {
       filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=85);
       opacity: 0.85; }
   @media (min-width: 769px) {
-    /* line 43, ../sass/components/_movies.scss */
-    .view-mode-teaser.node-movie-review .content {
-      bottom: 0;
-      left: 180px;
-      padding: 0 30px;
-      position: absolute;
-      right: 0;
-      top: 0; } }
-  /* line 53, ../sass/components/_movies.scss */
-  .view-mode-teaser.node-movie-review h2 {
+    /* line 45, ../sass/components/_movies.scss */
+    .node--view-mode-teaser.node--type-movie-review .content {
+      overflow: hidden;
+      padding: 0 30px; } }
+  /* line 51, ../sass/components/_movies.scss */
+  .node--view-mode-teaser.node--type-movie-review h2 {
     text-transform: uppercase;
     margin: 26px 0 10px; }
+  /* line 55, ../sass/components/_movies.scss */
+  .node--view-mode-teaser.node--type-movie-review .field-name-body {
+    clear: both; }
   @media (min-width: 769px) {
-    /* line 57, ../sass/components/_movies.scss */
-    .view-mode-teaser.node-movie-review .bottom {
-      bottom: 24px;
-      left: 0;
-      padding: 0 30px;
-      position: absolute;
+    /* line 58, ../sass/components/_movies.scss */
+    .node--view-mode-teaser.node--type-movie-review .bottom {
+      clear: both;
+      float: left;
+      padding: 18px 0 30px;
       width: 100%; } }
   /* line 66, ../sass/components/_movies.scss */
-  .view-mode-teaser.node-movie-review .green-button {
+  .node--view-mode-teaser.node--type-movie-review .green-button {
     float: right; }
 
 /* line 71, ../sass/components/_movies.scss */
@@ -308,20 +312,28 @@ ul.inline {
       margin-right: 8.03571%;
       padding: 0; } }
 
-@media (min-width: 769px) {
-  /* line 2, ../sass/components/_sidebar.scss */
-  .l-sidebar {
-    width: 26.78571%;
-    float: left;
-    margin-left: 0.89286%;
-    margin-right: 0.89286%;
-    margin-left: 8.03571%;
-    padding-right: 30px; } }
-/* line 8, ../sass/components/_sidebar.scss */
-.l-sidebar .block {
-  background: #fcdd62;
-  padding: 30px;
-  margin-bottom: 30px; }
-  /* line 12, ../sass/components/_sidebar.scss */
-  .l-sidebar .block h2 {
-    margin-top: 0; }
+/* line 80, ../sass/components/_movies.scss */
+.feed-icons {
+  display: none; }
+
+/* line 2, ../sass/components/_sidebar.scss */
+.l-sidebar {
+  clear: both; }
+  @media (min-width: 769px) {
+    /* line 2, ../sass/components/_sidebar.scss */
+    .l-sidebar {
+      clear: none;
+      width: 26.78571%;
+      float: left;
+      margin-left: 0.89286%;
+      margin-right: 0.89286%;
+      margin-left: 8.03571%;
+      padding-right: 30px; } }
+  /* line 10, ../sass/components/_sidebar.scss */
+  .l-sidebar .block {
+    background: #fcdd62;
+    padding: 30px;
+    margin-bottom: 30px; }
+    /* line 14, ../sass/components/_sidebar.scss */
+    .l-sidebar .block h2 {
+      margin-top: 0; }

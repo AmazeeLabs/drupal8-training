@@ -1,5 +1,10 @@
-movies-corescripts:
-  version: 1.0
+global-styles:
+  version: 1.x
+  css:
+    theme:
+      css/styles.css: {}
+global-scripts:
+  version: 1.x
   js:
     js/movies.behaviors.js: {}
   dependencies:

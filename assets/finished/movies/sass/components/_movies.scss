@@ -18,11 +18,13 @@
 .dark {
   background-image: url(../images/star-dark-retina.png);
 }
-.view-mode-teaser.node-movie-review {
+.node--view-mode-teaser.node--type-movie-review {
   background-color: $beige;
+  float: left;
   margin: 0 0 30px;
   padding: 20px;
   position: relative;
+  width: 100%;
   @include breakpoint($desktop-up) {
     padding: 0;
   }
@@ -42,24 +44,22 @@
   }
   .content {
     @include breakpoint($desktop-up) {
-      bottom: 0;
-      left: 180px;
+      overflow: hidden;
       padding: 0 30px;
-      position: absolute;
-      right: 0;
-      top: 0;
     }
   }
   h2 {
     text-transform: uppercase;
     margin: 26px 0 10px;
   }
+  .field-name-body {
+    clear: both;
+  }
   .bottom {
     @include breakpoint($desktop-up) {
-      bottom: 24px;
-      left: 0;
-      padding: 0 30px;
-      position: absolute;
+      clear: both;
+      float: left;
+      padding: 18px 0 30px;
       width: 100%;
     }
   }
@@ -75,4 +75,8 @@
     @include post(1);
     padding: 0;
   }
+}
+
+.feed-icons {
+  display: none;
 }

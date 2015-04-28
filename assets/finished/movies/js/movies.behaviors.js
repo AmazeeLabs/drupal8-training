@@ -1,23 +1,30 @@
-(function ($, window) {
-
-  "use strict";
+(function($) {
 
   /*
-  * Konami code
-  * */
+   * Capitalize the Site Title
+   */
+  Drupal.behaviors.javascriptTest = {
+    attach: function (context, settings) {
+      // alert('Javascript is working!');
+      $('#site-header a').css('text-transform', 'uppercase');
+    }
+  };
+
+  /*
+   * Hidden Easter Egg
+   */
   Drupal.behaviors.konamiCode = {
     attach: function (context, settings) {
-      var audio = new Audio("themes/movies/audio/magicword.wav");
+      var audio = new Audio("/themes/movies/audio/magicword.wav");
       audio.addEventListener('ended', function() {
         this.currentTime = 0;
         this.play();
       }, false);
-      // var secret = "777986736983"; // movies
-      var secret = "80798067798278";
+      var secret = "80798067798278"; // popcorn
       var input = "";
       var timer;
 
-      // The following function sets a timer that checks for user input. You can change the variation in how long the user has to input by changing the number in ‘setTimeout.’ In this case, it’s set for 500 milliseconds or ½ second.
+      // The following function sets a timer that checks for user input.
       $(document).keyup(function(e) {
          input += e.which;
          clearTimeout(timer);
@@ -29,8 +36,6 @@
       function check_input() {
         if(input == secret) {
           audio.play();
-          // $('.overlay-bg').css({ display: "block" });
-          // $('.overlay-bg').fadeIn("slow");
           $('.overlay-bg').fadeIn("fast");
         }
       };
@@ -41,4 +46,4 @@
     }
   };
 
-})(jQuery, window);
+})(jQuery);
