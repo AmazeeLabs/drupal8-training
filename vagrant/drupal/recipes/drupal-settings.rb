@@ -21,9 +21,9 @@ directory "/home/vagrant/public_html/drupal/sites/default/files" do
 end
 
 
-%w[ files/config_vagrant files/config_vagrant/staging].each do |dir|
+%w[ files/config_vagrant files/config_vagrant/staging files/config_vagrant/active].each do |dir|
   directory "/home/vagrant/public_html/drupal/sites/default/#{dir}" do
-    mode 00777
+    mode "0777"
   end
 end
 
