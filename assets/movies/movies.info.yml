@@ -1,0 +1,11 @@
+name: Movies
+type: theme
+description: An Amazee Labs demo theme for the 'Drupal 8 for Drupalistas' training — DrupalCon Los Angeles 2015.
+core: 8.x
+libraries:
+  - movies/global-styles
+regions:
+  header: Header
+  content: Content
+  sidebar: Sidebar
+  footer: Footer

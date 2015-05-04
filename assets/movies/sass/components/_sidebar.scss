@@ -1,0 +1,18 @@
+
+.l-sidebar {
+  clear: both;
+  @include breakpoint($desktop-up) {
+    clear: none;
+    @include span(first 4 of 14);
+    @include pre(1);
+    padding-right: 30px;
+  }
+  .block {
+    background: $yellow;
+    padding: 30px;
+    margin-bottom: 30px;
+    h2 {
+      margin-top: 0;
+    }
+  }
+}
