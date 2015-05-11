@@ -17,16 +17,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vm.customize ["modifyvm", :id, "--ioapic", "on"]
   end
 
-  if not RUBY_PLATFORM.downcase.include?("mswin")
-    config.vm.provider :virtualbox do |vm|
-      vm.customize ["modifyvm", :id, "--cpus", `awk "/^processor/ {++n} END {print n}" /proc/cpuinfo 2> /dev/null || sh -c 'sysctl hw.logicalcpu 2> /dev/null || echo ": 2"' | awk \'{print \$2}\' `.chomp ]
-    end
-  else
-    config.vm.provider :virtualbox do |vm|
-      vm.customize ["modifyvm", :id, "--cpus", "2"]
-    end
-  end
-
   config.vm.provision :chef_solo do |chef|
     chef.cookbooks_path = "vagrant"
     chef.log_level = ENV['CHEF_LOG'] || "info"
